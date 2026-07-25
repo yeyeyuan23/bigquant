@@ -18,7 +18,8 @@ from bigalpha2026.candidates.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.combinations import (
     fixed_rank_blend,
     positive_ic_weights,
-    walk_forward_hist_gradient_boosting,
+    tree_model_config,
+    walk_forward_tree_boosting,
 )
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
@@ -287,22 +288,23 @@ def main() -> None:
         name: fixed_rank_blend(component_frames, weights)
         for name, weights in method_weights.items()
     }
-    tree_config = {
-        "model": "HistGradientBoostingRegressor",
-        "learning_rate": 0.05,
-        "max_iter": 100,
-        "max_leaf_nodes": 7,
-        "min_samples_leaf": 100,
-        "l2_regularization": 1.0,
-        "random_state": 20260726,
-        "training": "expanding_window",
+    tree_backends = {
+        "hist_gbdt": "sklearn_hist",
+        "lightgbm": "lightgbm",
+        "xgboost": "xgboost",
     }
-    methods["hist_gbdt"] = walk_forward_hist_gradient_boosting(
-        panel,
-        labels,
-        feature_columns=MEMBERS,
-        prediction_years=(2020, 2021, 2022, 2023),
-    )
+    tree_configs = {
+        method: tree_model_config(backend)
+        for method, backend in tree_backends.items()
+    }
+    for method, backend in tree_backends.items():
+        methods[method] = walk_forward_tree_boosting(
+            panel,
+            labels,
+            feature_columns=MEMBERS,
+            prediction_years=(2020, 2021, 2022, 2023),
+            backend=backend,
+        )
 
     enet_candidates: list[dict[str, object]] = []
     for alpha in (1e-6, 5e-6, 1e-5, 5e-5, 1e-4):
@@ -407,7 +409,7 @@ def main() -> None:
         )
         # INT-001 was frozen and submitted before the tree baseline was added.
         # Record its evidence without allowing a post-submission method switch.
-        eligible_for_selection = method != "hist_gbdt"
+        eligible_for_selection = method not in tree_backends
         admitted = passed_metrics and eligible_for_selection
         selection_score = validation_ic + 0.25 * development_ic
         decision_rows.append(
@@ -428,7 +430,7 @@ def main() -> None:
                 "weights": (
                     method_weights[method]
                     if method in method_weights
-                    else tree_config
+                    else tree_configs[method]
                 ),
             }
         )
@@ -450,7 +452,7 @@ def main() -> None:
             "train_2019_2021_weights": best_enet["train_weights"],
             "refit_2019_2022_weights": final_enet_weights,
         },
-        "post_freeze_tree_baseline": tree_config,
+        "post_freeze_tree_baselines": tree_configs,
         "upload_authorized_by_user": True,
         "upload_ready": False,
     }

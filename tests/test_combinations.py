@@ -5,7 +5,8 @@ import pandas as pd
 from bigalpha2026.combinations import (
     fixed_rank_blend,
     positive_ic_weights,
-    walk_forward_hist_gradient_boosting,
+    tree_model_config,
+    walk_forward_tree_boosting,
 )
 from bigalpha2026.research_policy import fixed_weight_rank_combination
 
@@ -68,16 +69,27 @@ class CombinationTest(unittest.TestCase):
         )
         labels = panel[["date", "instrument"]].copy()
         labels["ret_close_to_close"] = panel["FR-002"] / 1000
-        result = walk_forward_hist_gradient_boosting(
-            panel,
-            labels,
-            feature_columns=("FR-002", "HF-001"),
-            prediction_years=(2020, 2021),
-        )
-        self.assertEqual(set(result["date"].dt.year), {2020, 2021})
-        self.assertEqual(list(result.columns), ["date", "instrument", "factor"])
-        self.assertFalse(result.duplicated(["date", "instrument"]).any())
-        self.assertTrue(result["factor"].between(-1, 1).all())
+        for backend in ("sklearn_hist", "lightgbm", "xgboost"):
+            with self.subTest(backend=backend):
+                result = walk_forward_tree_boosting(
+                    panel,
+                    labels,
+                    feature_columns=("FR-002", "HF-001"),
+                    prediction_years=(2020, 2021),
+                    backend=backend,
+                )
+                self.assertEqual(set(result["date"].dt.year), {2020, 2021})
+                self.assertEqual(
+                    list(result.columns), ["date", "instrument", "factor"]
+                )
+                self.assertFalse(result.duplicated(["date", "instrument"]).any())
+                self.assertTrue(result["factor"].between(-1, 1).all())
+
+    def test_tree_model_configs_are_shallow_and_deterministic(self):
+        for backend in ("sklearn_hist", "lightgbm", "xgboost"):
+            config = tree_model_config(backend)
+            self.assertEqual(config["random_state"], 20260726)
+            self.assertEqual(config["training"], "expanding_window")
 
 
 if __name__ == "__main__":
