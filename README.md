@@ -1,45 +1,32 @@
-# BigAlpha 2026 双因子研究工程
+# BigAlpha 2026 因子研究工程
 
-本工程实现两个独立的日频参赛因子：
+当前工程只保留已登记候选、共享数据合同、评价规则和最小验证。后续工作以 [因子选择与评估执行计划](docs/factor_research_plan.md) 为唯一主流程。
 
-1. `hf_pressure_underreaction`：持续盘口压力与价格反应不足；
-2. `quality_flow_interaction`：现金流质量与盘口确认。
+## 当前有效内容
 
-原始比赛数据只在 BigQuant AIStudio 内读取。本地测试使用合成数据，不保存或导出比赛数据。
-合成数据指标只验证代码和方向响应，不代表真实比赛表现。
+- `docs/factor_research_plan.md`：逐阶段研究、评价、冻结和提交计划；
+- `docs/candidate_registry.md`：已登记候选、数据准入状态和最小实现记录；
+- `docs/data_contract.md`：AIStudio 数据合同、字段和最小面板验收；
+- `src/bigalpha2026/candidates/`：只包含已经登记并通过数据核验的候选实现；
+- `src/bigalpha2026/evaluation.py`：与具体候选无关的通用评价工具；
+- `src/bigalpha2026/research_policy.py`：因子池、门槛、代表月份和组合规则的本地唯一事实来源。
 
-## 目录
+## 项目原则
 
-- `src/bigalpha2026/`：共享数据处理、两类因子、评估和约束搜索；
-- `submissions/`：可上传的独立 Notebook，每个 Notebook 只产生一个因子；
-- `research/constrained_search.ipynb`：平台内48候选约束搜索和筛选入口；
-- `scripts/build_submission_notebooks.py`：从受测源代码生成自包含 Notebook；
-- `scripts/run_synthetic_demo.py`：本地合成数据演示；
-- `tests/`：接口、防泄漏、累计字段、PIT 和评估测试；
-- `docs/ai_methodology.md`：AI赛道复现和审计记录模板。
+- 原始分钟、盘口和财务全表只在网页 BigQuant AIStudio 查询；
+- 同一数据族在 AIStudio 一次聚合为股票日 Parquet，并通过平台官方 UI 在下载配额内保存到本地；
+- 因子池、候选定义、历史评价、组合和消融全部由本地版本化规则执行；
+- 本地 Python 统一显式使用 `conda run --no-capture-output -n quant python`，不得调用系统 Python；
+- Parquet 基础面板按 `date、instrument` 唯一，特征、财务事件、标签和因子输出分层保存；
+- 未登记的候选不实现；
+- 严格研究准入与“平台链路冒烟提交”分开记录；冒烟提交不得被表述为已通过交易准入；
+- 每个提交 Notebook 只能包含一个因子入口；
+- `main()` 只能返回 `date、instrument、factor` 三列。
 
-## 本地验证
+## 当前结论
 
-```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
-PYTHONPATH=src python3 scripts/run_synthetic_demo.py
-python3 scripts/build_submission_notebooks.py --check
-```
+四类最小共享面板、2019—2023 年基础包、FR PIT 事件和 HF/OB 日频组件均已通过 AIStudio 与本地双重验收。八个基础候选的首轮评价已完成；随后按“先跑通最小组合链路”的独立目的，将 `FR-002` 与 `HF-001` 纳入组合准入观察池。
 
-## 平台提交
+规则组合和机器学习基线已经完整比较：单因子、等权秩、75/25、训练期 IC 加权和 Elastic Net 均走完同一评价接口。2022 选择期中等权秩组合 Rank IC 为 `0.00851`，高于 `FR-002` 的 `0.00610`；2023 只作确认，等权组合 Rank IC 为 `0.01710`。Elastic Net 流程可运行，但 2022 Rank IC 为 `-0.00404`，方向反转，未被选用。
 
-分别上传以下文件，不要将两个 Notebook 放进同一次提交：
-
-- `submissions/factor_hf_pressure.ipynb`
-- `submissions/factor_quality_interaction.ipynb`
-
-每个 Notebook 都定义：
-
-```python
-def main(datasources, start_date, end_date):
-    ...
-```
-
-并且只返回 `date、instrument、factor` 三列。
-
-研究Notebook不是提交文件，不能与因子Notebook放在同一次提交中。
+冻结的 `INT-001` 是 `FR-002/HF-001` 各 50% 的日度截面秩组合。它的 20 bps 成本后多空收益仍为负，因此不属于“可交易性已通过”的严格候选；本次仅作为平台端到端冒烟版本。2026-07-26，AIStudio 真实数据短窗返回 3,000 行、三列契约、无重复、覆盖率 100%，随后比赛网页确认提交成功。平台公榜分数仍以提交记录中的异步评估结果为准。
