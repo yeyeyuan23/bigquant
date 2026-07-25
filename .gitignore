@@ -8,4 +8,6 @@ dist/
 *.egg-info/
 reports/*.csv
 reports/*.json
-
+.DS_Store
+data/**/*.parquet
+data/manifest*.json

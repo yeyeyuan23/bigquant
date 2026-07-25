@@ -1,4 +1,8 @@
-"""Local replicas of the disclosed BigAlpha evaluation components."""
+"""AIStudio-side proxies for the disclosed BigAlpha evaluation components.
+
+This module may be syntax-checked locally, but meaningful metrics must be
+computed with real competition data in the web AIStudio environment.
+"""
 
 from __future__ import annotations
 
@@ -24,9 +28,15 @@ def daily_prices_from_bar(bar: pd.DataFrame) -> pd.DataFrame:
     frame["day"] = frame["date"].dt.normalize()
     frame["instrument"] = frame["instrument"].astype(str)
     frame = frame.sort_values(["instrument", "date"])
+    aggregation: dict[str, tuple[str, str]] = {
+        "open": ("open", "first"),
+        "close": ("close", "last"),
+    }
+    if "pre_close" in frame.columns:
+        aggregation["pre_close"] = ("pre_close", "first")
     return (
         frame.groupby(["day", "instrument"], sort=False)
-        .agg(open=("open", "first"), close=("close", "last"))
+        .agg(**aggregation)
         .reset_index()
         .rename(columns={"day": "date"})
         .sort_values(["instrument", "date"])
@@ -34,16 +44,61 @@ def daily_prices_from_bar(bar: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def build_return_labels(daily_prices: pd.DataFrame) -> pd.DataFrame:
-    """Build all plausible next-period labels disclosed only at a high level."""
+def build_return_labels(
+    daily_prices: pd.DataFrame,
+    trading_days: Iterable[object],
+) -> pd.DataFrame:
+    """Build next-CN-trading-day labels without skipping suspensions.
 
-    frame = daily_prices.copy().sort_values(["instrument", "date"])
-    group = frame.groupby("instrument", sort=False)
-    next_open = group["open"].shift(-1)
-    next_close = group["close"].shift(-1)
-    frame["ret_close_to_close"] = next_close / frame["close"] - 1.0
-    frame["ret_next_open_to_close"] = next_close / next_open - 1.0
-    frame["ret_close_to_next_open"] = next_open / frame["close"] - 1.0
+    The factor date is first mapped to the next market trading date. Prices are
+    joined only on that exact date, so a suspension produces missing labels
+    instead of silently extending the horizon to the stock's next traded day.
+    """
+
+    required = {"date", "instrument", "open", "close", "pre_close"}
+    missing = sorted(required.difference(daily_prices.columns))
+    if missing:
+        raise ValueError(f"daily_prices is missing required columns: {missing}")
+    calendar = pd.DatetimeIndex(pd.to_datetime(list(trading_days), errors="coerce"))
+    calendar = calendar.dropna().normalize().unique().sort_values()
+    if len(calendar) < 2:
+        raise ValueError("trading_days must contain at least two valid dates")
+    mapping = pd.DataFrame(
+        {
+            "date": calendar[:-1],
+            "next_date": calendar[1:],
+        }
+    )
+    current = daily_prices[["date", "instrument"]].copy()
+    current["date"] = pd.to_datetime(current["date"], errors="coerce").dt.normalize()
+    current["instrument"] = current["instrument"].astype(str)
+    frame = current.merge(mapping, on="date", how="left")
+    next_prices = daily_prices[
+        ["date", "instrument", "open", "close", "pre_close"]
+    ].copy()
+    next_prices["date"] = pd.to_datetime(
+        next_prices["date"],
+        errors="coerce",
+    ).dt.normalize()
+    next_prices["instrument"] = next_prices["instrument"].astype(str)
+    next_prices = next_prices.rename(
+        columns={
+            "date": "next_date",
+            "open": "next_open",
+            "close": "next_close",
+            "pre_close": "next_pre_close",
+        }
+    )
+    frame = frame.merge(next_prices, on=["next_date", "instrument"], how="left")
+    frame["ret_close_to_close"] = (
+        frame["next_close"] / frame["next_pre_close"] - 1.0
+    )
+    frame["ret_next_open_to_close"] = (
+        frame["next_close"] / frame["next_open"] - 1.0
+    )
+    frame["ret_close_to_next_open"] = (
+        frame["next_open"] / frame["next_pre_close"] - 1.0
+    )
     return frame[["date", "instrument", *LABEL_COLUMNS]]
 
 
@@ -78,23 +133,57 @@ def preprocess_factor(
     exp = exposures.copy()
     exp["date"] = pd.to_datetime(exp["date"], errors="coerce").dt.normalize()
     frame = frame.merge(exp, on=["date", "instrument"], how="left")
-    exposure_columns = [
+    numeric_columns = [
         column
         for column in exp.columns
         if column not in {"date", "instrument"}
         and pd.api.types.is_numeric_dtype(exp[column])
     ]
-    if not exposure_columns:
+    if "SIZE" in numeric_columns and "float_market_cap" in numeric_columns:
+        numeric_columns.remove("float_market_cap")
+    categorical_columns = [
+        column
+        for column in exp.columns
+        if column not in {"date", "instrument"}
+        and (
+            isinstance(exp[column].dtype, pd.CategoricalDtype)
+            or pd.api.types.is_object_dtype(exp[column])
+            or pd.api.types.is_string_dtype(exp[column])
+        )
+    ]
+    if not numeric_columns and not categorical_columns:
         return frame[["date", "instrument", "factor"]]
 
     residuals = pd.Series(np.nan, index=frame.index, dtype=float)
     for _, indices in frame.groupby("date", sort=False).groups.items():
         block = frame.loc[indices]
-        valid = block["factor"].notna() & block[exposure_columns].notna().all(axis=1)
-        if valid.sum() <= len(exposure_columns) + 1:
+        valid = block["factor"].notna()
+        if numeric_columns:
+            valid &= block[numeric_columns].notna().all(axis=1)
+        if categorical_columns:
+            valid &= block[categorical_columns].notna().all(axis=1)
+        if not valid.any():
             residuals.loc[indices] = block["factor"]
             continue
-        x = block.loc[valid, exposure_columns].to_numpy(dtype=float)
+        design_parts: list[np.ndarray] = []
+        if numeric_columns:
+            design_parts.append(block.loc[valid, numeric_columns].to_numpy(dtype=float))
+        if categorical_columns:
+            dummies = pd.get_dummies(
+                block.loc[valid, categorical_columns].astype("string"),
+                drop_first=True,
+                dtype=float,
+            )
+            if not dummies.empty:
+                design_parts.append(dummies.to_numpy(dtype=float))
+        x = (
+            np.column_stack(design_parts)
+            if design_parts
+            else np.empty((int(valid.sum()), 0))
+        )
+        if valid.sum() <= x.shape[1] + 1:
+            residuals.loc[indices] = block["factor"]
+            continue
         x = np.column_stack([np.ones(len(x)), x])
         y = block.loc[valid, "factor"].to_numpy(dtype=float)
         beta, *_ = np.linalg.lstsq(x, y, rcond=None)
@@ -148,6 +237,106 @@ def long_short_returns(
     return merged.groupby("date", sort=False).apply(one_day, include_groups=False)
 
 
+def turnover_adjusted_long_short_returns(
+    merged: pd.DataFrame,
+    factor_column: str = "factor",
+    label_column: str = "ret_close_to_close",
+    quantiles: int = 5,
+    one_way_cost_bps: int = 0,
+    segment_gap_days: int = 15,
+) -> pd.DataFrame:
+    """Return gross/net long-short returns and explicit one-way turnover.
+
+    The portfolio is one dollar long the top quantile and one dollar short the
+    bottom quantile. A representative-month gap resets the portfolio to cash;
+    entry and exit trades are both charged at the supplied one-way cost.
+    """
+
+    blocks: list[tuple[pd.Timestamp, pd.Series, float]] = []
+    for date, block in merged.groupby("date", sort=True):
+        valid = block[["instrument", factor_column, label_column]].dropna()
+        if len(valid) < quantiles * 2:
+            continue
+        ranks = valid[factor_column].rank(pct=True, method="average")
+        top = valid.loc[ranks > 1.0 - 1.0 / quantiles]
+        bottom = valid.loc[ranks <= 1.0 / quantiles]
+        if top.empty or bottom.empty:
+            continue
+        weights = pd.concat(
+            [
+                pd.Series(1.0 / len(top), index=top["instrument"].astype(str)),
+                pd.Series(-1.0 / len(bottom), index=bottom["instrument"].astype(str)),
+            ]
+        ).groupby(level=0).sum()
+        returns = valid.set_index(valid["instrument"].astype(str))[label_column]
+        gross = float((weights * returns.reindex(weights.index)).sum())
+        blocks.append((pd.Timestamp(date), weights, gross))
+
+    rows: list[dict[str, float | pd.Timestamp]] = []
+    previous = pd.Series(dtype=float)
+    for index, (date, weights, gross) in enumerate(blocks):
+        if index > 0 and (date - blocks[index - 1][0]).days > segment_gap_days:
+            previous = pd.Series(dtype=float)
+        union = weights.index.union(previous.index)
+        turnover = float(
+            (
+                weights.reindex(union, fill_value=0.0)
+                - previous.reindex(union, fill_value=0.0)
+            )
+            .abs()
+            .sum()
+        )
+        is_segment_end = (
+            index == len(blocks) - 1
+            or (blocks[index + 1][0] - date).days > segment_gap_days
+        )
+        if is_segment_end:
+            turnover += float(weights.abs().sum())
+        cost = turnover * one_way_cost_bps / 10_000.0
+        rows.append(
+            {
+                "date": date,
+                "gross_return": gross,
+                "turnover": turnover,
+                "cost": cost,
+                "net_return": gross - cost,
+            }
+        )
+        previous = weights
+    return pd.DataFrame(rows)
+
+
+def quantile_group_returns(
+    merged: pd.DataFrame,
+    factor_column: str = "factor",
+    label_column: str = "ret_close_to_close",
+    quantiles: int = 5,
+) -> pd.DataFrame:
+    """Return daily equal-count group returns from low to high factor values."""
+
+    def one_day(block: pd.DataFrame) -> pd.Series:
+        valid = block[[factor_column, label_column]].dropna()
+        output = pd.Series(
+            np.nan,
+            index=range(1, quantiles + 1),
+            dtype=float,
+        )
+        if len(valid) < quantiles * 2:
+            return output
+        ranks = valid[factor_column].rank(pct=True, method="first")
+        groups = np.ceil(ranks * quantiles).clip(1, quantiles).astype(int)
+        means = valid[label_column].groupby(groups).mean()
+        output.loc[means.index] = means.to_numpy(dtype=float)
+        return output
+
+    result = merged.groupby("date", sort=False).apply(
+        one_day,
+        include_groups=False,
+    )
+    result.columns = [f"group_{group}" for group in range(1, quantiles + 1)]
+    return result
+
+
 def _safe_ratio(mean: float, std: float) -> float:
     return float(mean / std) if np.isfinite(std) and std > 1e-12 else np.nan
 
@@ -165,6 +354,16 @@ def evaluate_single_factor(
     for label in LABEL_COLUMNS:
         ic = rank_ic_series(merged, label_column=label).dropna()
         long_short = long_short_returns(merged, label_column=label).dropna()
+        groups = quantile_group_returns(merged, label_column=label)
+        mean_groups = groups.mean()
+        group_monotonicity = mean_groups.corr(
+            pd.Series(
+                range(1, len(mean_groups) + 1),
+                index=mean_groups.index,
+                dtype=float,
+            ),
+            method="spearman",
+        )
         market = merged.groupby("date", sort=False)[label].mean()
         market_vol = merged.groupby("date", sort=False)[label].std()
         high_vol_cutoff = market_vol.quantile(0.75) if not market_vol.empty else np.nan
@@ -173,8 +372,28 @@ def evaluate_single_factor(
         output[label] = {
             "rank_ic_mean": float(ic.mean()) if not ic.empty else np.nan,
             "rank_ic_ir": _safe_ratio(float(ic.mean()), float(ic.std())),
+            "rank_ic_positive_rate": float((ic > 0).mean()) if not ic.empty else np.nan,
+            "rank_ic_t_stat": (
+                _safe_ratio(float(ic.mean()), float(ic.std())) * np.sqrt(len(ic))
+                if not ic.empty
+                else np.nan
+            ),
+            "group_monotonicity": float(group_monotonicity),
+            "long_short_mean": (
+                float(long_short.mean()) if not long_short.empty else np.nan
+            ),
             "long_short_sharpe": (
                 _safe_ratio(float(long_short.mean()), float(long_short.std())) * np.sqrt(252)
+                if not long_short.empty
+                else np.nan
+            ),
+            "long_short_max_drawdown": (
+                float(
+                    (
+                        long_short.cumsum()
+                        - long_short.cumsum().cummax()
+                    ).min()
+                )
                 if not long_short.empty
                 else np.nan
             ),
@@ -304,4 +523,3 @@ def chronological_gate(
     if not np.isfinite(development) or not np.isfinite(holdout) or holdout < 0.5 * development:
         reasons.append("2024 Rank IC is below 50% of the development-period magnitude")
     return not reasons, reasons
-

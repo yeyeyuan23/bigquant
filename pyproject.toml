@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bigalpha-2026-factors"
 version = "0.1.0"
-description = "BigAlpha 2026 dual-factor research and submission toolkit"
+description = "BigAlpha 2026 factor selection and evaluation toolkit"
 requires-python = ">=3.11"
 dependencies = [
   "numpy>=1.24",
@@ -19,3 +19,5 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]

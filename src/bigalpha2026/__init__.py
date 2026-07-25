@@ -1,7 +1,25 @@
-"""BigAlpha 2026 factor research package."""
+"""BigAlpha 2026 factor research utilities."""
 
-from .hf_pressure import main as hf_pressure_main
-from .quality_interaction import main as quality_interaction_main
+from .feature_contracts import FEATURE_CONTRACTS
+from .research_policy import (
+    CANDIDATE_POOL,
+    FORMAL_EVALUATION_POLICY,
+    HF_OB_ACTIVATED_OPTIONAL_MONTHS,
+    HF_OB_MANDATORY_MONTHS,
+    HF_OB_MAX_OPTIONAL_MONTHS,
+    HF_OB_OPTIONAL_MONTH_POOL,
+    HF_OB_REPRESENTATIVE_MONTHS,
+    MINIMAL_BASELINE,
+)
 
-__all__ = ["hf_pressure_main", "quality_interaction_main"]
-
+__all__ = [
+    "CANDIDATE_POOL",
+    "FEATURE_CONTRACTS",
+    "FORMAL_EVALUATION_POLICY",
+    "HF_OB_ACTIVATED_OPTIONAL_MONTHS",
+    "HF_OB_MANDATORY_MONTHS",
+    "HF_OB_MAX_OPTIONAL_MONTHS",
+    "HF_OB_OPTIONAL_MONTH_POOL",
+    "HF_OB_REPRESENTATIVE_MONTHS",
+    "MINIMAL_BASELINE",
+]
