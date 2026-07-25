@@ -2,7 +2,11 @@ import unittest
 
 import pandas as pd
 
-from bigalpha2026.combinations import fixed_rank_blend, positive_ic_weights
+from bigalpha2026.combinations import (
+    fixed_rank_blend,
+    positive_ic_weights,
+    walk_forward_hist_gradient_boosting,
+)
 from bigalpha2026.research_policy import fixed_weight_rank_combination
 
 
@@ -46,6 +50,34 @@ class CombinationTest(unittest.TestCase):
         )
         self.assertAlmostEqual(weights["FR-002"], 1.0)
         self.assertAlmostEqual(weights["HF-001"], 0.0)
+
+    def test_tree_predictions_are_strictly_walk_forward(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 120
+            + ["2020-01-02"] * 120
+            + ["2021-01-04"] * 120
+        )
+        values = list(range(120)) * 3
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(120)] * 3,
+                "FR-002": values,
+                "HF-001": list(reversed(values[:120])) * 3,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["FR-002"] / 1000
+        result = walk_forward_hist_gradient_boosting(
+            panel,
+            labels,
+            feature_columns=("FR-002", "HF-001"),
+            prediction_years=(2020, 2021),
+        )
+        self.assertEqual(set(result["date"].dt.year), {2020, 2021})
+        self.assertEqual(list(result.columns), ["date", "instrument", "factor"])
+        self.assertFalse(result.duplicated(["date", "instrument"]).any())
+        self.assertTrue(result["factor"].between(-1, 1).all())
 
 
 if __name__ == "__main__":

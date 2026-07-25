@@ -15,7 +15,11 @@ from sklearn.linear_model import ElasticNet
 
 from bigalpha2026.candidates.fr_002 import build_fr_002_factor_from_panel
 from bigalpha2026.candidates.hf_001 import build_hf_001_factor_from_daily
-from bigalpha2026.combinations import fixed_rank_blend, positive_ic_weights
+from bigalpha2026.combinations import (
+    fixed_rank_blend,
+    positive_ic_weights,
+    walk_forward_hist_gradient_boosting,
+)
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
     turnover_adjusted_long_short_returns,
@@ -283,6 +287,22 @@ def main() -> None:
         name: fixed_rank_blend(component_frames, weights)
         for name, weights in method_weights.items()
     }
+    tree_config = {
+        "model": "HistGradientBoostingRegressor",
+        "learning_rate": 0.05,
+        "max_iter": 100,
+        "max_leaf_nodes": 7,
+        "min_samples_leaf": 100,
+        "l2_regularization": 1.0,
+        "random_state": 20260726,
+        "training": "expanding_window",
+    }
+    methods["hist_gbdt"] = walk_forward_hist_gradient_boosting(
+        panel,
+        labels,
+        feature_columns=MEMBERS,
+        prediction_years=(2020, 2021, 2022, 2023),
+    )
 
     enet_candidates: list[dict[str, object]] = []
     for alpha in (1e-6, 5e-6, 1e-5, 5e-5, 1e-4):
@@ -380,15 +400,21 @@ def main() -> None:
         baseline_validation_ic = value(
             metrics, baseline, "validation_2022", "raw_full", "rank_ic_mean"
         )
-        admitted = (
+        passed_metrics = (
             development_ic > 0
             and validation_ic > 0
             and validation_tradable_ic > 0
         )
+        # INT-001 was frozen and submitted before the tree baseline was added.
+        # Record its evidence without allowing a post-submission method switch.
+        eligible_for_selection = method != "hist_gbdt"
+        admitted = passed_metrics and eligible_for_selection
         selection_score = validation_ic + 0.25 * development_ic
         decision_rows.append(
             {
                 "method": method,
+                "passed_metric_gate": passed_metrics,
+                "eligible_for_selection": eligible_for_selection,
                 "admitted_for_selection": admitted,
                 "selection_score_uses_2023": False,
                 "selection_score": selection_score,
@@ -399,7 +425,11 @@ def main() -> None:
                 ),
                 "validation_2022_tradable_rank_ic_mean": validation_tradable_ic,
                 "confirmation_2023_rank_ic_mean": confirmation_ic,
-                "weights": method_weights[method],
+                "weights": (
+                    method_weights[method]
+                    if method in method_weights
+                    else tree_config
+                ),
             }
         )
     admitted = [row for row in decision_rows if row["admitted_for_selection"]]
@@ -420,6 +450,7 @@ def main() -> None:
             "train_2019_2021_weights": best_enet["train_weights"],
             "refit_2019_2022_weights": final_enet_weights,
         },
+        "post_freeze_tree_baseline": tree_config,
         "upload_authorized_by_user": True,
         "upload_ready": False,
     }
