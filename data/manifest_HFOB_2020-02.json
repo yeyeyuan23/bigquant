@@ -1,0 +1,40 @@
+{
+  "month": "2020-02",
+  "raw_rows": 8734320,
+  "days": 20,
+  "panel_rows": 20000,
+  "active_instruments": 1825,
+  "hf_component_coverage": {
+    "minute_count": 0.99835,
+    "total_amount": 0.99835,
+    "total_volume": 0.99835,
+    "total_deal_number": 0.99835,
+    "net_log_return": 0.99835,
+    "absolute_log_return": 0.99835,
+    "tail_60_amount": 0.99835,
+    "tail_60_deal_number": 0.99835,
+    "avg_trade_value": 0.99835,
+    "avg_trade_volume": 0.99835,
+    "directional_efficiency": 0.9626,
+    "tail_trade_value_ratio": 0.99835,
+    "shock_q90_active_count": 0.9626,
+    "shock_q90_mean_abs_return": 0.9626,
+    "shock_q90_recovery_5m_median": 0.9626
+  },
+  "ob_component_coverage": {
+    "minute_count": 0.99835,
+    "valid_snapshot_count": 0.99835,
+    "both_sides_valid_rate": 0.99835,
+    "full_five_levels_rate": 0.99835,
+    "tail_60_valid_best_quote_minutes": 0.99835,
+    "tail_60_relative_spread_median": 0.99045,
+    "tail_60_depth_completeness_median": 0.99835,
+    "tail_60_bid_depth_imbalance_median": 0.99835,
+    "negative_mid_shock_q10_bid_depth_recovery_5m_median": 0.95995,
+    "full_day_depth_shape_median": 0.99195,
+    "tail_60_depth_shape_median": 0.99045,
+    "tail_60_shape_sign_consistency": 0.99045
+  },
+  "elapsed_seconds": 56.017,
+  "evaluation_performed": false
+}

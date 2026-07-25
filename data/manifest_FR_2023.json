@@ -1,0 +1,50 @@
+{
+  "schema_version": "research-data-v1",
+  "family": "FR",
+  "source_period": [
+    "2023-01-01",
+    "2023-12-31"
+  ],
+  "generated_at": "2026-07-25T16:05:09.094246+00:00",
+  "pool_filter": "union_of_2019_2023_historical_pool",
+  "columns": [
+    "disclosure_date",
+    "effective_date",
+    "instrument",
+    "report_date",
+    "category",
+    "shift",
+    "net_cffoa",
+    "net_profit",
+    "operating_revenue",
+    "total_assets"
+  ],
+  "key": [
+    "disclosure_date",
+    "instrument",
+    "report_date",
+    "category",
+    "shift"
+  ],
+  "partitions": {
+    "2023": {
+      "relative_path": "features/FR/year=2023/part-2023.parquet",
+      "shape": [
+        8616,
+        10
+      ],
+      "sha256": "9a20d71c314746b8e22b35079abf10107299bed35b350f65d7b78df2de6c80c3",
+      "bytes": 280003
+    }
+  },
+  "rows": 8616,
+  "instruments": 1202,
+  "duplicate_keys": 0,
+  "strictly_next_trading_day": true,
+  "weekend_disclosures": 2090,
+  "category_rows": {
+    "lf": 4308,
+    "ttm": 4308
+  },
+  "evaluation_performed": false
+}

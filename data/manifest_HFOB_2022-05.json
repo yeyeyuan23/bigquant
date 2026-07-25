@@ -1,0 +1,40 @@
+{
+  "month": "2022-05",
+  "raw_rows": 8919120,
+  "days": 19,
+  "panel_rows": 19000,
+  "active_instruments": 2077,
+  "hf_component_coverage": {
+    "minute_count": 0.9445263157894737,
+    "total_amount": 0.9445263157894737,
+    "total_volume": 0.9445263157894737,
+    "total_deal_number": 0.9445263157894737,
+    "net_log_return": 0.9445263157894737,
+    "absolute_log_return": 0.9445263157894737,
+    "tail_60_amount": 0.9445263157894737,
+    "tail_60_deal_number": 0.9445263157894737,
+    "avg_trade_value": 0.9409473684210526,
+    "avg_trade_volume": 0.9409473684210526,
+    "directional_efficiency": 0.9366842105263158,
+    "tail_trade_value_ratio": 0.9367368421052632,
+    "shock_q90_active_count": 0.9366842105263158,
+    "shock_q90_mean_abs_return": 0.9366842105263158,
+    "shock_q90_recovery_5m_median": 0.9366842105263158
+  },
+  "ob_component_coverage": {
+    "minute_count": 0.9445263157894737,
+    "valid_snapshot_count": 0.9445263157894737,
+    "both_sides_valid_rate": 0.9445263157894737,
+    "full_five_levels_rate": 0.9445263157894737,
+    "tail_60_valid_best_quote_minutes": 0.9445263157894737,
+    "tail_60_relative_spread_median": 0.9365789473684211,
+    "tail_60_depth_completeness_median": 0.9445263157894737,
+    "tail_60_bid_depth_imbalance_median": 0.9445263157894737,
+    "negative_mid_shock_q10_bid_depth_recovery_5m_median": 0.9322631578947368,
+    "full_day_depth_shape_median": 0.9443684210526315,
+    "tail_60_depth_shape_median": 0.9440526315789474,
+    "tail_60_shape_sign_consistency": 0.9440526315789474
+  },
+  "elapsed_seconds": 57.521,
+  "evaluation_performed": false
+}

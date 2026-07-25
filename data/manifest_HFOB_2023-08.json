@@ -1,0 +1,96 @@
+{
+  "month": "2023-08",
+  "raw_rows": 5513280,
+  "days": 23,
+  "panel_rows": 23000,
+  "active_instruments": 999,
+  "hf_component_coverage": {
+    "minute_count": 0.9987826086956522,
+    "total_amount": 0.9987826086956522,
+    "total_volume": 0.9987826086956522,
+    "total_deal_number": 0.9987826086956522,
+    "net_log_return": 0.9987826086956522,
+    "absolute_log_return": 0.9987826086956522,
+    "tail_60_amount": 0.9987826086956522,
+    "tail_60_deal_number": 0.9987826086956522,
+    "avg_trade_value": 0.9987826086956522,
+    "avg_trade_volume": 0.9987826086956522,
+    "directional_efficiency": 0.9986521739130435,
+    "tail_trade_value_ratio": 0.9987826086956522,
+    "shock_q90_active_count": 0.9986521739130435,
+    "shock_q90_mean_abs_return": 0.9986521739130435,
+    "shock_q90_recovery_5m_median": 0.9986521739130435
+  },
+  "ob_component_coverage": {
+    "minute_count": 0.9987826086956522,
+    "valid_snapshot_count": 0.9987826086956522,
+    "both_sides_valid_rate": 0.9987826086956522,
+    "full_five_levels_rate": 0.9987826086956522,
+    "tail_60_valid_best_quote_minutes": 0.9987826086956522,
+    "tail_60_relative_spread_median": 0.9987826086956522,
+    "tail_60_depth_completeness_median": 0.9987826086956522,
+    "tail_60_bid_depth_imbalance_median": 0.9987826086956522,
+    "negative_mid_shock_q10_bid_depth_recovery_5m_median": 0.9983478260869565,
+    "full_day_depth_shape_median": 0.9987826086956522,
+    "tail_60_depth_shape_median": 0.9987826086956522,
+    "tail_60_shape_sign_consistency": 0.9987826086956522
+  },
+  "evaluation_performed": false,
+  "month_end_repair": {
+    "date": "2023-08-31",
+    "reason": "exclusive_end_boundary",
+    "evaluation_performed": false
+  },
+  "repair_elapsed_seconds": 5.756,
+  "files": {
+    "HF": {
+      "sha256": "4b03344c4f373f938d3d4b9b622143a376d6ea509950f7f88f903714018138fb",
+      "shape": [
+        23000,
+        17
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "minute_count",
+        "total_amount",
+        "total_volume",
+        "total_deal_number",
+        "net_log_return",
+        "absolute_log_return",
+        "tail_60_amount",
+        "tail_60_deal_number",
+        "avg_trade_value",
+        "avg_trade_volume",
+        "directional_efficiency",
+        "tail_trade_value_ratio",
+        "shock_q90_active_count",
+        "shock_q90_mean_abs_return",
+        "shock_q90_recovery_5m_median"
+      ]
+    },
+    "OB": {
+      "sha256": "696d26271f9e7a949fe5eb2f2a315e613f45afc70b0eb7246993a43fb9c82b05",
+      "shape": [
+        23000,
+        14
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "minute_count",
+        "valid_snapshot_count",
+        "both_sides_valid_rate",
+        "full_five_levels_rate",
+        "tail_60_valid_best_quote_minutes",
+        "tail_60_relative_spread_median",
+        "tail_60_depth_completeness_median",
+        "tail_60_bid_depth_imbalance_median",
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median",
+        "full_day_depth_shape_median",
+        "tail_60_depth_shape_median",
+        "tail_60_shape_sign_consistency"
+      ]
+    }
+  }
+}

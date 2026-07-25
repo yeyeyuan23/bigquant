@@ -1,0 +1,111 @@
+{
+  "schema_version": "research-data-v1",
+  "year": 2020,
+  "generated_at": "2026-07-25T14:38:52.816119+00:00",
+  "period": [
+    "2020-01-01",
+    "2020-12-31"
+  ],
+  "trading_days": 243,
+  "daily_pool_rows": 1000,
+  "datasets": {
+    "universe": {
+      "relative_path": "universe/year=2020/part-2020.parquet",
+      "shape": [
+        243000,
+        3
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "name"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "name": 1.0
+      },
+      "sha256": "c961216124d69c438f595ad23d2fd34a9cc7dfa73414ba1b3eeec56ce0f5592d",
+      "bytes": 37430
+    },
+    "PV": {
+      "relative_path": "features/PV/year=2020/part-2020.parquet",
+      "shape": [
+        243000,
+        10
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "amount",
+        "volume",
+        "deal_number"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "open": 0.998119341563786,
+        "high": 0.998119341563786,
+        "low": 0.998119341563786,
+        "close": 0.998119341563786,
+        "pre_close": 1.0,
+        "amount": 0.998119341563786,
+        "volume": 1.0,
+        "deal_number": 1.0
+      },
+      "sha256": "586e94b75c234fe9fa89e422d27f55de21123db1bba5abfd7cd92ad0bbc9d026",
+      "bytes": 12172987
+    },
+    "exposures": {
+      "relative_path": "exposures/year=2020/part-2020.parquet",
+      "shape": [
+        243000,
+        6
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "SIZE",
+        "LIQUIDTY",
+        "industry_level1_code",
+        "float_market_cap"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "SIZE": 0.999,
+        "LIQUIDTY": 0.999,
+        "industry_level1_code": 0.999,
+        "float_market_cap": 0.999
+      },
+      "sha256": "36a2f90b81d1892e9eeaf1793636b505c5b8eafc014a870e2b0948b58adb62dc",
+      "bytes": 6114750
+    },
+    "labels": {
+      "relative_path": "labels/year=2020/part-2020.parquet",
+      "shape": [
+        243000,
+        5
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "ret_close_to_close",
+        "ret_next_open_to_close",
+        "ret_close_to_next_open"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "ret_close_to_close": 0.9981152263374485,
+        "ret_next_open_to_close": 0.9981152263374485,
+        "ret_close_to_next_open": 0.9981152263374485
+      },
+      "sha256": "63db57a83d2bed5461b794898256732bf281e77908e12a7f3e4da1db7f115dc5",
+      "bytes": 4086706
+    }
+  },
+  "label_rule": "exact next CN trading day; suspension remains missing",
+  "evaluation_performed": false
+}
