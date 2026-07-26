@@ -295,6 +295,15 @@ PYTHONPATH=src conda run --no-capture-output -n quant \
 提交准入和冻结内容统一见 `docs/factor_research_plan.md` 第 8 节；Notebook
 接口统一见 `docs/data_contract.md` 的“候选输出合同”。本文件只规定协作交付。
 
+正式提交只能在比赛页面点击顶部“提交代码”，从队伍的 AIStudio 私有工作区选择
+Notebook，再在“提交记录”确认新记录出现。以下入口均不属于比赛评测提交，禁止使用：
+
+- AIStudio 的“分享策略”；
+- “公开分享”或任何 `codeshare` 链接；
+- 比赛“代码”标签页里的“上传代码”。
+
+比赛提交只授权评测系统读取私有 Notebook，不代表授权向策略社区公开源码。
+
 上传后只需告诉队长：
 
 - Notebook 文件名和 `candidate_id`；
