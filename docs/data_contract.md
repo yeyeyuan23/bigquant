@@ -102,6 +102,14 @@ tail_60_bid_depth_imbalance_median
 negative_mid_shock_q10_bid_depth_recovery_5m_median
 ```
 
+平台下载原件固定放在
+`data/raw/OB_DAILY_FULL/ob_daily_YEAR.parquet`，再由
+`scripts/prepare_ob_daily_full.py` 按历史股票池左连接并生成
+`data/features/OB_DAILY_FULL/year=YEAR/part-YEAR.parquet`。标准面板额外包含
+布尔列 `ob_snapshot_available`：源表存在该日该股票盘口时为真；不存在时四个
+组件保持 NaN，禁止在数据层伪装成 0。2019—2023 任一年度缺失都应直接失败，
+禁止退回代表月份后继续生成正式数据快照。
+
 只将这些日级聚合结果同步回本地；原始分钟盘口行不下载、不进入 Git。新增盘口
 候选若需要合同中其余组件，应扩展同一按年聚合脚本并生成新的快照 manifest，
 不能在每个候选中重复拉取全量分钟明细。

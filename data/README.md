@@ -13,6 +13,7 @@
 - `features/PV/`：日频量价通用组件；
 - `features/HF/`：分钟成交聚合后的日频通用组件；
 - `features/OB/`：分钟盘口聚合后的日频通用组件；
+- `features/OB_DAILY_FULL/`：供 `OB-001` 使用的 2019—2023 完整年度盘口日频组件；
 - `features/FR/`：严格 PIT 的财务状态或披露组件；
 - `exposures/`：行业、市值、流动性和风险暴露；
 - `labels/`：独立保存的未来收益标签；
@@ -34,6 +35,14 @@ FR 事件面板按披露年份保存在 `features/FR/year=YYYY/part-YYYY.parquet
 披露的前提下计算首次差分状态。
 
 HF/OB 日频共享面板按 `features/HF|OB/year=YYYY/month=MM/part-YYYY-MM.parquet` 保存，每月对应 `manifest_HFOB_YYYY-MM.json`。默认首轮读取 2019—2023 每年 2、8 月，共 10 个必跑月份。因子计算前的市场状态检查发现开发样本缺少低流动性尾部，故按冻结规则唯一启用 `2022-11`；该选择未读取任何候选值。其余 7 个已下载备选月不参与本轮，2023 年 5、11 月尚未生成。
+
+完整 OB 日频底座不再使用上述代表月份。平台导出的全市场聚合原件保存在
+`raw/OB_DAILY_FULL/ob_daily_YYYY.parquet`，随后运行
+`scripts/prepare_ob_daily_full.py`，按历史股票池裁成
+`features/OB_DAILY_FULL/year=YYYY/part-YYYY.parquet`。标准面板保留明确的
+`ob_snapshot_available` 标志；缺少盘口快照的组件保持 NaN，不在数据层填 0。
+原始分钟盘口仍留在 AIStudio。源文件与标准文件的行数、日期覆盖、缺失键和
+SHA-256 均记录在 `manifest_OB_DAILY_FULL.json`。
 
 公开 36 因子库和大型训练矩阵默认留在 AIStudio；本目录只接收评价报告、特征
 重要性和预测结果，不要求为本地训练下载完整副本。只有需要离线复现时，才按
