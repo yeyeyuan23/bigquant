@@ -1,0 +1,9 @@
+candidate_id,factor_coverage,minimum_daily_unique_values,eligible_days,excluded_sparse_days,technical_passed
+FR-003,1.0,9,204,15,True
+FR-004,1.0,9,204,15,True
+FR-005,1.0,915,219,0,True
+PV-003,1.0,905,219,0,True
+PV-004,1.0,995,219,0,True
+PV-005,1.0,995,219,0,True
+PV-006,1.0,995,219,0,True
+PV-007,1.0,1,0,219,False

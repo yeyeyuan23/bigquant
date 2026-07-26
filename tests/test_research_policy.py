@@ -17,8 +17,21 @@ from bigalpha2026.research_policy import (
 
 class ResearchPolicyTest(unittest.TestCase):
     def test_all_registered_candidates_are_available_to_first_round(self):
-        self.assertEqual(len(candidate_ids()), 8)
-        self.assertEqual(candidate_ids("first_round"), candidate_ids())
+        self.assertEqual(len(candidate_ids()), 16)
+        self.assertEqual(len(candidate_ids("first_round")), 8)
+        self.assertEqual(
+            candidate_ids("oap_batch1"),
+            (
+                "PV-003",
+                "PV-004",
+                "PV-005",
+                "PV-006",
+                "PV-007",
+                "FR-003",
+                "FR-004",
+                "FR-005",
+            ),
+        )
 
     def test_formal_periods_and_representative_months_are_frozen(self):
         self.assertEqual(FORMAL_EVALUATION_POLICY.development_start, "2019-01-01")
@@ -66,8 +79,6 @@ class ResearchPolicyTest(unittest.TestCase):
         self.assertLessEqual(
             len(HF_OB_ACTIVATED_OPTIONAL_MONTHS), HF_OB_MAX_OPTIONAL_MONTHS
         )
-        self.assertEqual(FORMAL_EVALUATION_POLICY.cost_sensitivity_bps, (0, 10, 20, 30))
-
     def test_fixed_weight_combination_is_frozen_and_ranked(self):
         keys = {
             "date": pd.to_datetime(["2022-01-04"] * 3),

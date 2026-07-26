@@ -1,0 +1,123 @@
+{
+  "protocol": "oap_batch1_shared_factorlib_baseline_v1",
+  "factor_version": "oap_batch1_v1_2026-07-26",
+  "evaluation_months": [
+    "2019-02",
+    "2019-08",
+    "2020-02",
+    "2020-08",
+    "2021-02",
+    "2021-08",
+    "2022-02",
+    "2022-08",
+    "2022-11",
+    "2023-02",
+    "2023-08"
+  ],
+  "evaluation_dates": 219,
+  "panel_rows": 219000,
+  "public_factor_count": 36,
+  "candidate_count": 8,
+  "rolling_baseline_fits": 8,
+  "baseline_reused_for_candidates": [
+    "PV-003",
+    "PV-004",
+    "PV-005",
+    "PV-006",
+    "PV-007",
+    "FR-003",
+    "FR-004",
+    "FR-005"
+  ],
+  "decisions": [
+    {
+      "candidate_id": "FR-003",
+      "technical_passed": true,
+      "selection_passed": false,
+      "selection_reasons": [
+        "no positive out-of-sample Rank IC increment over factorlib",
+        "candidate weight direction is not stable"
+      ],
+      "selection_oos_rank_ic_increment": -0.00047734687234595764,
+      "confirmation_oos_rank_ic_increment": 0.00024607389666482515,
+      "confirmation_direction_preserved": true
+    },
+    {
+      "candidate_id": "FR-004",
+      "technical_passed": true,
+      "selection_passed": false,
+      "selection_reasons": [
+        "no positive out-of-sample Rank IC increment over factorlib"
+      ],
+      "selection_oos_rank_ic_increment": -0.0010644019816039001,
+      "confirmation_oos_rank_ic_increment": 0.000319732793992375,
+      "confirmation_direction_preserved": true
+    },
+    {
+      "candidate_id": "FR-005",
+      "technical_passed": true,
+      "selection_passed": true,
+      "selection_reasons": [],
+      "selection_oos_rank_ic_increment": 0.00010659461986799353,
+      "confirmation_oos_rank_ic_increment": 0.0017701196054956542,
+      "confirmation_direction_preserved": true
+    },
+    {
+      "candidate_id": "PV-003",
+      "technical_passed": true,
+      "selection_passed": false,
+      "selection_reasons": [
+        "candidate weight direction is not stable"
+      ],
+      "selection_oos_rank_ic_increment": 0.00037182965226051357,
+      "confirmation_oos_rank_ic_increment": -0.0000336567170029084,
+      "confirmation_direction_preserved": false
+    },
+    {
+      "candidate_id": "PV-004",
+      "technical_passed": true,
+      "selection_passed": false,
+      "selection_reasons": [
+        "candidate weight direction is not stable"
+      ],
+      "selection_oos_rank_ic_increment": 0.001019565261195822,
+      "confirmation_oos_rank_ic_increment": -0.0010979657523875613,
+      "confirmation_direction_preserved": false
+    },
+    {
+      "candidate_id": "PV-005",
+      "technical_passed": true,
+      "selection_passed": false,
+      "selection_reasons": [
+        "candidate weight direction is not stable"
+      ],
+      "selection_oos_rank_ic_increment": 0.0007140801827938657,
+      "confirmation_oos_rank_ic_increment": 0.0006476748567064011,
+      "confirmation_direction_preserved": true
+    },
+    {
+      "candidate_id": "PV-006",
+      "technical_passed": true,
+      "selection_passed": false,
+      "selection_reasons": [
+        "no positive out-of-sample Rank IC increment over factorlib"
+      ],
+      "selection_oos_rank_ic_increment": -0.00042820572477802327,
+      "confirmation_oos_rank_ic_increment": -0.0004436318995443417,
+      "confirmation_direction_preserved": false
+    },
+    {
+      "candidate_id": "PV-007",
+      "technical_passed": false,
+      "selection_passed": false,
+      "selection_reasons": [
+        "candidate has fewer than 40 technically eligible days",
+        "no positive out-of-sample Rank IC increment over factorlib",
+        "candidate weight direction is not stable"
+      ],
+      "selection_oos_rank_ic_increment": -0.00006792014806611749,
+      "confirmation_oos_rank_ic_increment": 0.0004283155489305107,
+      "confirmation_direction_preserved": true
+    }
+  ]
+}

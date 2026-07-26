@@ -30,6 +30,14 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
     CandidateSpec("OB-002", "OB", "depth_shape_persistence"),
     CandidateSpec("FR-001", "FR", "cash_conversion_improvement"),
     CandidateSpec("FR-002", "FR", "asset_efficiency_improvement"),
+    CandidateSpec("PV-003", "PV", "oap_maximum_return", stage="oap_batch1"),
+    CandidateSpec("PV-004", "PV", "oap_return_skewness", stage="oap_batch1"),
+    CandidateSpec("PV-005", "PV", "oap_amihud_illiquidity", stage="oap_batch1"),
+    CandidateSpec("PV-006", "PV", "oap_corwin_schultz_spread", stage="oap_batch1"),
+    CandidateSpec("PV-007", "PV", "oap_zero_trade_fraction", stage="oap_batch1"),
+    CandidateSpec("FR-003", "FR", "oap_asset_growth", stage="oap_batch1"),
+    CandidateSpec("FR-004", "FR", "oap_revenue_growth_surprise", stage="oap_batch1"),
+    CandidateSpec("FR-005", "FR", "oap_cash_flow_to_market", stage="oap_batch1"),
 )
 
 # Mechanical calendar samples frozen before the first formal factor evaluation.
@@ -75,7 +83,6 @@ class FormalEvaluationPolicy:
     minimum_rank_ic_t_stat: float = 2.0
     minimum_group_monotonicity: float = 0.50
     liquid_subset_exclusion_quantile: float = 0.20
-    cost_sensitivity_bps: tuple[int, ...] = (0, 10, 20, 30)
     admitted_candidate_statuses: tuple[str, ...] = (
         "provisional_survivor",
         "selection_survivor",

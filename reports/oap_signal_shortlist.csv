@@ -1,0 +1,35 @@
+screen_id,oap_acronym,oap_data_category,proposed_family,priority,implementation_fidelity,existing_data_reuse,public_factor_overlap,decision,reason
+OAP-A01,AssetGrowth,Accounting,FR,A,exact,FR total_assets,low,implemented,Annual total-asset growth is directly available with PIT disclosure timing and is not present as a level in the public library
+OAP-A02,cfp,Accounting,FR,A,near_exact,FR net_cffoa plus exposure float_market_cap,medium,implemented,Operating cash flow to market can be reconstructed but must be compared with PE PB and profitability controls
+OAP-A03,EarningsSurprise,Accounting,FR,A,adapted,FR net_profit history,medium,implement_first,Use PIT TTM profit change surprise because quarterly EPS and share-count fields are not in the current contract
+OAP-A04,RevenueSurprise,Accounting,FR,A,adapted,FR operating_revenue history,low,implemented,Use PIT TTM year-over-year revenue growth because revenue-per-share and the original historical standardization are unavailable
+OAP-A05,NumEarnIncrease,Accounting,FR,A,adapted,FR net_profit history,low,implement_first,Count consecutive PIT TTM profit increases instead of quarterly per-share increases
+OAP-A06,MaxRet,Price,PV,A,exact,PV daily close and pre_close,medium,implemented,Previous-month maximum daily return is directly computable and differs from five-day volatility
+OAP-A07,ReturnSkew,Price,PV,A,exact,PV daily close and pre_close,low,implemented,Previous-month daily-return skewness is directly computable and absent from the public library
+OAP-A08,High52,Price,PV,A,exact,PV daily close plus 2018 prehistory backfill,medium,implement_after_backfill,Distance to the trailing 52-week high is computable but preserving the full 2019 development year requires prehistory
+OAP-A09,Illiquidity,Trading,PV,A,near_exact,PV daily return and amount,medium,implemented,Amihud-style absolute return per amount is directly computable with A-share amount
+OAP-A10,BidAskSpread,Trading,PV,A,exact,PV daily high and low,low,implemented,Corwin-Schultz high-low spread estimator needs no quote data and is distinct from the OB snapshot spread
+OAP-A11,PriceDelayRsq,Price,PV,A,near_exact,PV returns plus universe market return and 2018 prehistory backfill,low,implement_after_backfill,A-share market-return lags can be built internally but the annual estimation window needs prehistory
+OAP-A12,CoskewACX,Price,PV,A,near_exact,PV returns plus universe market return and 2018 prehistory backfill,low,implement_after_backfill,Coskewness adds a nonlinear risk mechanism but its past-year window needs prehistory
+OAP-A13,zerotrade1M,Trading,PV,A,adapted,PV volume and deal_number plus universe trading state,low,implemented,Use stock-pool trading days with zero volume or zero deals while separating suspensions and missing records
+OAP-A14,IntMom,Price,PV,A,exact,PV daily close plus 2018 prehistory backfill,medium,implement_after_backfill,Return from months t-12 to t-6 differs from public five-day momentum but needs prehistory
+OAP-A15,IndMom,Price,composite,A,near_exact,PV returns plus exposure industry_level1_code and 2018 prehistory backfill,low,implement_after_backfill,Industry momentum is feasible internally but the six-month return window needs prehistory
+OAP-B01,EarningsConsistency,Accounting,FR,B,adapted,FR net_profit history,medium,defer,TTM earnings consistency is feasible but the original requires 48 months and EPS-based filters
+OAP-B02,MeanRankRevGrowth,Accounting,FR,B,adapted,FR operating_revenue history,low,defer,Five-year revenue-growth ranks are feasible only after checking usable pre-2019 history and coverage
+OAP-B03,AbnormalAccruals,Accounting,FR,B,proxy,FR net_cffoa net_profit operating_revenue total_assets,high,defer,The cash accrual core is available but PPE is missing and the mechanism overlaps FR-001
+OAP-B04,AM,Accounting,composite,B,exact,FR total_assets plus factorlib market_cap,high,defer,Assets-to-market is feasible but likely redundant with PB size and valuation features
+OAP-B05,Mom12m,Price,PV,B,exact,PV daily close,medium,defer,Twelve-month momentum is feasible but should enter only after IntMom and public momentum controls
+OAP-B06,RealizedVol,Price,PV,B,adapted,PV returns plus universe market return,high,defer,CAPM-residual volatility is feasible but likely overlaps volatility_5 beta and size
+OAP-B07,VolSD,Trading,PV,B,adapted,PV daily volume,medium,defer,The original 36-month monthly-volume window reduces usable development history
+OAP-B08,std_turn,Trading,PV,B,near_exact,factorlib turn history,high,defer,Turnover volatility is feasible in AIStudio but derives entirely from an existing public input
+OAP-B09,VolumeTrend,Trading,PV,B,adapted,PV daily volume,medium,defer,The original 60-month trend window is too long for clean 2019 development coverage
+OAP-B10,LRreversal,Price,PV,B,exact,PV daily close,medium,defer,The 36-to-13-month return leaves insufficient prehistory for the frozen development start
+OAP-B11,ResidualMomentum,Price,composite,B,proxy,PV returns plus factorlib controls,medium,defer,The original FF3 residual cannot be exact but an A-share rolling residual version is possible
+OAP-C01,ChAssetTurnover,Accounting,FR,C,exact,FR operating_revenue and total_assets,very_high,covered_existing,Existing FR-002 already implements the change in asset-turnover mechanism
+OAP-C02,roaq,Accounting,FR,C,near_exact,FR net_profit and total_assets,very_high,covered_existing,Public roa_avg_ttm and FR-002 already cover the underlying profitability level and change
+OAP-C03,STreversal,Price,PV,C,exact,PV daily close,very_high,covered_existing,Public reversal_5 and daily_return already represent short-horizon reversal
+OAP-C04,EP,Accounting,composite,C,exact,FR net_profit plus factorlib market_cap,very_high,covered_existing,Public pe_ttm already contains the inverse valuation information
+OAP-C05,BM,Accounting,composite,C,proxy,factorlib pb,very_high,covered_existing,Public pb directly covers book-to-market ranking
+OAP-C06,SP,Accounting,composite,C,exact,FR operating_revenue plus factorlib market_cap,very_high,covered_existing,Public ps_ttm directly covers sales-to-price
+OAP-C07,Beta,Price,PV,C,near_exact,PV returns plus market return,very_high,covered_existing,Public beta_000300SH_22 already supplies a beta feature
+OAP-C08,DolVol,Trading,PV,C,near_exact,PV amount,very_high,covered_existing,Public amount and existing PV activity components already cover dollar-volume level

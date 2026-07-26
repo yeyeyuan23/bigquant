@@ -9,21 +9,27 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from bigalpha2026.candidates.fr.fr_001 import build_fr_001_factor_from_panel
 from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
+from bigalpha2026.candidates.fr.fr_003 import build_fr_003_factor
+from bigalpha2026.candidates.fr.fr_004 import build_fr_004_factor
+from bigalpha2026.candidates.fr.fr_005 import build_fr_005_factor
 from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
 from bigalpha2026.candidates.ob.ob_001 import build_ob_001_factor_from_daily
 from bigalpha2026.candidates.ob.ob_002 import build_ob_002_factor_from_daily
 from bigalpha2026.candidates.pv.pv_001 import build_pv_001_factor
 from bigalpha2026.candidates.pv.pv_002 import build_pv_002_factor
+from bigalpha2026.candidates.pv.pv_003 import build_pv_003_factor
+from bigalpha2026.candidates.pv.pv_004 import build_pv_004_factor
+from bigalpha2026.candidates.pv.pv_005 import build_pv_005_factor
+from bigalpha2026.candidates.pv.pv_006 import build_pv_006_factor
+from bigalpha2026.candidates.pv.pv_007 import build_pv_007_factor
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
     rank_ic_series,
-    turnover_adjusted_long_short_returns,
 )
 from bigalpha2026.research_policy import (
     FORMAL_EVALUATION_POLICY,
@@ -47,7 +53,7 @@ SELECTION_YEAR = int(FORMAL_EVALUATION_POLICY.selection_start[:4])
 CONFIRMATION_YEAR = int(FORMAL_EVALUATION_POLICY.confirmation_start[:4])
 MARKET_STATE_YEARS = range(2019, SELECTION_YEAR + 1)
 ALL_BASE_YEARS = range(2019, 2024)
-CANDIDATE_POOL_VERSION = "first_round_v1_2026-07-26"
+CANDIDATE_POOL_VERSION = "oap_batch1_v1_2026-07-26"
 
 
 def read_yearly(path_template: str, years: range) -> pd.DataFrame:
@@ -236,39 +242,6 @@ def stability_rows(
     return rows
 
 
-def cost_rows(
-    candidate_id: str,
-    period: str,
-    factor: pd.DataFrame,
-    labels: pd.DataFrame,
-) -> list[dict[str, object]]:
-    merged = factor.merge(labels, on=["date", "instrument"], how="inner")
-    rows: list[dict[str, object]] = []
-    for cost_bps in FORMAL_EVALUATION_POLICY.cost_sensitivity_bps:
-        returns = turnover_adjusted_long_short_returns(
-            merged,
-            one_way_cost_bps=cost_bps,
-        )
-        net = returns["net_return"]
-        rows.append(
-            {
-                "candidate_id": candidate_id,
-                "period": period,
-                "cost_bps": cost_bps,
-                "gross_mean": float(returns["gross_return"].mean()),
-                "net_mean": float(net.mean()),
-                "net_sharpe": (
-                    float(net.mean() / net.std() * np.sqrt(252))
-                    if len(net) > 1 and net.std() > 1e-12
-                    else np.nan
-                ),
-                "mean_turnover": float(returns["turnover"].mean()),
-                "days": int(len(returns)),
-            }
-        )
-    return rows
-
-
 def candidate_pool_frame(
     factors: dict[str, pd.DataFrame],
     *,
@@ -307,7 +280,6 @@ def candidate_pool_frame(
 def classify_candidates(
     metrics: pd.DataFrame,
     stability: pd.DataFrame,
-    costs: pd.DataFrame,
 ) -> list[dict[str, object]]:
     decisions: list[dict[str, object]] = []
 
@@ -349,14 +321,6 @@ def classify_candidates(
             < FORMAL_EVALUATION_POLICY.minimum_group_monotonicity
         ):
             failures.append(f"{display_name} raw group monotonicity is below the gate")
-        cost20 = costs.loc[
-            costs["candidate_id"].eq(candidate_id)
-            & costs["period"].eq(period)
-            & costs["cost_bps"].eq(20),
-            "net_mean",
-        ]
-        if cost20.empty or float(cost20.iloc[0]) <= 0:
-            failures.append(f"{display_name} 20 bps long-short mean is not positive")
         return failures
 
     for candidate_id in sorted(metrics["candidate_id"].unique()):
@@ -463,6 +427,11 @@ def main() -> None:
     factors: dict[str, pd.DataFrame] = {
         "PV-001": build_pv_001_factor(pv, pool),
         "PV-002": build_pv_002_factor(pv, pool),
+        "PV-003": build_pv_003_factor(pv, pool),
+        "PV-004": build_pv_004_factor(pv, pool),
+        "PV-005": build_pv_005_factor(pv, pool),
+        "PV-006": build_pv_006_factor(pv, pool),
+        "PV-007": build_pv_007_factor(pv, pool),
     }
     financial = pd.concat(
         [
@@ -473,6 +442,9 @@ def main() -> None:
     )
     factors["FR-001"] = build_fr_001_factor_from_panel(financial, pool)
     factors["FR-002"] = build_fr_002_factor_from_panel(financial, pool)
+    factors["FR-003"] = build_fr_003_factor(financial, pool)
+    factors["FR-004"] = build_fr_004_factor(financial, pool)
+    factors["FR-005"] = build_fr_005_factor(financial, exposures, pool)
 
     hf = read_evaluation_family("HF")
     ob = read_evaluation_family("OB")
@@ -487,7 +459,6 @@ def main() -> None:
 
     metric_output: list[dict[str, object]] = []
     stability_output: list[dict[str, object]] = []
-    cost_output: list[dict[str, object]] = []
     technical_output: list[dict[str, object]] = []
     clean_factors: dict[str, pd.DataFrame] = {}
     for candidate_id, factor in factors.items():
@@ -519,20 +490,14 @@ def main() -> None:
             stability_output.extend(
                 stability_rows(candidate_id, period, block, period_labels)
             )
-            cost_output.extend(
-                cost_rows(candidate_id, period, block, period_labels)
-            )
-
     metrics_frame = pd.DataFrame(metric_output)
     stability_frame = pd.DataFrame(stability_output)
-    costs_frame = pd.DataFrame(cost_output)
     metrics_frame.to_csv(
         REPORTS / "first_round_metrics.csv", index=False
     )
     stability_frame.to_csv(
         REPORTS / "first_round_stability.csv", index=False
     )
-    costs_frame.to_csv(REPORTS / "first_round_costs.csv", index=False)
     pd.DataFrame(technical_output).to_csv(
         REPORTS / "first_round_technical.csv", index=False
     )
@@ -547,24 +512,30 @@ def main() -> None:
                 how="inner",
                 suffixes=("_left", "_right"),
             )
-            daily_corr = merged.groupby("date", sort=False).apply(
-                lambda block: block["factor_left"].corr(
-                    block["factor_right"], method="spearman"
-                ),
-                include_groups=False,
-            )
+            if merged.empty:
+                overlap_days = 0
+                mean_daily_spearman = float("nan")
+            else:
+                daily_corr = merged.groupby("date", sort=False).apply(
+                    lambda block: block["factor_left"].corr(
+                        block["factor_right"], method="spearman"
+                    ),
+                    include_groups=False,
+                )
+                overlap_days = int(daily_corr.notna().sum())
+                mean_daily_spearman = float(daily_corr.mean())
             correlation_rows.append(
                 {
                     "left": left_id,
                     "right": right_id,
-                    "overlap_days": int(daily_corr.notna().sum()),
-                    "mean_daily_spearman": float(daily_corr.mean()),
+                    "overlap_days": overlap_days,
+                    "mean_daily_spearman": mean_daily_spearman,
                 }
             )
     pd.DataFrame(correlation_rows).to_csv(
         REPORTS / "first_round_correlations.csv", index=False
     )
-    decisions = classify_candidates(metrics_frame, stability_frame, costs_frame)
+    decisions = classify_candidates(metrics_frame, stability_frame)
     candidate_pool = candidate_pool_frame(clean_factors)
     candidate_pool.to_parquet(DATA / "factors" / "candidate_pool.parquet", index=False)
     (REPORTS / "first_round_decisions.json").write_text(

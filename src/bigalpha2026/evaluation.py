@@ -237,75 +237,6 @@ def long_short_returns(
     return merged.groupby("date", sort=False).apply(one_day, include_groups=False)
 
 
-def turnover_adjusted_long_short_returns(
-    merged: pd.DataFrame,
-    factor_column: str = "factor",
-    label_column: str = "ret_close_to_close",
-    quantiles: int = 5,
-    one_way_cost_bps: int = 0,
-    segment_gap_days: int = 15,
-) -> pd.DataFrame:
-    """Return gross/net long-short returns and explicit one-way turnover.
-
-    The portfolio is one dollar long the top quantile and one dollar short the
-    bottom quantile. A representative-month gap resets the portfolio to cash;
-    entry and exit trades are both charged at the supplied one-way cost.
-    """
-
-    blocks: list[tuple[pd.Timestamp, pd.Series, float]] = []
-    for date, block in merged.groupby("date", sort=True):
-        valid = block[["instrument", factor_column, label_column]].dropna()
-        if len(valid) < quantiles * 2:
-            continue
-        ranks = valid[factor_column].rank(pct=True, method="average")
-        top = valid.loc[ranks > 1.0 - 1.0 / quantiles]
-        bottom = valid.loc[ranks <= 1.0 / quantiles]
-        if top.empty or bottom.empty:
-            continue
-        weights = pd.concat(
-            [
-                pd.Series(1.0 / len(top), index=top["instrument"].astype(str)),
-                pd.Series(-1.0 / len(bottom), index=bottom["instrument"].astype(str)),
-            ]
-        ).groupby(level=0).sum()
-        returns = valid.set_index(valid["instrument"].astype(str))[label_column]
-        gross = float((weights * returns.reindex(weights.index)).sum())
-        blocks.append((pd.Timestamp(date), weights, gross))
-
-    rows: list[dict[str, float | pd.Timestamp]] = []
-    previous = pd.Series(dtype=float)
-    for index, (date, weights, gross) in enumerate(blocks):
-        if index > 0 and (date - blocks[index - 1][0]).days > segment_gap_days:
-            previous = pd.Series(dtype=float)
-        union = weights.index.union(previous.index)
-        turnover = float(
-            (
-                weights.reindex(union, fill_value=0.0)
-                - previous.reindex(union, fill_value=0.0)
-            )
-            .abs()
-            .sum()
-        )
-        is_segment_end = (
-            index == len(blocks) - 1
-            or (blocks[index + 1][0] - date).days > segment_gap_days
-        )
-        if is_segment_end:
-            turnover += float(weights.abs().sum())
-        cost = turnover * one_way_cost_bps / 10_000.0
-        rows.append(
-            {
-                "date": date,
-                "gross_return": gross,
-                "turnover": turnover,
-                "cost": cost,
-                "net_return": gross - cost,
-            }
-        )
-        previous = weights
-    return pd.DataFrame(rows)
-
-
 def quantile_group_returns(
     merged: pd.DataFrame,
     factor_column: str = "factor",
@@ -674,6 +605,245 @@ def factorlib_regularized_incremental_validation(
         "windows": float(len(weights)),
     }
     return summary, weights, predictions
+
+
+def factorlib_regularized_incremental_batch_validation(
+    factor_panel: pd.DataFrame,
+    target: pd.DataFrame,
+    base_factor_columns: Sequence[str],
+    candidate_columns: Sequence[str],
+    target_column: str = "ret_close_to_close",
+    config: FactorLibraryValidationConfig = FactorLibraryValidationConfig(),
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Evaluate many candidates while fitting each rolling baseline only once.
+
+    All candidates use one common complete-case stock-day sample.  Within every
+    rolling window the public-factor baseline is fitted once, then reused for
+    each one-candidate augmented model.  This makes candidate increments
+    directly comparable and avoids repeating the 36-factor baseline work.
+    """
+
+    try:
+        from sklearn.linear_model import ElasticNet
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("scikit-learn is required for Elastic Net evaluation") from exc
+
+    base_columns = tuple(base_factor_columns)
+    candidates = tuple(candidate_columns)
+    if not base_columns:
+        raise ValueError("base_factor_columns must not be empty")
+    if not candidates:
+        raise ValueError("candidate_columns must not be empty")
+    if len(set(candidates)) != len(candidates):
+        raise ValueError("candidate_columns must be unique")
+    if set(base_columns).intersection(candidates):
+        raise ValueError("base and candidate columns must be disjoint")
+
+    required = {"date", "instrument", *base_columns, *candidates}
+    missing = sorted(required.difference(factor_panel.columns))
+    if missing:
+        raise ValueError(f"factor_panel is missing required columns: {missing}")
+    if target_column not in target.columns:
+        raise ValueError(f"target is missing required column: {target_column}")
+
+    panel = factor_panel[
+        ["date", "instrument", *base_columns, *candidates]
+    ].copy()
+    panel["date"] = pd.to_datetime(panel["date"], errors="coerce").dt.normalize()
+    panel["instrument"] = panel["instrument"].astype(str)
+    if panel.duplicated(["date", "instrument"]).any():
+        raise ValueError("factor_panel contains duplicate date-instrument keys")
+
+    labels = target[["date", "instrument", target_column]].copy()
+    labels["date"] = pd.to_datetime(labels["date"], errors="coerce").dt.normalize()
+    labels["instrument"] = labels["instrument"].astype(str)
+    merged = panel.merge(
+        labels,
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    all_features = (*base_columns, *candidates)
+    merged = cross_section_zscore(merged, [*all_features, target_column])
+    merged = merged.dropna(subset=[*all_features, target_column])
+    dates = np.array(sorted(merged["date"].dropna().unique()))
+
+    baseline_prediction_parts: list[pd.DataFrame] = []
+    augmented_prediction_parts: list[pd.DataFrame] = []
+    baseline_weight_rows: list[dict[str, object]] = []
+    candidate_weight_rows: list[dict[str, object]] = []
+    train_days = config.train_window_days
+    test_days = config.test_window_days
+    for test_start in range(train_days, len(dates), test_days):
+        train_dates = dates[test_start - train_days : test_start]
+        test_dates = dates[test_start : test_start + test_days]
+        if len(test_dates) == 0:
+            continue
+        train = merged.loc[merged["date"].isin(train_dates)]
+        test = merged.loc[merged["date"].isin(test_dates)]
+        if len(train) <= len(all_features) + 2 or test.empty:
+            continue
+
+        baseline = ElasticNet(
+            alpha=config.alpha,
+            l1_ratio=config.l1_ratio,
+            fit_intercept=True,
+            max_iter=10000,
+            random_state=0,
+        )
+        baseline.fit(
+            train.loc[:, base_columns].to_numpy(dtype=float),
+            train[target_column].to_numpy(dtype=float),
+        )
+        baseline_predictions = test[
+            ["date", "instrument", target_column]
+        ].copy()
+        baseline_predictions["baseline_prediction"] = baseline.predict(
+            test.loc[:, base_columns].to_numpy(dtype=float)
+        )
+        baseline_prediction_parts.append(baseline_predictions)
+        baseline_weight_row: dict[str, object] = {
+            "train_start": pd.Timestamp(train_dates[0]),
+            "train_end": pd.Timestamp(train_dates[-1]),
+            "test_start": pd.Timestamp(test_dates[0]),
+            "test_end": pd.Timestamp(test_dates[-1]),
+        }
+        baseline_weight_row.update(
+            dict(zip(base_columns, baseline.coef_, strict=True))
+        )
+        baseline_weight_rows.append(baseline_weight_row)
+
+        for candidate in candidates:
+            augmented_columns = (*base_columns, candidate)
+            augmented = ElasticNet(
+                alpha=config.alpha,
+                l1_ratio=config.l1_ratio,
+                fit_intercept=True,
+                max_iter=10000,
+                random_state=0,
+            )
+            augmented.fit(
+                train.loc[:, augmented_columns].to_numpy(dtype=float),
+                train[target_column].to_numpy(dtype=float),
+            )
+            augmented_predictions = baseline_predictions.copy()
+            augmented_predictions["candidate"] = candidate
+            augmented_predictions["augmented_prediction"] = augmented.predict(
+                test.loc[:, augmented_columns].to_numpy(dtype=float)
+            )
+            augmented_prediction_parts.append(augmented_predictions)
+            candidate_weight_rows.append(
+                {
+                    "candidate": candidate,
+                    "train_start": pd.Timestamp(train_dates[0]),
+                    "train_end": pd.Timestamp(train_dates[-1]),
+                    "test_start": pd.Timestamp(test_dates[0]),
+                    "test_end": pd.Timestamp(test_dates[-1]),
+                    "candidate_weight": float(augmented.coef_[-1]),
+                }
+            )
+
+    baseline_predictions = (
+        pd.concat(baseline_prediction_parts, ignore_index=True)
+        if baseline_prediction_parts
+        else pd.DataFrame(
+            columns=[
+                "date",
+                "instrument",
+                target_column,
+                "baseline_prediction",
+            ]
+        )
+    )
+    augmented_predictions = (
+        pd.concat(augmented_prediction_parts, ignore_index=True)
+        if augmented_prediction_parts
+        else pd.DataFrame(
+            columns=[
+                "date",
+                "instrument",
+                target_column,
+                "baseline_prediction",
+                "candidate",
+                "augmented_prediction",
+            ]
+        )
+    )
+    baseline_weights = pd.DataFrame(baseline_weight_rows)
+    candidate_weights = pd.DataFrame(candidate_weight_rows)
+
+    baseline_ic = rank_ic_series(
+        baseline_predictions,
+        factor_column="baseline_prediction",
+        label_column=target_column,
+    ).dropna()
+    correlations = factor_rank_correlation(merged, [*base_columns, *candidates])
+    summary_rows: list[dict[str, object]] = []
+    for candidate in candidates:
+        candidate_predictions = augmented_predictions.loc[
+            augmented_predictions["candidate"].eq(candidate)
+        ]
+        augmented_ic = rank_ic_series(
+            candidate_predictions,
+            factor_column="augmented_prediction",
+            label_column=target_column,
+        ).dropna()
+        common_ic = pd.concat(
+            [
+                baseline_ic.rename("baseline"),
+                augmented_ic.rename("augmented"),
+            ],
+            axis=1,
+            join="inner",
+        ).dropna()
+        weights = candidate_weights.loc[
+            candidate_weights["candidate"].eq(candidate),
+            "candidate_weight",
+        ]
+        nonzero = weights.abs() > config.coefficient_epsilon
+        selected = weights.loc[nonzero]
+        maximum_correlation = float(
+            correlations.loc[candidate, list(base_columns)].abs().max()
+        )
+        baseline_mean = (
+            float(common_ic["baseline"].mean()) if not common_ic.empty else np.nan
+        )
+        augmented_mean = (
+            float(common_ic["augmented"].mean()) if not common_ic.empty else np.nan
+        )
+        summary_rows.append(
+            {
+                "candidate": candidate,
+                "baseline_oos_rank_ic": baseline_mean,
+                "augmented_oos_rank_ic": augmented_mean,
+                "oos_rank_ic_increment": augmented_mean - baseline_mean,
+                "positive_increment_day_ratio": (
+                    float(
+                        (
+                            common_ic["augmented"] - common_ic["baseline"]
+                            > 0
+                        ).mean()
+                    )
+                    if not common_ic.empty
+                    else 0.0
+                ),
+                "candidate_min_nonzero_window_ratio": (
+                    float(nonzero.mean()) if len(nonzero) else 0.0
+                ),
+                "candidate_min_positive_weight_ratio": (
+                    float((selected > 0).mean()) if not selected.empty else 0.0
+                ),
+                "candidate_max_abs_rank_correlation": maximum_correlation,
+                "oos_days": float(len(common_ic)),
+                "windows": float(len(weights)),
+            }
+        )
+    return (
+        pd.DataFrame(summary_rows),
+        baseline_weights,
+        candidate_weights,
+        augmented_predictions,
+    )
 
 
 def factor_rank_correlation(

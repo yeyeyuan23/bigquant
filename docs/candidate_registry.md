@@ -38,6 +38,14 @@ registered
 | `OB-002` | OB | 盘口深度形状的持续偏斜 | 买方近端深度占优越高 | 1 日 | `no_registered_direction_evidence` |
 | `FR-001` | FR | 新披露现金转化质量改善 | 现金转化改善越强越高 | 5—20 日 | `no_registered_direction_evidence` |
 | `FR-002` | FR | 新披露资产效率改善 | 资产周转与 ROA 改善越强越高 | 5—20 日 | `development_survivor` |
+| `PV-003` | PV | OAP 过去月度最大单日收益 | 最大单日收益越低越高 | 1—20 日 | `rejected` |
+| `PV-004` | PV | OAP 日收益偏度 | 偏度越低越高 | 1—20 日 | `rejected` |
+| `PV-005` | PV | OAP Amihud 非流动性 | 单位成交额冲击越大越高 | 1—20 日 | `rejected` |
+| `PV-006` | PV | OAP Corwin-Schultz 价差估计 | 估计价差越宽越高 | 1—20 日 | `rejected` |
+| `PV-007` | PV | OAP 零成交状态 | 零成交日占比越高越高 | 1—20 日 | `rejected` |
+| `FR-003` | FR | OAP 总资产增长 | 总资产同比增长越低越高 | 5—20 日 | `rejected` |
+| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `rejected` |
+| `FR-005` | FR | OAP 经营现金流市值比 | 经营现金流/流通市值越高越高 | 5—20 日 | `combination_tested` |
 | `INT-001` | composite `[FR, HF]` | `FR-002/HF-001` 等权截面秩 | 两组件越高越高 | 1 日 | `submitted_smoke` |
 | `MICRO-EN-001` | composite `[HF, OB]` | 微观结构相对公开因子库的滚动 Elastic Net 增量 | 由训练窗学习 | 1 日 | `development_watch` |
 
@@ -54,7 +62,7 @@ registered
 - 源码：`src/bigalpha2026/candidates/pv/pv_001.py`
 - 数据：日频价格、成交额、成交量、成交笔数。
 - 机制：相对自身历史，成交活动放大但价格推进有限代表拥挤或供给吸收。
-- 主要重复风险：换手、短期反转、波动率和流动性。
+- 主要重复风险：成交活跃度、短期反转、波动率和流动性。
 
 #### PV-002
 
@@ -111,6 +119,77 @@ registered
 - 机制：资产周转和利润资产效率的披露间改善。
 - 主要重复风险：ROA、资产周转、成长和公开财务质量因子。
 
+### OAP 第一批
+
+这一批的文献来源、字段映射和排除规则见
+`reports/oap_signal_screening.md`。2026-07-26 已在 AIStudio 对 219 个代表交易日、
+219,000 个股票日运行一次共享的公开 36 因子滚动基线和 8 个候选增强模型；精确
+结果见 `reports/oap_batch1_factorlib_incremental.csv` 和
+`reports/oap_batch1_factorlib_decisions.json`。
+
+严格增量门槛下只有 `FR-005` 通过，并在 2023 保持正增量。`PV-005` 在选择期和
+确认期均有正增量，但正方向权重比例未达门槛；当前编号淘汰，机制仅作后续新编号
+研究参考，不进入正式组合。
+`PV-003/004/006` 的确认期或选择期增量为负；`FR-003/004` 未通过选择期增量；
+`PV-007` 还因 21 日离散计数无法达到每日 50 个不同值的技术门槛而淘汰。
+
+#### PV-003
+
+- 源码：`src/bigalpha2026/candidates/pv/pv_003.py`
+- 数据：日频收盘价和前收盘价。
+- 机制：过去 21 个交易日最大单日收益越极端，后续收益预期越低。
+- 固定方向：按 OAP `MaxRet` 方向取负。
+
+#### PV-004
+
+- 源码：`src/bigalpha2026/candidates/pv/pv_004.py`
+- 数据：日频收盘价和前收盘价。
+- 机制：过去 21 个交易日日收益的正偏度越高，后续收益预期越低。
+- 固定方向：按 OAP `ReturnSkew` 方向取负。
+
+#### PV-005
+
+- 源码：`src/bigalpha2026/candidates/pv/pv_005.py`
+- 数据：日收益和成交额。
+- 机制：以过去 21 个交易日 `abs(return)/amount` 均值衡量单位成交额价格冲击。
+- 主要重复风险：公开波动率、成交额和现有 PV-001 活动强度。
+
+#### PV-006
+
+- 源码：`src/bigalpha2026/candidates/pv/pv_006.py`
+- 数据：日频最高价和最低价。
+- 机制：Corwin-Schultz 两日高低价价差估计的 21 日均值。
+- 约束：这是日线价差估计，不解释为真实盘口报价。
+
+#### PV-007
+
+- 源码：`src/bigalpha2026/candidates/pv/pv_007.py`
+- 数据：股票池日频成交量和成交笔数。
+- 机制：过去 21 个股票池交易日中零成交状态的比例。
+- 约束：缺失记录不自动解释为零成交；停牌影响必须在正式评价中单独报告。
+
+#### FR-003
+
+- 源码：`src/bigalpha2026/candidates/fr/fr_003.py`
+- 数据：PIT `lf total_assets`。
+- 机制：当前报告期总资产相对去年同报告期增长，按 OAP `AssetGrowth` 取负。
+- 约束：仅使用当前披露时已经可见的去年同期记录。
+
+#### FR-004
+
+- 源码：`src/bigalpha2026/candidates/fr/fr_004.py`
+- 数据：PIT `ttm operating_revenue`。
+- 机制：TTM 营业收入相对去年同报告期的增长。
+- 约束：缺少季度每股收入和原论文历史标准化字段，因此只能称为
+  OAP-inspired A股改写版，不能称为精确复现。
+
+#### FR-005
+
+- 源码：`src/bigalpha2026/candidates/fr/fr_005.py`
+- 数据：PIT `ttm net_cffoa` 和当日 `float_market_cap`。
+- 机制：经营现金流相对流通市值越高，预期收益越高。
+- 主要重复风险：PE、PB、盈利质量、规模和 FR-001。
+
 ## 组合层
 
 ### INT-001
@@ -119,7 +198,7 @@ registered
 - 定义：两个组件分别做日度截面秩，固定 `50%/50%` 合成后再次做截面秩。
 - 比赛状态：2026-07-26 公榜分数 `0.57416`，当时团队排名第 `79`；
   私榜尚未公布。
-- 定位：端到端冒烟提交，不代表已经通过成本和严格交易准入。
+- 定位：端到端冒烟提交，不代表已经通过正式因子准入。
 - 冻结记录：`artifacts/frozen/int_001.json`。
 
 ### MICRO-EN-001

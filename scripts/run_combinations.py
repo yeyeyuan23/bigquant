@@ -21,7 +21,6 @@ from bigalpha2026.combinations import (
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
     factorlib_regularized_incremental_validation,
-    turnover_adjusted_long_short_returns,
 )
 from bigalpha2026.factor_pool import (
     KEY_COLUMNS,
@@ -315,7 +314,7 @@ def period_metrics(
     factor: pd.DataFrame,
     labels: pd.DataFrame,
     exposures: pd.DataFrame,
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+) -> list[dict[str, object]]:
     variants = {
         "raw_full": (labels, None),
         "neutral_full": (labels, exposures),
@@ -345,30 +344,7 @@ def period_metrics(
             }
         )
 
-    merged = factor.merge(
-        labels[["date", "instrument", "ret_close_to_close"]],
-        on=["date", "instrument"],
-        how="inner",
-    )
-    cost_rows: list[dict[str, object]] = []
-    for cost_bps in FORMAL_EVALUATION_POLICY.cost_sensitivity_bps:
-        returns = turnover_adjusted_long_short_returns(
-            merged,
-            one_way_cost_bps=cost_bps,
-        )
-        cost_rows.append(
-            {
-                "experiment": experiment,
-                "method": method,
-                "period": period,
-                "cost_bps": cost_bps,
-                "gross_mean": float(returns["gross_return"].mean()),
-                "net_mean": float(returns["net_return"].mean()),
-                "mean_turnover": float(returns["turnover"].mean()),
-                "days": int(len(returns)),
-            }
-        )
-    return metric_rows, cost_rows
+    return metric_rows
 
 
 def metric_value(
@@ -484,7 +460,6 @@ def run_experiments(
         )
 
     metric_rows: list[dict[str, object]] = []
-    cost_rows: list[dict[str, object]] = []
     periods = {
         "selection_2022": SELECTION_YEAR,
         "confirmation_2023": CONFIRMATION_YEAR,
@@ -495,7 +470,7 @@ def run_experiments(
             dates = block["date"].unique()
             period_labels = labels.loc[labels["date"].isin(dates)]
             period_exposures = exposures.loc[exposures["date"].isin(dates)]
-            new_metrics, new_costs = period_metrics(
+            new_metrics = period_metrics(
                 experiment,
                 method,
                 period,
@@ -504,9 +479,7 @@ def run_experiments(
                 period_exposures,
             )
             metric_rows.extend(new_metrics)
-            cost_rows.extend(new_costs)
     metrics = pd.DataFrame(metric_rows)
-    costs = pd.DataFrame(cost_rows)
 
     decisions: list[dict[str, object]] = []
     for experiment, method in methods:
@@ -590,7 +563,6 @@ def run_experiments(
         index=False,
     )
     metrics.to_csv(reports_dir / "factor_pool_metrics.csv", index=False)
-    costs.to_csv(reports_dir / "factor_pool_costs.csv", index=False)
     result = {
         "protocol": "dynamic_factor_pool_v1",
         "development_years": list(DEVELOPMENT_YEARS),

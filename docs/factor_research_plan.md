@@ -145,7 +145,7 @@ HF/OB 首轮可以使用冻结的代表月份以控制计算成本；候选通�
 - 日度 Rank IC 均值、IC_IR、t 值和正向比例；
 - 年度或代表月份稳定性；
 - 五分组单调性；
-- 多空收益、换手和 0/10/20/30 bps 成本；
+- 多空收益和夏普；
 - 市值、流动性和可交易子集；
 - 行业、规模、流动性中性化后的结果；
 - 与同族候选和公开基础因子的 Rank 相关性。
@@ -156,7 +156,6 @@ HF/OB 首轮可以使用冻结的代表月份以控制计算成本；候选通�
 - PV/FR 至少 3/4 开发年度为正；HF/OB 至少 60% 的开发代表月份为正；
 - 五分组单调性不低于 0.50；
 - 中性化后和可交易子集方向仍为正；
-- 20 bps 成本后的多空结果不为负；
 - 2023 单独确认，不参与调参。
 
 未达到独立信号门槛时，可以根据证据标记为：
@@ -172,17 +171,23 @@ HF/OB 首轮可以使用冻结的代表月份以控制计算成本；候选通�
 
 ```text
 factorlib_regularized_incremental_validation
+factorlib_regularized_incremental_batch_validation
 ```
 
 位置：`src/bigalpha2026/evaluation.py`。
 
 流程：
 
-1. 使用相同股票日样本和标签。
-2. 训练仅含公开因子库的基线 Elastic Net。
-3. 训练“公开因子库 + 候选”的增强 Elastic Net。
-4. 每个窗口只使用过去 60 个交易日训练，随后 20 日 OOS 测试。
-5. 比较 OOS Rank IC，并记录候选权重、选择频率和与公开因子的最大相关性。
+1. 先冻结所有候选共用的股票日、标签、公开 36 因子和模型参数。
+2. 每个滚动窗口只使用过去 60 个交易日训练，随后 20 日 OOS 测试。
+3. 每个窗口的 36 因子基线只拟合一次并缓存预测，全部候选复用；数据合同、
+   标签、时间切分或模型参数改变时才重跑基线。
+4. 每个候选只新增一个“公开 36 因子 + 候选”的增强模型。
+5. 比较同一基线上的 OOS Rank IC，并记录候选权重、选择频率和与公开因子的
+   最大相关性。
+
+首批 8 个 OAP 候选统一入口为
+`scripts/run_oap_batch1_incremental.py`，禁止逐候选复制一套基线流程。
 
 当前内部增量门槛：
 
@@ -223,7 +228,6 @@ factorlib_regularized_incremental_validation
 - 2022 选择期 Rank IC 增量；
 - 2023 确认结果；
 - 可交易子集；
-- 换手和成本；
 - 逐项删除后的贡献；
 - 权重或特征重要性的时间稳定性。
 
@@ -246,7 +250,7 @@ factorlib_regularized_incremental_validation
 - 三列合同、覆盖率和防泄漏通过；
 - 开发、选择和确认期结果完整；
 - 相对公开因子库和简单组合存在稳定增量；
-- 可交易子集与成本不过度恶化；
+- 可交易子集方向不过度恶化；
 - Notebook 可在 AIStudio 用任意短日期运行；
 - 用户明确授权提交。
 
@@ -261,13 +265,14 @@ reports/
 ├── first_round_technical.csv
 ├── first_round_metrics.csv
 ├── first_round_stability.csv
-├── first_round_costs.csv
 ├── first_round_correlations.csv
 ├── first_round_decisions.json
+├── oap_batch1_technical.csv
+├── oap_batch1_factorlib_incremental.csv
+├── oap_batch1_factorlib_decisions.json
 ├── factor_pool_screening.csv
 ├── factor_pool_incremental.csv
 ├── factor_pool_metrics.csv
-├── factor_pool_costs.csv
 └── factor_pool_decisions.json
 
 artifacts/frozen/

@@ -5,6 +5,7 @@ import pandas as pd
 
 from bigalpha2026.evaluation import (
     FactorLibraryValidationConfig,
+    factorlib_regularized_incremental_batch_validation,
     factorlib_regularized_incremental_validation,
 )
 from bigalpha2026.factorlib import (
@@ -88,6 +89,68 @@ class FactorLibraryTest(unittest.TestCase):
         self.assertFalse(predictions.empty)
         passed, reasons = factorlib_incremental_gate(summary)
         self.assertTrue(passed, reasons)
+
+    def test_batch_validation_reuses_one_baseline_for_all_candidates(self):
+        rng = np.random.default_rng(11)
+        dates = pd.bdate_range("2021-01-04", periods=80)
+        rows = []
+        labels = []
+        for date in dates:
+            for stock in range(20):
+                base = rng.normal()
+                candidate_a = rng.normal()
+                candidate_b = rng.normal()
+                rows.append(
+                    {
+                        "date": date,
+                        "instrument": f"S{stock:03d}",
+                        "base": base,
+                        "candidate_a": candidate_a,
+                        "candidate_b": candidate_b,
+                    }
+                )
+                labels.append(
+                    {
+                        "date": date,
+                        "instrument": f"S{stock:03d}",
+                        "ret_close_to_close": (
+                            0.2 * base
+                            + candidate_a
+                            - 0.5 * candidate_b
+                            + rng.normal(scale=0.1)
+                        ),
+                    }
+                )
+
+        summaries, baseline_weights, candidate_weights, predictions = (
+            factorlib_regularized_incremental_batch_validation(
+                pd.DataFrame(rows),
+                pd.DataFrame(labels),
+                ["base"],
+                ["candidate_a", "candidate_b"],
+                config=FactorLibraryValidationConfig(
+                    train_window_days=40,
+                    test_window_days=20,
+                    alpha=0.001,
+                    l1_ratio=0.5,
+                ),
+            )
+        )
+        self.assertEqual(len(summaries), 2)
+        self.assertEqual(len(baseline_weights), 2)
+        self.assertEqual(len(candidate_weights), 4)
+        baseline_by_candidate = predictions.pivot(
+            index=["date", "instrument"],
+            columns="candidate",
+            values="baseline_prediction",
+        )
+        self.assertTrue(
+            np.allclose(
+                baseline_by_candidate["candidate_a"],
+                baseline_by_candidate["candidate_b"],
+            )
+        )
+        self.assertEqual(summaries["baseline_oos_rank_ic"].nunique(), 1)
 
 
 if __name__ == "__main__":
