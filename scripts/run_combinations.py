@@ -24,7 +24,6 @@ from bigalpha2026.evaluation import (
 )
 from bigalpha2026.factor_pool import (
     KEY_COLUMNS,
-    admitted_candidate_ids,
     apply_feature_directions,
     build_feature_panel,
     family_balanced_factor,
@@ -171,17 +170,43 @@ def load_dynamic_inputs(
     factorlib = load_factorlib(data_dir, YEARS)
     candidate_pool = pd.read_parquet(data_dir / "factors/candidate_pool.parquet")
     decisions = load_decisions(reports_dir / "first_round_decisions.json")
-    admitted = admitted_candidate_ids(
-        decisions,
-        admitted_statuses=FORMAL_EVALUATION_POLICY.admitted_candidate_statuses,
+    candidate_ids = tuple(
+        sorted(candidate_pool["candidate_id"].astype(str).unique())
+    )
+    decision_by_id = {
+        str(row["candidate_id"]): row
+        for row in decisions
+    }
+    missing_decisions = sorted(set(candidate_ids).difference(decision_by_id))
+    if missing_decisions:
+        raise ValueError(
+            "first-round decisions do not cover the full candidate pool; "
+            f"rerun run_first_round.py, missing={missing_decisions}"
+        )
+    single_factor_admitted = tuple(
+        candidate_id
+        for candidate_id in candidate_ids
+        if bool(
+            decision_by_id[candidate_id].get(
+                "single_factor_selection_passed",
+                False,
+            )
+        )
     )
     panel, public_columns, self_columns, coverage = build_feature_panel(
         universe,
         factorlib,
         candidate_pool,
-        admitted_candidates=admitted,
+        admitted_candidates=candidate_ids,
     )
-    return panel, labels, exposures, coverage, candidate_pool, admitted
+    return (
+        panel,
+        labels,
+        exposures,
+        coverage,
+        candidate_pool,
+        single_factor_admitted,
+    )
 
 
 def contract_summary(
@@ -203,10 +228,14 @@ def contract_summary(
             None,
         )
 
-    panel, labels, exposures, coverage, candidate_pool, admitted = load_dynamic_inputs(
-        data_dir,
-        reports_dir,
-    )
+    (
+        panel,
+        labels,
+        exposures,
+        coverage,
+        candidate_pool,
+        single_factor_admitted,
+    ) = load_dynamic_inputs(data_dir, reports_dir)
     public_columns = tuple(
         column for column in panel.columns if column.startswith("factorlib__")
     )
@@ -236,7 +265,8 @@ def contract_summary(
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
         },
         "combination_inputs": {
-            "self_candidates": list(admitted),
+            "all_candidate_count": int(candidate_pool["candidate_id"].nunique()),
+            "single_factor_candidates": list(single_factor_admitted),
             "self_feature_count": len(self_columns),
         },
         "minimum_public_coverage": minimum_public_coverage,
@@ -386,6 +416,7 @@ def run_experiments(
     exposures: pd.DataFrame,
     public_columns: tuple[str, ...],
     self_columns: tuple[str, ...],
+    single_factor_candidates: tuple[str, ...],
     reports_dir: Path,
 ) -> dict[str, object]:
     development_panel = panel.loc[panel["date"].dt.year.isin(DEVELOPMENT_YEARS)]
@@ -482,8 +513,15 @@ def run_experiments(
             "no self-developed factor passed the screened-factorlib training gate"
         )
 
-    self_features = tuple(admitted_self)
-    joint_features = (*selected_public, *self_features)
+    self_features = tuple(
+        f"self__{candidate_id}"
+        for candidate_id in single_factor_candidates
+        if f"self__{candidate_id}" in self_columns
+    )
+    if not self_features:
+        raise RuntimeError("no candidate passed the single-factor selection gate")
+    joint_self_features = tuple(admitted_self)
+    joint_features = (*selected_public, *joint_self_features)
     pipelines: dict[tuple[str, str], pd.DataFrame] = {
         (
             "self_factor_composite",
@@ -659,7 +697,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     assert loaded is not None
-    panel, labels, exposures, _, _ = loaded
+    panel, labels, exposures, _, _, single_factor_candidates = loaded
     public_columns = tuple(
         column for column in panel.columns if column.startswith("factorlib__")
     )
@@ -672,6 +710,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         exposures,
         public_columns,
         self_columns,
+        single_factor_candidates,
         args.reports_dir,
     )
     print(json.dumps(result["pipeline_decisions"], ensure_ascii=False, indent=2))

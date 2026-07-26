@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -294,20 +294,3 @@ def family_balanced_factor(
         .mul(2.0)
     )
     return result
-
-
-def admitted_candidate_ids(
-    decisions: Sequence[Mapping[str, object]],
-    *,
-    admitted_statuses: Iterable[str],
-) -> tuple[str, ...]:
-    """Return deterministic candidate ids admitted by the first-round report."""
-
-    statuses = set(admitted_statuses)
-    return tuple(
-        sorted(
-            str(row["candidate_id"])
-            for row in decisions
-            if str(row.get("status")) in statuses
-        )
-    )

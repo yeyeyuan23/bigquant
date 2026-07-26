@@ -136,7 +136,7 @@ class ResearchPolicyTest(unittest.TestCase):
                 all36_passed=True,
                 screened_passed=False,
             ),
-            {"classification": "orthogonal_watch", "enters_training": False},
+            {"classification": "rejected", "enters_training": False},
         )
         self.assertEqual(
             dual_factorlib_admission(

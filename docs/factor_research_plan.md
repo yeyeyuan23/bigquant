@@ -158,12 +158,16 @@ HF/OB 首轮可以使用冻结的代表月份以控制计算成本；候选通�
 - 中性化后和可交易子集方向仍为正；
 - 2023 单独确认，不参与调参。
 
-未达到独立信号门槛时，可以根据证据标记为：
+单因子评价只产生明确路由：
 
-- `conditional_watch`：只在特定状态有用；
-- `diversifier`：单独较弱但组合增量稳定；
-- `risk_variable`：更适合控制风险；
-- `rejected`：方向、状态和增量均不稳定。
+- 通过开发期与 2022 选择期门槛：`S=通过`，进入
+  `self_factor_composite`；
+- 未通过：`S=未通过`，不进入规则组合，但仍必须继续完成双基准评价；
+- `S=未通过` 且 screened15 增量通过的候选，只进入 Elastic Net 与
+  LightGBM；
+- `S` 与 screened15 增量均未通过：`rejected`。
+
+不保留没有明确后续训练动作的 `watch`、`development_survivor` 或风险变量状态。
 
 ## 6. 公开因子库增量评价
 
@@ -208,13 +212,27 @@ factorlib_regularized_incremental_batch_validation
 |---|---|---|---|
 | 通过 | 通过 | `core_candidate` | 是 |
 | 未通过 | 通过 | `overlap_aware_candidate` | 是 |
-| 通过 | 未通过 | `orthogonal_watch` | 否 |
+| 通过 | 未通过 | `rejected` | 否 |
 | 未通过 | 未通过 | `rejected` | 否 |
 
 技术门槛未通过时直接标记 `technical_reject`。因此，
 `factorlib_screened` 通过是进入训练的必要条件；`factorlib_all36` 用于区分候选
-是否在完整公开库之外仍有稳定正交增量。不得为了让候选晋级而在查看 2022 或
-2023 后修改公开因子筛选成员。
+是否在完整公开库之外仍有稳定正交增量。只通过 `factorlib_all36`、但未通过
+`factorlib_screened` 的候选直接淘汰，不设置没有后续动作的观察状态。不得为了
+让候选晋级而在查看 2022 或 2023 后修改公开因子筛选成员。
+
+三个评价结果的固定路由为：
+
+| 单因子 `S` | all36 正交 `O` | screened15 增量 `I` | 明确动作 |
+|---|---|---|---|
+| 通过 | 任意 | 未通过 | 只进入 `self_factor_composite` |
+| 未通过 | 任意 | 通过 | 只进入两个联合模型 |
+| 通过 | 任意 | 通过 | 同时进入规则组合和两个联合模型 |
+| 未通过 | 任意 | 未通过 | `rejected` |
+
+只有当 `I=通过` 时，`O` 才用于把联合模型候选标为 `core_candidate`
+（`O=通过`）或 `overlap_aware_candidate`（`O=未通过`）。`O` 不单独产生训练
+管线或观察状态。
 
 这是官方评分的代理检查，不等于真实比赛分数。
 

@@ -7,7 +7,6 @@ from bigalpha2026.evaluation import ElasticNetConfig
 from bigalpha2026.factor_pool import (
     PUBLIC_PREFIX,
     SELF_PREFIX,
-    admitted_candidate_ids,
     apply_feature_directions,
     build_feature_panel,
     family_balanced_factor,
@@ -141,7 +140,7 @@ class FactorPoolTest(unittest.TestCase):
         oriented = apply_feature_directions(panel, screening)
         self.assertEqual(len(oriented), len(panel))
 
-    def test_candidate_pool_contract_and_decision_filter(self):
+    def test_candidate_pool_contract(self):
         pool = pd.DataFrame(
             {
                 "date": pd.to_datetime(["2022-01-04"]),
@@ -152,14 +151,6 @@ class FactorPoolTest(unittest.TestCase):
             }
         )
         validate_candidate_pool(pool)
-        admitted = admitted_candidate_ids(
-            [
-                {"candidate_id": "FR-002", "status": "development_survivor"},
-                {"candidate_id": "PV-001", "status": "rejected"},
-            ],
-            admitted_statuses=("development_survivor",),
-        )
-        self.assertEqual(admitted, ("FR-002",))
 
 
 if __name__ == "__main__":

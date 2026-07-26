@@ -83,15 +83,6 @@ class FormalEvaluationPolicy:
     minimum_rank_ic_t_stat: float = 2.0
     minimum_group_monotonicity: float = 0.50
     liquid_subset_exclusion_quantile: float = 0.20
-    admitted_candidate_statuses: tuple[str, ...] = (
-        "provisional_survivor",
-        "selection_survivor",
-        "development_survivor",
-        "conditional_watch",
-        "diversifier",
-    )
-
-
 FORMAL_EVALUATION_POLICY = FormalEvaluationPolicy()
 
 
@@ -284,9 +275,6 @@ def dual_factorlib_admission(
     elif screened_passed:
         classification = "overlap_aware_candidate"
         enters_training = True
-    elif all36_passed:
-        classification = "orthogonal_watch"
-        enters_training = False
     else:
         classification = "rejected"
         enters_training = False

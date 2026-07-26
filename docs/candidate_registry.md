@@ -30,21 +30,21 @@ registered
 
 | ID | 类别 | 机制 | 方向 | 周期 | 当前状态 |
 |---|---|---|---|---|---|
-| `PV-001` | PV | 活动强度相对价格推进效率 | 推进越有效越高 | 1—3 日 | `no_registered_direction_evidence` |
-| `PV-002` | PV | 隔夜冲击的日内吸收 | 负跳空回补为正，正跳空回落为负 | 1—3 日 | `no_registered_direction_evidence` |
-| `HF-001` | HF | 分钟价格冲击后的吸收与恢复 | 恢复越充分越高 | 1—3 日 | `conditional_watch` |
-| `HF-002` | HF | 成交碎片化条件下的价格效率 | 价格效率越高越高 | 1—3 日 | `no_registered_direction_evidence` |
-| `OB-001` | OB | 有效档位盘口韧性 | 价差更低、深度恢复更强越高 | 1 日 | `no_registered_direction_evidence` |
-| `OB-002` | OB | 盘口深度形状的持续偏斜 | 买方近端深度占优越高 | 1 日 | `no_registered_direction_evidence` |
-| `FR-001` | FR | 新披露现金转化质量改善 | 现金转化改善越强越高 | 5—20 日 | `no_registered_direction_evidence` |
-| `FR-002` | FR | 新披露资产效率改善 | 资产周转与 ROA 改善越强越高 | 5—20 日 | `development_survivor` |
+| `PV-001` | PV | 活动强度相对价格推进效率 | 推进越有效越高 | 1—3 日 | `evaluation_pending` |
+| `PV-002` | PV | 隔夜冲击的日内吸收 | 负跳空回补为正，正跳空回落为负 | 1—3 日 | `evaluation_pending` |
+| `HF-001` | HF | 分钟价格冲击后的吸收与恢复 | 恢复越充分越高 | 1—3 日 | `evaluation_pending` |
+| `HF-002` | HF | 成交碎片化条件下的价格效率 | 价格效率越高越高 | 1—3 日 | `evaluation_pending` |
+| `OB-001` | OB | 有效档位盘口韧性 | 价差更低、深度恢复更强越高 | 1 日 | `evaluation_pending` |
+| `OB-002` | OB | 盘口深度形状的持续偏斜 | 买方近端深度占优越高 | 1 日 | `evaluation_pending` |
+| `FR-001` | FR | 新披露现金转化质量改善 | 现金转化改善越强越高 | 5—20 日 | `evaluation_pending` |
+| `FR-002` | FR | 新披露资产效率改善 | 资产周转与 ROA 改善越强越高 | 5—20 日 | `evaluation_pending` |
 | `PV-003` | PV | OAP 过去月度最大单日收益 | 最大单日收益越低越高 | 1—20 日 | `rejected` |
 | `PV-004` | PV | OAP 日收益偏度 | 偏度越低越高 | 1—20 日 | `rejected` |
 | `PV-005` | PV | OAP Amihud 非流动性 | 单位成交额冲击越大越高 | 1—20 日 | `rejected` |
 | `PV-006` | PV | OAP Corwin-Schultz 价差估计 | 估计价差越宽越高 | 1—20 日 | `rejected` |
 | `PV-007` | PV | OAP 零成交状态 | 零成交日占比越高越高 | 1—20 日 | `rejected` |
 | `FR-003` | FR | OAP 总资产增长 | 总资产同比增长越低越高 | 5—20 日 | `rejected` |
-| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `conditional_watch` |
+| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `rejected` |
 | `FR-005` | FR | OAP 经营现金流市值比 | 经营现金流/流通市值越高越高 | 5—20 日 | `combination_tested` |
 | `INT-001` | composite `[FR, HF]` | `FR-002/HF-001` 等权截面秩 | 两组件越高越高 | 1 日 | `submitted_smoke` |
 | `MICRO-EN-001` | composite `[HF, OB]` | 微观结构相对公开因子库的滚动 Elastic Net 增量 | 由训练窗学习 | 1 日 | `development_watch` |
@@ -129,8 +129,8 @@ registered
 
 双基准准入结果中，`FR-005` 同时通过 `factorlib_all36` 和冻结的
 `factorlib_screened（15/36）`，属于 `core_candidate`，且 2023 两套增量均为正。
-`FR-004` 只通过 screened 基准，属于 `overlap_aware_candidate`，可以进入挑战池；
-但它相对 screened 的 2023 增量转负，因此不得进入最终冻结主组合。
+`FR-004` 在选择期只通过 screened 基准，但相对 screened 的 2023 增量转负，
+最终状态为 `rejected`，不进入当前任何训练管线。
 
 其余候选不进入训练。`PV-005` 虽在选择期和确认期均有正增量，但正方向权重比例
 未达门槛；当前编号淘汰，只作后续新编号研究参考。`PV-003/004/006` 未通过双基准

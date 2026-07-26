@@ -346,7 +346,6 @@ def classify_candidates(
                 FORMAL_EVALUATION_POLICY.minimum_positive_subperiod_fraction
             )
 
-        dev_ic = value(candidate_id, "development", "raw_full", "rank_ic_mean")
         development_failures = period_failures(
             candidate_id,
             "development",
@@ -378,16 +377,17 @@ def classify_candidates(
             status = "provisional_survivor"
         elif not development_failures and not selection_failures:
             status = "selection_survivor"
-        elif not development_failures:
-            status = "development_survivor"
-        elif dev_ic > 0 and not selection_failures and not confirmation_failures:
-            status = "conditional_watch"
         else:
-            status = "no_registered_direction_evidence"
+            status = "rejected"
         decisions.append(
             {
                 "candidate_id": candidate_id,
                 "status": status,
+                "technical_passed": True,
+                "single_factor_selection_passed": (
+                    not development_failures and not selection_failures
+                ),
+                "single_factor_confirmation_passed": not confirmation_failures,
                 "development_stability_fraction": stability_fraction,
                 "development_failures": development_failures,
                 "selection_failures": selection_failures,
@@ -536,6 +536,28 @@ def main() -> None:
         REPORTS / "first_round_correlations.csv", index=False
     )
     decisions = classify_candidates(metrics_frame, stability_frame)
+    decided_ids = {str(row["candidate_id"]) for row in decisions}
+    for row in technical_output:
+        candidate_id = str(row["candidate_id"])
+        if candidate_id in decided_ids:
+            continue
+        decisions.append(
+            {
+                "candidate_id": candidate_id,
+                "status": "technical_reject",
+                "technical_passed": False,
+                "single_factor_selection_passed": False,
+                "single_factor_confirmation_passed": False,
+                "development_stability_fraction": 0.0,
+                "development_failures": [
+                    "candidate has no technically eligible evaluation metrics"
+                ],
+                "selection_failures": [],
+                "confirmation_failures": [],
+                "upload_ready": False,
+            }
+        )
+    decisions.sort(key=lambda row: str(row["candidate_id"]))
     candidate_pool = candidate_pool_frame(clean_factors)
     candidate_pool.to_parquet(DATA / "factors" / "candidate_pool.parquet", index=False)
     (REPORTS / "first_round_decisions.json").write_text(
