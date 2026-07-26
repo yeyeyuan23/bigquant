@@ -1,4 +1,5 @@
 import unittest
+from multiprocessing import get_context
 
 import pandas as pd
 
@@ -9,6 +10,36 @@ from bigalpha2026.combinations import (
     walk_forward_tree_boosting,
 )
 from bigalpha2026.research_policy import fixed_weight_rank_combination
+
+
+def _run_tree_backend_smoke(backend: str) -> None:
+    dates = pd.to_datetime(
+        ["2019-01-02"] * 120
+        + ["2020-01-02"] * 120
+        + ["2021-01-04"] * 120
+    )
+    values = list(range(120)) * 3
+    panel = pd.DataFrame(
+        {
+            "date": dates,
+            "instrument": [str(value) for value in range(120)] * 3,
+            "FR-002": values,
+            "HF-001": list(reversed(values[:120])) * 3,
+        }
+    )
+    labels = panel[["date", "instrument"]].copy()
+    labels["ret_close_to_close"] = panel["FR-002"] / 1000
+    result = walk_forward_tree_boosting(
+        panel,
+        labels,
+        feature_columns=("FR-002", "HF-001"),
+        prediction_years=(2020, 2021),
+        backend=backend,
+    )
+    assert set(result["date"].dt.year) == {2020, 2021}
+    assert list(result.columns) == ["date", "instrument", "factor"]
+    assert not result.duplicated(["date", "instrument"]).any()
+    assert result["factor"].between(-1, 1).all()
 
 
 class CombinationTest(unittest.TestCase):
@@ -53,40 +84,22 @@ class CombinationTest(unittest.TestCase):
         self.assertAlmostEqual(weights["HF-001"], 0.0)
 
     def test_tree_predictions_are_strictly_walk_forward(self):
-        dates = pd.to_datetime(
-            ["2019-01-02"] * 120
-            + ["2020-01-02"] * 120
-            + ["2021-01-04"] * 120
-        )
-        values = list(range(120)) * 3
-        panel = pd.DataFrame(
-            {
-                "date": dates,
-                "instrument": [str(value) for value in range(120)] * 3,
-                "FR-002": values,
-                "HF-001": list(reversed(values[:120])) * 3,
-            }
-        )
-        labels = panel[["date", "instrument"]].copy()
-        labels["ret_close_to_close"] = panel["FR-002"] / 1000
-        for backend in ("sklearn_hist", "lightgbm", "xgboost"):
+        for backend in ("lightgbm", "xgboost"):
             with self.subTest(backend=backend):
-                result = walk_forward_tree_boosting(
-                    panel,
-                    labels,
-                    feature_columns=("FR-002", "HF-001"),
-                    prediction_years=(2020, 2021),
-                    backend=backend,
+                process = get_context("spawn").Process(
+                    target=_run_tree_backend_smoke,
+                    args=(backend,),
                 )
-                self.assertEqual(set(result["date"].dt.year), {2020, 2021})
-                self.assertEqual(
-                    list(result.columns), ["date", "instrument", "factor"]
-                )
-                self.assertFalse(result.duplicated(["date", "instrument"]).any())
-                self.assertTrue(result["factor"].between(-1, 1).all())
+                process.start()
+                process.join(timeout=60)
+                if process.is_alive():
+                    process.terminate()
+                    process.join()
+                    self.fail(f"{backend} smoke test timed out")
+                self.assertEqual(process.exitcode, 0)
 
     def test_tree_model_configs_are_shallow_and_deterministic(self):
-        for backend in ("sklearn_hist", "lightgbm", "xgboost"):
+        for backend in ("lightgbm", "xgboost"):
             config = tree_model_config(backend)
             self.assertEqual(config["random_state"], 20260726)
             self.assertEqual(config["training"], "expanding_window")

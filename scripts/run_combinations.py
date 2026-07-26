@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 
-from bigalpha2026.candidates.fr_002 import build_fr_002_factor_from_panel
-from bigalpha2026.candidates.hf_001 import build_hf_001_factor_from_daily
+from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
+from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.combinations import (
     fixed_rank_blend,
     positive_ic_weights,
@@ -281,7 +281,6 @@ def main() -> None:
         "fr_002_only": {"FR-002": 1.0, "HF-001": 0.0},
         "hf_001_only": {"FR-002": 0.0, "HF-001": 1.0},
         "equal_rank": {"FR-002": 0.5, "HF-001": 0.5},
-        "fr_core_75_25": {"FR-002": 0.75, "HF-001": 0.25},
         "ic_weighted": ic_weights,
     }
     methods = {
@@ -289,7 +288,6 @@ def main() -> None:
         for name, weights in method_weights.items()
     }
     tree_backends = {
-        "hist_gbdt": "sklearn_hist",
         "lightgbm": "lightgbm",
         "xgboost": "xgboost",
     }

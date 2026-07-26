@@ -417,6 +417,17 @@ class ElasticNetConfig:
     coefficient_epsilon: float = 1e-10
 
 
+@dataclass(frozen=True)
+class FactorLibraryValidationConfig:
+    """Frozen settings for public-factor incremental validation."""
+
+    train_window_days: int = 60
+    test_window_days: int = 20
+    alpha: float = 0.001
+    l1_ratio: float = 0.5
+    coefficient_epsilon: float = 1e-10
+
+
 def rolling_elastic_net_scores(
     factor_panel: pd.DataFrame,
     target: pd.DataFrame,
@@ -489,6 +500,180 @@ def rolling_elastic_net_scores(
     if not score_frame.empty:
         score_frame["model_score_percentile"] = score_frame["model_score"].rank(pct=True)
     return score_frame, weights
+
+
+def factorlib_regularized_incremental_validation(
+    factor_panel: pd.DataFrame,
+    target: pd.DataFrame,
+    base_factor_columns: Sequence[str],
+    candidate_columns: Sequence[str],
+    target_column: str = "ret_close_to_close",
+    config: FactorLibraryValidationConfig = FactorLibraryValidationConfig(),
+) -> tuple[dict[str, float], pd.DataFrame, pd.DataFrame]:
+    """Compare public-factor and public-plus-candidate Elastic Net models.
+
+    Every rolling model is fitted on the trailing training window and scored
+    only on the following test window. Both models use the same complete-case
+    rows so the measured increment cannot come from a changing sample.
+    """
+
+    try:
+        from sklearn.linear_model import ElasticNet
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("scikit-learn is required for Elastic Net evaluation") from exc
+
+    base_columns = tuple(base_factor_columns)
+    candidates = tuple(candidate_columns)
+    if not base_columns:
+        raise ValueError("base_factor_columns must not be empty")
+    if not candidates:
+        raise ValueError("candidate_columns must not be empty")
+    if set(base_columns).intersection(candidates):
+        raise ValueError("base and candidate columns must be disjoint")
+
+    required = {"date", "instrument", *base_columns, *candidates}
+    missing = sorted(required.difference(factor_panel.columns))
+    if missing:
+        raise ValueError(f"factor_panel is missing required columns: {missing}")
+    if target_column not in target.columns:
+        raise ValueError(f"target is missing required column: {target_column}")
+
+    panel = factor_panel[["date", "instrument", *base_columns, *candidates]].copy()
+    panel["date"] = pd.to_datetime(panel["date"], errors="coerce").dt.normalize()
+    panel["instrument"] = panel["instrument"].astype(str)
+    if panel.duplicated(["date", "instrument"]).any():
+        raise ValueError("factor_panel contains duplicate date-instrument keys")
+
+    labels = target[["date", "instrument", target_column]].copy()
+    labels["date"] = pd.to_datetime(labels["date"], errors="coerce").dt.normalize()
+    labels["instrument"] = labels["instrument"].astype(str)
+    merged = panel.merge(
+        labels,
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    all_features = (*base_columns, *candidates)
+    merged = cross_section_zscore(merged, [*all_features, target_column])
+    merged = merged.dropna(subset=[*all_features, target_column])
+    dates = np.array(sorted(merged["date"].dropna().unique()))
+
+    prediction_parts: list[pd.DataFrame] = []
+    weight_rows: list[dict[str, object]] = []
+    train_days = config.train_window_days
+    test_days = config.test_window_days
+    for test_start in range(train_days, len(dates), test_days):
+        train_dates = dates[test_start - train_days : test_start]
+        test_dates = dates[test_start : test_start + test_days]
+        if len(test_dates) == 0:
+            continue
+        train = merged.loc[merged["date"].isin(train_dates)]
+        test = merged.loc[merged["date"].isin(test_dates)]
+        if len(train) <= len(all_features) + 2 or test.empty:
+            continue
+
+        baseline = ElasticNet(
+            alpha=config.alpha,
+            l1_ratio=config.l1_ratio,
+            fit_intercept=True,
+            max_iter=10000,
+            random_state=0,
+        )
+        augmented = ElasticNet(
+            alpha=config.alpha,
+            l1_ratio=config.l1_ratio,
+            fit_intercept=True,
+            max_iter=10000,
+            random_state=0,
+        )
+        baseline.fit(
+            train.loc[:, base_columns].to_numpy(dtype=float),
+            train[target_column].to_numpy(dtype=float),
+        )
+        augmented.fit(
+            train.loc[:, all_features].to_numpy(dtype=float),
+            train[target_column].to_numpy(dtype=float),
+        )
+
+        predictions = test[["date", "instrument", target_column]].copy()
+        predictions["baseline_prediction"] = baseline.predict(
+            test.loc[:, base_columns].to_numpy(dtype=float)
+        )
+        predictions["augmented_prediction"] = augmented.predict(
+            test.loc[:, all_features].to_numpy(dtype=float)
+        )
+        prediction_parts.append(predictions)
+
+        weight_row: dict[str, object] = {
+            "train_start": pd.Timestamp(train_dates[0]),
+            "train_end": pd.Timestamp(train_dates[-1]),
+            "test_start": pd.Timestamp(test_dates[0]),
+            "test_end": pd.Timestamp(test_dates[-1]),
+        }
+        weight_row.update(dict(zip(all_features, augmented.coef_, strict=True)))
+        weight_rows.append(weight_row)
+
+    predictions = (
+        pd.concat(prediction_parts, ignore_index=True)
+        if prediction_parts
+        else pd.DataFrame(
+            columns=[
+                "date",
+                "instrument",
+                target_column,
+                "baseline_prediction",
+                "augmented_prediction",
+            ]
+        )
+    )
+    weights = pd.DataFrame(weight_rows)
+
+    baseline_ic = rank_ic_series(
+        predictions,
+        factor_column="baseline_prediction",
+        label_column=target_column,
+    ).dropna()
+    augmented_ic = rank_ic_series(
+        predictions,
+        factor_column="augmented_prediction",
+        label_column=target_column,
+    ).dropna()
+
+    nonzero_ratios: list[float] = []
+    positive_ratios: list[float] = []
+    for candidate in candidates:
+        coefficients = (
+            pd.to_numeric(weights[candidate], errors="coerce")
+            if candidate in weights
+            else pd.Series(dtype=float)
+        )
+        nonzero = coefficients.abs() > config.coefficient_epsilon
+        nonzero_ratios.append(float(nonzero.mean()) if len(nonzero) else 0.0)
+        selected = coefficients.loc[nonzero]
+        positive_ratios.append(
+            float((selected > 0).mean()) if not selected.empty else 0.0
+        )
+
+    correlations = factor_rank_correlation(merged, [*base_columns, *candidates])
+    cross_correlations = correlations.loc[list(candidates), list(base_columns)].abs()
+    maximum_correlation = (
+        float(cross_correlations.max().max())
+        if not cross_correlations.empty
+        else np.nan
+    )
+    baseline_mean = float(baseline_ic.mean()) if not baseline_ic.empty else np.nan
+    augmented_mean = float(augmented_ic.mean()) if not augmented_ic.empty else np.nan
+    summary = {
+        "baseline_oos_rank_ic": baseline_mean,
+        "augmented_oos_rank_ic": augmented_mean,
+        "oos_rank_ic_increment": augmented_mean - baseline_mean,
+        "candidate_min_nonzero_window_ratio": min(nonzero_ratios),
+        "candidate_min_positive_weight_ratio": min(positive_ratios),
+        "candidate_max_abs_rank_correlation": maximum_correlation,
+        "oos_days": float(len(augmented_ic)),
+        "windows": float(len(weights)),
+    }
+    return summary, weights, predictions
 
 
 def factor_rank_correlation(

@@ -9,4 +9,15 @@ dist/
 reports/*.csv
 reports/*.json
 .DS_Store
+
+# Competition data and transfer archives remain local. Git only tracks data
+# manifests and documentation.
 data/**/*.parquet
+data/raw/
+data/transfers/
+data/**/*.zip
+data/**/*.tar
+data/**/*.tar.gz
+data/**/*.tar.zst
+data/**/*.tmp
+data/**/*.partial

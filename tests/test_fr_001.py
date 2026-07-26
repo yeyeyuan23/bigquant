@@ -5,7 +5,10 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.fr_001 import build_fr_001_factor, compute_fr_001_events
+from bigalpha2026.candidates.fr.fr_001 import (
+    build_fr_001_factor,
+    compute_fr_001_events,
+)
 
 
 def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DatetimeIndex]:

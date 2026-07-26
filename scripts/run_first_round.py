@@ -12,14 +12,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.fr_001 import build_fr_001_factor_from_panel
-from bigalpha2026.candidates.fr_002 import build_fr_002_factor_from_panel
-from bigalpha2026.candidates.hf_001 import build_hf_001_factor_from_daily
-from bigalpha2026.candidates.hf_002 import build_hf_002_factor_from_daily
-from bigalpha2026.candidates.ob_001 import build_ob_001_factor_from_daily
-from bigalpha2026.candidates.ob_002 import build_ob_002_factor_from_daily
-from bigalpha2026.candidates.pv_001 import build_pv_001_factor
-from bigalpha2026.candidates.pv_002 import build_pv_002_factor
+from bigalpha2026.candidates.fr.fr_001 import build_fr_001_factor_from_panel
+from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
+from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
+from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
+from bigalpha2026.candidates.ob.ob_001 import build_ob_001_factor_from_daily
+from bigalpha2026.candidates.ob.ob_002 import build_ob_002_factor_from_daily
+from bigalpha2026.candidates.pv.pv_001 import build_pv_001_factor
+from bigalpha2026.candidates.pv.pv_002 import build_pv_002_factor
 from bigalpha2026.evaluation import (
     LABEL_COLUMNS,
     evaluate_single_factor,

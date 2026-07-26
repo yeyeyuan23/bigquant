@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.ob_002 import build_ob_002_factor
+from bigalpha2026.candidates.ob.ob_002 import build_ob_002_factor
 
 
 def _inputs() -> tuple[pd.DataFrame, pd.DataFrame]:

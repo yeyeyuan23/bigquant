@@ -108,9 +108,21 @@ class CombinationAdmissionGate:
     require_positive_tradable_ic: bool = True
 
 
+@dataclass(frozen=True)
+class FactorLibraryIncrementalGate:
+    """Admission gate against the competition-provided public factor library."""
+
+    minimum_oos_rank_ic_increment: float = 0.0
+    minimum_nonzero_window_ratio: float = 0.50
+    minimum_positive_weight_ratio: float = 0.60
+    maximum_abs_rank_correlation: float = 0.80
+    minimum_oos_days: int = 40
+
+
 TECHNICAL_GATE = TechnicalGate()
 INCREMENTAL_GATE = IncrementalGate()
 COMBINATION_ADMISSION_GATE = CombinationAdmissionGate()
+FACTORLIB_INCREMENTAL_GATE = FactorLibraryIncrementalGate()
 
 
 def candidate_ids(stage: str | None = None) -> tuple[str, ...]:
@@ -256,4 +268,38 @@ def incremental_gate(
     ls_improved = np.isfinite(base_ls) and np.isfinite(new_ls) and new_ls > base_ls
     if policy.require_ir_or_long_short_improvement and not (ir_improved or ls_improved):
         reasons.append("neither IC stability nor long-short performance improves")
+    return not reasons, reasons
+
+
+def factorlib_incremental_gate(
+    summary: Mapping[str, float],
+    policy: FactorLibraryIncrementalGate = FACTORLIB_INCREMENTAL_GATE,
+) -> tuple[bool, list[str]]:
+    """Require a candidate to add stable information beyond public factors."""
+
+    reasons: list[str] = []
+    increment = float(summary.get("oos_rank_ic_increment", np.nan))
+    nonzero_ratio = float(
+        summary.get("candidate_min_nonzero_window_ratio", np.nan)
+    )
+    positive_ratio = float(
+        summary.get("candidate_min_positive_weight_ratio", np.nan)
+    )
+    correlation = float(
+        summary.get("candidate_max_abs_rank_correlation", np.nan)
+    )
+    oos_days = float(summary.get("oos_days", np.nan))
+    if not np.isfinite(increment) or increment <= policy.minimum_oos_rank_ic_increment:
+        reasons.append("no positive out-of-sample Rank IC increment over factorlib")
+    if not np.isfinite(nonzero_ratio) or nonzero_ratio < policy.minimum_nonzero_window_ratio:
+        reasons.append("candidate is selected in too few regularized windows")
+    if (
+        not np.isfinite(positive_ratio)
+        or positive_ratio < policy.minimum_positive_weight_ratio
+    ):
+        reasons.append("candidate weight direction is not stable")
+    if not np.isfinite(correlation) or correlation > policy.maximum_abs_rank_correlation:
+        reasons.append("candidate is too correlated with a public factor")
+    if not np.isfinite(oos_days) or oos_days < policy.minimum_oos_days:
+        reasons.append("too few out-of-sample evaluation days")
     return not reasons, reasons
