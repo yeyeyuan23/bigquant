@@ -7,6 +7,7 @@ import pandas as pd
 from scripts.run_combinations import (
     CONFIRMATION_YEAR,
     DEVELOPMENT_YEARS,
+    FROZEN_TEST_YEAR,
     PIPELINE_NAMES,
     SELECTION_YEAR,
     contract_summary,
@@ -22,6 +23,7 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(DEVELOPMENT_YEARS, (2019, 2020, 2021))
         self.assertEqual(SELECTION_YEAR, 2022)
         self.assertEqual(CONFIRMATION_YEAR, 2023)
+        self.assertEqual(FROZEN_TEST_YEAR, 2024)
         self.assertEqual(
             PIPELINE_NAMES,
             (

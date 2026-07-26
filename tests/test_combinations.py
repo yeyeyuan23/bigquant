@@ -34,6 +34,8 @@ def _run_lightgbm_smoke() -> None:
         labels,
         feature_columns=("FR-002", "HF-001"),
         prediction_years=(2020, 2021),
+        train_window_days=1,
+        test_window_days=1,
     )
     assert set(result["date"].dt.year) == {2020, 2021}
     assert list(result.columns) == ["date", "instrument", "factor"]
@@ -104,6 +106,8 @@ class CombinationTest(unittest.TestCase):
             labels,
             feature_columns=("public", "candidate"),
             prediction_years=(2020, 2021),
+            train_window_days=1,
+            test_window_days=1,
             alpha=1e-6,
         )
         self.assertEqual(set(result["date"].dt.year), {2020, 2021})
@@ -113,7 +117,7 @@ class CombinationTest(unittest.TestCase):
     def test_lightgbm_config_is_shallow_and_deterministic(self):
         config = lightgbm_model_config()
         self.assertEqual(config["random_state"], 20260726)
-        self.assertEqual(config["training"], "expanding_window")
+        self.assertEqual(config["training"], "rolling_60_train_20_test")
 
 
 if __name__ == "__main__":

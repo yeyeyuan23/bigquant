@@ -22,7 +22,7 @@ def lightgbm_model_config() -> dict[str, object]:
         "n_estimators": 200,
         "max_depth": 3,
         "random_state": 20260726,
-        "training": "expanding_window",
+        "training": "rolling_60_train_20_test",
         "num_leaves": 7,
         "min_child_samples": 100,
         "subsample": 1.0,
@@ -69,11 +69,12 @@ def walk_forward_elastic_net(
     feature_columns: tuple[str, ...],
     prediction_years: tuple[int, ...],
     label_column: str = "ret_close_to_close",
-    first_training_year: int = 2019,
+    train_window_days: int = 60,
+    test_window_days: int = 20,
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
 ) -> pd.DataFrame:
-    """Generate strictly expanding-window Elastic Net predictions."""
+    """Generate strict 60-day train / 20-day OOS Elastic Net predictions."""
 
     from sklearn.linear_model import ElasticNet
 
@@ -84,11 +85,20 @@ def walk_forward_elastic_net(
         validate="one_to_one",
     ).dropna(subset=[*feature_columns, label_column])
     outputs: list[pd.DataFrame] = []
-    for prediction_year in prediction_years:
-        train = merged.loc[
-            merged["date"].dt.year.between(first_training_year, prediction_year - 1)
+    all_dates = pd.DatetimeIndex(sorted(merged["date"].unique()))
+    prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
+    for start in range(0, len(prediction_dates), test_window_days):
+        test_dates = prediction_dates[start : start + test_window_days]
+        if test_dates.empty:
+            continue
+        first_test_position = all_dates.get_loc(test_dates[0])
+        if first_test_position < train_window_days:
+            continue
+        train_dates = all_dates[
+            first_test_position - train_window_days : first_test_position
         ]
-        test = merged.loc[merged["date"].dt.year.eq(prediction_year)]
+        train = merged.loc[merged["date"].isin(train_dates)]
+        test = merged.loc[merged["date"].isin(test_dates)]
         if train.empty or test.empty:
             continue
         model = ElasticNet(
@@ -127,9 +137,10 @@ def walk_forward_lightgbm(
     feature_columns: tuple[str, ...],
     prediction_years: tuple[int, ...],
     label_column: str = "ret_close_to_close",
-    first_training_year: int = 2019,
+    train_window_days: int = 60,
+    test_window_days: int = 20,
 ) -> pd.DataFrame:
-    """Generate strictly expanding-window LightGBM predictions."""
+    """Generate strict 60-day train / 20-day OOS LightGBM predictions."""
 
     merged = panel.merge(
         labels[["date", "instrument", label_column]],
@@ -138,11 +149,20 @@ def walk_forward_lightgbm(
         validate="one_to_one",
     ).dropna(subset=[*feature_columns, label_column])
     outputs: list[pd.DataFrame] = []
-    for prediction_year in prediction_years:
-        train = merged.loc[
-            merged["date"].dt.year.between(first_training_year, prediction_year - 1)
+    all_dates = pd.DatetimeIndex(sorted(merged["date"].unique()))
+    prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
+    for start in range(0, len(prediction_dates), test_window_days):
+        test_dates = prediction_dates[start : start + test_window_days]
+        if test_dates.empty:
+            continue
+        first_test_position = all_dates.get_loc(test_dates[0])
+        if first_test_position < train_window_days:
+            continue
+        train_dates = all_dates[
+            first_test_position - train_window_days : first_test_position
         ]
-        test = merged.loc[merged["date"].dt.year.eq(prediction_year)]
+        train = merged.loc[merged["date"].isin(train_dates)]
+        test = merged.loc[merged["date"].isin(test_dates)]
         if train.empty or test.empty:
             continue
         model = _lightgbm_regressor()

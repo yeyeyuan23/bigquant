@@ -46,12 +46,12 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
 # never because a candidate happened to perform well in that month.
 HF_OB_MANDATORY_MONTHS: tuple[str, ...] = tuple(
     f"{year}-{month:02d}"
-    for year in range(2019, 2024)
+    for year in range(2019, 2025)
     for month in (2, 8)
 )
 HF_OB_OPTIONAL_MONTH_POOL: tuple[str, ...] = tuple(
     f"{year}-{month:02d}"
-    for year in range(2019, 2024)
+    for year in range(2019, 2025)
     for month in (5, 11)
 )
 HF_OB_MAX_OPTIONAL_MONTHS = 6

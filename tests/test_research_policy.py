@@ -66,6 +66,8 @@ class ResearchPolicyTest(unittest.TestCase):
                 "2022-08",
                 "2023-02",
                 "2023-08",
+                "2024-02",
+                "2024-08",
             ),
         )
         self.assertEqual(
@@ -81,6 +83,8 @@ class ResearchPolicyTest(unittest.TestCase):
                 "2022-11",
                 "2023-05",
                 "2023-11",
+                "2024-05",
+                "2024-11",
             ),
         )
         self.assertEqual(HF_OB_MAX_OPTIONAL_MONTHS, 6)

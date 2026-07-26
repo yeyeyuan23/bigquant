@@ -51,8 +51,9 @@ DEVELOPMENT_YEARS = range(
 )
 SELECTION_YEAR = int(FORMAL_EVALUATION_POLICY.selection_start[:4])
 CONFIRMATION_YEAR = int(FORMAL_EVALUATION_POLICY.confirmation_start[:4])
+FROZEN_TEST_YEAR = int(FORMAL_EVALUATION_POLICY.frozen_test_start[:4])
 MARKET_STATE_YEARS = range(2019, SELECTION_YEAR + 1)
-ALL_BASE_YEARS = range(2019, 2024)
+ALL_BASE_YEARS = range(2019, FROZEN_TEST_YEAR + 1)
 CANDIDATE_POOL_VERSION = "oap_batch1_v1_2026-07-26"
 
 
@@ -470,6 +471,9 @@ def main() -> None:
             "selection_2022": clean.loc[clean["date"].dt.year.eq(SELECTION_YEAR)],
             "confirmation_2023": clean.loc[
                 clean["date"].dt.year.eq(CONFIRMATION_YEAR)
+            ],
+            "frozen_test_2024": clean.loc[
+                clean["date"].dt.year.eq(FROZEN_TEST_YEAR)
             ],
         }
         for period, block in periods.items():

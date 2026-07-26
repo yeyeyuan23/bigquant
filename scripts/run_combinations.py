@@ -2,7 +2,8 @@
 
 The old hard-coded FR-002/HF-001 research funnel has been removed.  This
 entrypoint only operates on the standard candidate pool and the competition
-factor library.  Selection uses 2022; 2023 is confirmation only.
+factor library. Selection uses 2022, 2023 is confirmation only, and 2024 is
+reported only after the pipeline decisions are frozen.
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ from bigalpha2026.research_policy import (
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = ROOT / "data"
 DEFAULT_REPORTS = ROOT / "reports"
-YEARS = (2019, 2020, 2021, 2022, 2023)
+YEARS = (2019, 2020, 2021, 2022, 2023, 2024)
 DEVELOPMENT_YEARS = tuple(
     range(
         int(FORMAL_EVALUATION_POLICY.development_start[:4]),
@@ -51,6 +52,7 @@ DEVELOPMENT_YEARS = tuple(
 )
 SELECTION_YEAR = int(FORMAL_EVALUATION_POLICY.selection_start[:4])
 CONFIRMATION_YEAR = int(FORMAL_EVALUATION_POLICY.confirmation_start[:4])
+FROZEN_TEST_YEAR = int(FORMAL_EVALUATION_POLICY.frozen_test_start[:4])
 PIPELINE_NAMES = (
     "self_factor_composite",
     "joint_elastic_net",
@@ -534,7 +536,11 @@ def run_experiments(
             oriented,
             labels,
             feature_columns=joint_features,
-            prediction_years=(SELECTION_YEAR, CONFIRMATION_YEAR),
+            prediction_years=(
+                SELECTION_YEAR,
+                CONFIRMATION_YEAR,
+                FROZEN_TEST_YEAR,
+            ),
         ),
         (
             "joint_lightgbm",
@@ -543,7 +549,11 @@ def run_experiments(
             oriented,
             labels,
             feature_columns=joint_features,
-            prediction_years=(SELECTION_YEAR, CONFIRMATION_YEAR),
+            prediction_years=(
+                SELECTION_YEAR,
+                CONFIRMATION_YEAR,
+                FROZEN_TEST_YEAR,
+            ),
         ),
     }
 
@@ -551,6 +561,7 @@ def run_experiments(
     periods = {
         "selection_2022": SELECTION_YEAR,
         "confirmation_2023": CONFIRMATION_YEAR,
+        "frozen_test_2024": FROZEN_TEST_YEAR,
     }
     for (experiment, method), factor in pipelines.items():
         for period, year in periods.items():
@@ -603,6 +614,14 @@ def run_experiments(
             "raw_full",
             "rank_ic_mean",
         )
+        frozen_test_ic = metric_value(
+            metrics,
+            experiment,
+            method,
+            "frozen_test_2024",
+            "raw_full",
+            "rank_ic_mean",
+        )
         passed_selection = (
             selection_ic > 0
             and selection_t >= COMBINATION_ADMISSION_GATE.minimum_rank_ic_t_stat
@@ -618,6 +637,7 @@ def run_experiments(
                 "selection_rank_ic_t_stat": selection_t,
                 "selection_tradable_rank_ic_mean": selection_tradable_ic,
                 "confirmation_rank_ic_mean": confirmation_ic,
+                "frozen_test_rank_ic_mean": frozen_test_ic,
             }
         )
         decisions[-1]["confirmed_2023"] = confirmation_ic > 0
@@ -641,11 +661,33 @@ def run_experiments(
         str(row["experiment"]): row
         for row in decisions
     }
+    tie_priority = {
+        "self_factor_composite": 0,
+        "joint_elastic_net": 1,
+        "joint_lightgbm": 2,
+    }
+    frozen_submission_order = [
+        str(row["experiment"])
+        for row in sorted(
+            (
+                row
+                for row in decisions
+                if bool(row["passed_selection_gate"])
+                and bool(row["confirmed_2023"])
+            ),
+            key=lambda row: (
+                -float(row["selection_rank_ic_mean"]),
+                tie_priority[str(row["experiment"])],
+            ),
+        )
+    ]
     result = {
         "protocol": "isolated_combination_pipelines_v2",
         "development_years": list(DEVELOPMENT_YEARS),
         "selection_year": SELECTION_YEAR,
         "confirmation_year": CONFIRMATION_YEAR,
+        "frozen_test_year": FROZEN_TEST_YEAR,
+        "frozen_test_changes_admission": False,
         "pipelines": {
             "self_factor_composite": {
                 "method": "family_equal_rank",
@@ -670,6 +712,11 @@ def run_experiments(
         "factorlib_incremental": incremental_rows,
         "dual_benchmark_admission": admission_rows,
         "pipeline_decisions": pipeline_decisions,
+        "frozen_submission_order": frozen_submission_order,
+        "frozen_winner": (
+            frozen_submission_order[0] if frozen_submission_order else None
+        ),
+        "winner_uses_2024": False,
     }
     (reports_dir / "factor_pool_decisions.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2),
