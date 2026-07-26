@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 
@@ -30,21 +30,20 @@ from bigalpha2026.factor_pool import (
     KEY_COLUMNS,
     apply_feature_directions,
     build_feature_panel,
-    file_sha256,
     family_balanced_factor,
+    file_sha256,
     screen_public_factors,
     validate_candidate_pool_manifest,
 )
 from bigalpha2026.factorlib import validate_factorlib_subset_frame
 from bigalpha2026.research_policy import (
     COMBINATION_ADMISSION_GATE,
-    FROZEN_FACTORLIB_SCREENED_FEATURES,
     FORMAL_EVALUATION_POLICY,
+    FROZEN_FACTORLIB_SCREENED_FEATURES,
     TREE_INCREMENTAL_GATE,
     factorlib_incremental_gate,
     tree_incremental_track_gate,
 )
-
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = ROOT / "data"
@@ -131,7 +130,7 @@ def required_paths(
 def load_decisions(path: Path) -> list[dict[str, object]]:
     content = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(content, list):
-        raise ValueError("first-round decisions must be a JSON list")
+        raise TypeError("first-round decisions must be a JSON list")
     return [dict(row) for row in content]
 
 
@@ -249,7 +248,7 @@ def load_dynamic_inputs(
             )
         )
     )
-    panel, public_columns, self_columns, coverage = build_feature_panel(
+    panel, _public_columns, _self_columns, coverage = build_feature_panel(
         universe,
         factorlib,
         candidate_pool,
@@ -319,7 +318,7 @@ def contract_summary(
     )
     summary = {
         "status": status,
-        "rows": int(len(panel)),
+        "rows": len(panel),
         "duplicate_keys": int(panel.duplicated(list(KEY_COLUMNS)).sum()),
         "factorlib_reference": {
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),

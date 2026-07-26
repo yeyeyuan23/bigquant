@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 
@@ -64,7 +64,6 @@ from bigalpha2026.research_policy import (
     TECHNICAL_GATE,
     candidate_ids,
 )
-
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -355,7 +354,7 @@ def stability_rows(
                     "subperiod": str(subperiod),
                     "rank_ic_mean": float(values.mean()),
                     "positive": bool(values.mean() > 0),
-                    "days": int(len(values)),
+                    "days": len(values),
                 }
             )
     return rows

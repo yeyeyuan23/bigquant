@@ -24,6 +24,8 @@ from scripts.run_first_round import (
     CANDIDATE_POOL_VERSION,
     candidate_pool_frame,
     classify_candidates,
+)
+from scripts.run_first_round import (
     parse_args as parse_first_round_args,
 )
 

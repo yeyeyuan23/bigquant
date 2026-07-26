@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
-from datetime import datetime
 import hashlib
 import json
+from collections.abc import Iterable, Sequence
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +16,6 @@ from .factorlib import (
     FACTORLIB_FEATURE_COLUMNS,
     validate_factorlib_subset_frame,
 )
-
 
 KEY_COLUMNS = ("date", "instrument")
 CANDIDATE_POOL_SCHEMA_VERSION = "candidate-pool-v2"
@@ -127,7 +126,7 @@ def candidate_pool_manifest(
             dates.max().date().isoformat(),
         ],
         "columns": list(CANDIDATE_POOL_COLUMNS),
-        "rows": int(len(frame)),
+        "rows": len(frame),
         "duplicate_keys": 0,
         "candidate_rows": candidate_rows,
         "candidate_dates": candidate_dates,
@@ -339,10 +338,12 @@ def screen_public_factors(
     minimum_positive_rate: float = 0.55,
     minimum_nonzero_window_ratio: float = 0.50,
     maximum_abs_rank_correlation: float = 0.90,
-    elastic_net_config: ElasticNetConfig = ElasticNetConfig(),
+    elastic_net_config: ElasticNetConfig | None = None,
 ) -> pd.DataFrame:
     """Select and orient public factors using development data only."""
 
+    if elastic_net_config is None:
+        elastic_net_config = ElasticNetConfig()
     columns = tuple(public_columns)
     if not columns:
         raise ValueError("public_columns must not be empty")

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
 import json
+from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 
@@ -14,7 +14,6 @@ from bigalpha2026.factor_pool import file_sha256
 from bigalpha2026.factorlib import validate_factorlib_subset_frame
 from bigalpha2026.feature_contracts import validate_feature_frame
 from bigalpha2026.research_policy import FROZEN_FACTORLIB_SCREENED_FEATURES
-
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
