@@ -1,9 +1,9 @@
 {
   "schema_version": "candidate-pool-v2",
-  "generated_at": "2026-07-26T23:13:10+08:00",
+  "generated_at": "2026-07-26T23:48:41+08:00",
   "generation_entrypoint": "scripts/run_first_round.py",
   "relative_path": "factors/candidate_pool.parquet",
-  "factor_version": "oap_b_v2_full_ob_2026-07-26",
+  "factor_version": "literature_round2_v1_2026-07-26",
   "date_range": [
     "2019-01-02",
     "2023-12-29"
@@ -15,7 +15,7 @@
     "factor_version",
     "factor"
   ],
-  "rows": 35231000,
+  "rows": 37249000,
   "duplicate_keys": 0,
   "candidate_rows": {
     "FR-001": 1214000,
@@ -29,8 +29,10 @@
     "FR-010": 1214000,
     "FR-011": 1214000,
     "FR-012": 915000,
+    "FR-013": 310000,
     "HF-001": 1214000,
     "HF-002": 1214000,
+    "INT-002": 564000,
     "OB-001": 1214000,
     "OB-002": 1214000,
     "OB-003": 1214000,
@@ -51,7 +53,8 @@
     "PV-017": 611000,
     "PV-018": 458000,
     "PV-019": 815000,
-    "PV-020": 1204000
+    "PV-020": 1204000,
+    "PV-021": 1144000
   },
   "candidate_dates": {
     "FR-001": 1214,
@@ -65,8 +68,10 @@
     "FR-010": 1214,
     "FR-011": 1214,
     "FR-012": 915,
+    "FR-013": 310,
     "HF-001": 1214,
     "HF-002": 1214,
+    "INT-002": 564,
     "OB-001": 1214,
     "OB-002": 1214,
     "OB-003": 1214,
@@ -87,14 +92,15 @@
     "PV-017": 611,
     "PV-018": 458,
     "PV-019": 815,
-    "PV-020": 1204
+    "PV-020": 1204,
+    "PV-021": 1144
   },
   "technical_rejects_omitted": [
     "FR-007",
     "PV-007",
     "PV-012"
   ],
-  "sha256": "d34336c9ef97ce9156238b0b0593e3ad0240e8355ac0ad4be23d24a38f3a50a1",
+  "sha256": "c9856fcc2a20b592c12df3fd2b91d25148273b3d489816c4fc35bb797646163d",
   "input_manifest_sha256": {
     "data/manifest_2019.json": "102b47ea7dd2a5fb308bd85b63ad043bf4103671d30bb4c9dd5d38b15110f281",
     "data/manifest_2020.json": "209aafd06e149d81b55228a7605b2e6626d1182550995af7d89a751da5b8e57f",

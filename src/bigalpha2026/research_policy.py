@@ -74,6 +74,78 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
         "directional_order_book_resilience_asymmetry",
         stage="literature_round1",
     ),
+    CandidateSpec(
+        "FR-013",
+        "FR",
+        "financial_report_timing_surprise",
+        stage="literature_round2",
+    ),
+    CandidateSpec(
+        "PV-021",
+        "PV",
+        "dynamic_volume_return_regime",
+        stage="literature_round2",
+    ),
+    CandidateSpec(
+        "INT-002",
+        "composite",
+        "earnings_announcement_overnight_drift",
+        stage="literature_round2",
+    ),
+    CandidateSpec(
+        "HF-003",
+        "HF",
+        "relative_signed_intraday_jump_variation",
+        stage="literature_round3",
+    ),
+    CandidateSpec(
+        "HF-004",
+        "HF",
+        "residual_closing_signed_volume_pressure",
+        stage="literature_round3",
+    ),
+    CandidateSpec(
+        "OB-004",
+        "OB",
+        "closing_order_book_imbalance_innovation",
+        stage="literature_round3",
+    ),
+    CandidateSpec(
+        "PV-022",
+        "PV",
+        "continuous_information_momentum",
+        stage="literature_round4",
+    ),
+    CandidateSpec(
+        "PV-023",
+        "PV",
+        "overnight_daytime_tug_of_war",
+        stage="literature_round4",
+    ),
+    CandidateSpec(
+        "FR-014",
+        "FR",
+        "point_in_time_earnings_yield",
+        stage="literature_round4",
+    ),
+    CandidateSpec(
+        "FR-015",
+        "FR",
+        "net_margin_improvement",
+        stage="literature_round4",
+    ),
+    CandidateSpec(
+        "OB-005",
+        "OB",
+        "persistent_closing_microprice_pressure",
+        stage="literature_round4",
+    ),
+    CandidateSpec(
+        "INT-003",
+        "composite",
+        "earnings_surprise_liquidity_friction",
+        stage="literature_round4",
+    ),
 )
 
 # Mechanical calendar samples frozen before the first formal factor evaluation.
@@ -151,6 +223,16 @@ class FactorLibraryIncrementalGate:
 
 
 @dataclass(frozen=True)
+class FactorLibraryPoolGate:
+    """Joint Elastic Net pool confirmation on development OOS predictions."""
+
+    minimum_oos_rank_ic_increment: float = 0.0
+    minimum_oos_days: int = 180
+    minimum_positive_day_ratio: float = 0.50
+    minimum_positive_years: int = 2
+
+
+@dataclass(frozen=True)
 class TreeIncrementalGate:
     """LightGBM-specific admission, evaluated only on development data."""
 
@@ -165,6 +247,7 @@ class TreeIncrementalGate:
 TECHNICAL_GATE = TechnicalGate()
 COMBINATION_ADMISSION_GATE = CombinationAdmissionGate()
 FACTORLIB_INCREMENTAL_GATE = FactorLibraryIncrementalGate()
+FACTORLIB_POOL_GATE = FactorLibraryPoolGate()
 TREE_INCREMENTAL_GATE = TreeIncrementalGate()
 
 # Frozen on 2026-07-26 from the competition's 36 public factors using only
@@ -329,4 +412,37 @@ def factorlib_incremental_gate(
         reasons.append("candidate is too correlated with a public factor")
     if not np.isfinite(oos_days) or oos_days < policy.minimum_oos_days:
         reasons.append("too few out-of-sample evaluation days")
+    return not reasons, reasons
+
+
+def factorlib_pool_incremental_gate(
+    summary: Mapping[str, float],
+    policy: FactorLibraryPoolGate = FACTORLIB_POOL_GATE,
+) -> tuple[bool, list[str]]:
+    """Confirm that a complete Elastic Net candidate pool adds stable OOS value."""
+
+    reasons: list[str] = []
+    increment = float(summary.get("oos_rank_ic_increment", np.nan))
+    oos_days = float(summary.get("oos_days", np.nan))
+    positive_day_ratio = float(
+        summary.get("positive_increment_day_ratio", np.nan)
+    )
+    positive_years = float(summary.get("positive_years", np.nan))
+    if (
+        not np.isfinite(increment)
+        or increment <= policy.minimum_oos_rank_ic_increment
+    ):
+        reasons.append("no positive joint out-of-sample Rank IC increment")
+    if not np.isfinite(oos_days) or oos_days < policy.minimum_oos_days:
+        reasons.append("too few joint out-of-sample evaluation days")
+    if (
+        not np.isfinite(positive_day_ratio)
+        or positive_day_ratio < policy.minimum_positive_day_ratio
+    ):
+        reasons.append("joint increment is positive on too few OOS days")
+    if (
+        not np.isfinite(positive_years)
+        or positive_years < policy.minimum_positive_years
+    ):
+        reasons.append("joint increment is positive in too few years")
     return not reasons, reasons

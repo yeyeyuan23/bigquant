@@ -19,7 +19,7 @@ from .factorlib import (
 
 KEY_COLUMNS = ("date", "instrument")
 CANDIDATE_POOL_SCHEMA_VERSION = "candidate-pool-v2"
-CANDIDATE_POOL_VERSION = "oap_b_v2_full_ob_2026-07-26"
+CANDIDATE_POOL_VERSION = "literature_round4_v1_2026-07-27"
 CANDIDATE_POOL_COLUMNS = (
     "date",
     "instrument",

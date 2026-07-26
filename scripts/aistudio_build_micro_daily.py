@@ -40,6 +40,18 @@ def query_period(start_date: str, end_date: str):
                          / ((bid_price1 + ask_price1) / 2.0)
                     ELSE NULL
                 END AS relative_spread,
+                CASE
+                    WHEN bid_price1 > 0 AND ask_price1 > bid_price1
+                         AND bid_volume1 > 0 AND ask_volume1 > 0
+                    THEN (
+                        (
+                            ask_price1 * bid_volume1
+                          + bid_price1 * ask_volume1
+                        ) / (bid_volume1 + ask_volume1)
+                      - (bid_price1 + ask_price1) / 2.0
+                    ) / (ask_price1 - bid_price1)
+                    ELSE NULL
+                END AS microprice_gap,
                 (
                     CASE WHEN bid_price1 > 0 AND bid_volume1 > 0
                         THEN bid_volume1 ELSE 0 END
@@ -179,7 +191,10 @@ def query_period(start_date: str, end_date: str):
                 ) AS negative_mid_q10,
                 quantile_cont(mid_return, 0.90) OVER (
                     PARTITION BY instrument, trading_day
-                ) AS positive_mid_q90
+                ) AS positive_mid_q90,
+                stddev_samp(minute_log_return) OVER (
+                    PARTITION BY instrument, trading_day
+                ) AS intraday_return_sigma
             FROM sequenced
         )
         SELECT
@@ -209,6 +224,27 @@ def query_period(start_date: str, end_date: str):
                 AS tail_60_volume,
             sum(CASE WHEN reverse_minute <= 60 THEN deal_number ELSE 0 END)
                 AS tail_60_deal_number,
+            sum(CASE WHEN reverse_minute <= 60
+                THEN minute_log_return END) AS tail_60_log_return,
+            sum(CASE
+                WHEN reverse_minute <= 60
+                     AND volume >= 0
+                     AND minute_log_return IS NOT NULL
+                     AND intraday_return_sigma > 0
+                THEN volume * (
+                    2.0 / (
+                        1.0 + exp(
+                            -1.702 * GREATEST(
+                                -6.0,
+                                LEAST(
+                                    6.0,
+                                    minute_log_return / intraday_return_sigma
+                                )
+                            )
+                        )
+                    ) - 1.0
+                )
+                END) AS tail_60_signed_volume_bvc,
             sum(CASE WHEN session_id = 0 THEN amount ELSE 0 END)
                 / NULLIF(sum(amount), 0) AS morning_amount_share,
             sum(CASE WHEN session_id = 1 THEN abs(minute_log_return) ELSE 0 END)
@@ -288,6 +324,10 @@ def query_period(start_date: str, end_date: str):
             stddev_samp(depth_imbalance) AS full_day_depth_imbalance_std,
             median(CASE WHEN reverse_minute <= 60 THEN depth_imbalance END)
                 AS tail_60_bid_depth_imbalance_median,
+            median(CASE WHEN reverse_minute <= 60 THEN microprice_gap END)
+                AS tail_60_microprice_gap_median,
+            avg(CASE WHEN reverse_minute <= 60 THEN sign(microprice_gap) END)
+                AS tail_60_microprice_gap_sign_consistency,
             median(CASE
                 WHEN mid_return < 0 AND mid_return <= negative_mid_q10
                 THEN GREATEST(-2.0, LEAST(2.0, bid_recovery_5m))

@@ -26,6 +26,8 @@ reports/*.json
 !reports/tree_factor_incremental.csv
 !reports/tree_factor_admission.csv
 !reports/tree_group_increment.csv
+!reports/tree_pool_promotion.csv
+!reports/incremental_pool_promotion.csv
 !reports/factor_pool_decisions.json
 !reports/combination_summary.csv
 .DS_Store
@@ -35,6 +37,7 @@ reports/*.json
 data/**/*.parquet
 data/raw/
 data/transfers/
+data/cache/
 data/**/*.zip
 data/**/*.tar
 data/**/*.tar.gz

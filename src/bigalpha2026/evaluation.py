@@ -508,7 +508,13 @@ def factorlib_regularized_incremental_validation(
     )
     all_features = (*base_columns, *candidates)
     merged = cross_section_zscore(merged, [*all_features, target_column])
-    merged = merged.dropna(subset=[*all_features, target_column])
+    # Match final-model preprocessing: a missing/constant standardized feature
+    # is neutral, while the target remains mandatory. This prevents another
+    # candidate's sparse rows from changing the paired sample.
+    merged.loc[:, list(all_features)] = merged.loc[
+        :, list(all_features)
+    ].fillna(0.0)
+    merged = merged.dropna(subset=[target_column])
     dates = np.array(sorted(merged["date"].dropna().unique()))
 
     prediction_parts: list[pd.DataFrame] = []
@@ -616,10 +622,38 @@ def factorlib_regularized_incremental_validation(
     )
     baseline_mean = float(baseline_ic.mean()) if not baseline_ic.empty else np.nan
     augmented_mean = float(augmented_ic.mean()) if not augmented_ic.empty else np.nan
+    common_ic = pd.concat(
+        [
+            baseline_ic.rename("baseline"),
+            augmented_ic.rename("augmented"),
+        ],
+        axis=1,
+        join="inner",
+    ).dropna()
+    daily_increment = common_ic["augmented"] - common_ic["baseline"]
+    yearly_increment = (
+        common_ic.assign(
+            year=pd.DatetimeIndex(pd.to_datetime(common_ic.index)).year
+        )
+        .groupby("year", sort=True)[["baseline", "augmented"]]
+        .mean()
+    )
     summary = {
         "baseline_oos_rank_ic": baseline_mean,
         "augmented_oos_rank_ic": augmented_mean,
         "oos_rank_ic_increment": augmented_mean - baseline_mean,
+        "positive_increment_day_ratio": (
+            float((daily_increment > 0).mean())
+            if not daily_increment.empty
+            else 0.0
+        ),
+        "positive_years": float(
+            (
+                yearly_increment["augmented"]
+                - yearly_increment["baseline"]
+                > 0
+            ).sum()
+        ),
         "candidate_min_nonzero_window_ratio": min(nonzero_ratios),
         "candidate_min_positive_weight_ratio": min(positive_ratios),
         "candidate_max_abs_rank_correlation": maximum_correlation,
@@ -687,7 +721,13 @@ def factorlib_regularized_incremental_batch_validation(
     )
     all_features = (*base_columns, *candidates)
     merged = cross_section_zscore(merged, [*all_features, target_column])
-    merged = merged.dropna(subset=[*all_features, target_column])
+    # Candidates grouped on the same active-date calendar share this sample.
+    # Feature gaps are neutralized instead of deleting another candidate's
+    # otherwise valid stock-day.
+    merged.loc[:, list(all_features)] = merged.loc[
+        :, list(all_features)
+    ].fillna(0.0)
+    merged = merged.dropna(subset=[target_column])
     dates = np.array(sorted(merged["date"].dropna().unique()))
 
     baseline_prediction_parts: list[pd.DataFrame] = []

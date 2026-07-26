@@ -61,7 +61,9 @@ amount, volume, deal_number
 date, instrument,
 minute_count, total_amount, total_volume, total_deal_number,
 net_log_return, absolute_log_return,
-tail_60_amount, tail_60_deal_number,
+realized_volatility, downside_realized_volatility,
+tail_60_amount, tail_60_volume, tail_60_deal_number,
+tail_60_log_return, tail_60_signed_volume_bvc,
 avg_trade_value, avg_trade_volume,
 directional_efficiency, tail_trade_value_ratio,
 shock_q90_active_count, shock_q90_mean_abs_return,
@@ -85,6 +87,10 @@ tail_60_valid_best_quote_minutes,
 tail_60_relative_spread_median,
 tail_60_depth_completeness_median,
 tail_60_bid_depth_imbalance_median,
+tail_60_microprice_gap_median,
+tail_60_microprice_gap_sign_consistency,
+full_day_depth_imbalance_median,
+full_day_depth_imbalance_std,
 negative_mid_shock_q10_bid_depth_recovery_5m_median,
 positive_mid_shock_q90_ask_depth_recovery_5m_median,
 full_day_depth_shape_median,
@@ -101,10 +107,18 @@ tail_60_shape_sign_consistency
 在数据层伪装成0。2019—2023任一年度缺失都应直接失败，禁止退回代表月份继续
 正式评价。
 
-HF-001、HF-002、OB-001、OB-002和OB-003全部读取这一个连续面板。只将日级聚合结果同步
-回本地；原始分钟成交和盘口行不下载、不进入Git。新增微观候选若需要合同之外
-的组件，应扩展同一聚合脚本并生成新manifest，不能在每个候选内重复拉取全量
-分钟明细。
+HF-001至HF-004、OB-001至OB-005全部读取这一个连续面板。只将日级聚合结果同步
+回本地；原始分钟成交和盘口行不下载、不进入Git。`tail_60_signed_volume_bvc`
+使用分钟收益相对当日分钟波动率的 logistic 正态分布近似
+`2 / (1 + exp(-1.702x)) - 1` 给成交量分配连续方向，不能解释为平台提供的真实
+主动买卖标记。新增微观候选若需要合同之外的组件，应扩展同一聚合脚本并生成新
+manifest，不能在每个候选内重复拉取全量分钟明细。
+
+`tail_60_microprice_gap_median`中的分钟微价格固定为
+`(ask1×bid_volume1 + bid1×ask_volume1)/(bid_volume1+ask_volume1)`，再以
+一档价差标准化其相对中间价的偏离；只有买卖一档价格、数量均有效且价差大于0时
+才参与聚合。`tail_60_microprice_gap_sign_consistency`是同一尾盘窗口内该偏离
+符号的均值，不是委托流或主动买卖方向。
 
 ### FR：财务披露事件
 

@@ -23,22 +23,23 @@
     "screened_count": 15
   },
   "candidate_pool_reference": {
-    "factor_version": "oap_b_v2_full_ob_2026-07-26",
-    "sha256": "d34336c9ef97ce9156238b0b0593e3ad0240e8355ac0ad4be23d24a38f3a50a1"
+    "factor_version": "literature_round2_v1_2026-07-26",
+    "sha256": "c9856fcc2a20b592c12df3fd2b91d25148273b3d489816c4fc35bb797646163d"
   },
   "combination_inputs": {
-    "all_candidate_count": 34,
+    "all_candidate_count": 37,
     "single_factor_candidates": [
       "FR-002",
       "FR-004",
       "FR-005",
       "FR-006",
+      "INT-002",
       "PV-003",
       "PV-009",
       "PV-011",
       "PV-014"
     ],
-    "self_feature_count": 34
+    "self_feature_count": 37
   },
   "minimum_public_coverage": 0.9985799011532125,
   "minimum_self_coverage": 0.1614497528830313,

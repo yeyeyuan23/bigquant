@@ -206,6 +206,65 @@ class FactorLibraryTest(unittest.TestCase):
         )
         self.assertEqual(summaries["baseline_oos_rank_ic"].nunique(), 1)
 
+    def test_sparse_peer_does_not_change_another_candidate_sample(self):
+        rng = np.random.default_rng(42)
+        dates = pd.bdate_range("2021-01-04", periods=80)
+        rows = []
+        labels = []
+        for date in dates:
+            for stock in range(20):
+                base = rng.normal()
+                candidate_a = rng.normal()
+                candidate_b = rng.normal() if stock >= 10 else np.nan
+                rows.append(
+                    {
+                        "date": date,
+                        "instrument": f"S{stock:03d}",
+                        "base": base,
+                        "candidate_a": candidate_a,
+                        "candidate_b": candidate_b,
+                    }
+                )
+                labels.append(
+                    {
+                        "date": date,
+                        "instrument": f"S{stock:03d}",
+                        "ret_close_to_close": (
+                            0.2 * base
+                            + candidate_a
+                            + rng.normal(scale=0.2)
+                        ),
+                    }
+                )
+        panel = pd.DataFrame(rows)
+        target = pd.DataFrame(labels)
+        config = FactorLibraryValidationConfig(
+            train_window_days=40,
+            test_window_days=20,
+        )
+        alone = factorlib_regularized_incremental_batch_validation(
+            panel[["date", "instrument", "base", "candidate_a"]],
+            target,
+            ["base"],
+            ["candidate_a"],
+            config=config,
+        )[0].iloc[0]
+        batched = factorlib_regularized_incremental_batch_validation(
+            panel,
+            target,
+            ["base"],
+            ["candidate_a", "candidate_b"],
+            config=config,
+        )[0].set_index("candidate").loc["candidate_a"]
+        self.assertAlmostEqual(
+            alone["baseline_oos_rank_ic"],
+            batched["baseline_oos_rank_ic"],
+        )
+        self.assertAlmostEqual(
+            alone["augmented_oos_rank_ic"],
+            batched["augmented_oos_rank_ic"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

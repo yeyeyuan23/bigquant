@@ -3,20 +3,36 @@ import unittest
 import pandas as pd
 
 from bigalpha2026.research_policy import (
-    FROZEN_FACTORLIB_SCREENED_FEATURES,
     COMBINATION_ADMISSION_GATE,
     FORMAL_EVALUATION_POLICY,
+    FROZEN_FACTORLIB_SCREENED_FEATURES,
     HF_OB_ACTIVATED_OPTIONAL_MONTHS,
     HF_OB_MANDATORY_MONTHS,
     HF_OB_MAX_OPTIONAL_MONTHS,
     HF_OB_OPTIONAL_MONTH_POOL,
     candidate_ids,
+    factorlib_pool_incremental_gate,
     fixed_weight_rank_combination,
     technical_gate,
 )
 
 
 class ResearchPolicyTest(unittest.TestCase):
+    def test_incremental_pool_gate_uses_joint_prediction_stability(self):
+        passed, reasons = factorlib_pool_incremental_gate(
+            {
+                "oos_rank_ic_increment": 0.001,
+                "oos_days": 200,
+                "positive_increment_day_ratio": 0.51,
+                "positive_years": 2,
+                # Pool confirmation intentionally ignores the weakest
+                # candidate's coefficient diagnostics.
+                "candidate_min_nonzero_window_ratio": 0.0,
+                "candidate_min_positive_weight_ratio": 0.0,
+            }
+        )
+        self.assertTrue(passed, reasons)
+
     def test_screened_factorlib_membership_is_frozen_at_15_of_36(self):
         self.assertEqual(len(FROZEN_FACTORLIB_SCREENED_FEATURES), 15)
         self.assertEqual(len(set(FROZEN_FACTORLIB_SCREENED_FEATURES)), 15)
@@ -28,7 +44,7 @@ class ResearchPolicyTest(unittest.TestCase):
         )
 
     def test_all_registered_candidates_are_available_to_first_round(self):
-        self.assertEqual(len(candidate_ids()), 37)
+        self.assertEqual(len(candidate_ids()), 49)
         self.assertEqual(len(candidate_ids("first_round")), 8)
         self.assertEqual(
             candidate_ids("oap_batch1"),
@@ -74,6 +90,18 @@ class ResearchPolicyTest(unittest.TestCase):
         self.assertEqual(
             candidate_ids("literature_round1"),
             ("PV-020", "FR-012", "OB-003"),
+        )
+        self.assertEqual(
+            candidate_ids("literature_round2"),
+            ("FR-013", "PV-021", "INT-002"),
+        )
+        self.assertEqual(
+            candidate_ids("literature_round3"),
+            ("HF-003", "HF-004", "OB-004"),
+        )
+        self.assertEqual(
+            candidate_ids("literature_round4"),
+            ("PV-022", "PV-023", "FR-014", "FR-015", "OB-005", "INT-003"),
         )
 
     def test_formal_periods_and_representative_months_are_frozen(self):

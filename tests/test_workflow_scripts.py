@@ -16,9 +16,14 @@ from scripts.run_combinations import (
     VALIDATION_2022_YEAR,
     VALIDATION_2023_YEAR,
     contract_summary,
+    enters_family_equal_rank,
     parse_args,
+    promote_frozen_incremental_pool,
+    promote_frozen_tree_pool,
     required_paths,
     synthetic_contract_summary,
+    validated_frozen_incremental_pool,
+    validated_frozen_tree_pool,
 )
 from scripts.run_first_round import (
     CANDIDATE_POOL_VERSION,
@@ -31,6 +36,90 @@ from scripts.run_first_round import (
 
 
 class WorkflowScriptTest(unittest.TestCase):
+    def test_incremental_pool_changes_only_after_both_confirmation_gates(self):
+        frozen = ("self__FR-002",)
+        unchanged, promoted = promote_frozen_incremental_pool(
+            frozen,
+            ("self__PV-TEST",),
+            provisional_vs_screened_passed=True,
+            provisional_vs_frozen_passed=False,
+        )
+        self.assertFalse(promoted)
+        self.assertEqual(unchanged, frozen)
+
+        updated, promoted = promote_frozen_incremental_pool(
+            frozen,
+            ("self__PV-TEST",),
+            provisional_vs_screened_passed=True,
+            provisional_vs_frozen_passed=True,
+        )
+        self.assertTrue(promoted)
+        self.assertEqual(updated, ("self__FR-002", "self__PV-TEST"))
+
+    def test_frozen_incremental_pool_rejects_implicit_content_change(self):
+        state = {
+            "frozen_candidates": ["self__FR-002"],
+            "candidate_fingerprints": {"self__FR-002": "old"},
+        }
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "cannot be changed implicitly",
+        ):
+            validated_frozen_incremental_pool(
+                state,
+                available_candidates=("self__FR-002",),
+                candidate_fingerprints={"self__FR-002": "new"},
+            )
+
+    def test_tree_pool_changes_only_after_both_confirmation_gates(self):
+        frozen = ("self__HF-002",)
+        unchanged, promoted = promote_frozen_tree_pool(
+            frozen,
+            ("self__PV-TEST",),
+            provisional_group_passed=True,
+            relative_to_frozen_passed=False,
+        )
+        self.assertFalse(promoted)
+        self.assertEqual(unchanged, frozen)
+
+        updated, promoted = promote_frozen_tree_pool(
+            frozen,
+            ("self__PV-TEST",),
+            provisional_group_passed=True,
+            relative_to_frozen_passed=True,
+        )
+        self.assertTrue(promoted)
+        self.assertEqual(updated, ("self__HF-002", "self__PV-TEST"))
+
+    def test_frozen_tree_pool_rejects_implicit_content_change(self):
+        state = {
+            "frozen_candidates": ["self__HF-002"],
+            "candidate_fingerprints": {"self__HF-002": "old"},
+        }
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "cannot be changed implicitly",
+        ):
+            validated_frozen_tree_pool(
+                state,
+                eligible_candidates=("self__HF-002",),
+                candidate_fingerprints={"self__HF-002": "new"},
+            )
+        self.assertEqual(
+            validated_frozen_tree_pool(
+                state,
+                eligible_candidates=("self__HF-002",),
+                candidate_fingerprints={"self__HF-002": "old"},
+            ),
+            ("self__HF-002",),
+        )
+
+    def test_composite_candidates_do_not_enter_family_equal_rank(self):
+        self.assertTrue(enters_family_equal_rank("self__FR-013"))
+        self.assertTrue(enters_family_equal_rank("self__PV-021"))
+        self.assertFalse(enters_family_equal_rank("self__INT-002"))
+        self.assertFalse(enters_family_equal_rank("factorlib__amount"))
+
     def test_dynamic_combination_periods_and_check_mode_are_frozen(self):
         self.assertEqual(DEVELOPMENT_YEARS, (2019, 2020, 2021))
         self.assertEqual(VALIDATION_2022_YEAR, 2022)
@@ -46,6 +135,32 @@ class WorkflowScriptTest(unittest.TestCase):
         )
         args = parse_args(["--check"])
         self.assertTrue(args.check)
+        cache_args = parse_args(
+            [
+                "--incremental-cache-dir",
+                "local-I-cache",
+                "--refresh-incremental-cache",
+                "--refresh-incremental-candidate",
+                "PV-020",
+                "--tree-cache-dir",
+                "local-tree-cache",
+                "--refresh-tree-cache",
+                "--refresh-tree-candidate",
+                "OB-003",
+            ]
+        )
+        self.assertEqual(
+            cache_args.incremental_cache_dir,
+            Path("local-I-cache"),
+        )
+        self.assertTrue(cache_args.refresh_incremental_cache)
+        self.assertEqual(
+            cache_args.refresh_incremental_candidate,
+            ["PV-020"],
+        )
+        self.assertEqual(cache_args.tree_cache_dir, Path("local-tree-cache"))
+        self.assertTrue(cache_args.refresh_tree_cache)
+        self.assertEqual(cache_args.refresh_tree_candidate, ["OB-003"])
         summary = synthetic_contract_summary()
         self.assertEqual(summary["status"], "ok")
         self.assertEqual(summary["factorlib_features"], 15)

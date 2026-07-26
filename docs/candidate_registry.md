@@ -34,44 +34,61 @@ registered
 | `PV-002` | PV | 隔夜冲击的日内吸收 | 负跳空回补为正，正跳空回落为负 | 1—3 日 | `rejected` |
 | `HF-001` | HF | 分钟价格冲击后的吸收与恢复 | 恢复越充分越高 | 1—3 日 | `rejected` |
 | `HF-002` | HF | 成交碎片化条件下的价格效率 | 价格效率越高越高 | 1—3 日 | `rejected` |
-| `OB-001` | OB | 有效档位盘口韧性 | 价差更低、深度恢复更强越高 | 1 日 | `combination_tested` |
+| `OB-001` | OB | 有效档位盘口韧性 | 价差更低、深度恢复更强越高 | 1 日 | `frozen` |
 | `OB-002` | OB | 盘口深度形状的持续偏斜 | 买方近端深度占优越高 | 1 日 | `rejected` |
 | `FR-001` | FR | 新披露现金转化质量改善 | 现金转化改善越强越高 | 5—20 日 | `rejected` |
-| `FR-002` | FR | 新披露资产效率改善 | 资产周转与 ROA 改善越强越高 | 5—20 日 | `combination_tested` |
+| `FR-002` | FR | 新披露资产效率改善 | 资产周转与 ROA 改善越强越高 | 5—20 日 | `frozen` |
 | `PV-003` | PV | OAP 过去月度最大单日收益 | 最大单日收益越低越高 | 1—20 日 | `combination_tested` |
 | `PV-004` | PV | OAP 日收益偏度 | 偏度越低越高 | 1—20 日 | `rejected` |
 | `PV-005` | PV | OAP Amihud 非流动性 | 单位成交额冲击越大越高 | 1—20 日 | `rejected` |
 | `PV-006` | PV | OAP Corwin-Schultz 价差估计 | 估计价差越宽越高 | 1—20 日 | `rejected` |
 | `PV-007` | PV | OAP 零成交状态 | 零成交日占比越高越高 | 1—20 日 | `rejected` |
 | `FR-003` | FR | OAP 总资产增长 | 总资产同比增长越低越高 | 5—20 日 | `rejected` |
-| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `combination_tested` |
-| `FR-005` | FR | OAP 经营现金流市值比 | 经营现金流/流通市值越高越高 | 5—20 日 | `combination_tested` |
-| `FR-006` | FR | OAP-inspired TTM 净利润增长惊喜 | 净利润同比改善越高越高 | 5—20 日 | `combination_tested` |
+| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `frozen` |
+| `FR-005` | FR | OAP 经营现金流市值比 | 经营现金流/流通市值越高越高 | 5—20 日 | `frozen` |
+| `FR-006` | FR | OAP-inspired TTM 净利润增长惊喜 | 净利润同比改善越高越高 | 5—20 日 | `frozen` |
 | `FR-007` | FR | OAP-inspired 连续盈利改善次数 | 连续改善次数越多越高 | 5—20 日 | `rejected` |
-| `PV-008` | PV | 52周高点接近度 | 越接近过去52周高点越高 | 1—20 日 | `combination_tested` |
-| `PV-009` | PV | 当期与滞后市场反应延迟 | 价格延迟越低越高 | 1—20 日 | `combination_tested` |
+| `PV-008` | PV | 52周高点接近度 | 越接近过去52周高点越高 | 1—20 日 | `frozen` |
+| `PV-009` | PV | 当期与滞后市场反应延迟 | 价格延迟越低越高 | 1—20 日 | `frozen` |
 | `PV-010` | PV | 市场协偏度 | 协偏度越低越高 | 1—20 日 | `rejected` |
-| `PV-011` | PV | 12至6个月中期动量 | 中期累计收益越高越高 | 1—20 日 | `combination_tested` |
+| `PV-011` | PV | 12至6个月中期动量 | 中期累计收益越高越高 | 1—20 日 | `frozen` |
 | `PV-012` | PV | 一级行业动量 | 所属行业过去收益越高越高 | 1—20 日 | `rejected` |
 | `FR-008` | FR | 48个月盈利增长一致性 | 平均盈利增长越高越高 | 5—20 日 | `rejected` |
 | `FR-009` | FR | 5年收入增长加权排名 | 历史排名越高越高 | 5—20 日 | `rejected` |
 | `FR-010` | FR | 异常应计代理 | 现金应计越低越高 | 5—20 日 | `rejected` |
 | `FR-011` | FR | 总资产市值比 | 资产/市值越高越高 | 5—20 日 | `rejected` |
-| `PV-013` | PV | 12至1个月动量 | 累计收益越高越高 | 1—20 日 | `combination_tested` |
-| `PV-014` | PV | 21日CAPM残差波动率 | 残差波动越低越高 | 1—20 日 | `combination_tested` |
+| `PV-013` | PV | 12至1个月动量 | 累计收益越高越高 | 1—20 日 | `frozen` |
+| `PV-014` | PV | 21日CAPM残差波动率 | 残差波动越低越高 | 1—20 日 | `frozen` |
 | `PV-015` | PV | 36月成交量波动 | 成交量波动越低越高 | 1—20 日 | `rejected` |
 | `PV-016` | PV | 36月换手率波动 | 换手波动越低越高 | 1—20 日 | `rejected` |
 | `PV-017` | PV | 60月成交量趋势 | 成交量上升趋势越弱越高 | 1—20 日 | `rejected` |
 | `PV-018` | PV | 36至13个月长期反转 | 长期收益越低越高 | 1—20 日 | `rejected` |
-| `PV-019` | PV | CAPM残差动量代理 | 残差动量越高越高 | 1—20 日 | `combination_tested` |
+| `PV-019` | PV | CAPM残差动量代理 | 残差动量越高越高 | 1—20 日 | `frozen` |
 | `PV-020` | PV | 流动性稀缺条件下的短期反转 | 低成交额状态下的标准化价格冲击越负，因子越高 | 1—3 日 | `registered` |
-| `FR-012` | FR | 营收确认的盈利惊喜 | 盈利与营收惊喜同向且越强，因子绝对值越大 | 5—20 日 | `registered` |
-| `OB-003` | OB | 方向性盘口韧性不对称 | 跌价后买盘恢复相对涨价后卖盘恢复越强越高 | 1—3 日 | `registered` |
+| `FR-012` | FR | 营收确认的盈利惊喜 | 盈利与营收惊喜同向且越强，因子绝对值越大 | 5—20 日 | `frozen` |
+| `OB-003` | OB | 方向性盘口韧性不对称 | 跌价后买盘恢复相对涨价后卖盘恢复越强越高 | 1—3 日 | `frozen` |
+| `FR-013` | FR | 财报披露时点惊喜 | 相对自身同季度历史越早披露越高 | 5—20 日 | `registered` |
+| `PV-021` | PV | 成交量—收益状态切换 | 历史量价状态支持的延续或反转方向越强越高 | 1—3 日 | `registered` |
+| `INT-002` | composite `[FR, PV]` | 财报日异常隔夜反应漂移 | 财报生效日异常隔夜收益越高越高 | 1—20 日 | `registered` |
+| `HF-003` | HF | 分钟相对有符号跳跃 | 下行分钟变差相对占比越高，因子越高 | 1—5 日 | `implemented` |
+| `HF-004` | HF | 尾盘残余方向成交压力 | 未被同期价格解释的尾盘买压越高，因子越高 | 1 日 | `registered` |
+| `OB-004` | OB | 尾盘盘口失衡创新 | 尾盘买方深度相对全日常态增强越多，因子越高 | 1 日 | `implemented` |
+| `PV-022` | PV | 连续信息动量 | 过去12至1个月收益越连续且越高，因子越高 | 1—20 日 | `implemented` |
+| `PV-023` | PV | 隔夜上涨—日内回落异常共现 | 两种状态超出独立概率的共现越多，因子越高 | 1—20 日 | `implemented` |
+| `FR-014` | FR | PIT 盈利收益率 | 最新可见TTM净利润/当日流通市值越高，因子越高 | 5—20 日 | `implemented` |
+| `FR-015` | FR | PIT 净利率同比改善 | 最新TTM净利率相对同季度去年改善越多，因子越高 | 5—20 日 | `implemented` |
+| `OB-005` | OB | 尾盘微价格压力持续性 | 尾盘微价格偏向买方且方向越持续，因子越高 | 1 日 | `registered` |
+| `INT-003` | composite `[FR, OB]` | 盈利惊喜×事件日流动性摩擦 | 盈利惊喜在尾盘流动性恶化时被增强 | 1—20 日 | `implemented` |
 | `INT-001` | composite `[FR, HF]` | `FR-002/HF-001` 等权截面秩 | 两组件越高越高 | 1 日 | `submitted_smoke` |
 
 表中状态来自本地核验快照上的统一评价：2019—2021 开发，2022、2023
 作为两个等权的跨市场状态验证年。长窗口候选允许2019年自然预热，从实际有效日期
 开始评价。
+
+其中 `FR-002/004/005/006/012、OB-001/003、PV-008/009/011/013/014/019`
+已在 `literature_round2_v1_2026-07-26` 核验快照上通过候选级 I 以及两项联合
+池确认，冻结进入 Elastic Net。这里的 `frozen` 不代表其自动进入 LightGBM；
+T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
 
 ## 基础候选定义
 
@@ -107,6 +124,27 @@ registered
 - 机制：在成交碎片化条件下衡量价格路径效率。
 - 主要重复风险：平均成交规模、零售交易代理和流动性。
 
+#### HF-003
+
+- 源码：`src/bigalpha2026/candidates/hf/hf_003.py`
+- 数据：日内实现波动率和下行实现波动率。
+- 机制：先计算
+  `RSJ = 1 - 2 × downside_realized_variance / realized_variance`，再取最近
+  5日均值的负值；上涨跳跃相对占优的股票因子更低。
+- 固定方向：`-mean_5d(RSJ)`，不根据评价结果翻转。
+- 主要重复风险：极端收益、`PV-003`和公开短期波动率。
+
+#### HF-004
+
+- 源码：`src/bigalpha2026/candidates/hf/hf_004.py`
+- 数据：尾盘60分钟收益、成交量以及用分钟收益连续分配方向后的成交量。
+- 机制：先以`尾盘方向成交量/尾盘成交量`得到方向压力，再用同一股票严格滞后的
+  60日、至少30日回归剔除同期尾盘收益能够解释的部分。
+- 固定方向：当前尾盘方向压力减去历史价格—压力关系的拟合值，残余买压越大越高。
+- 约束：方向成交量是固定 logistic BVC 近似，不是真实主动买卖标记；新增聚合字段
+  必须先在AIStudio短窗核验再生成全量面板。
+- 主要重复风险：公开`netflow_amount_rate_main`和普通成交量不平衡。
+
 ### OB
 
 #### OB-001
@@ -130,6 +168,17 @@ registered
 - 机制：比较两种方向性流动性供给；买盘补充相对更强代表下行冲击更易被吸收。
 - 固定方向：每日截面 `rank(negative-shock bid recovery) - rank(positive-shock ask recovery)`。
 - 主要重复风险：订单簿恢复、买卖盘不平衡和 `OB-001`。
+
+#### OB-004
+
+- 源码：`src/bigalpha2026/candidates/ob/ob_004.py`
+- 数据：全日盘口深度失衡中位数、日内失衡标准差和尾盘60分钟失衡中位数。
+- 机制：
+  `(tail_imbalance - full_day_imbalance) / full_day_imbalance_std`，只衡量
+  尾盘盘口状态相对当日常态的创新。
+- 固定方向：尾盘买方深度相对增强越多，因子越高。
+- 约束：分钟盘口是快照，不能把状态变化解释为新增委托或撤单。
+- 主要重复风险：`OB-001`中的尾盘失衡水平和`OB-002`的盘口形状。
 
 ### FR
 
@@ -257,6 +306,159 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
   私榜尚未公布。
 - 定位：端到端冒烟提交，不代表已经通过正式因子准入。
 - 冻结记录：`artifacts/frozen/int_001.json`。
+
+### FR-013
+
+- candidate_id：`FR-013`
+- data_family：`FR`
+- data_sources：`bigalpha_2026_financial`
+- mechanism：公司会相对自身正常节奏提前披露好消息、推迟披露坏消息。
+- source_fields：`disclosure_date、effective_date、report_date、category、shift`
+- formula：当前披露滞后天数减去同一股票、同一报告季度过去 3 次披露滞后中位数，
+  再取负；历史不足 2 次时不产生信号。
+- available_time：`effective_date`
+- expected_direction：异常提前披露为正，异常延迟披露为负。
+- expected_horizon：5—20 日。
+- failure_conditions：法定截止日聚集压过公司自主时点、报告期类型映射不稳定。
+- duplication_risk：低；现有 FR 候选均以财务数值而非披露行为为核心。
+- status：`registered`
+
+### PV-021
+
+- candidate_id：`PV-021`
+- data_family：`PV`
+- data_sources：`cn_stock_bar1d`
+- mechanism：高成交状态下的收益可能来自信息交易并延续，低成交状态更可能是
+  流动性冲击并反转；每只股票用自身历史估计状态方向。
+- source_fields：`close、pre_close、amount`
+- formula：先用滞后 20 日成交额中位数构造异常成交额；再用截至前一日的 120 日、
+  至少 60 日窗口估计
+  `r_t = a + b*r_(t-1) + c*r_(t-1)*abnormal_volume_t`，当日信号为
+  `c_hat_(t-1)*r_t*abnormal_volume_t`。
+- available_time：当日收盘后。
+- expected_direction：`c_hat` 为正时顺势，为负时反转。
+- expected_horizon：1—3 日。
+- failure_conditions：滚动回归病态、异常成交额由停复牌或公司行动驱动。
+- duplication_risk：中低；与普通动量/反转共享收益输入，但方向由历史量价状态决定。
+- status：`registered`
+
+### INT-002
+
+- candidate_id：`INT-002`
+- data_family：`composite`
+- data_sources：`[FR, PV]`
+- mechanism：财报披露后的异常隔夜反应包含价值信息，并在后续交易日继续漂移。
+- source_fields：`effective_date、instrument、open、pre_close`
+- formula：在财报 `effective_date` 计算个股隔夜收益减当日股票池等权隔夜收益，
+  固定保留 20 个交易日；不叠加盈利方向过滤。
+- available_time：财报生效日开盘后；作为日因子在当日收盘后使用。
+- expected_direction：异常隔夜收益越高，因子越高。
+- expected_horizon：1—20 日。
+- failure_conditions：开盘价缺失、停牌复牌跳空、市场隔夜基准受极端横截面污染。
+- duplication_risk：中；与 `PV-002` 共享隔夜收益，但只在财报事件窗口激活。
+- status：`registered`
+
+### PV-022
+
+- candidate_id：`PV-022`
+- data_family：`PV`
+- data_sources：`cn_stock_bar1d`
+- mechanism：把过去12至1个月动量按日收益符号的连续程度加权，区分持续小幅
+  信息进入和少数离散跳跃造成的相同累计收益。
+- source_fields：`close、pre_close`
+- formula：先算 `PRET = close_(t-21) / close_(t-252) - 1`，再算
+  `ID = sign(PRET) × (negative_share - positive_share)`，最终为
+  `PRET × (1-ID)/2`。
+- available_time：当日收盘后，形成期严格截止到21个交易日前。
+- expected_direction：连续形成的正动量越强越高；连续负动量为负。
+- expected_horizon：1—20 日。
+- failure_conditions：长期停牌导致形成窗稀疏、除权价格未正确复权。
+- duplication_risk：中；与普通12—1月动量共享累计收益，但新增路径连续性。
+- status：`implemented`
+
+### PV-023
+
+- candidate_id：`PV-023`
+- data_family：`PV`
+- data_sources：`cn_stock_bar1d`
+- mechanism：识别正隔夜收益与负日内收益之间超出各自边际频率的异常共现，
+  表达隔夜与日内投资者的方向分歧。
+- source_fields：`open、close、pre_close`
+- formula：20日滚动
+  `P(overnight>0, intraday<0) - P(overnight>0)×P(intraday<0)`。
+- available_time：当日收盘后。
+- expected_direction：高开后回落的异常共现越多，因子越高。
+- expected_horizon：1—20 日。
+- failure_conditions：涨跌停、停复牌和公司行动扭曲开盘收益。
+- duplication_risk：中低；与 `PV-002` 共享隔夜和日内收益，但使用滚动共现结构。
+- status：`implemented`
+
+### FR-014
+
+- candidate_id：`FR-014`
+- data_family：`FR`
+- data_sources：`bigalpha_2026_financial + daily exposures`
+- mechanism：以披露时可见的TTM盈利相对同日可交易流通市值衡量便宜程度。
+- source_fields：`net_profit、effective_date、float_market_cap`
+- formula：`PIT TTM net_profit / same-day float_market_cap`。
+- available_time：财报 `effective_date` 当日收盘后。
+- expected_direction：盈利收益率越高，因子越高。
+- expected_horizon：5—20 日。
+- failure_conditions：负利润、极小流通市值和财报/市值单位不一致。
+- duplication_risk：中；接近价值因子，但采用严格PIT盈利与流通市值。
+- status：`implemented`
+
+### FR-015
+
+- candidate_id：`FR-015`
+- data_family：`FR`
+- data_sources：`bigalpha_2026_financial`
+- mechanism：净利率的同季度同比改善同时约束盈利和营收，减少单纯利润增长的
+  规模效应。
+- source_fields：`net_profit、operating_revenue、report_date、effective_date`
+- formula：最新 `TTM net_profit / TTM operating_revenue` 减去同一报告季度
+  上一年的净利率。
+- available_time：财报 `effective_date`。
+- expected_direction：净利率同比改善越多，因子越高。
+- expected_horizon：5—20 日。
+- failure_conditions：收入接近零、同季度历史缺失、主营业务发生结构性变化。
+- duplication_risk：中；与盈利增长和资产效率共享基本面信息，但直接刻画利润率。
+- status：`implemented`
+
+### OB-005
+
+- candidate_id：`OB-005`
+- data_family：`OB`
+- data_sources：`bigalpha_2026_stock_bar1m`
+- mechanism：一档微价格相对中间价的位置反映两侧最优深度压力；尾盘方向持续
+  出现时，比单点盘口失衡更可靠。
+- source_fields：`bid_price1、ask_price1、bid_volume1、ask_volume1`
+- formula：分钟
+  `gap=(microprice-mid)/(ask1-bid1)`，日级信号为
+  `tail60_median(gap) × abs(tail60_mean(sign(gap)))`。
+- available_time：当日收盘后。
+- expected_direction：尾盘持续买方压力为正，持续卖方压力为负。
+- expected_horizon：1 日。
+- failure_conditions：一档报价无效、价差为零、尾盘有效快照不足。
+- duplication_risk：中；与盘口失衡共享深度输入，但微价格按对侧价格加权。
+- status：`registered`；聚合代码已实现，需先在AIStudio短窗核验新增日级字段。
+
+### INT-003
+
+- candidate_id：`INT-003`
+- data_family：`composite`
+- data_sources：`[FR, OB]`
+- mechanism：事件日尾盘价差扩大且深度收缩时，盈利惊喜更可能尚未被充分吸收。
+- source_fields：`FR-012 factor_raw、full/tail spread、full/tail depth`
+- formula：
+  `FR-012 × (1 + positive_rank(log(tail_spread/full_spread) + log(full_depth/tail_depth)))`，
+  固定保留20个交易日。
+- available_time：财报生效日收盘后。
+- expected_direction：正盈利惊喜被流动性恶化增强，负惊喜同方向放大。
+- expected_horizon：1—20 日。
+- failure_conditions：事件日无盘口快照、价差或深度无效、财报惊喜历史不足。
+- duplication_risk：中低；只在财报事件上将基本面与当日流动性状态交互。
+- status：`implemented`
 
 ## 新候选登记模板
 

@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from bigalpha2026.candidates.composite.int_002 import build_int_002_factor
+from bigalpha2026.candidates.composite.int_003 import build_int_003_factor
 from bigalpha2026.candidates.fr.fr_001 import build_fr_001_factor_from_panel
 from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
 from bigalpha2026.candidates.fr.fr_003 import build_fr_003_factor
@@ -25,11 +27,18 @@ from bigalpha2026.candidates.fr.fr_009 import build_fr_009_factor
 from bigalpha2026.candidates.fr.fr_010 import build_fr_010_factor
 from bigalpha2026.candidates.fr.fr_011 import build_fr_011_factor
 from bigalpha2026.candidates.fr.fr_012 import build_fr_012_factor
+from bigalpha2026.candidates.fr.fr_013 import build_fr_013_factor
+from bigalpha2026.candidates.fr.fr_014 import build_fr_014_factor
+from bigalpha2026.candidates.fr.fr_015 import build_fr_015_factor
 from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
+from bigalpha2026.candidates.hf.hf_003 import build_hf_003_factor_from_daily
+from bigalpha2026.candidates.hf.hf_004 import build_hf_004_factor_from_daily
 from bigalpha2026.candidates.ob.ob_001 import build_ob_001_factor_from_daily
 from bigalpha2026.candidates.ob.ob_002 import build_ob_002_factor_from_daily
 from bigalpha2026.candidates.ob.ob_003 import build_ob_003_factor_from_daily
+from bigalpha2026.candidates.ob.ob_004 import build_ob_004_factor_from_daily
+from bigalpha2026.candidates.ob.ob_005 import build_ob_005_factor_from_daily
 from bigalpha2026.candidates.pv.pv_001 import build_pv_001_factor
 from bigalpha2026.candidates.pv.pv_002 import build_pv_002_factor
 from bigalpha2026.candidates.pv.pv_003 import build_pv_003_factor
@@ -50,6 +59,9 @@ from bigalpha2026.candidates.pv.pv_017 import build_pv_017_factor
 from bigalpha2026.candidates.pv.pv_018 import build_pv_018_factor
 from bigalpha2026.candidates.pv.pv_019 import build_pv_019_factor
 from bigalpha2026.candidates.pv.pv_020 import build_pv_020_factor
+from bigalpha2026.candidates.pv.pv_021 import build_pv_021_factor
+from bigalpha2026.candidates.pv.pv_022 import build_pv_022_factor
+from bigalpha2026.candidates.pv.pv_023 import build_pv_023_factor
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
     rank_ic_series,
@@ -526,6 +538,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         "PV-018": build_pv_018_factor(pv, pool),
         "PV-019": build_pv_019_factor(pv, pool),
         "PV-020": build_pv_020_factor(pv, pool),
+        "PV-021": build_pv_021_factor(pv, pool),
+        "PV-022": build_pv_022_factor(pv, pool),
+        "PV-023": build_pv_023_factor(pv, pool),
     }
     factorlib = read_yearly(
         "features/FACTORLIB/year={year}/part-{year}.parquet",
@@ -551,13 +566,22 @@ def main(argv: Sequence[str] | None = None) -> None:
     factors["FR-010"] = build_fr_010_factor(financial, pool)
     factors["FR-011"] = build_fr_011_factor(financial, exposures, pool)
     factors["FR-012"] = build_fr_012_factor(financial, pool)
+    factors["FR-013"] = build_fr_013_factor(financial, pool)
+    factors["FR-014"] = build_fr_014_factor(financial, exposures, pool)
+    factors["FR-015"] = build_fr_015_factor(financial, pool)
+    factors["INT-002"] = build_int_002_factor(financial, pv, pool)
 
     micro = read_full_micro_panel()
     factors["HF-001"] = build_hf_001_factor_from_daily(micro, pool)
     factors["HF-002"] = build_hf_002_factor_from_daily(micro, pool)
+    factors["HF-003"] = build_hf_003_factor_from_daily(micro, pool)
+    factors["HF-004"] = build_hf_004_factor_from_daily(micro, pool)
     factors["OB-001"] = build_ob_001_factor_from_daily(micro, pool)
     factors["OB-002"] = build_ob_002_factor_from_daily(micro, pool)
     factors["OB-003"] = build_ob_003_factor_from_daily(micro, pool)
+    factors["OB-004"] = build_ob_004_factor_from_daily(micro, pool)
+    factors["OB-005"] = build_ob_005_factor_from_daily(micro, pool)
+    factors["INT-003"] = build_int_003_factor(financial, micro, pool)
 
     metric_output: list[dict[str, object]] = []
     stability_output: list[dict[str, object]] = []

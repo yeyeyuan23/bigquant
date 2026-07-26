@@ -6,7 +6,7 @@ AIStudio.  A frozen submission only uses recorded features and parameters.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -386,6 +386,9 @@ def lightgbm_candidate_incremental_validation(
     label_column: str = "ret_close_to_close",
     train_window_days: int = 60,
     test_window_days: int = 20,
+    prediction_loader: (
+        Callable[[tuple[str, ...]], pd.DataFrame] | None
+    ) = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Evaluate individual and full-pool conditional LightGBM increments."""
 
@@ -396,22 +399,26 @@ def lightgbm_candidate_incremental_validation(
     if set(base_feature_columns).intersection(candidate_columns):
         raise ValueError("base and candidate feature columns must be disjoint")
     all_features = (*base_feature_columns, *candidate_columns)
-    prepared = _prepare_joint_model_frame(
-        panel,
-        labels,
-        feature_columns=all_features,
-        label_column=label_column,
-    )
-
-    def predict(features: tuple[str, ...]) -> pd.DataFrame:
-        return _walk_forward_lightgbm_prepared(
-            prepared,
-            feature_columns=features,
-            prediction_years=prediction_years,
+    if prediction_loader is None:
+        prepared = _prepare_joint_model_frame(
+            panel,
+            labels,
+            feature_columns=all_features,
             label_column=label_column,
-            train_window_days=train_window_days,
-            test_window_days=test_window_days,
         )
+
+        def predict(features: tuple[str, ...]) -> pd.DataFrame:
+            return _walk_forward_lightgbm_prepared(
+                prepared,
+                feature_columns=features,
+                prediction_years=prediction_years,
+                label_column=label_column,
+                train_window_days=train_window_days,
+                test_window_days=test_window_days,
+            )
+
+    else:
+        predict = prediction_loader
 
     baseline = predict(base_feature_columns)
     full = predict(all_features)

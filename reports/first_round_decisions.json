@@ -222,6 +222,25 @@
     "upload_ready": false
   },
   {
+    "candidate_id": "FR-013",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.6428571428571429,
+    "development_failures": [
+      "development IC t-stat is below 2"
+    ],
+    "validation_2022_observations": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_observations": [
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
     "candidate_id": "HF-001",
     "status": "rejected",
     "technical_passed": true,
@@ -262,6 +281,22 @@
       "2023 validation raw_full IC is not positive",
       "2023 validation neutral_full IC is not positive",
       "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "INT-002",
+    "status": "provisional_survivor",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": true,
+    "development_stability_fraction": 0.782608695652174,
+    "development_failures": [],
+    "validation_2022_observations": [
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_observations": [
       "2023 validation raw group monotonicity is below the gate"
     ],
     "upload_ready": false
@@ -700,6 +735,34 @@
       "2022 validation raw group monotonicity is below the gate"
     ],
     "validation_2023_observations": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-021",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.30303030303030304,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development monthly sign stability is below the gate"
+    ],
+    "validation_2022_observations": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_observations": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
     "upload_ready": false
   }
 ]
