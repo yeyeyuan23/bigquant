@@ -1,9 +1,9 @@
 {
   "schema_version": "candidate-pool-v2",
-  "generated_at": "2026-07-26T23:48:41+08:00",
+  "generated_at": "2026-07-27T01:15:32+08:00",
   "generation_entrypoint": "scripts/run_first_round.py",
   "relative_path": "factors/candidate_pool.parquet",
-  "factor_version": "literature_round2_v1_2026-07-26",
+  "factor_version": "literature_round4_v1_2026-07-27",
   "date_range": [
     "2019-01-02",
     "2023-12-29"
@@ -15,7 +15,7 @@
     "factor_version",
     "factor"
   ],
-  "rows": 37249000,
+  "rows": 47091000,
   "duplicate_keys": 0,
   "candidate_rows": {
     "FR-001": 1214000,
@@ -30,12 +30,19 @@
     "FR-011": 1214000,
     "FR-012": 915000,
     "FR-013": 310000,
+    "FR-014": 1214000,
+    "FR-015": 1166000,
     "HF-001": 1214000,
     "HF-002": 1214000,
+    "HF-003": 1212000,
+    "HF-004": 1184000,
     "INT-002": 564000,
+    "INT-003": 476000,
     "OB-001": 1214000,
     "OB-002": 1214000,
     "OB-003": 1214000,
+    "OB-004": 1214000,
+    "OB-005": 1214000,
     "PV-001": 1204000,
     "PV-002": 1214000,
     "PV-003": 1205000,
@@ -54,7 +61,9 @@
     "PV-018": 458000,
     "PV-019": 815000,
     "PV-020": 1204000,
-    "PV-021": 1144000
+    "PV-021": 1144000,
+    "PV-022": 962000,
+    "PV-023": 1200000
   },
   "candidate_dates": {
     "FR-001": 1214,
@@ -69,12 +78,19 @@
     "FR-011": 1214,
     "FR-012": 915,
     "FR-013": 310,
+    "FR-014": 1214,
+    "FR-015": 1166,
     "HF-001": 1214,
     "HF-002": 1214,
+    "HF-003": 1212,
+    "HF-004": 1184,
     "INT-002": 564,
+    "INT-003": 476,
     "OB-001": 1214,
     "OB-002": 1214,
     "OB-003": 1214,
+    "OB-004": 1214,
+    "OB-005": 1214,
     "PV-001": 1204,
     "PV-002": 1214,
     "PV-003": 1205,
@@ -93,14 +109,16 @@
     "PV-018": 458,
     "PV-019": 815,
     "PV-020": 1204,
-    "PV-021": 1144
+    "PV-021": 1144,
+    "PV-022": 962,
+    "PV-023": 1200
   },
   "technical_rejects_omitted": [
     "FR-007",
     "PV-007",
     "PV-012"
   ],
-  "sha256": "c9856fcc2a20b592c12df3fd2b91d25148273b3d489816c4fc35bb797646163d",
+  "sha256": "cd5adb7ba98692a2c8bbfc64423bc7b3cae9665de4539b6414a7d85816ba828e",
   "input_manifest_sha256": {
     "data/manifest_2019.json": "102b47ea7dd2a5fb308bd85b63ad043bf4103671d30bb4c9dd5d38b15110f281",
     "data/manifest_2020.json": "209aafd06e149d81b55228a7605b2e6626d1182550995af7d89a751da5b8e57f",
@@ -109,7 +127,7 @@
     "data/manifest_2023.json": "38390c8a4f26bb1e71eb8cb2574fb75c22ca59012f196107bf79fb19d0cee74a",
     "data/manifest_FR_2017_2022.json": "325a99d26a64d514913aaf2643eb52ce8dcd428e467a646d97c74a3d3d0de61d",
     "data/manifest_FR_2023.json": "7672a31d52b4ec8079151a97ce5705d5b5164319325f52bc2b7dea9611fef7ee",
-    "data/manifest_MICRO_DAILY_FULL.json": "294d9a8c206dbd3343395b879f2a0e7fd2f9d17f1f4d04207c82f49a08ce053b"
+    "data/manifest_MICRO_DAILY_FULL.json": "2d1f764a4c6513956e2067c5f8b080af0ae1317b44c7700d2f481c2ed144eb20"
   },
   "result_role": "local_verified_research_snapshot",
   "aistudio_truth_required": false

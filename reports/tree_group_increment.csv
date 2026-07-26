@@ -1,2 +1,2 @@
 baseline_oos_rank_ic,augmented_oos_rank_ic,oos_rank_ic_increment,positive_window_ratio,positive_years,oos_days,windows,passed,reasons,selected_candidate_count
-0.03974139255211792,0.046659550859695566,0.006918158307577641,0.8235294117647058,3.0,670.0,34.0,True,,9
+0.03974139255211792,0.050882498325439465,0.01114110577332154,0.9411764705882353,3.0,670.0,34.0,True,,11

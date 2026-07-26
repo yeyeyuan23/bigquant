@@ -11,12 +11,19 @@ FR-010,self__FR-010,False,False,I_rejected,False,False,False,False,0,rejected
 FR-011,self__FR-011,False,False,I_rejected,False,False,True,True,1,admitted
 FR-012,self__FR-012,False,True,frozen_I,False,True,False,False,1,admitted
 FR-013,self__FR-013,False,False,I_rejected,False,False,False,False,0,rejected
+FR-014,self__FR-014,False,False,I_rejected,False,False,False,False,0,rejected
+FR-015,self__FR-015,False,True,pending_passed_not_frozen,False,False,False,False,0,rejected
 HF-001,self__HF-001,False,False,I_rejected,False,False,False,False,0,rejected
 HF-002,self__HF-002,False,False,I_rejected,False,False,True,True,1,admitted
+HF-003,self__HF-003,False,True,pending_passed_not_frozen,False,False,True,True,1,admitted
+HF-004,self__HF-004,False,False,I_rejected,False,False,False,False,0,rejected
 INT-002,self__INT-002,True,False,I_rejected,False,False,False,False,0,rejected
+INT-003,self__INT-003,False,False,I_rejected,False,False,False,False,0,rejected
 OB-001,self__OB-001,False,True,frozen_I,False,True,False,False,1,admitted
 OB-002,self__OB-002,False,False,I_rejected,False,False,False,False,0,rejected
 OB-003,self__OB-003,False,True,frozen_I,False,True,True,False,1,admitted
+OB-004,self__OB-004,False,False,I_rejected,False,False,False,False,0,rejected
+OB-005,self__OB-005,False,False,I_rejected,False,False,True,True,1,admitted
 PV-001,self__PV-001,False,False,I_rejected,False,False,True,True,1,admitted
 PV-002,self__PV-002,False,False,I_rejected,False,False,True,True,1,admitted
 PV-003,self__PV-003,True,False,I_rejected,True,False,True,True,2,admitted
@@ -36,3 +43,5 @@ PV-018,self__PV-018,False,False,I_rejected,False,False,False,False,0,rejected
 PV-019,self__PV-019,False,True,frozen_I,False,True,False,False,1,admitted
 PV-020,self__PV-020,False,False,I_rejected,False,False,True,False,0,rejected
 PV-021,self__PV-021,False,False,I_rejected,False,False,False,False,0,rejected
+PV-022,self__PV-022,False,True,pending_passed_not_frozen,False,False,False,False,0,rejected
+PV-023,self__PV-023,False,False,I_rejected,False,False,False,False,0,rejected

@@ -124,6 +124,53 @@ class SubmissionTest(unittest.TestCase):
                     source.read_text(encoding="utf-8"),
                 )
 
+    def test_lightgbm_submission_matches_frozen_tree_pool(self):
+        source_path = ROOT / "submissions" / "factor_joint_lightgbm.py"
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        main = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "main"
+        )
+        self_columns = None
+        for node in ast.walk(main):
+            if not isinstance(node, ast.Assign):
+                continue
+            if any(
+                isinstance(target, ast.Name) and target.id == "self_columns"
+                for target in node.targets
+            ):
+                self_columns = tuple(ast.literal_eval(node.value))
+                break
+        self.assertIsNotNone(self_columns)
+
+        frozen_state = json.loads(
+            (
+                ROOT
+                / "data"
+                / "cache"
+                / "tree_v2"
+                / "frozen"
+                / "frozen_state.json"
+            ).read_text(encoding="utf-8")
+        )
+        expected = tuple(
+            candidate.removeprefix("self__")
+            for candidate in frozen_state["frozen_candidates"]
+        )
+        self.assertEqual(self_columns, expected)
+
+        source = source_path.read_text(encoding="utf-8")
+        for required in (
+            'panel["HF-003"]',
+            'panel["OB-005"]',
+            "downside_realized_volatility",
+            "tail_60_microprice_gap_median",
+            "tail_60_microprice_gap_sign_consistency",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, source)
+
 
 if __name__ == "__main__":
     unittest.main()

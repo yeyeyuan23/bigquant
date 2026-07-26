@@ -19,6 +19,14 @@ def main(datasources, start_date, end_date):
     history_start = start_ts - pd.Timedelta(days=500)
     financial_start = start_ts - pd.Timedelta(days=1500)
     hf_start = start_ts - pd.Timedelta(days=120)
+    financial_source = datasources.get(
+        "financial",
+        "bigalpha_2026_financial",
+    )
+    bar1m_source = datasources.get(
+        "bar1m",
+        "bigalpha_2026_stock_bar1m",
+    )
 
     public_columns = (
         "amount",
@@ -64,6 +72,8 @@ def main(datasources, start_date, end_date):
         "PV-003",
         "PV-006",
         "PV-014",
+        "HF-003",
+        "OB-005",
     )
 
     pool = dai.query(
@@ -71,8 +81,8 @@ def main(datasources, start_date, end_date):
         filters={"date": [history_start, end_ts]},
         compression=True,
     ).df()
-    daily = dai.query(
-        f"""
+    raw_daily = dai.query(
+        """
         SELECT
             date,
             instrument,
@@ -81,8 +91,18 @@ def main(datasources, start_date, end_date):
             low,
             close,
             pre_close,
+            deal_number
+        FROM cn_stock_bar1d
+        """,
+        filters={"date": [history_start, end_ts]},
+        compression=True,
+    ).df()
+    public_daily = dai.query(
+        f"""
+        SELECT
+            date,
+            instrument,
             daily_return,
-            deal_number,
             {", ".join(public_columns)}
         FROM bigalpha_2026_factorlib
         """,
@@ -108,7 +128,7 @@ def main(datasources, start_date, end_date):
             net_profit,
             operating_revenue,
             total_assets
-        FROM {datasources["financial"]}
+        FROM {financial_source}
         """,
         filters={"date": [financial_start, end_ts + pd.Timedelta(days=1)]},
         compression=True,
@@ -125,8 +145,20 @@ def main(datasources, start_date, end_date):
                 close,
                 amount,
                 volume,
-                deal_number
-            FROM {datasources["bar1m"]}
+                deal_number,
+                CASE
+                    WHEN bid_price1 > 0 AND ask_price1 > bid_price1
+                         AND bid_volume1 > 0 AND ask_volume1 > 0
+                    THEN (
+                        (
+                            ask_price1 * bid_volume1
+                          + bid_price1 * ask_volume1
+                        ) / (bid_volume1 + ask_volume1)
+                      - (bid_price1 + ask_price1) / 2.0
+                    ) / (ask_price1 - bid_price1)
+                    ELSE NULL
+                END AS microprice_gap
+            FROM {bar1m_source}
         ),
         sequenced AS (
             SELECT
@@ -166,7 +198,16 @@ def main(datasources, start_date, end_date):
                     0
                 )
             ) / NULLIF(sum(amount) / NULLIF(sum(deal_number), 0), 0)
-                AS tail_trade_value_ratio
+                AS tail_trade_value_ratio,
+            sqrt(sum(minute_log_return * minute_log_return))
+                AS realized_volatility,
+            sqrt(sum(CASE WHEN minute_log_return < 0
+                THEN minute_log_return * minute_log_return ELSE 0 END))
+                AS downside_realized_volatility,
+            median(CASE WHEN reverse_minute <= 60 THEN microprice_gap END)
+                AS tail_60_microprice_gap_median,
+            avg(CASE WHEN reverse_minute <= 60 THEN sign(microprice_gap) END)
+                AS tail_60_microprice_gap_sign_consistency
         FROM sequenced
         GROUP BY trading_day, instrument
         ORDER BY date, instrument
@@ -187,7 +228,14 @@ def main(datasources, start_date, end_date):
         cursor += 1
     hf_daily = pd.concat(hf_parts, ignore_index=True)
 
-    for frame in (pool, daily, exposure, financial, hf_daily):
+    for frame in (
+        pool,
+        raw_daily,
+        public_daily,
+        exposure,
+        financial,
+        hf_daily,
+    ):
         frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
         frame["instrument"] = frame["instrument"].astype(str)
     pool = (
@@ -195,10 +243,21 @@ def main(datasources, start_date, end_date):
         .drop_duplicates(["date", "instrument"], keep="last")
         .sort_values(["instrument", "date"])
     )
-    daily = (
-        daily.dropna(subset=["date", "instrument"])
+    raw_daily = (
+        raw_daily.dropna(subset=["date", "instrument"])
         .drop_duplicates(["date", "instrument"], keep="last")
         .sort_values(["instrument", "date"])
+    )
+    public_daily = (
+        public_daily.dropna(subset=["date", "instrument"])
+        .drop_duplicates(["date", "instrument"], keep="last")
+        .sort_values(["instrument", "date"])
+    )
+    daily = raw_daily.merge(
+        public_daily,
+        on=["date", "instrument"],
+        how="left",
+        validate="one_to_one",
     )
     exposure = (
         exposure.dropna(subset=["date", "instrument"])
@@ -432,12 +491,17 @@ def main(datasources, start_date, end_date):
                 "avg_trade_volume",
                 "directional_efficiency",
                 "tail_trade_value_ratio",
+                "realized_volatility",
+                "downside_realized_volatility",
+                "tail_60_microprice_gap_median",
+                "tail_60_microprice_gap_sign_consistency",
             ]
         ],
         on=["date", "instrument"],
         how="left",
         validate="one_to_one",
     )
+    panel = panel.sort_values(["instrument", "date"]).reset_index(drop=True)
     hf_components = []
     for column in (
         "avg_trade_value",
@@ -455,6 +519,45 @@ def main(datasources, start_date, end_date):
             .fillna(0.5)
         )
     panel["HF-002"] = ranked(pd.concat(hf_components, axis=1).mean(axis=1))
+
+    # HF-003: negative five-day mean of relative signed intraday variation.
+    realized_variation = pd.to_numeric(
+        panel["realized_volatility"],
+        errors="coerce",
+    ).pow(2)
+    downside_variation = pd.to_numeric(
+        panel["downside_realized_volatility"],
+        errors="coerce",
+    ).pow(2)
+    valid_signed_variation = (
+        realized_variation.gt(0)
+        & downside_variation.ge(0)
+        & downside_variation.le(realized_variation * (1.0 + 1e-9))
+    )
+    downside_variation = downside_variation.clip(upper=realized_variation)
+    panel["relative_signed_variation"] = (
+        1.0 - 2.0 * downside_variation / realized_variation
+    ).where(valid_signed_variation)
+    hf003_raw = panel.groupby(
+        "instrument",
+        sort=False,
+    )["relative_signed_variation"].transform(
+        lambda values: -values.rolling(5, min_periods=3).mean()
+    )
+    panel["HF-003"] = ranked(hf003_raw)
+
+    # OB-005: closing microprice gap weighted by directional persistence.
+    closing_gap = pd.to_numeric(
+        panel["tail_60_microprice_gap_median"],
+        errors="coerce",
+    )
+    closing_consistency = pd.to_numeric(
+        panel["tail_60_microprice_gap_sign_consistency"],
+        errors="coerce",
+    ).abs().clip(0.0, 1.0)
+    panel["OB-005"] = ranked(
+        closing_gap.clip(-0.5, 0.5) * closing_consistency
+    )
 
     # PIT financial factors.
     financial["report_date"] = pd.to_datetime(

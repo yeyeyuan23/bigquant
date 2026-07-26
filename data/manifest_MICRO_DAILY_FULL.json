@@ -1,6 +1,6 @@
 {
   "dataset": "MICRO_DAILY_FULL",
-  "created_at": "2026-07-26T22:24:42.181683+08:00",
+  "created_at": "2026-07-27T01:10:40.270889+08:00",
   "years": [
     2019,
     2020,
@@ -30,6 +30,8 @@
     "tail_120_amount",
     "tail_60_volume",
     "tail_60_deal_number",
+    "tail_60_log_return",
+    "tail_60_signed_volume_bvc",
     "morning_amount_share",
     "afternoon_absolute_return_share",
     "avg_trade_value",
@@ -54,6 +56,8 @@
     "full_day_depth_imbalance_median",
     "full_day_depth_imbalance_std",
     "tail_60_bid_depth_imbalance_median",
+    "tail_60_microprice_gap_median",
+    "tail_60_microprice_gap_sign_consistency",
     "negative_mid_shock_q10_bid_depth_recovery_5m_median",
     "positive_mid_shock_q90_ask_depth_recovery_5m_median",
     "full_day_depth_shape_median",
@@ -71,8 +75,8 @@
       "dates": 244,
       "instruments": 1198,
       "missing_keys": 1007,
-      "source_sha256": "256076d94e1d0585ddb001b2522ddb0bccf18312cd72f08fe0149875713f13ff",
-      "output_sha256": "89c964ab62be4535bf6d1dbe31fc238b4866526903fadaaa4c368dba386e37d1"
+      "source_sha256": "17242025c1d0ff9ef63ab84ca07e5fd2929d2475cf33c151265c4412cb5972cc",
+      "output_sha256": "241d27242bf72b51d5d165c58efa0141355a2ffd3589c7212652bbced89ccbc7"
     },
     {
       "year": 2020,
@@ -83,8 +87,8 @@
       "dates": 243,
       "instruments": 1209,
       "missing_keys": 700,
-      "source_sha256": "df7d479ca4122e75abeff26e3bd169d6c19f81bbcba072397d3b64f995673345",
-      "output_sha256": "ea01ed88e72c2625c773a190d133a372aba75a8051e15fdbcdeadbbdcfda9edf"
+      "source_sha256": "0df70fca3cc2fe8937df23e807ed59a192b863f11c3f5f9ceb96a5154b318089",
+      "output_sha256": "cd92c1ad937585844699be3114bbed0166dfba5712775dea5cf26ae2f918f235"
     },
     {
       "year": 2021,
@@ -95,8 +99,8 @@
       "dates": 243,
       "instruments": 1205,
       "missing_keys": 578,
-      "source_sha256": "69610c1ae9830d8d96bd9659b26a41c4b19e3d32b7894d6e4f611df50541b632",
-      "output_sha256": "b10e438cdc3f029ab209ca6a41dd06d7b389ba265204f838db89027e9ea2b88d"
+      "source_sha256": "cb9009befd8aebf0abe98bcb6c7c33211572d8d4e12e75842fe95d8268daccb7",
+      "output_sha256": "cf4471bc1ead082d922096d6b61fb3a715104c2b03934a76f2445738d309e1b2"
     },
     {
       "year": 2022,
@@ -107,8 +111,8 @@
       "dates": 242,
       "instruments": 1200,
       "missing_keys": 490,
-      "source_sha256": "b2999fca2a49d6d44cba110ded0ceb2493d00242e044d328deeaecb5a98e5807",
-      "output_sha256": "723fc404e5fff855dc625a6a52ea56a08fd177a8cd304163c6ac2a06246a1ebc"
+      "source_sha256": "53100b6f50f32cd3b88de9d03c7b8d43c6a767596f847ac2794a6c7a1ce121e4",
+      "output_sha256": "4289aae232b1eacf140001930b1c7ce2a566552876a7e07f2e80e2617a3498b4"
     },
     {
       "year": 2023,
@@ -119,8 +123,8 @@
       "dates": 242,
       "instruments": 1202,
       "missing_keys": 369,
-      "source_sha256": "a80b9405f03427a868b390b11f9509497cf4bf6708401291fd7c276a210fb7f1",
-      "output_sha256": "4d7b75f3e46bc469fb0c081dd23bd282235a177c8e7e40682b28e1c89da10ba6"
+      "source_sha256": "f100f7aa0e1b918485a49f570b07ef65f96b1b4111042063cce321f769c2c949",
+      "output_sha256": "76d9d267bafa04d94201d9cc8ea70c25c35d57341e5f645f288f5dde6feabcdc"
     }
   ]
 }

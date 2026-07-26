@@ -133,6 +133,8 @@ T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
   5日均值的负值；上涨跳跃相对占优的股票因子更低。
 - 固定方向：`-mean_5d(RSJ)`，不根据评价结果翻转。
 - 主要重复风险：极端收益、`PV-003`和公开短期波动率。
+- status：S未通过；I候选级通过但池级未冻结；T候选级与池级均通过，已进入
+  `frozen_T`。
 
 #### HF-004
 
@@ -144,6 +146,7 @@ T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
 - 约束：方向成交量是固定 logistic BVC 近似，不是真实主动买卖标记；新增聚合字段
   必须先在AIStudio短窗核验再生成全量面板。
 - 主要重复风险：公开`netflow_amount_rate_main`和普通成交量不平衡。
+- status：S/I/T均未通过，不进入组合。
 
 ### OB
 
@@ -179,6 +182,7 @@ T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
 - 固定方向：尾盘买方深度相对增强越多，因子越高。
 - 约束：分钟盘口是快照，不能把状态变化解释为新增委托或撤单。
 - 主要重复风险：`OB-001`中的尾盘失衡水平和`OB-002`的盘口形状。
+- status：S/I/T均未通过，不进入组合。
 
 ### FR
 
@@ -293,7 +297,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 | pipeline | 冻结输入 | 2022 Rank IC | 2023 Rank IC | Notebook | 比赛状态 |
 | --- | --- | ---: | ---: | --- | --- |
 | `self_factor_composite` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/factor_self_family_rank.ipynb` | 2026-07-26 已提交，公榜计算中 |
-| `joint_lightgbm` | 冻结 `screened15` 加 `FR-002/004/011, HF-002, PV-001/002/003/006/014` | 0.04065 | 0.02857 | `submissions/factor_joint_lightgbm.ipynb` | 2026-07-26 已提交，公榜计算中 |
+| `joint_lightgbm` | 冻结 `screened15` 加 `FR-002/004/011, HF-002/003, OB-005, PV-001/002/003/006/014` | 0.04409 | 0.03388 | `submissions/factor_joint_lightgbm.ipynb` | 2026-07-27 新版待提交 |
 
 两份 Notebook 均仅保留比赛要求的 `main(datasources, start_date, end_date)`，
 返回列固定为 `date, instrument, factor`。
@@ -374,7 +378,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1—20 日。
 - failure_conditions：长期停牌导致形成窗稀疏、除权价格未正确复权。
 - duplication_risk：中；与普通12—1月动量共享累计收益，但新增路径连续性。
-- status：`implemented`
+- status：S未通过；I候选级通过但池级未冻结；T未通过，不进入组合。
 
 ### PV-023
 
@@ -391,7 +395,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1—20 日。
 - failure_conditions：涨跌停、停复牌和公司行动扭曲开盘收益。
 - duplication_risk：中低；与 `PV-002` 共享隔夜和日内收益，但使用滚动共现结构。
-- status：`implemented`
+- status：S/I/T均未通过，不进入组合。
 
 ### FR-014
 
@@ -406,7 +410,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：5—20 日。
 - failure_conditions：负利润、极小流通市值和财报/市值单位不一致。
 - duplication_risk：中；接近价值因子，但采用严格PIT盈利与流通市值。
-- status：`implemented`
+- status：S/I/T均未通过，不进入组合。
 
 ### FR-015
 
@@ -423,7 +427,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：5—20 日。
 - failure_conditions：收入接近零、同季度历史缺失、主营业务发生结构性变化。
 - duplication_risk：中；与盈利增长和资产效率共享基本面信息，但直接刻画利润率。
-- status：`implemented`
+- status：S未通过；I候选级通过但池级未冻结；T未通过，不进入组合。
 
 ### OB-005
 
@@ -441,7 +445,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1 日。
 - failure_conditions：一档报价无效、价差为零、尾盘有效快照不足。
 - duplication_risk：中；与盘口失衡共享深度输入，但微价格按对侧价格加权。
-- status：`registered`；聚合代码已实现，需先在AIStudio短窗核验新增日级字段。
+- status：S/I未通过；T候选级与池级均通过，已进入 `frozen_T`。
 
 ### INT-003
 
@@ -458,7 +462,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1—20 日。
 - failure_conditions：事件日无盘口快照、价差或深度无效、财报惊喜历史不足。
 - duplication_risk：中低；只在财报事件上将基本面与当日流动性状态交互。
-- status：`implemented`
+- status：S/I未通过；开发期有效日239，低于T门槛240，不进入组合。
 
 ## 新候选登记模板
 
