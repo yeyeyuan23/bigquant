@@ -36,5 +36,72 @@
     "tail_60_shape_sign_consistency": 0.94405
   },
   "elapsed_seconds": 64.42,
-  "evaluation_performed": false
+  "evaluation_performed": false,
+  "schema_version": "hfob-daily-month-v2",
+  "validated_at": "2026-07-26T21:23:51+08:00",
+  "source_frequency": "1m",
+  "panel_frequency": "1d",
+  "available_time": "after_close",
+  "date_role": "trading_day",
+  "key": [
+    "date",
+    "instrument"
+  ],
+  "files": {
+    "HF": {
+      "relative_path": "data/features/HF/year=2019/month=05/part-2019-05.parquet",
+      "sha256": "22dbbefa5abc9d068a61b72b39919ab20efc42084351aa634518ea03c608a99e",
+      "shape": [
+        20000,
+        17
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "minute_count",
+        "total_amount",
+        "total_volume",
+        "total_deal_number",
+        "net_log_return",
+        "absolute_log_return",
+        "tail_60_amount",
+        "tail_60_deal_number",
+        "avg_trade_value",
+        "avg_trade_volume",
+        "directional_efficiency",
+        "tail_trade_value_ratio",
+        "shock_q90_active_count",
+        "shock_q90_mean_abs_return",
+        "shock_q90_recovery_5m_median"
+      ],
+      "null_keys": 0,
+      "duplicate_keys": 0
+    },
+    "OB": {
+      "relative_path": "data/features/OB/year=2019/month=05/part-2019-05.parquet",
+      "sha256": "effea94d518c0ab03d789dbecfa24b5aea3a7a621e655a5cf15aa133b03d9f0e",
+      "shape": [
+        20000,
+        14
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "minute_count",
+        "valid_snapshot_count",
+        "both_sides_valid_rate",
+        "full_five_levels_rate",
+        "tail_60_valid_best_quote_minutes",
+        "tail_60_relative_spread_median",
+        "tail_60_depth_completeness_median",
+        "tail_60_bid_depth_imbalance_median",
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median",
+        "full_day_depth_shape_median",
+        "tail_60_depth_shape_median",
+        "tail_60_shape_sign_consistency"
+      ],
+      "null_keys": 0,
+      "duplicate_keys": 0
+    }
+  }
 }

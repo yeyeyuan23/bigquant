@@ -51,6 +51,10 @@ from bigalpha2026.evaluation import (
     evaluate_single_factor,
     rank_ic_series,
 )
+from bigalpha2026.factor_pool import (
+    CANDIDATE_POOL_VERSION,
+    write_candidate_pool_manifest,
+)
 from bigalpha2026.research_policy import (
     FORMAL_EVALUATION_POLICY,
     HF_OB_ACTIVATED_OPTIONAL_MONTHS,
@@ -73,7 +77,6 @@ VALIDATION_2022_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2022_start[:4])
 VALIDATION_2023_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4])
 MARKET_STATE_YEARS = range(2019, VALIDATION_2022_YEAR + 1)
 ALL_BASE_YEARS = range(2019, VALIDATION_2023_YEAR + 1)
-CANDIDATE_POOL_VERSION = "oap_b_v2_full_ob_2026-07-26"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -94,7 +97,61 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=[],
         help="with --resume-metrics, recompute this candidate instead of reusing it",
     )
+    parser.add_argument(
+        "--refresh-manifest-only",
+        action="store_true",
+        help="validate the existing candidate pool and refresh only its manifest",
+    )
     return parser.parse_args(argv)
+
+
+def candidate_input_manifest_paths() -> tuple[Path, ...]:
+    """Return every source manifest that determines the candidate snapshot."""
+
+    paths = [DATA / f"manifest_{year}.json" for year in ALL_BASE_YEARS]
+    paths.extend(
+        [
+            DATA / "manifest_FR_2017_2022.json",
+            DATA / "manifest_FR_2023.json",
+            DATA / "manifest_OB_DAILY_FULL.json",
+        ]
+    )
+    evaluation_months = {
+        *(
+            month
+            for month in HF_OB_MANDATORY_MONTHS
+            if int(month[:4]) <= VALIDATION_2023_YEAR
+        ),
+        *HF_OB_ACTIVATED_OPTIONAL_MONTHS,
+    }
+    paths.extend(
+        DATA / f"manifest_HFOB_{month}.json"
+        for month in sorted(evaluation_months)
+    )
+    missing = [str(path) for path in paths if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            f"candidate input manifests are missing: {missing}"
+        )
+    return tuple(paths)
+
+
+def refresh_candidate_pool_manifest(
+    candidate_pool: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    """Write the manifest that belongs to the current candidate Parquet."""
+
+    parquet_path = DATA / "factors" / "candidate_pool.parquet"
+    if candidate_pool is None:
+        candidate_pool = pd.read_parquet(parquet_path)
+    return write_candidate_pool_manifest(
+        candidate_pool,
+        parquet_path=parquet_path,
+        manifest_path=DATA / "manifest_candidate_pool.json",
+        data_root=DATA,
+        input_manifest_paths=candidate_input_manifest_paths(),
+        registered_candidate_ids=candidate_ids(),
+    )
 
 
 def read_yearly(path_template: str, years: range) -> pd.DataFrame:
@@ -472,6 +529,10 @@ def classify_candidates(
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
+    if args.refresh_manifest_only:
+        manifest = refresh_candidate_pool_manifest()
+        print(json.dumps(manifest, ensure_ascii=False, indent=2))
+        return
     REPORTS.mkdir(exist_ok=True)
     (DATA / "factors").mkdir(exist_ok=True)
     universe = read_yearly("universe/year={year}/part-{year}.parquet", ALL_BASE_YEARS)
@@ -621,6 +682,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 )
     candidate_pool = candidate_pool_frame(clean_factors)
     candidate_pool.to_parquet(DATA / "factors" / "candidate_pool.parquet", index=False)
+    refresh_candidate_pool_manifest(candidate_pool)
     pd.DataFrame(technical_output).to_csv(
         REPORTS / "first_round_technical.csv", index=False
     )

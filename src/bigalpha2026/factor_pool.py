@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from datetime import datetime
+import hashlib
+import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -15,6 +19,8 @@ from .factorlib import (
 
 
 KEY_COLUMNS = ("date", "instrument")
+CANDIDATE_POOL_SCHEMA_VERSION = "candidate-pool-v2"
+CANDIDATE_POOL_VERSION = "oap_b_v2_full_ob_2026-07-26"
 CANDIDATE_POOL_COLUMNS = (
     "date",
     "instrument",
@@ -24,6 +30,16 @@ CANDIDATE_POOL_COLUMNS = (
 )
 PUBLIC_PREFIX = "factorlib__"
 SELF_PREFIX = "self__"
+
+
+def file_sha256(path: Path) -> str:
+    """Return the SHA-256 digest of a local snapshot file."""
+
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def normalize_keys(frame: pd.DataFrame, *, name: str) -> pd.DataFrame:
@@ -61,6 +77,160 @@ def validate_candidate_pool(frame: pd.DataFrame) -> None:
     if (versions != 1).any():
         invalid = sorted(versions.index[versions != 1].astype(str))
         raise ValueError(f"candidate pool has multiple active versions: {invalid}")
+
+
+def candidate_pool_manifest(
+    frame: pd.DataFrame,
+    *,
+    parquet_path: Path,
+    data_root: Path,
+    input_manifest_paths: Sequence[Path] = (),
+    registered_candidate_ids: Sequence[str] = (),
+) -> dict[str, object]:
+    """Build a reproducibility manifest for a materialized candidate pool."""
+
+    validate_candidate_pool(frame)
+    versions = sorted(frame["factor_version"].astype(str).unique())
+    if versions != [CANDIDATE_POOL_VERSION]:
+        raise ValueError(
+            "candidate pool version does not match the current research contract; "
+            f"expected={CANDIDATE_POOL_VERSION}, actual={versions}"
+        )
+    dates = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+    if dates.isna().any():
+        raise ValueError("candidate pool contains invalid dates")
+    candidate_rows = (
+        frame.groupby("candidate_id", sort=True)
+        .size()
+        .astype(int)
+        .to_dict()
+    )
+    candidate_dates = (
+        frame.assign(_date=dates)
+        .groupby("candidate_id", sort=True)["_date"]
+        .nunique()
+        .astype(int)
+        .to_dict()
+    )
+    manifest_hashes = {
+        str(path.relative_to(data_root.parent)): file_sha256(path)
+        for path in sorted(input_manifest_paths)
+    }
+    return {
+        "schema_version": CANDIDATE_POOL_SCHEMA_VERSION,
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "generation_entrypoint": "scripts/run_first_round.py",
+        "relative_path": str(parquet_path.relative_to(data_root)),
+        "factor_version": CANDIDATE_POOL_VERSION,
+        "date_range": [
+            dates.min().date().isoformat(),
+            dates.max().date().isoformat(),
+        ],
+        "columns": list(CANDIDATE_POOL_COLUMNS),
+        "rows": int(len(frame)),
+        "duplicate_keys": 0,
+        "candidate_rows": candidate_rows,
+        "candidate_dates": candidate_dates,
+        "technical_rejects_omitted": sorted(
+            set(registered_candidate_ids).difference(candidate_rows)
+        ),
+        "sha256": file_sha256(parquet_path),
+        "input_manifest_sha256": manifest_hashes,
+        "result_role": "local_verified_research_snapshot",
+        "aistudio_truth_required": False,
+    }
+
+
+def write_candidate_pool_manifest(
+    frame: pd.DataFrame,
+    *,
+    parquet_path: Path,
+    manifest_path: Path,
+    data_root: Path,
+    input_manifest_paths: Sequence[Path] = (),
+    registered_candidate_ids: Sequence[str] = (),
+) -> dict[str, object]:
+    """Validate a candidate Parquet snapshot and atomically refresh its manifest."""
+
+    manifest = candidate_pool_manifest(
+        frame,
+        parquet_path=parquet_path,
+        data_root=data_root,
+        input_manifest_paths=input_manifest_paths,
+        registered_candidate_ids=registered_candidate_ids,
+    )
+    partial_path = manifest_path.with_suffix(f"{manifest_path.suffix}.partial")
+    partial_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    partial_path.replace(manifest_path)
+    return manifest
+
+
+def validate_candidate_pool_manifest(
+    frame: pd.DataFrame,
+    *,
+    parquet_path: Path,
+    manifest_path: Path,
+    data_root: Path,
+) -> dict[str, object]:
+    """Reject stale or substituted candidate snapshots before evaluation."""
+
+    validate_candidate_pool(frame)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("schema_version") != CANDIDATE_POOL_SCHEMA_VERSION:
+        raise ValueError(
+            "candidate pool manifest schema is stale; "
+            f"expected={CANDIDATE_POOL_SCHEMA_VERSION}, "
+            f"actual={manifest.get('schema_version')}"
+        )
+    versions = sorted(frame["factor_version"].astype(str).unique())
+    if versions != [CANDIDATE_POOL_VERSION]:
+        raise ValueError(
+            "candidate pool data version is stale; "
+            f"expected={CANDIDATE_POOL_VERSION}, actual={versions}"
+        )
+    if manifest.get("factor_version") != CANDIDATE_POOL_VERSION:
+        raise ValueError(
+            "candidate pool manifest version is stale; "
+            f"expected={CANDIDATE_POOL_VERSION}, "
+            f"actual={manifest.get('factor_version')}"
+        )
+    if manifest.get("columns") != list(CANDIDATE_POOL_COLUMNS):
+        raise ValueError("candidate pool manifest columns do not match the contract")
+    if int(manifest.get("rows", -1)) != len(frame):
+        raise ValueError("candidate pool manifest row count does not match the data")
+    actual_rows = (
+        frame.groupby("candidate_id", sort=True)
+        .size()
+        .astype(int)
+        .to_dict()
+    )
+    if manifest.get("candidate_rows") != actual_rows:
+        raise ValueError("candidate pool manifest candidate rows do not match the data")
+    actual_dates = (
+        frame.assign(
+            _date=pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+        )
+        .groupby("candidate_id", sort=True)["_date"]
+        .nunique()
+        .astype(int)
+        .to_dict()
+    )
+    if manifest.get("candidate_dates") != actual_dates:
+        raise ValueError("candidate pool manifest candidate dates do not match the data")
+    if manifest.get("sha256") != file_sha256(parquet_path):
+        raise ValueError("candidate pool Parquet SHA-256 does not match its manifest")
+    for relative_path, expected_hash in manifest.get(
+        "input_manifest_sha256", {}
+    ).items():
+        path = data_root.parent / relative_path
+        if not path.exists() or file_sha256(path) != expected_hash:
+            raise ValueError(
+                f"candidate pool input manifest changed after generation: {relative_path}"
+            )
+    return manifest
 
 
 def build_feature_panel(

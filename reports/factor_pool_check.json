@@ -22,6 +22,10 @@
     ],
     "screened_count": 15
   },
+  "candidate_pool_reference": {
+    "factor_version": "oap_b_v2_full_ob_2026-07-26",
+    "sha256": "a09b4bd328a31754c7dc8f9ced639e549ddad1e0e8a98899f6358872644d2488"
+  },
   "combination_inputs": {
     "all_candidate_count": 31,
     "single_factor_candidates": [

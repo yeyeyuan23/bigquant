@@ -13,6 +13,18 @@
     "FR-002": 0.5,
     "HF-001": 0.5
   },
+  "data_snapshot": {
+    "relative_path": "data/factors/INT-001_combination_v2.parquet",
+    "sha256": "27228576e61f84a9bb280ce82f6b4874420dc55f9d9920fdcc213e50af00b0eb",
+    "rows": 219000,
+    "columns": [
+      "date",
+      "instrument",
+      "factor",
+      "candidate_id",
+      "factor_version"
+    ]
+  },
   "selection_score": 0.010403518156150628,
   "upload_ready_at_submission": true,
   "platform_submission": {

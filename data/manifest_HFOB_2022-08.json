@@ -44,6 +44,7 @@
   "repair_elapsed_seconds": 5.662,
   "files": {
     "HF": {
+      "relative_path": "data/features/HF/year=2022/month=08/part-2022-08.parquet",
       "sha256": "c34482f3252a9d502d05daed05b60fa902d3f731fc9c967391d4048049d00d1e",
       "shape": [
         23000,
@@ -67,9 +68,12 @@
         "shock_q90_active_count",
         "shock_q90_mean_abs_return",
         "shock_q90_recovery_5m_median"
-      ]
+      ],
+      "null_keys": 0,
+      "duplicate_keys": 0
     },
     "OB": {
+      "relative_path": "data/features/OB/year=2022/month=08/part-2022-08.parquet",
       "sha256": "5bd37c8814b2d366dfd44499dda8f5c0ddab84736de99a19e37203a4e4d779e9",
       "shape": [
         23000,
@@ -90,7 +94,19 @@
         "full_day_depth_shape_median",
         "tail_60_depth_shape_median",
         "tail_60_shape_sign_consistency"
-      ]
+      ],
+      "null_keys": 0,
+      "duplicate_keys": 0
     }
-  }
+  },
+  "schema_version": "hfob-daily-month-v2",
+  "validated_at": "2026-07-26T21:23:51+08:00",
+  "source_frequency": "1m",
+  "panel_frequency": "1d",
+  "available_time": "after_close",
+  "date_role": "trading_day",
+  "key": [
+    "date",
+    "instrument"
+  ]
 }

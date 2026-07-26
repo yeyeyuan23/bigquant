@@ -143,6 +143,9 @@ disclosure_date, instrument, report_date, category, shift
 - 本地增量和动态组合代码读取的 DataFrame 必须严格包含
   `date、instrument` 和冻结的 15 个特征。
 - 固定目录为 `data/features/FACTORLIB/year=YYYY/part-YYYY.parquet`。
+- manifest 必须区分可直接观测的数值尺度与平台生成来源；本地发现每日均值约为
+  0、标准差约为 1 时只能记录为 `observed_value_scale`，在 AIStudio 取数代码
+  未留档前不得声称标准化由官方表或某一段导出代码完成。
 
 ## 本地目录
 

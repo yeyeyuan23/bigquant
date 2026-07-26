@@ -19,23 +19,171 @@
   "years": {
     "2019": {
       "rows": 244000,
-      "sha256": "ef63d1273d2448524164608bffd55a03ca4e0acaa88416698c011a830681ba42"
+      "sha256": "ef63d1273d2448524164608bffd55a03ca4e0acaa88416698c011a830681ba42",
+      "relative_path": "data/features/FACTORLIB/year=2019/part-2019.parquet",
+      "columns": [
+        "date",
+        "instrument",
+        "amount",
+        "atr_14",
+        "bias_20",
+        "cci_14",
+        "float_market_cap",
+        "kdj_d_9_3_3",
+        "macd_diff_12_26_9",
+        "macd_hist_12_26_9",
+        "momentum_5",
+        "net_profit_rate_ttm",
+        "netflow_amount_rate_main",
+        "total_market_cap",
+        "turn",
+        "volatility_5",
+        "volume"
+      ],
+      "duplicate_keys": 0,
+      "coverage_min": 0.9977786885245902
     },
     "2020": {
       "rows": 243000,
-      "sha256": "fb28497ecccd1607a2db70a6e65ebc33e80beeaadc4c9b2aeb99ac5e9e12da84"
+      "sha256": "fb28497ecccd1607a2db70a6e65ebc33e80beeaadc4c9b2aeb99ac5e9e12da84",
+      "relative_path": "data/features/FACTORLIB/year=2020/part-2020.parquet",
+      "columns": [
+        "date",
+        "instrument",
+        "amount",
+        "atr_14",
+        "bias_20",
+        "cci_14",
+        "float_market_cap",
+        "kdj_d_9_3_3",
+        "macd_diff_12_26_9",
+        "macd_hist_12_26_9",
+        "momentum_5",
+        "net_profit_rate_ttm",
+        "netflow_amount_rate_main",
+        "total_market_cap",
+        "turn",
+        "volatility_5",
+        "volume"
+      ],
+      "duplicate_keys": 0,
+      "coverage_min": 0.998119341563786
     },
     "2021": {
       "rows": 243000,
-      "sha256": "ae0911cd21709de282dccad58e4ff40ecbb5157c4554adf64437d7283ff895de"
+      "sha256": "ae0911cd21709de282dccad58e4ff40ecbb5157c4554adf64437d7283ff895de",
+      "relative_path": "data/features/FACTORLIB/year=2021/part-2021.parquet",
+      "columns": [
+        "date",
+        "instrument",
+        "amount",
+        "atr_14",
+        "bias_20",
+        "cci_14",
+        "float_market_cap",
+        "kdj_d_9_3_3",
+        "macd_diff_12_26_9",
+        "macd_hist_12_26_9",
+        "momentum_5",
+        "net_profit_rate_ttm",
+        "netflow_amount_rate_main",
+        "total_market_cap",
+        "turn",
+        "volatility_5",
+        "volume"
+      ],
+      "duplicate_keys": 0,
+      "coverage_min": 0.9986213991769547
     },
     "2022": {
       "rows": 242000,
-      "sha256": "dd0e21f91a55d281d281c602f1c4bbbfeeab475e554778e1f20930bea5c0e3e8"
+      "sha256": "dd0e21f91a55d281d281c602f1c4bbbfeeab475e554778e1f20930bea5c0e3e8",
+      "relative_path": "data/features/FACTORLIB/year=2022/part-2022.parquet",
+      "columns": [
+        "date",
+        "instrument",
+        "amount",
+        "atr_14",
+        "bias_20",
+        "cci_14",
+        "float_market_cap",
+        "kdj_d_9_3_3",
+        "macd_diff_12_26_9",
+        "macd_hist_12_26_9",
+        "momentum_5",
+        "net_profit_rate_ttm",
+        "netflow_amount_rate_main",
+        "total_market_cap",
+        "turn",
+        "volatility_5",
+        "volume"
+      ],
+      "duplicate_keys": 0,
+      "coverage_min": 0.9989752066115702
     },
     "2023": {
       "rows": 242000,
-      "sha256": "b4236175a96278637d5171e4a7c826516376e2ce48e7ae87c92896000b1c66b7"
+      "sha256": "b4236175a96278637d5171e4a7c826516376e2ce48e7ae87c92896000b1c66b7",
+      "relative_path": "data/features/FACTORLIB/year=2023/part-2023.parquet",
+      "columns": [
+        "date",
+        "instrument",
+        "amount",
+        "atr_14",
+        "bias_20",
+        "cci_14",
+        "float_market_cap",
+        "kdj_d_9_3_3",
+        "macd_diff_12_26_9",
+        "macd_hist_12_26_9",
+        "momentum_5",
+        "net_profit_rate_ttm",
+        "netflow_amount_rate_main",
+        "total_market_cap",
+        "turn",
+        "volatility_5",
+        "volume"
+      ],
+      "duplicate_keys": 0,
+      "coverage_min": 0.9994132231404959
     }
-  }
+  },
+  "schema_version": "factorlib-screened15-v2",
+  "validated_at": "2026-07-26T21:23:51+08:00",
+  "source_table": "bigalpha_2026_factorlib",
+  "source_frequency": "1d",
+  "panel_frequency": "1d",
+  "available_time": "after_close",
+  "date_role": "trading_day",
+  "key": [
+    "date",
+    "instrument"
+  ],
+  "columns": [
+    "date",
+    "instrument",
+    "amount",
+    "atr_14",
+    "bias_20",
+    "cci_14",
+    "float_market_cap",
+    "kdj_d_9_3_3",
+    "macd_diff_12_26_9",
+    "macd_hist_12_26_9",
+    "momentum_5",
+    "net_profit_rate_ttm",
+    "netflow_amount_rate_main",
+    "total_market_cap",
+    "turn",
+    "volatility_5",
+    "volume"
+  ],
+  "frozen_membership_source": "src/bigalpha2026/research_policy.py:FROZEN_FACTORLIB_SCREENED_FEATURES",
+  "selection_period": [
+    "2019-01-01",
+    "2021-12-31"
+  ],
+  "observed_value_scale": "daily_cross_section_standardized",
+  "preprocessing_provenance": "not_embedded_in_platform_export",
+  "aistudio_preprocessing_confirmation_required": true
 }

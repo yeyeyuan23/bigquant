@@ -1,9 +1,14 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
 import pandas as pd
 
+from bigalpha2026.factor_pool import (
+    validate_candidate_pool_manifest,
+    write_candidate_pool_manifest,
+)
 from scripts.run_combinations import (
     DEVELOPMENT_YEARS,
     FROZEN_TEST_YEAR,
@@ -16,6 +21,7 @@ from scripts.run_combinations import (
     synthetic_contract_summary,
 )
 from scripts.run_first_round import (
+    CANDIDATE_POOL_VERSION,
     candidate_pool_frame,
     classify_candidates,
     parse_args as parse_first_round_args,
@@ -97,6 +103,45 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertTrue(args.resume_metrics)
         self.assertTrue(args.skip_correlations)
         self.assertEqual(args.refresh_candidate, ["OB-001"])
+
+    def test_candidate_pool_manifest_rejects_stale_versions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data_root = Path(directory) / "data"
+            parquet_path = data_root / "factors" / "candidate_pool.parquet"
+            manifest_path = data_root / "manifest_candidate_pool.json"
+            parquet_path.parent.mkdir(parents=True)
+            pool = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(["2022-01-04", "2022-01-04"]),
+                    "instrument": ["A", "B"],
+                    "candidate_id": ["PV-001", "PV-001"],
+                    "factor_version": [CANDIDATE_POOL_VERSION] * 2,
+                    "factor": [0.1, 0.2],
+                }
+            )
+            pool.to_parquet(parquet_path, index=False)
+            write_candidate_pool_manifest(
+                pool,
+                parquet_path=parquet_path,
+                manifest_path=manifest_path,
+                data_root=data_root,
+            )
+            validate_candidate_pool_manifest(
+                pool,
+                parquet_path=parquet_path,
+                manifest_path=manifest_path,
+                data_root=data_root,
+            )
+            manifest = json.loads(manifest_path.read_text())
+            manifest["factor_version"] = "stale-v1"
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "manifest version is stale"):
+                validate_candidate_pool_manifest(
+                    pool,
+                    parquet_path=parquet_path,
+                    manifest_path=manifest_path,
+                    data_root=data_root,
+                )
 
     def test_single_factor_gate_requires_both_validation_years(self):
         rows = []

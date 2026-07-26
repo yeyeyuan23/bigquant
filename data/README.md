@@ -36,6 +36,10 @@ FR 事件面板按披露年份保存在 `features/FR/year=YYYY/part-YYYY.parquet
 
 HF/OB 日频共享面板按 `features/HF|OB/year=YYYY/month=MM/part-YYYY-MM.parquet` 保存，每月对应 `manifest_HFOB_YYYY-MM.json`。默认首轮读取 2019—2023 每年 2、8 月，共 10 个必跑月份。因子计算前的市场状态检查发现开发样本缺少低流动性尾部，故按冻结规则唯一启用 `2022-11`；该选择未读取任何候选值。其余 7 个已下载备选月不参与本轮，2023 年 5、11 月尚未生成。
 
+所有 HF/OB 月度 manifest 必须记录对应 HF、OB 文件的路径、SHA-256、shape、
+严格列集合和主键检查。文件同步或修复后运行
+`PYTHONPATH=src python scripts/refresh_data_manifests.py` 统一复核并刷新这些字段。
+
 完整 OB 日频底座不再使用上述代表月份。平台导出的全市场聚合原件保存在
 `raw/OB_DAILY_FULL/ob_daily_YYYY.parquet`，随后运行
 `scripts/prepare_ob_daily_full.py`，按历史股票池裁成
@@ -48,3 +52,6 @@ SHA-256 均记录在 `manifest_OB_DAILY_FULL.json`。
 重要性和预测结果，不要求为本地训练下载完整副本。只有需要离线复现时，才按
 `features/FACTORLIB/year=YYYY/part-YYYY.parquet` 保存可选快照，并使用
 `run_combinations.py --check-files` 验收；默认的 `--check` 不读取比赛数据。
+当前 screened15 快照在本地可观测为“每日截面均值约 0、标准差约 1”；manifest
+将该事实记录为 `observed_value_scale`，但标准化究竟由平台表还是导出代码产生，
+仍须在 AIStudio 确认，不能仅凭本地数值反推来源。

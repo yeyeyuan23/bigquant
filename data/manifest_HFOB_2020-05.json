@@ -36,5 +36,72 @@
     "tail_60_shape_sign_consistency": 0.9956111111111111
   },
   "elapsed_seconds": 50.939,
-  "evaluation_performed": false
+  "evaluation_performed": false,
+  "schema_version": "hfob-daily-month-v2",
+  "validated_at": "2026-07-26T21:23:51+08:00",
+  "source_frequency": "1m",
+  "panel_frequency": "1d",
+  "available_time": "after_close",
+  "date_role": "trading_day",
+  "key": [
+    "date",
+    "instrument"
+  ],
+  "files": {
+    "HF": {
+      "relative_path": "data/features/HF/year=2020/month=05/part-2020-05.parquet",
+      "sha256": "90d5f195c847522b47b35533c27eb79237199b536fdf98b9c8be19347e9dd114",
+      "shape": [
+        18000,
+        17
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "minute_count",
+        "total_amount",
+        "total_volume",
+        "total_deal_number",
+        "net_log_return",
+        "absolute_log_return",
+        "tail_60_amount",
+        "tail_60_deal_number",
+        "avg_trade_value",
+        "avg_trade_volume",
+        "directional_efficiency",
+        "tail_trade_value_ratio",
+        "shock_q90_active_count",
+        "shock_q90_mean_abs_return",
+        "shock_q90_recovery_5m_median"
+      ],
+      "null_keys": 0,
+      "duplicate_keys": 0
+    },
+    "OB": {
+      "relative_path": "data/features/OB/year=2020/month=05/part-2020-05.parquet",
+      "sha256": "c7efe06bbde9b34124c0720098078a2b70791b95bcdaac91b03cdc7ee16fd517",
+      "shape": [
+        18000,
+        14
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "minute_count",
+        "valid_snapshot_count",
+        "both_sides_valid_rate",
+        "full_five_levels_rate",
+        "tail_60_valid_best_quote_minutes",
+        "tail_60_relative_spread_median",
+        "tail_60_depth_completeness_median",
+        "tail_60_bid_depth_imbalance_median",
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median",
+        "full_day_depth_shape_median",
+        "tail_60_depth_shape_median",
+        "tail_60_shape_sign_consistency"
+      ],
+      "null_keys": 0,
+      "duplicate_keys": 0
+    }
+  }
 }

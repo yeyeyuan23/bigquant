@@ -26,11 +26,14 @@ from bigalpha2026.evaluation import (
     factorlib_regularized_incremental_batch_validation,
 )
 from bigalpha2026.factor_pool import (
+    CANDIDATE_POOL_VERSION,
     KEY_COLUMNS,
     apply_feature_directions,
     build_feature_panel,
+    file_sha256,
     family_balanced_factor,
     screen_public_factors,
+    validate_candidate_pool_manifest,
 )
 from bigalpha2026.factorlib import validate_factorlib_subset_frame
 from bigalpha2026.research_policy import (
@@ -117,6 +120,8 @@ def required_paths(
     paths.extend(
         [
             data_dir / "factors/candidate_pool.parquet",
+            data_dir / "manifest_candidate_pool.json",
+            data_dir / "features/FACTORLIB/manifest.json",
             reports_dir / "first_round_decisions.json",
         ]
     )
@@ -131,12 +136,24 @@ def load_decisions(path: Path) -> list[dict[str, object]]:
 
 
 def load_factorlib(data_dir: Path, years: Sequence[int]) -> pd.DataFrame:
+    manifest_path = data_dir / "features/FACTORLIB/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("features") != list(SCREENED_FACTORLIB_RAW_FEATURES):
+        raise ValueError(
+            "factorlib manifest no longer matches the frozen screened15 membership"
+        )
     parts: list[pd.DataFrame] = []
     for year in years:
+        path = data_dir / f"features/FACTORLIB/year={year}/part-{year}.parquet"
         part = pd.read_parquet(
-            data_dir / f"features/FACTORLIB/year={year}/part-{year}.parquet"
+            path
         )
         validate_factorlib_subset_frame(part, SCREENED_FACTORLIB_RAW_FEATURES)
+        expected = manifest.get("years", {}).get(str(year), {})
+        if int(expected.get("rows", -1)) != len(part):
+            raise ValueError(f"factorlib {year} rows do not match its manifest")
+        if expected.get("sha256") != file_sha256(path):
+            raise ValueError(f"factorlib {year} SHA-256 does not match its manifest")
         parts.append(part)
     combined = pd.concat(parts, ignore_index=True)
     validate_factorlib_subset_frame(combined, SCREENED_FACTORLIB_RAW_FEATURES)
@@ -182,7 +199,32 @@ def load_dynamic_inputs(
         frame["instrument"] = frame["instrument"].astype(str)
 
     factorlib = load_factorlib(data_dir, YEARS)
-    candidate_pool = pd.read_parquet(data_dir / "factors/candidate_pool.parquet")
+    candidate_path = data_dir / "factors/candidate_pool.parquet"
+    candidate_pool = pd.read_parquet(candidate_path)
+    validate_candidate_pool_manifest(
+        candidate_pool,
+        parquet_path=candidate_path,
+        manifest_path=data_dir / "manifest_candidate_pool.json",
+        data_root=data_dir,
+    )
+    universe_dates = pd.DatetimeIndex(
+        pd.to_datetime(universe["date"], errors="coerce").dropna().unique()
+    )
+    ob_dates = pd.DatetimeIndex(
+        pd.to_datetime(
+            candidate_pool.loc[
+                candidate_pool["candidate_id"].eq("OB-001"),
+                "date",
+            ],
+            errors="coerce",
+        )
+        .dropna()
+        .unique()
+    )
+    if not ob_dates.sort_values().equals(universe_dates.sort_values()):
+        raise ValueError(
+            "OB-001 does not cover the full historical universe calendar"
+        )
     decisions = load_decisions(reports_dir / "first_round_decisions.json")
     candidate_ids = tuple(
         sorted(candidate_pool["candidate_id"].astype(str).unique())
@@ -253,6 +295,9 @@ def contract_summary(
         candidate_pool,
         single_factor_admitted,
     ) = load_dynamic_inputs(data_dir, reports_dir)
+    candidate_manifest = json.loads(
+        (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
+    )
     public_columns = tuple(
         column for column in panel.columns if column.startswith("factorlib__")
     )
@@ -279,6 +324,10 @@ def contract_summary(
         "factorlib_reference": {
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
+        },
+        "candidate_pool_reference": {
+            "factor_version": CANDIDATE_POOL_VERSION,
+            "sha256": candidate_manifest["sha256"],
         },
         "combination_inputs": {
             "all_candidate_count": int(candidate_pool["candidate_id"].nunique()),
