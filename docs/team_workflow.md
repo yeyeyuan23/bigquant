@@ -7,6 +7,17 @@
 3. `docs/data_contract.md`：允许使用哪些字段以及时间含义；
 4. `docs/factor_research_plan.md`：如何评价和晋级。
 
+## 发给队友 AI 的启动 Prompt
+
+```text
+请打开比赛页面和 AIStudio，让我先完成登录。然后 clone
+https://github.com/yeyeyuan23/bigquant，完整阅读 docs/team_workflow.md，
+并严格按其中流程直接开发、测试、在 AIStudio 做真实评价和组合优化。
+有效结果可以直接上传比赛；完成后 push 候选分支并创建 MR/PR。
+如收到数据压缩包，按手册校验和解压；如因子需要新数据，按手册一并交付
+可复现的取数代码、数据合同、manifest 和增量包。
+```
+
 ## 0. 首次登录与获取项目
 
 先用本人 BigQuant 账号在浏览器中登录：
