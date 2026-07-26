@@ -7,7 +7,7 @@ candidate membership, evaluation gates, or combination weights in a notebook.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Mapping
 
 import numpy as np
 import pandas as pd
@@ -18,12 +18,12 @@ class CandidateSpec:
     candidate_id: str
     data_family: str
     mechanism: str
-    stage: str = "incremental_queue"
+    stage: str = "first_round"
 
 
 CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
-    CandidateSpec("PV-001", "PV", "activity_price_efficiency", "minimal_baseline"),
-    CandidateSpec("HF-001", "HF", "intraday_shock_absorption", "minimal_baseline"),
+    CandidateSpec("PV-001", "PV", "activity_price_efficiency"),
+    CandidateSpec("HF-001", "HF", "intraday_shock_absorption"),
     CandidateSpec("PV-002", "PV", "overnight_gap_absorption"),
     CandidateSpec("HF-002", "HF", "fragmentation_price_efficiency"),
     CandidateSpec("OB-001", "OB", "valid_depth_resilience"),
@@ -31,8 +31,6 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
     CandidateSpec("FR-001", "FR", "cash_conversion_improvement"),
     CandidateSpec("FR-002", "FR", "asset_efficiency_improvement"),
 )
-
-MINIMAL_BASELINE: tuple[str, str] = ("PV-001", "HF-001")
 
 # Mechanical calendar samples frozen before the first formal factor evaluation.
 # February and August are always used. May and November are a pre-declared
@@ -53,16 +51,14 @@ HF_OB_MAX_OPTIONAL_MONTHS = 6
 # development months did not cover the low-liquidity monthly tail.
 HF_OB_ACTIVATED_OPTIONAL_MONTHS: tuple[str, ...] = ("2022-11",)
 
-# Backwards-compatible name for callers that mean the default first-round set.
-HF_OB_REPRESENTATIVE_MONTHS = HF_OB_MANDATORY_MONTHS
-
-
 @dataclass(frozen=True)
 class FormalEvaluationPolicy:
     development_start: str = "2019-01-01"
-    development_end: str = "2022-12-31"
-    selection_start: str = "2023-01-01"
-    selection_end: str = "2023-12-31"
+    development_end: str = "2021-12-31"
+    selection_start: str = "2022-01-01"
+    selection_end: str = "2022-12-31"
+    confirmation_start: str = "2023-01-01"
+    confirmation_end: str = "2023-12-31"
     frozen_test_start: str = "2024-01-01"
     frozen_test_end: str = "2024-12-31"
     primary_label: str = "ret_close_to_close"
@@ -80,6 +76,13 @@ class FormalEvaluationPolicy:
     minimum_group_monotonicity: float = 0.50
     liquid_subset_exclusion_quantile: float = 0.20
     cost_sensitivity_bps: tuple[int, ...] = (0, 10, 20, 30)
+    admitted_candidate_statuses: tuple[str, ...] = (
+        "provisional_survivor",
+        "selection_survivor",
+        "development_survivor",
+        "conditional_watch",
+        "diversifier",
+    )
 
 
 FORMAL_EVALUATION_POLICY = FormalEvaluationPolicy()
@@ -90,12 +93,6 @@ class TechnicalGate:
     minimum_coverage: float = 0.95
     minimum_daily_unique_values: int = 50
     minimum_labelled_days: int = 40
-
-
-@dataclass(frozen=True)
-class IncrementalGate:
-    maximum_ic_mean_degradation: float = 0.10
-    require_ir_or_long_short_improvement: bool = True
 
 
 @dataclass(frozen=True)
@@ -120,7 +117,6 @@ class FactorLibraryIncrementalGate:
 
 
 TECHNICAL_GATE = TechnicalGate()
-INCREMENTAL_GATE = IncrementalGate()
 COMBINATION_ADMISSION_GATE = CombinationAdmissionGate()
 FACTORLIB_INCREMENTAL_GATE = FactorLibraryIncrementalGate()
 
@@ -130,47 +126,6 @@ def candidate_ids(stage: str | None = None) -> tuple[str, ...]:
     if stage is not None:
         selected = tuple(item for item in selected if item.stage == stage)
     return tuple(item.candidate_id for item in selected)
-
-
-def equal_weight_rank_combination(
-    factors: Mapping[str, pd.DataFrame],
-    members: Sequence[str] = MINIMAL_BASELINE,
-) -> pd.DataFrame:
-    """Combine fixed members by equal-weight daily percentile ranks."""
-
-    if not members:
-        raise ValueError("members must not be empty")
-    panel: pd.DataFrame | None = None
-    factor_columns: list[str] = []
-    for member in members:
-        if member not in factors:
-            raise KeyError(f"missing factor for combination: {member}")
-        frame = factors[member][["date", "instrument", "factor"]].copy()
-        frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
-        frame["instrument"] = frame["instrument"].astype(str)
-        if frame.duplicated(["date", "instrument"]).any():
-            raise ValueError(f"{member} contains duplicate date-instrument keys")
-        column = f"factor_{member.lower().replace('-', '_')}"
-        frame = frame.rename(columns={"factor": column})
-        factor_columns.append(column)
-        panel = frame if panel is None else panel.merge(
-            frame,
-            on=["date", "instrument"],
-            how="inner",
-            validate="one_to_one",
-        )
-
-    assert panel is not None
-    ranks = pd.DataFrame(index=panel.index)
-    for column in factor_columns:
-        ranks[column] = panel.groupby("date", sort=False)[column].rank(
-            pct=True,
-            method="average",
-        )
-    panel["factor"] = ranks.mean(axis=1).sub(0.5).mul(2.0)
-    return panel[["date", "instrument", "factor"]].sort_values(
-        ["date", "instrument"]
-    ).reset_index(drop=True)
 
 
 def fixed_weight_rank_combination(
@@ -242,32 +197,6 @@ def technical_gate(
         reasons.append("too few labelled trading days")
     if not np.isfinite(future_leak_max_past_diff) or future_leak_max_past_diff > 0:
         reasons.append("future perturbation changed past factor values")
-    return not reasons, reasons
-
-
-def incremental_gate(
-    baseline: Mapping[str, float],
-    augmented: Mapping[str, float],
-    policy: IncrementalGate = INCREMENTAL_GATE,
-) -> tuple[bool, list[str]]:
-    """Keep a new factor only if the frozen combination has real increment."""
-
-    reasons: list[str] = []
-    base_ic = float(baseline.get("rank_ic_mean", np.nan))
-    new_ic = float(augmented.get("rank_ic_mean", np.nan))
-    if not np.isfinite(base_ic) or not np.isfinite(new_ic):
-        reasons.append("Rank IC is missing")
-    elif abs(new_ic) < abs(base_ic) * (1.0 - policy.maximum_ic_mean_degradation):
-        reasons.append("Rank IC mean degrades beyond the local tolerance")
-
-    base_ir = float(baseline.get("rank_ic_ir", np.nan))
-    new_ir = float(augmented.get("rank_ic_ir", np.nan))
-    base_ls = float(baseline.get("long_short_sharpe", np.nan))
-    new_ls = float(augmented.get("long_short_sharpe", np.nan))
-    ir_improved = np.isfinite(base_ir) and np.isfinite(new_ir) and new_ir > base_ir
-    ls_improved = np.isfinite(base_ls) and np.isfinite(new_ls) and new_ls > base_ls
-    if policy.require_ir_or_long_short_improvement and not (ir_improved or ls_improved):
-        reasons.append("neither IC stability nor long-short performance improves")
     return not reasons, reasons
 
 

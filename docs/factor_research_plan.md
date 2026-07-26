@@ -6,7 +6,8 @@
 ## 1. 总原则
 
 - 先登记机制和方向，再实现和查看结果。
-- AIStudio 是真实数据与字段口径的事实来源；本地是评价代码和冻结规则的事实来源。
+- 本地是因子与训练代码、评价规则和版本的事实来源；AIStudio 是真实数据计算、
+  评价和训练结果的事实来源。
 - 基础因子只分 `PV、HF、OB、FR` 四类；跨类候选进入 `composite`。
 - 所有模型按日期切分，禁止随机拆分股票日。
 - 单因子表现一般但有稳定组合增量时可以保留；没有单因子或组合增量时淘汰。
@@ -69,6 +70,8 @@ HF/OB 首轮可以使用冻结的代表月份以控制计算成本；候选通�
 
 - 核心函数：`src/bigalpha2026/evaluation.py`
 - 完整脚本：`scripts/run_first_round.py`
+
+代码在本地开发和最小测试；正式指标在 AIStudio 真实数据上批量计算并回传报告。
 
 必须报告：
 
@@ -133,24 +136,20 @@ factorlib_regularized_incremental_validation
 
 组合顺序：
 
-1. 单因子结果只用于诊断和确定方向，不逐个建立正式组合；
-2. 公开库使用 2019—2021 的单因子稳定性、滚动 Elastic Net 选择频率和相关性
-   去重；自研候选使用同一开发期和稳定性原则，经首轮准入后加入；
-3. 正式实验只保留两组：`factorlib_all36` 与
-   `screened_factorlib_plus_self`，不再单列“仅筛选公开因子”这一重复组；
-4. 先在数据族内等权，再对数据族等权，形成不会因某一族因子数量多而失衡的基准；
-5. Elastic Net 负责线性组合和可解释权重；
-6. 浅层 LightGBM 作为大量因子的主非线性模型；
-7. XGBoost 只作为独立实现的对照模型；
-8. IC 加权只保留为诊断，不作为大量相关因子的主选择器；
-9. 只有上述基准不足且样本量充分时才尝试更复杂模型。
+1. 公开库先做覆盖率、常数、有限值和主键检查，36 因子全部进入基线；
+2. 只用 2019—2021 的 Rank IC、滚动 Elastic Net 选择频率和相关性得到公开因子子集；
+3. 自研候选先通过首轮准入，再做“公开 36 因子 + 单个候选”的滚动正则增量检查；
+4. 正式只比较 `factorlib_all36` 与 `screened_factorlib_plus_self` 两组；
+5. 每组比较族内/族间等权、Elastic Net 和浅层 LightGBM，XGBoost只作对照；
+6. 2022 只选择实验组和方法，2023 只确认，不再筛选或调参。
 
-组合入口必须从登记表或标准化因子文件动态取得特征列，不允许继续在脚本中硬编码
-候选编号。所有模型共享同一个 `date、instrument` 左表、训练窗口、标签和评价切片。
-覆盖率先在各源面板验收；组合阶段左连接后转换为日度截面秩，缺失统一填
-`0`（截面中性值），禁止按全部特征完整值做 `inner join` 或 complete-case 删行。
-公开库 36 列作为一个基础族，自研候选按 `PV/HF/OB/FR` 归族，等权基准先族内再
-族间平均。
+训练代码在本地开发、测试和版本化，然后同步到 AIStudio 读取真实因子矩阵执行。
+新增因子只能扩充注册表和特征列，不能复制训练分支。所有模型共享股票池左表、
+时间切分、缺失值和评价口径；平台只向本地导出报告、重要性和预测结果。
+
+本地运行
+`PYTHONPATH=src conda run --no-capture-output -n quant python scripts/run_combinations.py --check`
+只使用合成数据验收动态列、左连接、中性填充和两组输出合同，不产生有效性结论。
 
 每增加一个输入都必须比较：
 
@@ -199,10 +198,13 @@ reports/
 ├── first_round_correlations.csv
 ├── first_round_decisions.json
 ├── factor_pool_screening.csv
-├── factor_pool_experiments.json
+├── factor_pool_incremental.csv
 ├── factor_pool_metrics.csv
 ├── factor_pool_costs.csv
-└── combination_frozen.json  # 仅保存已经冻结的历史提交，不由因子池实验覆盖
+└── factor_pool_decisions.json
+
+artifacts/frozen/
+└── int_001.json             # 已提交历史版本，因子池实验不得覆盖
 ```
 
 失败结果同样保留，防止重复试验和事后改写研究历史。

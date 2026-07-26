@@ -21,24 +21,33 @@ from bigalpha2026.candidates.ob.ob_002 import build_ob_002_factor_from_daily
 from bigalpha2026.candidates.pv.pv_001 import build_pv_001_factor
 from bigalpha2026.candidates.pv.pv_002 import build_pv_002_factor
 from bigalpha2026.evaluation import (
-    LABEL_COLUMNS,
     evaluate_single_factor,
     rank_ic_series,
     turnover_adjusted_long_short_returns,
 )
 from bigalpha2026.research_policy import (
+    FORMAL_EVALUATION_POLICY,
     HF_OB_ACTIVATED_OPTIONAL_MONTHS,
     HF_OB_MANDATORY_MONTHS,
     HF_OB_MAX_OPTIONAL_MONTHS,
     HF_OB_OPTIONAL_MONTH_POOL,
+    TECHNICAL_GATE,
+    candidate_ids,
 )
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 REPORTS = ROOT / "reports"
-DEVELOPMENT_YEARS = range(2019, 2023)
+DEVELOPMENT_YEARS = range(
+    int(FORMAL_EVALUATION_POLICY.development_start[:4]),
+    int(FORMAL_EVALUATION_POLICY.development_end[:4]) + 1,
+)
+SELECTION_YEAR = int(FORMAL_EVALUATION_POLICY.selection_start[:4])
+CONFIRMATION_YEAR = int(FORMAL_EVALUATION_POLICY.confirmation_start[:4])
+MARKET_STATE_YEARS = range(2019, SELECTION_YEAR + 1)
 ALL_BASE_YEARS = range(2019, 2024)
+CANDIDATE_POOL_VERSION = "first_round_v1_2026-07-26"
 
 
 def read_yearly(path_template: str, years: range) -> pd.DataFrame:
@@ -77,14 +86,14 @@ def freeze_market_state_check(
 ) -> dict[str, object]:
     """Check mandatory-month state coverage without reading any factor."""
 
-    dev_labels = labels.loc[labels["date"].dt.year.isin(DEVELOPMENT_YEARS)].copy()
+    dev_labels = labels.loc[labels["date"].dt.year.isin(MARKET_STATE_YEARS)].copy()
     daily = (
         dev_labels.groupby("date", sort=False)["ret_close_to_close"]
         .agg(market_return="mean", cross_section_volatility="std")
         .reset_index()
     )
     liquidity = (
-        exposures.loc[exposures["date"].dt.year.isin(DEVELOPMENT_YEARS)]
+        exposures.loc[exposures["date"].dt.year.isin(MARKET_STATE_YEARS)]
         .groupby("date", sort=False)["LIQUIDTY"]
         .median()
         .rename("liquidity")
@@ -142,13 +151,17 @@ def freeze_market_state_check(
 def eligible_factor(factor: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
     frame = factor.copy()
     unique = frame.groupby("date", sort=False)["factor"].nunique()
-    eligible_dates = unique.index[unique >= 50]
+    eligible_dates = unique.index[
+        unique >= TECHNICAL_GATE.minimum_daily_unique_values
+    ]
     filtered = frame.loc[frame["date"].isin(eligible_dates)].copy()
     return filtered, {
         "factor_coverage": float(frame["factor"].notna().mean()),
         "minimum_daily_unique_values": float(unique.min()),
         "eligible_days": float(len(eligible_dates)),
-        "excluded_sparse_days": float((unique < 50).sum()),
+        "excluded_sparse_days": float(
+            (unique < TECHNICAL_GATE.minimum_daily_unique_values).sum()
+        ),
     }
 
 
@@ -231,7 +244,7 @@ def cost_rows(
 ) -> list[dict[str, object]]:
     merged = factor.merge(labels, on=["date", "instrument"], how="inner")
     rows: list[dict[str, object]] = []
-    for cost_bps in (0, 10, 20, 30):
+    for cost_bps in FORMAL_EVALUATION_POLICY.cost_sensitivity_bps:
         returns = turnover_adjusted_long_short_returns(
             merged,
             one_way_cost_bps=cost_bps,
@@ -256,6 +269,41 @@ def cost_rows(
     return rows
 
 
+def candidate_pool_frame(
+    factors: dict[str, pd.DataFrame],
+    *,
+    factor_version: str = CANDIDATE_POOL_VERSION,
+) -> pd.DataFrame:
+    """Stack registered candidates into the shared long-format pool."""
+
+    unknown = sorted(set(factors).difference(candidate_ids()))
+    if unknown:
+        raise ValueError(f"candidate pool contains unregistered ids: {unknown}")
+    parts: list[pd.DataFrame] = []
+    for candidate_id, factor in sorted(factors.items()):
+        part = factor[["date", "instrument", "factor"]].copy()
+        part["candidate_id"] = candidate_id
+        part["factor_version"] = factor_version
+        parts.append(part)
+    if not parts:
+        raise ValueError("candidate pool must not be empty")
+    pool = pd.concat(parts, ignore_index=True)
+    columns = [
+        "date",
+        "instrument",
+        "candidate_id",
+        "factor_version",
+        "factor",
+    ]
+    pool = pool.loc[:, columns]
+    keys = ["date", "instrument", "candidate_id", "factor_version"]
+    if pool[keys].isna().any().any():
+        raise ValueError("candidate pool contains null keys")
+    if pool.duplicated(keys).any():
+        raise ValueError("candidate pool contains duplicate keys")
+    return pool.sort_values(keys).reset_index(drop=True)
+
+
 def classify_candidates(
     metrics: pd.DataFrame,
     stability: pd.DataFrame,
@@ -277,6 +325,40 @@ def classify_candidates(
         ]
         return float(row.iloc[0][column])
 
+    def period_failures(
+        candidate_id: str,
+        period: str,
+        display_name: str,
+        *,
+        require_t_stat: bool,
+    ) -> list[str]:
+        failures: list[str] = []
+        for variant in ("raw_full", "neutral_full", "raw_tradable"):
+            if value(candidate_id, period, variant, "rank_ic_mean") <= 0:
+                failures.append(f"{display_name} {variant} IC is not positive")
+        if require_t_stat and (
+            value(candidate_id, period, "raw_full", "rank_ic_t_stat")
+            < FORMAL_EVALUATION_POLICY.minimum_rank_ic_t_stat
+        ):
+            failures.append(
+                f"{display_name} IC t-stat is below "
+                f"{FORMAL_EVALUATION_POLICY.minimum_rank_ic_t_stat:g}"
+            )
+        if (
+            value(candidate_id, period, "raw_full", "group_monotonicity")
+            < FORMAL_EVALUATION_POLICY.minimum_group_monotonicity
+        ):
+            failures.append(f"{display_name} raw group monotonicity is below the gate")
+        cost20 = costs.loc[
+            costs["candidate_id"].eq(candidate_id)
+            & costs["period"].eq(period)
+            & costs["cost_bps"].eq(20),
+            "net_mean",
+        ]
+        if cost20.empty or float(cost20.iloc[0]) <= 0:
+            failures.append(f"{display_name} 20 bps long-short mean is not positive")
+        return failures
+
     for candidate_id in sorted(metrics["candidate_id"].unique()):
         family = candidate_id.split("-")[0]
         if family in {"PV", "FR"}:
@@ -286,7 +368,9 @@ def classify_candidates(
                 & stability["frequency"].eq("year")
             ]
             stability_fraction = float(stable["positive"].mean())
-            required_stability = 0.75
+            required_stability = (
+                FORMAL_EVALUATION_POLICY.minimum_positive_year_fraction
+            )
         else:
             stable = stability.loc[
                 stability["candidate_id"].eq(candidate_id)
@@ -294,77 +378,45 @@ def classify_candidates(
                 & stability["frequency"].eq("month")
             ]
             stability_fraction = float(stable["positive"].mean())
-            required_stability = 0.60
+            required_stability = (
+                FORMAL_EVALUATION_POLICY.minimum_positive_subperiod_fraction
+            )
 
-        development_failures: list[str] = []
-        confirmation_failures: list[str] = []
         dev_ic = value(candidate_id, "development", "raw_full", "rank_ic_mean")
-        if dev_ic <= 0:
-            development_failures.append(
-                "development IC is not positive in the registered direction"
-            )
-        if value(candidate_id, "development", "raw_full", "rank_ic_t_stat") < 2:
-            development_failures.append("development IC t-stat is below 2")
-        if value(candidate_id, "development", "raw_full", "group_monotonicity") < 0.50:
-            development_failures.append(
-                "development group monotonicity is below 0.50"
-            )
-        if value(candidate_id, "development", "neutral_full", "rank_ic_mean") <= 0:
-            development_failures.append(
-                "neutralized development IC is not positive"
-            )
-        if value(candidate_id, "development", "raw_tradable", "rank_ic_mean") <= 0:
-            development_failures.append(
-                "tradable-subset development IC is not positive"
-            )
+        development_failures = period_failures(
+            candidate_id,
+            "development",
+            "development",
+            require_t_stat=True,
+        )
         if stability_fraction < required_stability:
             development_failures.append(
                 "development subperiod sign stability is below the gate"
             )
-        cost20 = costs.loc[
-            costs["candidate_id"].eq(candidate_id)
-            & costs["period"].eq("development")
-            & costs["cost_bps"].eq(20),
-            "net_mean",
-        ]
-        if cost20.empty or float(cost20.iloc[0]) <= 0:
-            development_failures.append(
-                "20 bps development long-short mean is not positive"
-            )
-        for variant in ("raw_full", "neutral_full", "raw_tradable"):
-            if value(candidate_id, "confirmation_2023", variant, "rank_ic_mean") <= 0:
-                confirmation_failures.append(f"2023 {variant} IC is not positive")
-        if (
-            value(
-                candidate_id,
-                "confirmation_2023",
-                "raw_full",
-                "group_monotonicity",
-            )
-            < 0.50
-        ):
-            confirmation_failures.append(
-                "2023 raw group monotonicity is below 0.50"
-            )
-        confirmation_cost = costs.loc[
-            costs["candidate_id"].eq(candidate_id)
-            & costs["period"].eq("confirmation_2023")
-            & costs["cost_bps"].eq(20),
-            "net_mean",
-        ]
-        if confirmation_cost.empty or float(confirmation_cost.iloc[0]) <= 0:
-            confirmation_failures.append(
-                "2023 20 bps long-short mean is not positive"
-            )
+        selection_failures = period_failures(
+            candidate_id,
+            "selection_2022",
+            "2022 selection",
+            require_t_stat=False,
+        )
+        confirmation_failures = period_failures(
+            candidate_id,
+            "confirmation_2023",
+            "2023 confirmation",
+            require_t_stat=False,
+        )
 
-        if not development_failures and not confirmation_failures:
+        if (
+            not development_failures
+            and not selection_failures
+            and not confirmation_failures
+        ):
             status = "provisional_survivor"
+        elif not development_failures and not selection_failures:
+            status = "selection_survivor"
         elif not development_failures:
             status = "development_survivor"
-        elif dev_ic > 0 and all(
-            value(candidate_id, "confirmation_2023", variant, "rank_ic_mean") > 0
-            for variant in ("raw_full", "neutral_full", "raw_tradable")
-        ):
+        elif dev_ic > 0 and not selection_failures and not confirmation_failures:
             status = "conditional_watch"
         else:
             status = "no_registered_direction_evidence"
@@ -374,6 +426,7 @@ def classify_candidates(
                 "status": status,
                 "development_stability_fraction": stability_fraction,
                 "development_failures": development_failures,
+                "selection_failures": selection_failures,
                 "confirmation_failures": confirmation_failures,
                 "upload_ready": False,
             }
@@ -383,6 +436,7 @@ def classify_candidates(
 
 def main() -> None:
     REPORTS.mkdir(exist_ok=True)
+    (DATA / "factors").mkdir(exist_ok=True)
     universe = read_yearly("universe/year={year}/part-{year}.parquet", ALL_BASE_YEARS)
     pv = read_yearly("features/PV/year={year}/part-{year}.parquet", ALL_BASE_YEARS)
     exposures = read_yearly(
@@ -442,7 +496,10 @@ def main() -> None:
         technical_output.append({"candidate_id": candidate_id, **technical})
         periods = {
             "development": clean.loc[clean["date"].dt.year.isin(DEVELOPMENT_YEARS)],
-            "confirmation_2023": clean.loc[clean["date"].dt.year.eq(2023)],
+            "selection_2022": clean.loc[clean["date"].dt.year.eq(SELECTION_YEAR)],
+            "confirmation_2023": clean.loc[
+                clean["date"].dt.year.eq(CONFIRMATION_YEAR)
+            ],
         }
         for period, block in periods.items():
             if block.empty:
@@ -508,6 +565,8 @@ def main() -> None:
         REPORTS / "first_round_correlations.csv", index=False
     )
     decisions = classify_candidates(metrics_frame, stability_frame, costs_frame)
+    candidate_pool = candidate_pool_frame(clean_factors)
+    candidate_pool.to_parquet(DATA / "factors" / "candidate_pool.parquet", index=False)
     (REPORTS / "first_round_decisions.json").write_text(
         json.dumps(decisions, ensure_ascii=False, indent=2),
         encoding="utf-8",

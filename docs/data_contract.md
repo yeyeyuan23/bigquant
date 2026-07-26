@@ -7,11 +7,11 @@
 
 | 环境 | 职责 |
 |---|---|
-| BigQuant AIStudio | 查询比赛真实数据、完成字段与 PIT 核验、把分钟数据聚合为日频共享面板 |
-| 本地 `quant` 环境 | 候选实现、单因子评价、组合训练、报告和冻结 |
+| BigQuant AIStudio | 真实数据查询与核验、因子计算、批量评价、模型训练和结果查看 |
+| 本地 `quant` 环境 | 因子与训练代码、规则、最小测试、结果登记和版本控制 |
 | 比赛网页 | 提交冻结 Notebook、查看分数和排名 |
 
-本地检查只能证明代码和接口正确，不能替代 AIStudio 真实数据结论。
+本地检查只能证明代码、接口和规则可复现；AIStudio 结果才是有效性和模型结论。
 
 ## 官方数据表
 
@@ -109,17 +109,18 @@ disclosure_date, instrument, report_date, category, shift
 ## 公开基础因子库
 
 - 字段合同在 `src/bigalpha2026/factorlib.py`。
-- 本地推荐目录：
-
-```text
-data/features/FACTORLIB/year=YYYY/part-YYYY.parquet
-```
-
 - 必须验证严格列集合、空主键、重复键、股票池缺失、有限值和覆盖率。
+- 默认保留在 AIStudio，不下载完整训练矩阵。
 - 只用于：
   - 与公开因子的 Rank 相关性；
   - 残差信息检查；
   - 基础模型与“基础模型 + 候选”的滚动正则增量比较。
+- 只向本地导出评价报告、特征重要性和预测结果。
+- AIStudio 调用动态组合代码时，传入的 DataFrame 必须严格包含
+  `date、instrument` 和合同中的 36 个特征。
+- 如需离线复现，可选目录为
+  `data/features/FACTORLIB/year=YYYY/part-YYYY.parquet`；该目录不是默认数据包
+  的必需内容。
 
 ## 本地目录
 
@@ -130,11 +131,11 @@ data/
 │   ├── PV/
 │   ├── HF/
 │   ├── OB/
-│   ├── FR/
-│   └── FACTORLIB/
+│   └── FR/
 ├── exposures/
 ├── labels/
 └── factors/
+    └── candidate_pool.parquet
 ```
 
 - 数据按年份分区；单个年度仍过大时才按月拆分。

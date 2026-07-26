@@ -31,6 +31,7 @@ https://github.com/yeyeyuan23/bigquant
 ```bash
 git clone https://github.com/yeyeyuan23/bigquant.git
 cd bigquant
+conda run --no-capture-output -n quant python -m pip install -e .
 conda run --no-capture-output -n quant python -m pytest -q
 ```
 
@@ -50,8 +51,8 @@ src/bigalpha2026/
 └── research_policy.py   # 候选、月份和准入门槛
 
 scripts/
-├── run_first_round.py   # 八个基础候选的完整评价入口
-├── run_combinations.py  # 组合、Elastic Net 和树模型入口
+├── run_first_round.py   # 单因子评价代码
+├── run_combinations.py  # 组合与模型训练代码
 └── build_submission_notebook.py
 
 tests/                   # 单元测试
@@ -160,23 +161,22 @@ conda run --no-capture-output -n quant python -m pytest -q
 
 所有测试通过后才能进入 AIStudio 真实数据验收。
 
-## 4. AIStudio 数据验收
+## 4. AIStudio 真实计算
 
-AIStudio 只负责真实数据查询和共享面板生成，不在 Notebook 中临时改变因子方向、
-评价门槛或组合权重。
+本地代码通过测试后同步到 AIStudio。平台负责真实数据查询、因子计算、批量评价
+和模型训练；Notebook 不得临时改变已登记的方向、门槛、时间切分或模型规则。
 
 顺序：
 
 1. 用 2—5 个真实交易日和少量股票查询必要字段；
 2. 核对字段类型、分钟增量、交易时段、财务 PIT 和盘口空档；
 3. 扩到比赛股票池，检查每日行数、覆盖率和重复键；
-4. 在平台侧聚合成所属数据族的日级共享面板；
-5. 保存 Parquet 后重新读回，核对行数和字段；
-6. 使用该共享面板运行候选输出轻检；
+4. 在平台侧生成日级特征并运行候选轻检；
+5. 批量执行正式评价或训练；
+6. 只回传报告、特征重要性和预测结果；
 7. 记录数据合同变化，不把“可以运行”写成“因子有效”。
 
-原始分钟和财务宽表留在 AIStudio。只有符合 `data_contract.md` 的共享面板进入
-本地评价。
+原始表、公开 36 因子库和大型训练矩阵留在 AIStudio，不为本地训练下载副本。
 
 如果新因子需要现有 HF/OB 面板没有的新分钟逻辑，直接使用平台传入的
 `datasources["bar1m"]`。必须先做短窗验证，再聚合为以
@@ -184,9 +184,10 @@ AIStudio 只负责真实数据查询和共享面板生成，不在 Notebook 中�
 `volume、amount、deal_number` 按分钟增量处理；五档盘口只有价格和数量均为正
 的档位有效。
 
-## 5. 本地数据包同步
+## 5. 可选本地数据包同步
 
-比赛数据不进入 Git。需要在赛事规则允许的同队成员之间同步当前聚合研究面板时，
+比赛数据不进入 Git。只有最小验证确实需要本地共享面板时，才在赛事规则允许的
+同队成员之间同步；公开因子库和大型训练矩阵不走此流程。需要同步时，
 在仓库根目录执行：
 
 ```bash
@@ -240,8 +241,11 @@ manifests，不包含原始分钟成交或盘口快照。`data/transfers/` 已�
 bigalpha_research_data_20260726.tar.gz
 bigalpha_research_data_20260726.tar.gz.sha256
 SHA-256:
-4c2b6a88a9aae109bbb47fd4b46cfd77cc2c2a05adfb1db627ef0e5aab8f4fc6
+8ed3bc3c1de8ae13fd9253d992522bbfe1cf6caaf61dc4b4d8aebe7d03a6e46c
 ```
+
+该快照已经包含标准化的 `data/factors/candidate_pool.parquet`，仍不包含公开
+36 因子训练矩阵。
 
 如果候选引入当前包中没有的新日级组件，开发者必须同时交付：
 
@@ -266,13 +270,14 @@ bigalpha_data_delta_HF-003_20260726.tar.gz.sha256
 
 ### 基础评价
 
-把候选接入 `scripts/run_first_round.py`，然后运行：
+把候选接入评价代码，本地先运行：
 
 ```bash
-conda run --no-capture-output -n quant python scripts/run_first_round.py
+conda run --no-capture-output -n quant python -m pytest -q
 ```
 
-查看：
+测试通过后，在 AIStudio 真实数据上批量运行同一评价逻辑，并将以下小型结果同步
+回本地：
 
 ```text
 reports/first_round_technical.csv
@@ -283,8 +288,20 @@ reports/first_round_correlations.csv
 reports/first_round_decisions.json
 ```
 
-不要只看一个 IC。必须同时看方向稳定性、分组单调性、可交易子集、中性化、
-换手和成本。
+本地测试不产生有效性结论。平台报告必须同时包含方向稳定性、分组单调性、
+可交易子集、中性化、换手和成本。
+
+如果已取得赛事允许共享的聚合日频面板，可选地在本地复现：
+
+```bash
+PYTHONPATH=src conda run --no-capture-output -n quant \
+  python scripts/run_first_round.py
+```
+
+该入口会额外生成
+`data/factors/candidate_pool.parquet`，列严格为
+`date、instrument、candidate_id、factor_version、factor`。它是组合层的标准
+自研候选输入，但本地结果仍不能替代 AIStudio 真实结论。
 
 ### 公开因子库增量
 
@@ -307,29 +324,35 @@ factorlib_regularized_incremental_validation(...)
 
 ## 7. 进入组合层
 
-只有基础候选完成单因子评价后，才能修改：
+训练实现保存在：
 
 ```text
 src/bigalpha2026/combinations.py
 scripts/run_combinations.py
 ```
 
-运行：
+本地只做接口、时间切分和防泄漏测试；通过后同步到 AIStudio 真实训练：
 
 ```bash
-PYTHONPATH=src conda run --no-capture-output -n quant python scripts/run_combinations.py
+PYTHONPATH=src conda run --no-capture-output -n quant \
+  python scripts/run_combinations.py --check
 ```
 
-正式只比较两组输入：公开库全部 36 因子，以及“统一筛选后的公开因子 + 首轮准入
-的自研因子”。不再单列“仅筛选公开因子”组。每组先在数据族内等权、再对数据族
-等权，之后比较 Elastic Net 和浅层 LightGBM；XGBoost 只作对照。
-复杂模型只有在 2022 选择期和 2023 确认期都稳定超过简单基准时才能保留。
+`--check` 只使用合成数据，不读取比赛数据、不训练模型。真实流程为：
 
-组合脚本必须从登记表或标准化因子文件动态读取特征列，禁止为每个新增因子手工增加
-一套组合分支。统一以历史股票池为左表；特征转为日度截面秩后，缺失值填为截面中性
-值 `0`，不得用全部特征的交集缩小股票池。可先运行
-`scripts/run_combinations.py --check`，只验收动态列、两组成员和缺失值合同，
-不训练模型。
+1. 36 个公开因子通过技术检查后全部进入基线；
+2. 只用 2019—2021 筛选公开因子；
+3. 首轮准入的自研因子逐个做公开库增量检查；
+4. 比较 `factorlib_all36` 与 `screened_factorlib_plus_self`；
+5. 每组比较族平衡等权、Elastic Net、LightGBM，XGBoost 只作对照；
+6. 2022 选择，2023 确认且不再调参。
+
+训练入口必须动态读取特征列，新增到 100 个因子时仍只扩充注册表和特征列。
+所有模型使用相同股票池、时间切分、缺失值和评价口径。AIStudio 只回传报告、
+特征重要性和预测结果。
+
+已经提交的 `INT-001` 不再由组合脚本生成；不可变记录位于
+`artifacts/frozen/int_001.json`。
 
 不要把一次训练产生的模型直接放进 `composite/`。必须先冻结：
 
@@ -343,7 +366,7 @@ PYTHONPATH=src conda run --no-capture-output -n quant python scripts/run_combina
 
 ## 8. 比赛提交与代码交付
 
-候选完成本地评价和 AIStudio 真实数据验证、结果值得提交时，同队成员及其 AI
+候选完成 AIStudio 真实评价和训练、结果值得提交时，同队成员及其 AI
 可以直接上传比赛，不需要再次询问队长。
 
 提交前必须：
@@ -390,7 +413,7 @@ MR/PR 简单说明：
 - 只修改本候选和必要的公共入口；
 - 完整测试通过；
 - 没有数据文件、密钥或 Notebook 输出；
-- AIStudio 验收和本地有效性结论被明确区分；
+- 本地测试结果和 AIStudio 真实有效性结论被明确区分；
 - 失败结果已记录；
 - 新数据依赖已经交付生成代码、manifest 和增量包；
 - 最终代码已创建 MR/PR。

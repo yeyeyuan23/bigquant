@@ -7,6 +7,7 @@ from bigalpha2026.combinations import (
     fixed_rank_blend,
     positive_ic_weights,
     tree_model_config,
+    walk_forward_elastic_net,
     walk_forward_tree_boosting,
 )
 from bigalpha2026.research_policy import fixed_weight_rank_combination
@@ -97,6 +98,34 @@ class CombinationTest(unittest.TestCase):
                     process.join()
                     self.fail(f"{backend} smoke test timed out")
                 self.assertEqual(process.exitcode, 0)
+
+    def test_elastic_net_predictions_are_strictly_walk_forward(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 120
+            + ["2020-01-02"] * 120
+            + ["2021-01-04"] * 120
+        )
+        values = list(range(120)) * 3
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(120)] * 3,
+                "public": values,
+                "candidate": list(reversed(values[:120])) * 3,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["public"] / 1000
+        result = walk_forward_elastic_net(
+            panel,
+            labels,
+            feature_columns=("public", "candidate"),
+            prediction_years=(2020, 2021),
+            alpha=1e-6,
+        )
+        self.assertEqual(set(result["date"].dt.year), {2020, 2021})
+        self.assertFalse(result.duplicated(["date", "instrument"]).any())
+        self.assertTrue(result["factor"].between(-1, 1).all())
 
     def test_tree_model_configs_are_shallow_and_deterministic(self):
         for backend in ("lightgbm", "xgboost"):

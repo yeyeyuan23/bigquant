@@ -1,0 +1,32 @@
+{
+  "schema_version": "candidate-pool-v1",
+  "generated_at": "2026-07-26T15:08:57+08:00",
+  "relative_path": "factors/candidate_pool.parquet",
+  "factor_version": "first_round_v1_2026-07-26",
+  "date_range": [
+    "2019-01-02",
+    "2023-12-29"
+  ],
+  "columns": [
+    "date",
+    "instrument",
+    "candidate_id",
+    "factor_version",
+    "factor"
+  ],
+  "rows": 5722000,
+  "duplicate_keys": 0,
+  "candidate_rows": {
+    "FR-001": 1214000,
+    "FR-002": 1214000,
+    "HF-001": 219000,
+    "HF-002": 219000,
+    "OB-001": 219000,
+    "OB-002": 219000,
+    "PV-001": 1204000,
+    "PV-002": 1214000
+  },
+  "sha256": "a9e937107104e79d7b1f025a60c74150d1ec981043ea64d9d022720cec0d1aab",
+  "result_role": "local_reproduction_only",
+  "aistudio_truth_required": true
+}

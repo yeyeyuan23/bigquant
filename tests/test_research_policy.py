@@ -9,27 +9,24 @@ from bigalpha2026.research_policy import (
     HF_OB_MANDATORY_MONTHS,
     HF_OB_MAX_OPTIONAL_MONTHS,
     HF_OB_OPTIONAL_MONTH_POOL,
-    HF_OB_REPRESENTATIVE_MONTHS,
-    MINIMAL_BASELINE,
     candidate_ids,
-    equal_weight_rank_combination,
     fixed_weight_rank_combination,
-    incremental_gate,
     technical_gate,
 )
 
 
 class ResearchPolicyTest(unittest.TestCase):
-    def test_minimal_baseline_is_frozen_locally(self):
-        self.assertEqual(MINIMAL_BASELINE, ("PV-001", "HF-001"))
-        self.assertEqual(
-            candidate_ids("minimal_baseline"),
-            ("PV-001", "HF-001"),
-        )
+    def test_all_registered_candidates_are_available_to_first_round(self):
+        self.assertEqual(len(candidate_ids()), 8)
+        self.assertEqual(candidate_ids("first_round"), candidate_ids())
 
     def test_formal_periods_and_representative_months_are_frozen(self):
         self.assertEqual(FORMAL_EVALUATION_POLICY.development_start, "2019-01-01")
-        self.assertEqual(FORMAL_EVALUATION_POLICY.development_end, "2022-12-31")
+        self.assertEqual(FORMAL_EVALUATION_POLICY.development_end, "2021-12-31")
+        self.assertEqual(FORMAL_EVALUATION_POLICY.selection_start, "2022-01-01")
+        self.assertEqual(FORMAL_EVALUATION_POLICY.selection_end, "2022-12-31")
+        self.assertEqual(FORMAL_EVALUATION_POLICY.confirmation_start, "2023-01-01")
+        self.assertEqual(FORMAL_EVALUATION_POLICY.confirmation_end, "2023-12-31")
         self.assertEqual(FORMAL_EVALUATION_POLICY.primary_label, "ret_close_to_close")
         self.assertEqual(
             HF_OB_MANDATORY_MONTHS,
@@ -46,7 +43,6 @@ class ResearchPolicyTest(unittest.TestCase):
                 "2023-08",
             ),
         )
-        self.assertEqual(HF_OB_REPRESENTATIVE_MONTHS, HF_OB_MANDATORY_MONTHS)
         self.assertEqual(
             HF_OB_OPTIONAL_MONTH_POOL,
             (
@@ -72,19 +68,6 @@ class ResearchPolicyTest(unittest.TestCase):
         )
         self.assertEqual(FORMAL_EVALUATION_POLICY.cost_sensitivity_bps, (0, 10, 20, 30))
 
-    def test_equal_weight_rank_combination(self):
-        keys = {
-            "date": pd.to_datetime(["2022-01-04"] * 3),
-            "instrument": ["A", "B", "C"],
-        }
-        pv = pd.DataFrame({**keys, "factor": [1.0, 2.0, 3.0]})
-        hf = pd.DataFrame({**keys, "factor": [3.0, 2.0, 1.0]})
-        result = equal_weight_rank_combination(
-            {"PV-001": pv, "HF-001": hf}
-        )
-        self.assertEqual(result["factor"].nunique(), 1)
-        self.assertAlmostEqual(float(result["factor"].iloc[0]), 1.0 / 3.0)
-
     def test_fixed_weight_combination_is_frozen_and_ranked(self):
         keys = {
             "date": pd.to_datetime(["2022-01-04"] * 3),
@@ -101,20 +84,6 @@ class ResearchPolicyTest(unittest.TestCase):
 
     def test_gates_are_explicit(self):
         passed, reasons = technical_gate(0.99, 100, 60, 0.0)
-        self.assertTrue(passed)
-        self.assertEqual(reasons, [])
-        passed, reasons = incremental_gate(
-            {
-                "rank_ic_mean": 0.02,
-                "rank_ic_ir": 0.2,
-                "long_short_sharpe": 0.5,
-            },
-            {
-                "rank_ic_mean": 0.019,
-                "rank_ic_ir": 0.25,
-                "long_short_sharpe": 0.45,
-            },
-        )
         self.assertTrue(passed)
         self.assertEqual(reasons, [])
 

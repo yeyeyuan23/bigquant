@@ -37,6 +37,12 @@ class FactorLibraryTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "duplicate"):
             validate_factorlib_frame(duplicated)
+        with self.assertRaisesRegex(ValueError, "missing"):
+            validate_factorlib_columns(FACTORLIB_COLUMNS[:-1])
+        null_key = duplicated.iloc[:1].copy()
+        null_key.loc[:, "instrument"] = None
+        with self.assertRaisesRegex(ValueError, "null"):
+            validate_factorlib_frame(null_key)
 
     def test_regularized_validation_detects_incremental_candidate(self):
         rng = np.random.default_rng(7)

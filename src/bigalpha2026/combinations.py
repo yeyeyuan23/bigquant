@@ -129,6 +129,64 @@ def positive_ic_weights(
     return {candidate_id: value / total for candidate_id, value in raw.items()}
 
 
+def walk_forward_elastic_net(
+    panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    feature_columns: tuple[str, ...],
+    prediction_years: tuple[int, ...],
+    label_column: str = "ret_close_to_close",
+    first_training_year: int = 2019,
+    alpha: float = 0.001,
+    l1_ratio: float = 0.5,
+) -> pd.DataFrame:
+    """Generate strictly expanding-window Elastic Net predictions."""
+
+    from sklearn.linear_model import ElasticNet
+
+    merged = panel.merge(
+        labels[["date", "instrument", label_column]],
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    ).dropna(subset=[*feature_columns, label_column])
+    outputs: list[pd.DataFrame] = []
+    for prediction_year in prediction_years:
+        train = merged.loc[
+            merged["date"].dt.year.between(first_training_year, prediction_year - 1)
+        ]
+        test = merged.loc[merged["date"].dt.year.eq(prediction_year)]
+        if train.empty or test.empty:
+            continue
+        model = ElasticNet(
+            alpha=alpha,
+            l1_ratio=l1_ratio,
+            fit_intercept=True,
+            max_iter=20_000,
+            random_state=0,
+        )
+        model.fit(
+            train.loc[:, list(feature_columns)].to_numpy(dtype=float),
+            train[label_column].to_numpy(dtype=float),
+        )
+        block = test[["date", "instrument"]].copy()
+        block["factor"] = model.predict(
+            test.loc[:, list(feature_columns)].to_numpy(dtype=float)
+        )
+        block["factor"] = (
+            block.groupby("date", sort=False)["factor"]
+            .rank(pct=True, method="average")
+            .sub(0.5)
+            .mul(2.0)
+        )
+        outputs.append(block)
+    if not outputs:
+        raise ValueError("no walk-forward prediction year had train and test rows")
+    return pd.concat(outputs, ignore_index=True).sort_values(
+        ["date", "instrument"]
+    ).reset_index(drop=True)
+
+
 def walk_forward_tree_boosting(
     panel: pd.DataFrame,
     labels: pd.DataFrame,

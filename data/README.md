@@ -16,8 +16,10 @@
 - `features/FR/`：严格 PIT 的财务状态或披露组件；
 - `exposures/`：行业、市值、流动性和风险暴露；
 - `labels/`：独立保存的未来收益标签；
-- `factors/`：本地生成的候选和组合长表；`candidate_pool.parquet` 是
-  `run_first_round.py` 自动生成的统一自研因子入口。
+- `factors/`：本地最小验证或平台回传的候选与组合结果；
+  `candidate_pool.parquet` 是 `run_first_round.py` 生成的标准五列自研候选长表，
+  可作为小型可复现输入同步给队友；其版本、行数和校验和记录在
+  `manifest_candidate_pool.json`。
 
 `features` 禁止包含未来标签或候选编号绑定的中间量。日频共享数据主键为 `date、instrument`；因子长表主键为 `date、instrument、candidate_id、factor_version`。Parquet 按数据族和年份分区，频率写入元数据而不是作为顶层目录。
 
@@ -25,10 +27,15 @@
 
 正式年度分区采用 `year=YYYY/part-YYYY.parquet`。每次传输必须附带 `manifest_YYYY.json`，并在本地核对 SHA-256、列、形状、主键、每日股票池数量和跨表键后才能删除传输压缩包。2019—2023 年基础包已经通过该流程；所有 manifest 均为 `evaluation_performed=false`，不得把数据验收解释为因子评价。
 
-FR 事件面板按披露年份保存在 `features/FR/year=YYYY/part-YYYY.parquet`。开发历史清单为 `manifest_FR_2017_2022.json`，2023 样本外分区清单为 `manifest_FR_2023.json`。实际可用披露从 2018 年开始；2019 年首个交易日的 1,000 只股票均已有至少一条 LF 资产记录和两条 TTM 记录，因此可以在不使用未来披露的前提下计算首次差分状态。
+FR 事件面板按披露年份保存在 `features/FR/year=YYYY/part-YYYY.parquet`。历史与
+2022 选择期清单为 `manifest_FR_2017_2022.json`，2023 确认期分区清单为
+`manifest_FR_2023.json`。实际可用披露从 2018 年开始；2019 年首个交易日的
+1,000 只股票均已有至少一条 LF 资产记录和两条 TTM 记录，因此可以在不使用未来
+披露的前提下计算首次差分状态。
 
 HF/OB 日频共享面板按 `features/HF|OB/year=YYYY/month=MM/part-YYYY-MM.parquet` 保存，每月对应 `manifest_HFOB_YYYY-MM.json`。默认首轮读取 2019—2023 每年 2、8 月，共 10 个必跑月份。因子计算前的市场状态检查发现开发样本缺少低流动性尾部，故按冻结规则唯一启用 `2022-11`；该选择未读取任何候选值。其余 7 个已下载备选月不参与本轮，2023 年 5、11 月尚未生成。
 
-公开 36 因子库固定放在
-`features/FACTORLIB/year=YYYY/part-YYYY.parquet`。组合脚本按合同动态读取全部特征
-列，并以 `universe/` 为左表；因子库或自研因子缺失不会再通过内连接删掉股票日。
+公开 36 因子库和大型训练矩阵默认留在 AIStudio；本目录只接收评价报告、特征
+重要性和预测结果，不要求为本地训练下载完整副本。只有需要离线复现时，才按
+`features/FACTORLIB/year=YYYY/part-YYYY.parquet` 保存可选快照，并使用
+`run_combinations.py --check-files` 验收；默认的 `--check` 不读取比赛数据。

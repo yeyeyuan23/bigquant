@@ -685,26 +685,3 @@ def factor_rank_correlation(
     for column in columns:
         ranked[column] = ranked.groupby("date", sort=False)[column].rank(pct=True)
     return ranked[columns].corr(method="pearson")
-
-
-def chronological_gate(
-    metrics_by_period: dict[str, dict[str, float]],
-    development_period: str = "2019_2022",
-    holdout_period: str = "2024",
-) -> tuple[bool, list[str]]:
-    """Apply the frozen factor admission rules from the implementation plan."""
-
-    reasons: list[str] = []
-    ic_values = {
-        period: values.get("rank_ic_mean", np.nan)
-        for period, values in metrics_by_period.items()
-    }
-    finite = {period: value for period, value in ic_values.items() if np.isfinite(value)}
-    signs = {int(np.sign(value)) for value in finite.values() if abs(value) > 1e-12}
-    if len(finite) != len(metrics_by_period) or len(signs) != 1:
-        reasons.append("Rank IC direction is not stable across all periods")
-    development = abs(ic_values.get(development_period, np.nan))
-    holdout = abs(ic_values.get(holdout_period, np.nan))
-    if not np.isfinite(development) or not np.isfinite(holdout) or holdout < 0.5 * development:
-        reasons.append("2024 Rank IC is below 50% of the development-period magnitude")
-    return not reasons, reasons

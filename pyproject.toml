@@ -15,6 +15,12 @@ dependencies = [
   "xgboost>=3,<4",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "coverage[toml]>=7.15,<8",
+  "ruff>=0.12,<1",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -23,3 +29,13 @@ line-length = 100
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+concurrency = ["multiprocessing"]
+source = ["src/bigalpha2026", "scripts"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

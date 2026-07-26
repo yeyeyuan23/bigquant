@@ -41,6 +41,10 @@ registered
 | `INT-001` | composite `[FR, HF]` | `FR-002/HF-001` 等权截面秩 | 两组件越高越高 | 1 日 | `submitted_smoke` |
 | `MICRO-EN-001` | composite `[HF, OB]` | 微观结构相对公开因子库的滚动 Elastic Net 增量 | 由训练窗学习 | 1 日 | `development_watch` |
 
+表中基础候选状态是时间切分整改前的已记录状态。本次已经统一为
+2019—2021 开发、2022 选择、2023 确认；在 AIStudio 按新协议重跑前，不根据
+本地复现结果覆盖这些状态。
+
 ## 基础候选定义
 
 ### PV
@@ -116,6 +120,7 @@ registered
 - 比赛状态：2026-07-26 公榜分数 `0.57416`，当时团队排名第 `79`；
   私榜尚未公布。
 - 定位：端到端冒烟提交，不代表已经通过成本和严格交易准入。
+- 冻结记录：`artifacts/frozen/int_001.json`。
 
 ### MICRO-EN-001
 
