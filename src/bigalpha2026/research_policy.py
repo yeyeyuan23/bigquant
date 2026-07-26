@@ -132,9 +132,22 @@ class FactorLibraryIncrementalGate:
     minimum_oos_days: int = 40
 
 
+@dataclass(frozen=True)
+class TreeIncrementalGate:
+    """LightGBM-specific admission, evaluated only on development data."""
+
+    minimum_active_days: int = 240
+    minimum_oos_days: int = 180
+    minimum_windows: int = 9
+    minimum_positive_window_ratio: float = 0.55
+    minimum_positive_years: int = 2
+    minimum_oos_rank_ic_increment: float = 0.0
+
+
 TECHNICAL_GATE = TechnicalGate()
 COMBINATION_ADMISSION_GATE = CombinationAdmissionGate()
 FACTORLIB_INCREMENTAL_GATE = FactorLibraryIncrementalGate()
+TREE_INCREMENTAL_GATE = TreeIncrementalGate()
 
 # Frozen on 2026-07-26 from the competition's 36 public factors using only
 # 2019-2021 development data.  Later periods may validate this membership but
@@ -235,6 +248,37 @@ def technical_gate(
     if not np.isfinite(future_leak_max_past_diff) or future_leak_max_past_diff > 0:
         reasons.append("future perturbation changed past factor values")
     return not reasons, reasons
+
+
+def tree_incremental_track_gate(
+    summary: Mapping[str, float],
+    policy: TreeIncrementalGate = TREE_INCREMENTAL_GATE,
+) -> tuple[bool, list[str]]:
+    """Gate one paired LightGBM increment track."""
+
+    reasons: list[str] = []
+    increment = float(summary.get("oos_rank_ic_increment", np.nan))
+    if (
+        not np.isfinite(increment)
+        or increment <= policy.minimum_oos_rank_ic_increment
+    ):
+        reasons.append("tree OOS Rank IC increment is not positive")
+    if float(summary.get("oos_days", 0.0)) < policy.minimum_oos_days:
+        reasons.append("too few tree OOS days")
+    if float(summary.get("windows", 0.0)) < policy.minimum_windows:
+        reasons.append("too few tree OOS windows")
+    if (
+        float(summary.get("positive_window_ratio", 0.0))
+        < policy.minimum_positive_window_ratio
+    ):
+        reasons.append("tree positive-window ratio is below the gate")
+    if (
+        float(summary.get("positive_years", 0.0))
+        < policy.minimum_positive_years
+    ):
+        reasons.append("tree increment is positive in too few development years")
+    return not reasons, reasons
+
 
 def factorlib_incremental_gate(
     summary: Mapping[str, float],

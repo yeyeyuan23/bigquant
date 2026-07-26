@@ -73,7 +73,7 @@ VALIDATION_2022_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2022_start[:4])
 VALIDATION_2023_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4])
 MARKET_STATE_YEARS = range(2019, VALIDATION_2022_YEAR + 1)
 ALL_BASE_YEARS = range(2019, VALIDATION_2023_YEAR + 1)
-CANDIDATE_POOL_VERSION = "oap_b_v1_2026-07-26"
+CANDIDATE_POOL_VERSION = "oap_b_v2_full_ob_2026-07-26"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -87,6 +87,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--skip-correlations",
         action="store_true",
         help="defer pairwise correlation diagnostics; does not change S admission",
+    )
+    parser.add_argument(
+        "--refresh-candidate",
+        action="append",
+        default=[],
+        help="with --resume-metrics, recompute this candidate instead of reusing it",
     )
     return parser.parse_args(argv)
 
@@ -122,6 +128,23 @@ def read_evaluation_family(family: str) -> pd.DataFrame:
     missing = [str(path) for path in paths if not path.exists()]
     if missing:
         raise FileNotFoundError(f"missing evaluation {family} panels: {missing}")
+    return pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
+
+
+def read_full_ob_001_panel() -> pd.DataFrame:
+    """Read the complete yearly AIStudio aggregation required by OB-001."""
+
+    directory = DATA / "features" / "OB_DAILY_FULL"
+    paths = [
+        directory / f"year={year}" / f"part-{year}.parquet"
+        for year in ALL_BASE_YEARS
+    ]
+    missing = [str(path) for path in paths if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            "missing full-history OB-001 daily panels; generate them with "
+            f"scripts/aistudio_build_ob_daily.py: {missing}"
+        )
     return pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
 
 
@@ -520,13 +543,14 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     hf = read_evaluation_family("HF")
     ob = read_evaluation_family("OB")
+    ob_001_daily = read_full_ob_001_panel()
     mandatory_dates = pd.DatetimeIndex(
         sorted(pd.to_datetime(hf["date"]).dt.normalize().unique())
     )
     mandatory_pool = pool.loc[pool["date"].isin(mandatory_dates)]
     factors["HF-001"] = build_hf_001_factor_from_daily(hf, mandatory_pool)
     factors["HF-002"] = build_hf_002_factor_from_daily(hf, mandatory_pool)
-    factors["OB-001"] = build_ob_001_factor_from_daily(ob, mandatory_pool)
+    factors["OB-001"] = build_ob_001_factor_from_daily(ob_001_daily, pool)
     factors["OB-002"] = build_ob_002_factor_from_daily(ob, mandatory_pool)
 
     metric_output: list[dict[str, object]] = []
@@ -550,6 +574,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             cached_stability["period"] = cached_stability["period"].replace(
                 period_aliases
             )
+            refresh_ids = set(map(str, args.refresh_candidate))
+            if refresh_ids:
+                cached_metrics = cached_metrics.loc[
+                    ~cached_metrics["candidate_id"].astype(str).isin(refresh_ids)
+                ]
+                cached_stability = cached_stability.loc[
+                    ~cached_stability["candidate_id"].astype(str).isin(refresh_ids)
+                ]
             cached_metric_ids = set(cached_metrics["candidate_id"].astype(str))
     technical_output: list[dict[str, object]] = []
     clean_factors: dict[str, pd.DataFrame] = {}

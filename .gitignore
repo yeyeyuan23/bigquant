@@ -23,6 +23,9 @@ reports/*.json
 !reports/joint_elastic_net_metrics.csv
 !reports/joint_elastic_net_weights.csv
 !reports/joint_lightgbm_metrics.csv
+!reports/tree_factor_incremental.csv
+!reports/tree_factor_admission.csv
+!reports/tree_group_increment.csv
 !reports/factor_pool_decisions.json
 !reports/combination_summary.csv
 .DS_Store

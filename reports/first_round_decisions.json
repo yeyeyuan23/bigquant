@@ -258,13 +258,10 @@
     "status": "rejected",
     "technical_passed": true,
     "single_factor_cross_regime_passed": false,
-    "development_stability_fraction": 0.3333333333333333,
+    "development_stability_fraction": 0.3888888888888889,
     "development_failures": [
       "development raw_full IC is not positive",
-      "development neutral_full IC is not positive",
-      "development raw_tradable IC is not positive",
       "development IC t-stat is below 2",
-      "development raw group monotonicity is below the gate",
       "development subperiod sign stability is below the gate"
     ],
     "validation_2022_failures": [

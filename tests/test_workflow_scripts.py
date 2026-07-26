@@ -87,10 +87,16 @@ class WorkflowScriptTest(unittest.TestCase):
 
     def test_first_round_can_resume_without_recomputing_metrics(self):
         args = parse_first_round_args(
-            ["--resume-metrics", "--skip-correlations"]
+            [
+                "--resume-metrics",
+                "--skip-correlations",
+                "--refresh-candidate",
+                "OB-001",
+            ]
         )
         self.assertTrue(args.resume_metrics)
         self.assertTrue(args.skip_correlations)
+        self.assertEqual(args.refresh_candidate, ["OB-001"])
 
     def test_single_factor_gate_requires_both_validation_years(self):
         rows = []

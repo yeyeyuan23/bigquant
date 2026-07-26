@@ -15,10 +15,46 @@ from bigalpha2026.factorlib import (
     validate_factorlib_frame,
     validate_factorlib_subset_frame,
 )
-from bigalpha2026.research_policy import factorlib_incremental_gate
+from bigalpha2026.research_policy import (
+    TreeIncrementalGate,
+    factorlib_incremental_gate,
+    tree_incremental_track_gate,
+)
 
 
 class FactorLibraryTest(unittest.TestCase):
+    def test_tree_incremental_gate_requires_stable_oos_improvement(self):
+        policy = TreeIncrementalGate(
+            minimum_active_days=10,
+            minimum_oos_days=40,
+            minimum_windows=2,
+            minimum_positive_window_ratio=0.55,
+            minimum_positive_years=2,
+        )
+        passed, reasons = tree_incremental_track_gate(
+            {
+                "oos_rank_ic_increment": 0.001,
+                "oos_days": 60,
+                "windows": 3,
+                "positive_window_ratio": 2 / 3,
+                "positive_years": 2,
+            },
+            policy,
+        )
+        self.assertTrue(passed, reasons)
+        failed, reasons = tree_incremental_track_gate(
+            {
+                "oos_rank_ic_increment": 0.001,
+                "oos_days": 60,
+                "windows": 3,
+                "positive_window_ratio": 1 / 3,
+                "positive_years": 1,
+            },
+            policy,
+        )
+        self.assertFalse(failed)
+        self.assertTrue(reasons)
+
     def test_frozen_subset_contract_is_strict(self):
         columns = ("amount", "turn")
         frame = pd.DataFrame(

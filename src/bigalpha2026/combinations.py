@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+import numpy as np
 import pandas as pd
 
-from .evaluation import cross_section_zscore
+from .evaluation import cross_section_zscore, rank_ic_series
 from .research_policy import fixed_weight_rank_combination
 
 
@@ -63,6 +64,34 @@ def fixed_rank_blend(
     return fixed_weight_rank_combination(factors, weights)
 
 
+def _prepare_joint_model_frame(
+    panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    feature_columns: tuple[str, ...],
+    label_column: str,
+) -> pd.DataFrame:
+    """Build the identical standardized sample used by every learned model."""
+
+    merged = panel.merge(
+        labels[["date", "instrument", label_column]],
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    merged = cross_section_zscore(
+        merged,
+        [*feature_columns, label_column],
+    )
+    # A feature with no cross-sectional dispersion has no signal that day.
+    # Keep the date and use the standardized neutral value instead of deleting
+    # the complete cross-section. The target remains mandatory.
+    merged.loc[:, list(feature_columns)] = merged.loc[
+        :, list(feature_columns)
+    ].fillna(0.0)
+    return merged.dropna(subset=[label_column])
+
+
 def _walk_forward_elastic_net(
     panel: pd.DataFrame,
     labels: pd.DataFrame,
@@ -79,27 +108,15 @@ def _walk_forward_elastic_net(
 
     from sklearn.linear_model import ElasticNet
 
-    merged = panel.merge(
-        labels[["date", "instrument", label_column]],
-        on=["date", "instrument"],
-        how="inner",
-        validate="one_to_one",
-    )
     # Keep this identical to factorlib_regularized_incremental_batch_validation.
     # A fixed Elastic Net alpha is meaningful only when both X and y use the
     # same scale in screening and final training.
-    merged = cross_section_zscore(
-        merged,
-        [*feature_columns, label_column],
+    merged = _prepare_joint_model_frame(
+        panel,
+        labels,
+        feature_columns=feature_columns,
+        label_column=label_column,
     )
-    # A candidate that has no cross-sectional dispersion on one day carries
-    # no information on that day.  Treat its standardized value as neutral
-    # instead of dropping the entire date from every joint-model evaluation.
-    # The target remains mandatory.
-    merged.loc[:, list(feature_columns)] = merged.loc[
-        :, list(feature_columns)
-    ].fillna(0.0)
-    merged = merged.dropna(subset=[label_column])
     outputs: list[pd.DataFrame] = []
     weight_rows: list[dict[str, object]] = []
     all_dates = pd.DatetimeIndex(sorted(merged["date"].unique()))
@@ -226,14 +243,42 @@ def walk_forward_lightgbm(
 ) -> pd.DataFrame:
     """Generate strict 60-day train / 20-day OOS LightGBM predictions."""
 
-    merged = panel.merge(
-        labels[["date", "instrument", label_column]],
-        on=["date", "instrument"],
-        how="inner",
-        validate="one_to_one",
-    ).dropna(subset=[*feature_columns, label_column])
+    merged = _prepare_joint_model_frame(
+        panel,
+        labels,
+        feature_columns=feature_columns,
+        label_column=label_column,
+    )
+    return _walk_forward_lightgbm_prepared(
+        merged,
+        feature_columns=feature_columns,
+        prediction_years=prediction_years,
+        label_column=label_column,
+        train_window_days=train_window_days,
+        test_window_days=test_window_days,
+    )
+
+
+def _walk_forward_lightgbm_prepared(
+    prepared: pd.DataFrame,
+    *,
+    feature_columns: tuple[str, ...],
+    prediction_years: tuple[int, ...],
+    label_column: str = "ret_close_to_close",
+    train_window_days: int = 60,
+    test_window_days: int = 20,
+) -> pd.DataFrame:
+    """Fit LightGBM on a pre-standardized common sample."""
+
+    missing = sorted(
+        {"date", "instrument", label_column, *feature_columns}.difference(
+            prepared.columns
+        )
+    )
+    if missing:
+        raise ValueError(f"prepared frame is missing required columns: {missing}")
     outputs: list[pd.DataFrame] = []
-    all_dates = pd.DatetimeIndex(sorted(merged["date"].unique()))
+    all_dates = pd.DatetimeIndex(sorted(prepared["date"].unique()))
     prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
     for start in range(0, len(prediction_dates), test_window_days):
         test_dates = prediction_dates[start : start + test_window_days]
@@ -245,8 +290,8 @@ def walk_forward_lightgbm(
         train_dates = all_dates[
             first_test_position - train_window_days : first_test_position
         ]
-        train = merged.loc[merged["date"].isin(train_dates)]
-        test = merged.loc[merged["date"].isin(test_dates)]
+        train = prepared.loc[prepared["date"].isin(train_dates)]
+        test = prepared.loc[prepared["date"].isin(test_dates)]
         if train.empty or test.empty:
             continue
         model = _lightgbm_regressor()
@@ -270,3 +315,137 @@ def walk_forward_lightgbm(
     return pd.concat(outputs, ignore_index=True).sort_values(
         ["date", "instrument"]
     ).reset_index(drop=True)
+
+
+def paired_factor_rank_ic_increment(
+    baseline_factor: pd.DataFrame,
+    augmented_factor: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    label_column: str = "ret_close_to_close",
+    test_window_days: int = 20,
+) -> dict[str, float]:
+    """Summarize a paired OOS factor improvement on identical dates."""
+
+    baseline = baseline_factor.rename(columns={"factor": "baseline_factor"})
+    augmented = augmented_factor.rename(columns={"factor": "augmented_factor"})
+    merged = baseline.merge(
+        augmented,
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    ).merge(
+        labels[["date", "instrument", label_column]],
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    baseline_ic = rank_ic_series(
+        merged,
+        factor_column="baseline_factor",
+        label_column=label_column,
+    ).rename("baseline")
+    augmented_ic = rank_ic_series(
+        merged,
+        factor_column="augmented_factor",
+        label_column=label_column,
+    ).rename("augmented")
+    daily = pd.concat([baseline_ic, augmented_ic], axis=1).dropna()
+    if daily.empty:
+        return {
+            "baseline_oos_rank_ic": np.nan,
+            "augmented_oos_rank_ic": np.nan,
+            "oos_rank_ic_increment": np.nan,
+            "positive_window_ratio": 0.0,
+            "positive_years": 0.0,
+            "oos_days": 0.0,
+            "windows": 0.0,
+        }
+    daily["increment"] = daily["augmented"] - daily["baseline"]
+    window = np.arange(len(daily), dtype=int) // test_window_days
+    window_increment = daily["increment"].groupby(window).mean()
+    year_increment = daily["increment"].groupby(daily.index.year).mean()
+    return {
+        "baseline_oos_rank_ic": float(daily["baseline"].mean()),
+        "augmented_oos_rank_ic": float(daily["augmented"].mean()),
+        "oos_rank_ic_increment": float(daily["increment"].mean()),
+        "positive_window_ratio": float((window_increment > 0).mean()),
+        "positive_years": float((year_increment > 0).sum()),
+        "oos_days": float(len(daily)),
+        "windows": float(len(window_increment)),
+    }
+
+
+def lightgbm_candidate_incremental_validation(
+    panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    base_feature_columns: tuple[str, ...],
+    candidate_columns: tuple[str, ...],
+    prediction_years: tuple[int, ...],
+    label_column: str = "ret_close_to_close",
+    train_window_days: int = 60,
+    test_window_days: int = 20,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Evaluate individual and full-pool conditional LightGBM increments."""
+
+    if not base_feature_columns:
+        raise ValueError("base_feature_columns must not be empty")
+    if not candidate_columns:
+        raise ValueError("candidate_columns must not be empty")
+    if set(base_feature_columns).intersection(candidate_columns):
+        raise ValueError("base and candidate feature columns must be disjoint")
+    all_features = (*base_feature_columns, *candidate_columns)
+    prepared = _prepare_joint_model_frame(
+        panel,
+        labels,
+        feature_columns=all_features,
+        label_column=label_column,
+    )
+
+    def predict(features: tuple[str, ...]) -> pd.DataFrame:
+        return _walk_forward_lightgbm_prepared(
+            prepared,
+            feature_columns=features,
+            prediction_years=prediction_years,
+            label_column=label_column,
+            train_window_days=train_window_days,
+            test_window_days=test_window_days,
+        )
+
+    baseline = predict(base_feature_columns)
+    full = predict(all_features)
+    rows: list[dict[str, object]] = []
+    for candidate in candidate_columns:
+        individual = predict((*base_feature_columns, candidate))
+        without_candidate = predict(
+            tuple(feature for feature in all_features if feature != candidate)
+        )
+        individual_summary = paired_factor_rank_ic_increment(
+            baseline,
+            individual,
+            labels,
+            label_column=label_column,
+            test_window_days=test_window_days,
+        )
+        conditional_summary = paired_factor_rank_ic_increment(
+            without_candidate,
+            full,
+            labels,
+            label_column=label_column,
+            test_window_days=test_window_days,
+        )
+        rows.append(
+            {
+                "candidate": candidate,
+                **{
+                    f"individual_{key}": value
+                    for key, value in individual_summary.items()
+                },
+                **{
+                    f"conditional_{key}": value
+                    for key, value in conditional_summary.items()
+                },
+            }
+        )
+    return pd.DataFrame(rows), baseline

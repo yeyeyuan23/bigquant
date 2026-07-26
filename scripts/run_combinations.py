@@ -15,6 +15,8 @@ from typing import Sequence
 import pandas as pd
 
 from bigalpha2026.combinations import (
+    lightgbm_candidate_incremental_validation,
+    paired_factor_rank_ic_increment,
     walk_forward_elastic_net_with_weights,
     walk_forward_lightgbm,
 )
@@ -35,7 +37,9 @@ from bigalpha2026.research_policy import (
     COMBINATION_ADMISSION_GATE,
     FROZEN_FACTORLIB_SCREENED_FEATURES,
     FORMAL_EVALUATION_POLICY,
+    TREE_INCREMENTAL_GATE,
     factorlib_incremental_gate,
+    tree_incremental_track_gate,
 )
 
 
@@ -564,6 +568,91 @@ def run_experiments(
             f"expected={sorted(self_columns)}, "
             f"actual={sorted(actual_incremental_features)}"
         )
+
+    active_days_by_feature = {
+        self_column: int(
+            development_for_incremental.groupby("date", sort=True)[self_column]
+            .nunique()
+            .gt(1)
+            .sum()
+        )
+        for self_column in self_columns
+    }
+    tree_eligible_self = tuple(
+        self_column
+        for self_column in self_columns
+        if active_days_by_feature[self_column]
+        >= TREE_INCREMENTAL_GATE.minimum_active_days
+    )
+    if not tree_eligible_self:
+        raise RuntimeError(
+            "no self-developed factor has enough active days for tree admission"
+        )
+    tree_summary, tree_baseline_factor = (
+        lightgbm_candidate_incremental_validation(
+            oriented,
+            labels,
+            base_feature_columns=selected_public,
+            candidate_columns=tree_eligible_self,
+            prediction_years=DEVELOPMENT_YEARS,
+        )
+    )
+    tree_rows_by_feature = {
+        str(row["candidate"]): row
+        for row in tree_summary.to_dict(orient="records")
+    }
+    tree_admission_by_feature: dict[str, dict[str, object]] = {}
+    tree_admitted_self: list[str] = []
+    for self_column in self_columns:
+        active_days = active_days_by_feature[self_column]
+        if self_column not in tree_rows_by_feature:
+            tree_admission_by_feature[self_column] = {
+                "candidate": self_column,
+                "active_days": active_days,
+                "tree_data_eligible": False,
+                "individual_passed": False,
+                "conditional_passed": False,
+                "tree_incremental_passed": False,
+                "reasons": (
+                    f"active days below {TREE_INCREMENTAL_GATE.minimum_active_days}"
+                ),
+            }
+            continue
+        row = tree_rows_by_feature[self_column]
+        individual_summary = {
+            key.removeprefix("individual_"): value
+            for key, value in row.items()
+            if key.startswith("individual_")
+        }
+        conditional_summary = {
+            key.removeprefix("conditional_"): value
+            for key, value in row.items()
+            if key.startswith("conditional_")
+        }
+        individual_passed, individual_reasons = tree_incremental_track_gate(
+            individual_summary
+        )
+        conditional_passed, conditional_reasons = tree_incremental_track_gate(
+            conditional_summary
+        )
+        tree_passed = individual_passed or conditional_passed
+        reasons = []
+        if not individual_passed:
+            reasons.append("individual: " + "; ".join(individual_reasons))
+        if not conditional_passed:
+            reasons.append("conditional: " + "; ".join(conditional_reasons))
+        tree_admission_by_feature[self_column] = {
+            **row,
+            "active_days": active_days,
+            "tree_data_eligible": True,
+            "individual_passed": individual_passed,
+            "conditional_passed": conditional_passed,
+            "tree_incremental_passed": tree_passed,
+            "reasons": " | ".join(reasons),
+        }
+        if tree_passed:
+            tree_admitted_self.append(self_column)
+
     incremental_rows: list[dict[str, object]] = []
     admission_rows: list[dict[str, object]] = []
     admitted_self: list[str] = []
@@ -576,6 +665,9 @@ def run_experiments(
         ].iloc[0].to_dict()
         screened_passed, screened_reasons = factorlib_incremental_gate(
             screened_row
+        )
+        tree_passed = bool(
+            tree_admission_by_feature[self_column]["tree_incremental_passed"]
         )
         incremental_rows.append(
             {
@@ -596,12 +688,18 @@ def run_experiments(
                     self_column in single_factor_features
                 ),
                 "enters_joint_elastic_net": screened_passed,
-                "enters_joint_lightgbm": screened_passed,
+                "tree_incremental_passed": tree_passed,
+                "enters_joint_lightgbm": tree_passed,
                 "route_count": int(self_column in single_factor_features)
-                + 2 * int(screened_passed),
+                + int(screened_passed)
+                + int(tree_passed),
                 "status": (
                     "admitted"
-                    if self_column in single_factor_features or screened_passed
+                    if (
+                        self_column in single_factor_features
+                        or screened_passed
+                        or tree_passed
+                    )
                     else "rejected"
                 ),
             }
@@ -623,17 +721,32 @@ def run_experiments(
             "no candidate passed the single-factor cross-regime gate"
         )
     joint_self_features = tuple(admitted_self)
-    joint_features = (*selected_public, *joint_self_features)
+    joint_elastic_net_features = (*selected_public, *joint_self_features)
+    joint_lightgbm_features = (*selected_public, *tree_admitted_self)
     joint_elastic_net_factor, joint_elastic_net_weights = (
         walk_forward_elastic_net_with_weights(
             oriented,
             labels,
-            feature_columns=joint_features,
+            feature_columns=joint_elastic_net_features,
             prediction_years=(
                 VALIDATION_2022_YEAR,
                 VALIDATION_2023_YEAR,
             ),
         )
+    )
+    tree_development_factor = walk_forward_lightgbm(
+        oriented,
+        labels,
+        feature_columns=joint_lightgbm_features,
+        prediction_years=DEVELOPMENT_YEARS,
+    )
+    tree_group_increment = paired_factor_rank_ic_increment(
+        tree_baseline_factor,
+        tree_development_factor,
+        labels,
+    )
+    tree_group_passed, tree_group_reasons = tree_incremental_track_gate(
+        tree_group_increment
     )
     pipelines: dict[tuple[str, str], pd.DataFrame] = {
         (
@@ -650,7 +763,7 @@ def run_experiments(
         ): walk_forward_lightgbm(
             oriented,
             labels,
-            feature_columns=joint_features,
+            feature_columns=joint_lightgbm_features,
             prediction_years=(
                 VALIDATION_2022_YEAR,
                 VALIDATION_2023_YEAR,
@@ -740,6 +853,8 @@ def run_experiments(
             and validation_2022_tradable_ic > 0
             and validation_2023_tradable_ic > 0
         )
+        if experiment == "joint_lightgbm":
+            passed_validation = passed_validation and tree_group_passed
         robust_rank_ic = min(validation_2022_ic, validation_2023_ic)
         mean_rank_ic = (validation_2022_ic + validation_2023_ic) / 2.0
         decisions.append(
@@ -778,6 +893,27 @@ def run_experiments(
     )
     pd.DataFrame(admission_rows).to_csv(
         reports_dir / "factor_pool_admission.csv",
+        index=False,
+    )
+    tree_summary.to_csv(
+        reports_dir / "tree_factor_incremental.csv",
+        index=False,
+    )
+    pd.DataFrame(tree_admission_by_feature.values()).to_csv(
+        reports_dir / "tree_factor_admission.csv",
+        index=False,
+    )
+    pd.DataFrame(
+        [
+            {
+                **tree_group_increment,
+                "passed": tree_group_passed,
+                "reasons": "; ".join(tree_group_reasons),
+                "selected_candidate_count": len(tree_admitted_self),
+            }
+        ]
+    ).to_csv(
+        reports_dir / "tree_group_increment.csv",
         index=False,
     )
     for pipeline_name in PIPELINE_NAMES:
@@ -824,7 +960,7 @@ def run_experiments(
         index=False,
     )
     result = {
-        "protocol": "isolated_combination_pipelines_v3",
+        "protocol": "isolated_combination_pipelines_v6_tree_incremental_admission",
         "development_years": list(DEVELOPMENT_YEARS),
         "validation_years": [
             VALIDATION_2022_YEAR,
@@ -839,9 +975,26 @@ def run_experiments(
             "preprocessing": "daily_cross_section_zscore_features_and_target",
             "cache_key": incremental_protocol,
         },
-        "elastic_net_preprocessing": (
+        "learned_model_preprocessing": (
             "daily_cross_section_zscore_features_and_target"
         ),
+        "tree_incremental_protocol": {
+            "baseline": "lightgbm_screened15",
+            "individual": "baseline_plus_one_candidate",
+            "conditional": "full_eligible_pool_drop_one",
+            "evaluation_years": list(DEVELOPMENT_YEARS),
+            "train_days": 60,
+            "test_days": 20,
+            "minimum_active_days": TREE_INCREMENTAL_GATE.minimum_active_days,
+            "minimum_oos_days": TREE_INCREMENTAL_GATE.minimum_oos_days,
+            "minimum_windows": TREE_INCREMENTAL_GATE.minimum_windows,
+            "minimum_positive_window_ratio": (
+                TREE_INCREMENTAL_GATE.minimum_positive_window_ratio
+            ),
+            "minimum_positive_years": (
+                TREE_INCREMENTAL_GATE.minimum_positive_years
+            ),
+        },
         "frozen_test_year": FROZEN_TEST_YEAR,
         "frozen_test_changes_admission": False,
         "pipelines": {
@@ -851,11 +1004,14 @@ def run_experiments(
             },
             "joint_elastic_net": {
                 "method": "elastic_net",
-                "features": list(joint_features),
+                "features": list(joint_elastic_net_features),
             },
             "joint_lightgbm": {
                 "method": "lightgbm",
-                "features": list(joint_features),
+                "features": list(joint_lightgbm_features),
+                "admission": "tree_incremental_T",
+                "development_group_increment": tree_group_increment,
+                "development_group_increment_passed": tree_group_passed,
             },
         },
         "factorlib_screened_reference": {
@@ -865,6 +1021,9 @@ def run_experiments(
         },
         "factorlib_incremental": incremental_rows,
         "screened15_incremental_admission": admission_rows,
+        "tree_incremental_admission": list(
+            tree_admission_by_feature.values()
+        ),
         "pipeline_decisions": pipeline_decisions,
         "frozen_submission_order": frozen_submission_order,
         "frozen_winner": (

@@ -4,8 +4,10 @@ from multiprocessing import get_context
 import pandas as pd
 
 from bigalpha2026.combinations import (
+    _prepare_joint_model_frame,
     fixed_rank_blend,
     lightgbm_model_config,
+    paired_factor_rank_ic_increment,
     walk_forward_elastic_net,
     walk_forward_elastic_net_with_weights,
     walk_forward_lightgbm,
@@ -193,10 +195,64 @@ class CombinationTest(unittest.TestCase):
         self.assertEqual(result["date"].nunique(), 2)
         self.assertEqual(len(result), 240)
 
+    def test_learned_models_share_standardized_samples(self):
+        dates = pd.to_datetime(
+            ["2022-01-04"] * 10 + ["2022-01-05"] * 10
+        )
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(10)] * 2,
+                "dense": list(range(10)) * 2,
+                "constant": [1.0] * 20,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = list(range(10)) * 2
+        prepared = _prepare_joint_model_frame(
+            panel,
+            labels,
+            feature_columns=("dense", "constant"),
+            label_column="ret_close_to_close",
+        )
+        self.assertEqual(len(prepared), 20)
+        self.assertEqual(prepared["date"].nunique(), 2)
+        self.assertTrue(prepared["constant"].eq(0.0).all())
+        daily = prepared.groupby("date", sort=False)
+        self.assertTrue(daily["dense"].mean().abs().lt(1e-12).all())
+        self.assertTrue(
+            daily["ret_close_to_close"].mean().abs().lt(1e-12).all()
+        )
+
     def test_lightgbm_config_is_shallow_and_deterministic(self):
         config = lightgbm_model_config()
         self.assertEqual(config["random_state"], 20260726)
         self.assertEqual(config["training"], "rolling_60_train_20_test")
+
+    def test_paired_tree_increment_uses_daily_oos_rank_ic(self):
+        dates = pd.bdate_range("2021-01-04", periods=40)
+        rows = [
+            {"date": date, "instrument": str(stock)}
+            for date in dates
+            for stock in range(20)
+        ]
+        labels = pd.DataFrame(rows)
+        labels["ret_close_to_close"] = list(range(20)) * len(dates)
+        baseline = labels[["date", "instrument"]].copy()
+        baseline["factor"] = -labels["ret_close_to_close"]
+        augmented = labels[["date", "instrument"]].copy()
+        augmented["factor"] = labels["ret_close_to_close"]
+        summary = paired_factor_rank_ic_increment(
+            baseline,
+            augmented,
+            labels,
+            test_window_days=20,
+        )
+        self.assertGreater(summary["oos_rank_ic_increment"], 0)
+        self.assertEqual(summary["positive_window_ratio"], 1.0)
+        self.assertEqual(summary["positive_years"], 1.0)
+        self.assertEqual(summary["oos_days"], 40.0)
+        self.assertEqual(summary["windows"], 2.0)
 
 
 if __name__ == "__main__":
