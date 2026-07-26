@@ -91,6 +91,21 @@ tail_60_depth_shape_median,
 tail_60_shape_sign_consistency
 ```
 
+首批可复用盘口底座由 `scripts/aistudio_build_ob_daily.py` 在 AIStudio 按年生成，
+落盘为 `~/work/ob_daily_full/ob_daily_YEAR.parquet`。该批先固化四个可直接复用
+的组件：
+
+```text
+tail_60_relative_spread_median
+tail_60_depth_completeness_median
+tail_60_bid_depth_imbalance_median
+negative_mid_shock_q10_bid_depth_recovery_5m_median
+```
+
+只将这些日级聚合结果同步回本地；原始分钟盘口行不下载、不进入 Git。新增盘口
+候选若需要合同中其余组件，应扩展同一按年聚合脚本并生成新的快照 manifest，
+不能在每个候选中重复拉取全量分钟明细。
+
 ### FR：财务披露事件
 
 - 源表：`bigalpha_2026_financial`

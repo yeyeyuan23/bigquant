@@ -91,7 +91,15 @@ def _walk_forward_elastic_net(
     merged = cross_section_zscore(
         merged,
         [*feature_columns, label_column],
-    ).dropna(subset=[*feature_columns, label_column])
+    )
+    # A candidate that has no cross-sectional dispersion on one day carries
+    # no information on that day.  Treat its standardized value as neutral
+    # instead of dropping the entire date from every joint-model evaluation.
+    # The target remains mandatory.
+    merged.loc[:, list(feature_columns)] = merged.loc[
+        :, list(feature_columns)
+    ].fillna(0.0)
+    merged = merged.dropna(subset=[label_column])
     outputs: list[pd.DataFrame] = []
     weight_rows: list[dict[str, object]] = []
     all_dates = pd.DatetimeIndex(sorted(merged["date"].unique()))

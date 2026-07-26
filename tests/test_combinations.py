@@ -164,6 +164,35 @@ class CombinationTest(unittest.TestCase):
         )
         self.assertTrue(weights["public"].ne(0).all())
 
+    def test_elastic_net_keeps_dates_with_a_neutral_constant_feature(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 120
+            + ["2020-01-02"] * 120
+            + ["2021-01-04"] * 120
+        )
+        values = list(range(120)) * 3
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(120)] * 3,
+                "public": values,
+                "sparse_candidate": [0.0] * len(dates),
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["public"] / 10_000
+        result = walk_forward_elastic_net(
+            panel,
+            labels,
+            feature_columns=("public", "sparse_candidate"),
+            prediction_years=(2020, 2021),
+            train_window_days=1,
+            test_window_days=1,
+        )
+        self.assertEqual(set(result["date"].dt.year), {2020, 2021})
+        self.assertEqual(result["date"].nunique(), 2)
+        self.assertEqual(len(result), 240)
+
     def test_lightgbm_config_is_shallow_and_deterministic(self):
         config = lightgbm_model_config()
         self.assertEqual(config["random_state"], 20260726)

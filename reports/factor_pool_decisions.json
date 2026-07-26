@@ -1168,14 +1168,14 @@
         2022,
         2023
       ],
-      "validation_2022_rank_ic_mean": 0.06912811225924935,
-      "validation_2022_rank_ic_t_stat": 2.868480740878139,
-      "validation_2022_tradable_rank_ic_mean": 0.06656229945713629,
-      "validation_2023_rank_ic_mean": 0.08118080348291341,
-      "validation_2023_rank_ic_t_stat": 3.589557104241741,
-      "validation_2023_tradable_rank_ic_mean": 0.06690922584486637,
-      "cross_regime_worst_year_rank_ic": 0.06912811225924935,
-      "cross_regime_mean_rank_ic": 0.07515445787108138
+      "validation_2022_rank_ic_mean": 0.03910212000675161,
+      "validation_2022_rank_ic_t_stat": 5.370810187352757,
+      "validation_2022_tradable_rank_ic_mean": 0.03529740137562704,
+      "validation_2023_rank_ic_mean": 0.02806843909859001,
+      "validation_2023_rank_ic_t_stat": 2.910964389668212,
+      "validation_2023_tradable_rank_ic_mean": 0.0262723448451407,
+      "cross_regime_worst_year_rank_ic": 0.02806843909859001,
+      "cross_regime_mean_rank_ic": 0.03358527955267081
     },
     "joint_lightgbm": {
       "experiment": "joint_lightgbm",
@@ -1196,10 +1196,10 @@
     }
   },
   "frozen_submission_order": [
-    "joint_elastic_net",
     "self_factor_composite",
+    "joint_elastic_net",
     "joint_lightgbm"
   ],
-  "frozen_winner": "joint_elastic_net",
+  "frozen_winner": "self_factor_composite",
   "winner_uses_2024": false
 }
