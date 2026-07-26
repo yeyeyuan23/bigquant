@@ -11,6 +11,20 @@ dist/
 *.egg-info/
 reports/*.csv
 reports/*.json
+!reports/first_round_technical.csv
+!reports/first_round_metrics.csv
+!reports/first_round_stability.csv
+!reports/first_round_decisions.json
+!reports/factor_pool_check.json
+!reports/factor_pool_screening.csv
+!reports/factor_pool_incremental.csv
+!reports/factor_pool_admission.csv
+!reports/self_factor_composite_metrics.csv
+!reports/joint_elastic_net_metrics.csv
+!reports/joint_elastic_net_weights.csv
+!reports/joint_lightgbm_metrics.csv
+!reports/factor_pool_decisions.json
+!reports/combination_summary.csv
 .DS_Store
 
 # Competition data and transfer archives remain local. Git only tracks data
@@ -24,3 +38,4 @@ data/**/*.tar.gz
 data/**/*.tar.zst
 data/**/*.tmp
 data/**/*.partial
+data/screened15.part.*

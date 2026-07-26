@@ -7,6 +7,7 @@ from bigalpha2026.combinations import (
     fixed_rank_blend,
     lightgbm_model_config,
     walk_forward_elastic_net,
+    walk_forward_elastic_net_with_weights,
     walk_forward_lightgbm,
 )
 from bigalpha2026.research_policy import fixed_weight_rank_combination
@@ -113,6 +114,55 @@ class CombinationTest(unittest.TestCase):
         self.assertEqual(set(result["date"].dt.year), {2020, 2021})
         self.assertFalse(result.duplicated(["date", "instrument"]).any())
         self.assertTrue(result["factor"].between(-1, 1).all())
+
+    def test_elastic_net_is_invariant_to_label_units_and_records_weights(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 120
+            + ["2020-01-02"] * 120
+            + ["2021-01-04"] * 120
+        )
+        values = list(range(120)) * 3
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(120)] * 3,
+                "public": values,
+                "candidate": list(reversed(values[:120])) * 3,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["public"] / 10_000
+        scaled = labels.copy()
+        scaled["ret_close_to_close"] *= 100.0
+        base_prediction, weights = walk_forward_elastic_net_with_weights(
+            panel,
+            labels,
+            feature_columns=("public", "candidate"),
+            prediction_years=(2020, 2021),
+            train_window_days=1,
+            test_window_days=1,
+        )
+        scaled_prediction = walk_forward_elastic_net(
+            panel,
+            scaled,
+            feature_columns=("public", "candidate"),
+            prediction_years=(2020, 2021),
+            train_window_days=1,
+            test_window_days=1,
+        )
+        pd.testing.assert_frame_equal(base_prediction, scaled_prediction)
+        self.assertEqual(
+            list(weights.columns),
+            [
+                "train_start",
+                "train_end",
+                "test_start",
+                "test_end",
+                "public",
+                "candidate",
+            ],
+        )
+        self.assertTrue(weights["public"].ne(0).all())
 
     def test_lightgbm_config_is_shallow_and_deterministic(self):
         config = lightgbm_model_config()

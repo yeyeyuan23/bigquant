@@ -8,7 +8,10 @@ import numpy as np
 import pandas as pd
 
 from .evaluation import ElasticNetConfig, rank_ic_series, rolling_elastic_net_scores
-from .factorlib import FACTORLIB_FEATURE_COLUMNS, validate_factorlib_frame
+from .factorlib import (
+    FACTORLIB_FEATURE_COLUMNS,
+    validate_factorlib_subset_frame,
+)
 
 
 KEY_COLUMNS = ("date", "instrument")
@@ -66,6 +69,7 @@ def build_feature_panel(
     candidate_pool: pd.DataFrame,
     *,
     admitted_candidates: Iterable[str] | None = None,
+    public_feature_columns: Sequence[str] = FACTORLIB_FEATURE_COLUMNS,
 ) -> tuple[pd.DataFrame, tuple[str, ...], tuple[str, ...], pd.DataFrame]:
     """Left-join all feature sources to the historical competition universe."""
 
@@ -76,7 +80,8 @@ def build_feature_panel(
     library = factorlib.copy()
     library["date"] = pd.to_datetime(library["date"], errors="coerce").dt.normalize()
     library["instrument"] = library["instrument"].astype(str)
-    validate_factorlib_frame(library)
+    public_features = tuple(public_feature_columns)
+    validate_factorlib_subset_frame(library, public_features)
 
     candidates = candidate_pool.copy()
     candidates["date"] = pd.to_datetime(
@@ -102,7 +107,7 @@ def build_feature_panel(
     ).reset_index()
 
     public_rename = {
-        column: f"{PUBLIC_PREFIX}{column}" for column in FACTORLIB_FEATURE_COLUMNS
+        column: f"{PUBLIC_PREFIX}{column}" for column in public_features
     }
     self_rename = {
         column: f"{SELF_PREFIX}{column}"

@@ -13,11 +13,29 @@ from bigalpha2026.factorlib import (
     FACTORLIB_FEATURE_COLUMNS,
     validate_factorlib_columns,
     validate_factorlib_frame,
+    validate_factorlib_subset_frame,
 )
 from bigalpha2026.research_policy import factorlib_incremental_gate
 
 
 class FactorLibraryTest(unittest.TestCase):
+    def test_frozen_subset_contract_is_strict(self):
+        columns = ("amount", "turn")
+        frame = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2022-01-04"]),
+                "instrument": ["A"],
+                "amount": [1.0],
+                "turn": [0.1],
+            }
+        )
+        validate_factorlib_subset_frame(frame, columns)
+        with self.assertRaisesRegex(ValueError, "extra"):
+            validate_factorlib_subset_frame(
+                frame.assign(volume=2.0),
+                columns,
+            )
+
     def test_live_schema_has_36_features_and_strict_keys(self):
         self.assertEqual(FACTORLIB_COLUMNS[:2], ("date", "instrument"))
         self.assertEqual(len(FACTORLIB_COLUMNS), 38)

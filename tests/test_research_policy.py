@@ -11,7 +11,6 @@ from bigalpha2026.research_policy import (
     HF_OB_MAX_OPTIONAL_MONTHS,
     HF_OB_OPTIONAL_MONTH_POOL,
     candidate_ids,
-    dual_factorlib_admission,
     fixed_weight_rank_combination,
     technical_gate,
 )
@@ -29,7 +28,7 @@ class ResearchPolicyTest(unittest.TestCase):
         )
 
     def test_all_registered_candidates_are_available_to_first_round(self):
-        self.assertEqual(len(candidate_ids()), 16)
+        self.assertEqual(len(candidate_ids()), 34)
         self.assertEqual(len(candidate_ids("first_round")), 8)
         self.assertEqual(
             candidate_ids("oap_batch1"),
@@ -44,14 +43,54 @@ class ResearchPolicyTest(unittest.TestCase):
                 "FR-005",
             ),
         )
+        self.assertEqual(
+            candidate_ids("oap_batch2"),
+            (
+                "FR-006",
+                "FR-007",
+                "PV-008",
+                "PV-009",
+                "PV-010",
+                "PV-011",
+                "PV-012",
+            ),
+        )
+        self.assertEqual(
+            candidate_ids("oap_b"),
+            (
+                "FR-008",
+                "FR-009",
+                "FR-010",
+                "FR-011",
+                "PV-013",
+                "PV-014",
+                "PV-015",
+                "PV-016",
+                "PV-017",
+                "PV-018",
+                "PV-019",
+            ),
+        )
 
     def test_formal_periods_and_representative_months_are_frozen(self):
         self.assertEqual(FORMAL_EVALUATION_POLICY.development_start, "2019-01-01")
         self.assertEqual(FORMAL_EVALUATION_POLICY.development_end, "2021-12-31")
-        self.assertEqual(FORMAL_EVALUATION_POLICY.selection_start, "2022-01-01")
-        self.assertEqual(FORMAL_EVALUATION_POLICY.selection_end, "2022-12-31")
-        self.assertEqual(FORMAL_EVALUATION_POLICY.confirmation_start, "2023-01-01")
-        self.assertEqual(FORMAL_EVALUATION_POLICY.confirmation_end, "2023-12-31")
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2022_start,
+            "2022-01-01",
+        )
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2022_end,
+            "2022-12-31",
+        )
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2023_start,
+            "2023-01-01",
+        )
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2023_end,
+            "2023-12-31",
+        )
         self.assertEqual(FORMAL_EVALUATION_POLICY.primary_label, "ret_close_to_close")
         self.assertEqual(
             HF_OB_MANDATORY_MONTHS,
@@ -113,44 +152,6 @@ class ResearchPolicyTest(unittest.TestCase):
         passed, reasons = technical_gate(0.99, 100, 60, 0.0)
         self.assertTrue(passed)
         self.assertEqual(reasons, [])
-
-    def test_dual_factorlib_admission_requires_screened_baseline(self):
-        self.assertEqual(
-            dual_factorlib_admission(
-                technical_passed=True,
-                all36_passed=True,
-                screened_passed=True,
-            ),
-            {"classification": "core_candidate", "enters_training": True},
-        )
-        self.assertEqual(
-            dual_factorlib_admission(
-                technical_passed=True,
-                all36_passed=False,
-                screened_passed=True,
-            ),
-            {
-                "classification": "overlap_aware_candidate",
-                "enters_training": True,
-            },
-        )
-        self.assertEqual(
-            dual_factorlib_admission(
-                technical_passed=True,
-                all36_passed=True,
-                screened_passed=False,
-            ),
-            {"classification": "rejected", "enters_training": False},
-        )
-        self.assertEqual(
-            dual_factorlib_admission(
-                technical_passed=False,
-                all36_passed=True,
-                screened_passed=True,
-            ),
-            {"classification": "technical_reject", "enters_training": False},
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

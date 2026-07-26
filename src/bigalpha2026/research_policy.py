@@ -38,6 +38,24 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
     CandidateSpec("FR-003", "FR", "oap_asset_growth", stage="oap_batch1"),
     CandidateSpec("FR-004", "FR", "oap_revenue_growth_surprise", stage="oap_batch1"),
     CandidateSpec("FR-005", "FR", "oap_cash_flow_to_market", stage="oap_batch1"),
+    CandidateSpec("FR-006", "FR", "oap_earnings_growth_surprise", stage="oap_batch2"),
+    CandidateSpec("FR-007", "FR", "oap_earnings_increase_count", stage="oap_batch2"),
+    CandidateSpec("PV-008", "PV", "oap_52_week_high", stage="oap_batch2"),
+    CandidateSpec("PV-009", "PV", "oap_price_delay_rsq_adapted", stage="oap_batch2"),
+    CandidateSpec("PV-010", "PV", "oap_market_coskewness", stage="oap_batch2"),
+    CandidateSpec("PV-011", "PV", "oap_intermediate_momentum", stage="oap_batch2"),
+    CandidateSpec("PV-012", "PV", "oap_industry_momentum", stage="oap_batch2"),
+    CandidateSpec("FR-008", "FR", "oap_earnings_consistency_adapted", stage="oap_b"),
+    CandidateSpec("FR-009", "FR", "oap_mean_rank_revenue_growth", stage="oap_b"),
+    CandidateSpec("FR-010", "FR", "oap_abnormal_accruals_proxy", stage="oap_b"),
+    CandidateSpec("FR-011", "FR", "oap_assets_to_market", stage="oap_b"),
+    CandidateSpec("PV-013", "PV", "oap_twelve_month_momentum", stage="oap_b"),
+    CandidateSpec("PV-014", "PV", "oap_realized_residual_volatility", stage="oap_b"),
+    CandidateSpec("PV-015", "PV", "oap_monthly_volume_variability", stage="oap_b"),
+    CandidateSpec("PV-016", "PV", "oap_turnover_variability", stage="oap_b"),
+    CandidateSpec("PV-017", "PV", "oap_volume_trend", stage="oap_b"),
+    CandidateSpec("PV-018", "PV", "oap_long_term_reversal", stage="oap_b"),
+    CandidateSpec("PV-019", "PV", "oap_residual_momentum_proxy", stage="oap_b"),
 )
 
 # Mechanical calendar samples frozen before the first formal factor evaluation.
@@ -63,10 +81,10 @@ HF_OB_ACTIVATED_OPTIONAL_MONTHS: tuple[str, ...] = ("2022-11",)
 class FormalEvaluationPolicy:
     development_start: str = "2019-01-01"
     development_end: str = "2021-12-31"
-    selection_start: str = "2022-01-01"
-    selection_end: str = "2022-12-31"
-    confirmation_start: str = "2023-01-01"
-    confirmation_end: str = "2023-12-31"
+    validation_2022_start: str = "2022-01-01"
+    validation_2022_end: str = "2022-12-31"
+    validation_2023_start: str = "2023-01-01"
+    validation_2023_end: str = "2023-12-31"
     frozen_test_start: str = "2024-01-01"
     frozen_test_end: str = "2024-12-31"
     primary_label: str = "ret_close_to_close"
@@ -218,7 +236,6 @@ def technical_gate(
         reasons.append("future perturbation changed past factor values")
     return not reasons, reasons
 
-
 def factorlib_incremental_gate(
     summary: Mapping[str, float],
     policy: FactorLibraryIncrementalGate = FACTORLIB_INCREMENTAL_GATE,
@@ -251,34 +268,3 @@ def factorlib_incremental_gate(
     if not np.isfinite(oos_days) or oos_days < policy.minimum_oos_days:
         reasons.append("too few out-of-sample evaluation days")
     return not reasons, reasons
-
-
-def dual_factorlib_admission(
-    *,
-    technical_passed: bool,
-    all36_passed: bool,
-    screened_passed: bool,
-) -> dict[str, object]:
-    """Classify a candidate after both frozen public-library comparisons.
-
-    Passing the development-screened public library is required to enter
-    combination training.  Passing the complete 36-factor comparison upgrades
-    the candidate from overlap-aware to core/orthogonal status.
-    """
-
-    if not technical_passed:
-        classification = "technical_reject"
-        enters_training = False
-    elif all36_passed and screened_passed:
-        classification = "core_candidate"
-        enters_training = True
-    elif screened_passed:
-        classification = "overlap_aware_candidate"
-        enters_training = True
-    else:
-        classification = "rejected"
-        enters_training = False
-    return {
-        "classification": classification,
-        "enters_training": enters_training,
-    }

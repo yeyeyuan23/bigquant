@@ -7,11 +7,12 @@
 
 | 环境 | 职责 |
 |---|---|
-| BigQuant AIStudio | 真实数据查询与核验、因子计算、批量评价、模型训练和结果查看 |
-| 本地 `quant` 环境 | 因子与训练代码、规则、最小测试、结果登记和版本控制 |
+| BigQuant AIStudio | 真实数据查询与核验、日级快照生成、最终短窗复跑和提交 |
+| 本地 `quant` 环境 | 因子计算、批量评价、组合训练、测试、登记和版本控制 |
 | 比赛网页 | 提交冻结 Notebook、查看分数和排名 |
 
-本地检查只能证明代码、接口和规则可复现；AIStudio 结果才是有效性和模型结论。
+使用合成数据的本地检查只证明接口和规则可复现；使用 AIStudio 核验快照的本地
+全量运行可以形成有效性和模型结论。比赛网页分数仍只能由真实提交确认。
 
 ## 官方数据表
 
@@ -23,7 +24,7 @@
 | 风险暴露 | `bigalpha_2026_exposure` | 股票日 | 仅用于分层、中性化和增量诊断 |
 | 公共日线 | `cn_stock_bar1d` | 股票日 | PV 的优先数据源 |
 | 交易日历 | `all_trading_days` | 市场日 | 使用 `market_code='CN'` |
-| 公开因子库 | `bigalpha_2026_factorlib` | 股票日 | 36 个公开特征，只用于重复性与增量评价 |
+| 公开因子库 | `bigalpha_2026_factorlib` | 股票日 | 首次筛选 36 列，日常评价只读取冻结 screened15 |
 
 ## 通用连接规则
 
@@ -110,17 +111,15 @@ disclosure_date, instrument, report_date, category, shift
 
 - 字段合同在 `src/bigalpha2026/factorlib.py`。
 - 必须验证严格列集合、空主键、重复键、股票池缺失、有限值和覆盖率。
-- 默认保留在 AIStudio，不下载完整训练矩阵。
+- 在 AIStudio 首次核验严格列集合和冻结 `screened15` 后，按年度 Parquet 与
+  manifest 同步到本地；不必为每个候选重复查询。
 - 只用于：
   - 与公开因子的 Rank 相关性；
   - 残差信息检查；
   - 基础模型与“基础模型 + 候选”的滚动正则增量比较。
-- 只向本地导出评价报告、特征重要性和预测结果。
-- AIStudio 调用动态组合代码时，传入的 DataFrame 必须严格包含
-  `date、instrument` 和合同中的 36 个特征。
-- 如需离线复现，可选目录为
-  `data/features/FACTORLIB/year=YYYY/part-YYYY.parquet`；该目录不是默认数据包
-  的必需内容。
+- 本地增量和动态组合代码读取的 DataFrame 必须严格包含
+  `date、instrument` 和冻结的 15 个特征。
+- 固定目录为 `data/features/FACTORLIB/year=YYYY/part-YYYY.parquet`。
 
 ## 本地目录
 
@@ -131,7 +130,8 @@ data/
 │   ├── PV/
 │   ├── HF/
 │   ├── OB/
-│   └── FR/
+│   ├── FR/
+│   └── FACTORLIB/
 ├── exposures/
 ├── labels/
 └── factors/

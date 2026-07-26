@@ -1,0 +1,661 @@
+[
+  {
+    "candidate_id": "FR-001",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-002",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 1.0,
+    "development_failures": [],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-003",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.3333333333333333,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-004",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.6666666666666666,
+    "development_failures": [
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-005",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 1.0,
+    "development_failures": [],
+    "validation_2022_failures": [
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-006",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.6666666666666666,
+    "development_failures": [
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-007",
+    "status": "technical_reject",
+    "technical_passed": false,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "candidate has no technically eligible evaluation metrics"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-008",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-009",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "development has no technically eligible observations",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-010",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.3333333333333333,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "FR-011",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.3333333333333333,
+    "development_failures": [
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "HF-001",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 1.0,
+    "development_failures": [
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "HF-002",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.16666666666666666,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "OB-001",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.3333333333333333,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "OB-002",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.16666666666666666,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-001",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.3333333333333333,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-002",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-003",
+    "status": "provisional_survivor",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": true,
+    "development_stability_fraction": 1.0,
+    "development_failures": [],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-004",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.6666666666666666,
+    "development_failures": [
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-005",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 1.0,
+    "development_failures": [
+      "development neutral_full IC is not positive",
+      "development raw group monotonicity is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation neutral_full IC is not positive"
+    ],
+    "validation_2023_failures": [
+      "2023 validation neutral_full IC is not positive"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-006",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "development raw_full IC is not positive",
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-007",
+    "status": "technical_reject",
+    "technical_passed": false,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "candidate has no technically eligible evaluation metrics"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-008",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.3333333333333333,
+    "development_failures": [
+      "development neutral_full IC is not positive",
+      "development IC t-stat is below 2",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-009",
+    "status": "provisional_survivor",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": true,
+    "development_stability_fraction": 1.0,
+    "development_failures": [],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-010",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.6666666666666666,
+    "development_failures": [
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-011",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 1.0,
+    "development_failures": [],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-012",
+    "status": "technical_reject",
+    "technical_passed": false,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "candidate has no technically eligible evaluation metrics"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-013",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.5,
+    "development_failures": [
+      "development IC t-stat is below 2",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-014",
+    "status": "provisional_survivor",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": true,
+    "development_stability_fraction": 1.0,
+    "development_failures": [],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-015",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.5,
+    "development_failures": [
+      "development neutral_full IC is not positive",
+      "development raw_tradable IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation neutral_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw_tradable IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-016",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.5,
+    "development_failures": [
+      "development neutral_full IC is not positive",
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [
+      "2022 validation neutral_full IC is not positive"
+    ],
+    "validation_2023_failures": [
+      "2023 validation neutral_full IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-017",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 1.0,
+    "development_failures": [
+      "development IC t-stat is below 2",
+      "development raw group monotonicity is below the gate"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-018",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 0.0,
+    "development_failures": [
+      "development has no technically eligible observations",
+      "development subperiod sign stability is below the gate"
+    ],
+    "validation_2022_failures": [],
+    "validation_2023_failures": [
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  },
+  {
+    "candidate_id": "PV-019",
+    "status": "rejected",
+    "technical_passed": true,
+    "single_factor_cross_regime_passed": false,
+    "development_stability_fraction": 1.0,
+    "development_failures": [
+      "development IC t-stat is below 2"
+    ],
+    "validation_2022_failures": [
+      "2022 validation raw_full IC is not positive",
+      "2022 validation raw_tradable IC is not positive",
+      "2022 validation raw group monotonicity is below the gate"
+    ],
+    "validation_2023_failures": [
+      "2023 validation raw_full IC is not positive",
+      "2023 validation raw group monotonicity is below the gate"
+    ],
+    "upload_ready": false
+  }
+]

@@ -120,8 +120,9 @@ git switch -c factor/hf-003
 - `src/bigalpha2026/candidates/composite/` 和 `artifacts/frozen/` 中的冻结版本；
 - `main` 分支。
 
-如果发现公共代码或规则有问题，只在 MR/PR 中说明，不把修复混入候选提交；由
-主仓库负责人单独处理。队友可以运行公共评价和组合代码，但不能修改它们。
+公共代码和研究规则的调整使用独立 MR/PR，由主仓库负责人统一处理；候选 MR/PR
+只包含 `candidate` 范围内的实现、测试和登记信息。队友可以运行公共评价和组合
+代码，但不能修改它们。
 
 ## 3. 新增一个基础因子
 
@@ -151,7 +152,7 @@ tests/test_hf_003.py
 conda run --no-capture-output -n quant python -m pytest -q
 ```
 
-## 4. AIStudio 真实计算
+## 4. AIStudio 取数与最终验收
 
 本地与 AIStudio 的职责、传入内容、回传产物和固定循环统一见
 `docs/factor_research_plan.md` 第 2 节；真实表的连接和聚合规则见
@@ -159,18 +160,19 @@ conda run --no-capture-output -n quant python -m pytest -q
 
 实际操作：
 
-1. 本地测试通过后，将已登记的候选代码和 Git 版本同步到 AIStudio；
-2. 先用 2—5 个交易日和少量股票验收三列输出；
-3. 验收通过后扩到正式区间，运行 plan 规定的评价；
-4. 将 plan 规定的小型报告回传本地；
-5. 新数据依赖按第 5 节交付增量包。
+1. AIStudio 查询并核验股票池、标签、共享面板、风险暴露和冻结 screened15；
+2. 将日级 Parquet、manifest 和查询版本同步到本地；
+3. 本地运行 plan 规定的正式评价和三条组合管线；
+4. 冻结赢家后，将其代码和 Git 版本同步回 AIStudio；
+5. 用 2—5 个交易日验收三列输出，然后生成比赛提交。
 
-禁止把本地测试写成真实有效性结论，也禁止在 Notebook 中临时修改 plan。
+禁止把合成数据测试写成有效性结论，也禁止在 Notebook 中临时修改 plan。使用
+已核验真实快照的本地全量结果属于正式研究结果。
 
 ## 5. 可选本地数据包同步
 
-比赛数据不进入 Git。只有最小验证确实需要本地共享面板时，才在赛事规则允许的
-同队成员之间同步；公开因子库和大型训练矩阵不走此流程。需要同步时，
+比赛数据不进入 Git。经过核验的日级面板、screened15 和训练矩阵可在赛事规则允许
+的同队成员之间同步；原始分钟数据仅在开发新分钟逻辑时按最小月份同步。需要同步时，
 在仓库根目录执行：
 
 ```bash
@@ -258,19 +260,18 @@ bigalpha_data_delta_HF-003_20260726.tar.gz.sha256
 conda run --no-capture-output -n quant python -m pytest -q
 ```
 
-如果已取得赛事允许共享的聚合日频面板，可选地在本地复现：
+取得经过核验的研究快照后，在本地正式运行：
 
 ```bash
 PYTHONPATH=src conda run --no-capture-output -n quant \
-  python scripts/run_first_round.py
+  python scripts/run_first_round.py --resume-metrics
 ```
 
 该入口会额外生成
 `data/factors/candidate_pool.parquet`，列严格为
 `date、instrument、candidate_id、factor_version、factor`。它是组合层的标准
-自研候选输入，但本地结果仍不能替代 AIStudio 真实结论。
-
-正式评价必须在 AIStudio 运行，并按 plan 第 2.4、9 节回传和保存标准报告。
+自研候选输入。随后继续运行 I 与组合入口，并按 plan 第 9 节保存标准报告。
+`--resume-metrics` 只复用已有候选的完整S报告，新登记候选仍会正式计算。
 
 ## 7. 进入组合层
 
@@ -288,7 +289,7 @@ PYTHONPATH=src conda run --no-capture-output -n quant \
 
 ## 8. 比赛提交与代码交付
 
-候选完成 AIStudio 真实评价、结果值得提交时，同队成员及其 AI
+候选完成本地真实快照评价并通过 AIStudio 短窗验收、结果值得提交时，同队成员及其 AI
 可以直接上传比赛，不需要再次询问队长。
 
 提交准入和冻结内容统一见 `docs/factor_research_plan.md` 第 8 节；Notebook

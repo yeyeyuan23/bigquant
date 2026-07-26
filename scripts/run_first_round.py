@@ -6,8 +6,10 @@ Run it only with the local ``quant`` conda environment.
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
+from typing import Sequence
 
 import pandas as pd
 
@@ -16,6 +18,12 @@ from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
 from bigalpha2026.candidates.fr.fr_003 import build_fr_003_factor
 from bigalpha2026.candidates.fr.fr_004 import build_fr_004_factor
 from bigalpha2026.candidates.fr.fr_005 import build_fr_005_factor
+from bigalpha2026.candidates.fr.fr_006 import build_fr_006_factor
+from bigalpha2026.candidates.fr.fr_007 import build_fr_007_factor
+from bigalpha2026.candidates.fr.fr_008 import build_fr_008_factor
+from bigalpha2026.candidates.fr.fr_009 import build_fr_009_factor
+from bigalpha2026.candidates.fr.fr_010 import build_fr_010_factor
+from bigalpha2026.candidates.fr.fr_011 import build_fr_011_factor
 from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
 from bigalpha2026.candidates.ob.ob_001 import build_ob_001_factor_from_daily
@@ -27,6 +35,18 @@ from bigalpha2026.candidates.pv.pv_004 import build_pv_004_factor
 from bigalpha2026.candidates.pv.pv_005 import build_pv_005_factor
 from bigalpha2026.candidates.pv.pv_006 import build_pv_006_factor
 from bigalpha2026.candidates.pv.pv_007 import build_pv_007_factor
+from bigalpha2026.candidates.pv.pv_008 import build_pv_008_factor
+from bigalpha2026.candidates.pv.pv_009 import build_pv_009_factor
+from bigalpha2026.candidates.pv.pv_010 import build_pv_010_factor
+from bigalpha2026.candidates.pv.pv_011 import build_pv_011_factor
+from bigalpha2026.candidates.pv.pv_012 import build_pv_012_factor
+from bigalpha2026.candidates.pv.pv_013 import build_pv_013_factor
+from bigalpha2026.candidates.pv.pv_014 import build_pv_014_factor
+from bigalpha2026.candidates.pv.pv_015 import build_pv_015_factor
+from bigalpha2026.candidates.pv.pv_016 import build_pv_016_factor
+from bigalpha2026.candidates.pv.pv_017 import build_pv_017_factor
+from bigalpha2026.candidates.pv.pv_018 import build_pv_018_factor
+from bigalpha2026.candidates.pv.pv_019 import build_pv_019_factor
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
     rank_ic_series,
@@ -49,12 +69,26 @@ DEVELOPMENT_YEARS = range(
     int(FORMAL_EVALUATION_POLICY.development_start[:4]),
     int(FORMAL_EVALUATION_POLICY.development_end[:4]) + 1,
 )
-SELECTION_YEAR = int(FORMAL_EVALUATION_POLICY.selection_start[:4])
-CONFIRMATION_YEAR = int(FORMAL_EVALUATION_POLICY.confirmation_start[:4])
-FROZEN_TEST_YEAR = int(FORMAL_EVALUATION_POLICY.frozen_test_start[:4])
-MARKET_STATE_YEARS = range(2019, SELECTION_YEAR + 1)
-ALL_BASE_YEARS = range(2019, FROZEN_TEST_YEAR + 1)
-CANDIDATE_POOL_VERSION = "oap_batch1_v1_2026-07-26"
+VALIDATION_2022_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2022_start[:4])
+VALIDATION_2023_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4])
+MARKET_STATE_YEARS = range(2019, VALIDATION_2022_YEAR + 1)
+ALL_BASE_YEARS = range(2019, VALIDATION_2023_YEAR + 1)
+CANDIDATE_POOL_VERSION = "oap_b_v1_2026-07-26"
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--resume-metrics",
+        action="store_true",
+        help="reuse existing candidate metrics and evaluate only new candidates",
+    )
+    parser.add_argument(
+        "--skip-correlations",
+        action="store_true",
+        help="defer pairwise correlation diagnostics; does not change S admission",
+    )
+    return parser.parse_args(argv)
 
 
 def read_yearly(path_template: str, years: range) -> pd.DataFrame:
@@ -69,7 +103,11 @@ def read_yearly(path_template: str, years: range) -> pd.DataFrame:
 
 def read_evaluation_family(family: str) -> pd.DataFrame:
     evaluation_months = (
-        *HF_OB_MANDATORY_MONTHS,
+        *(
+            month
+            for month in HF_OB_MANDATORY_MONTHS
+            if int(month[:4]) <= VALIDATION_2023_YEAR
+        ),
         *HF_OB_ACTIVATED_OPTIONAL_MONTHS,
     )
     paths = [
@@ -305,6 +343,13 @@ def classify_candidates(
         *,
         require_t_stat: bool,
     ) -> list[str]:
+        period_rows = metrics.loc[
+            metrics["candidate_id"].eq(candidate_id)
+            & metrics["period"].eq(period)
+            & metrics["label"].eq("ret_close_to_close")
+        ]
+        if period_rows.empty:
+            return [f"{display_name} has no technically eligible observations"]
         failures: list[str] = []
         for variant in ("raw_full", "neutral_full", "raw_tradable"):
             if value(candidate_id, period, variant, "rank_ic_mean") <= 0:
@@ -332,7 +377,9 @@ def classify_candidates(
                 & stability["period"].eq("development")
                 & stability["frequency"].eq("year")
             ]
-            stability_fraction = float(stable["positive"].mean())
+            stability_fraction = (
+                float(stable["positive"].mean()) if not stable.empty else 0.0
+            )
             required_stability = (
                 FORMAL_EVALUATION_POLICY.minimum_positive_year_fraction
             )
@@ -342,7 +389,9 @@ def classify_candidates(
                 & stability["period"].eq("development")
                 & stability["frequency"].eq("month")
             ]
-            stability_fraction = float(stable["positive"].mean())
+            stability_fraction = (
+                float(stable["positive"].mean()) if not stable.empty else 0.0
+            )
             required_stability = (
                 FORMAL_EVALUATION_POLICY.minimum_positive_subperiod_fraction
             )
@@ -357,27 +406,25 @@ def classify_candidates(
             development_failures.append(
                 "development subperiod sign stability is below the gate"
             )
-        selection_failures = period_failures(
+        validation_2022_failures = period_failures(
             candidate_id,
-            "selection_2022",
-            "2022 selection",
+            "validation_2022",
+            "2022 validation",
             require_t_stat=False,
         )
-        confirmation_failures = period_failures(
+        validation_2023_failures = period_failures(
             candidate_id,
-            "confirmation_2023",
-            "2023 confirmation",
+            "validation_2023",
+            "2023 validation",
             require_t_stat=False,
         )
 
         if (
             not development_failures
-            and not selection_failures
-            and not confirmation_failures
+            and not validation_2022_failures
+            and not validation_2023_failures
         ):
             status = "provisional_survivor"
-        elif not development_failures and not selection_failures:
-            status = "selection_survivor"
         else:
             status = "rejected"
         decisions.append(
@@ -385,21 +432,23 @@ def classify_candidates(
                 "candidate_id": candidate_id,
                 "status": status,
                 "technical_passed": True,
-                "single_factor_selection_passed": (
-                    not development_failures and not selection_failures
+                "single_factor_cross_regime_passed": (
+                    not development_failures
+                    and not validation_2022_failures
+                    and not validation_2023_failures
                 ),
-                "single_factor_confirmation_passed": not confirmation_failures,
                 "development_stability_fraction": stability_fraction,
                 "development_failures": development_failures,
-                "selection_failures": selection_failures,
-                "confirmation_failures": confirmation_failures,
+                "validation_2022_failures": validation_2022_failures,
+                "validation_2023_failures": validation_2023_failures,
                 "upload_ready": False,
             }
         )
     return decisions
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
     REPORTS.mkdir(exist_ok=True)
     (DATA / "factors").mkdir(exist_ok=True)
     universe = read_yearly("universe/year={year}/part-{year}.parquet", ALL_BASE_YEARS)
@@ -433,7 +482,23 @@ def main() -> None:
         "PV-005": build_pv_005_factor(pv, pool),
         "PV-006": build_pv_006_factor(pv, pool),
         "PV-007": build_pv_007_factor(pv, pool),
+        "PV-008": build_pv_008_factor(pv, pool),
+        "PV-009": build_pv_009_factor(pv, pool),
+        "PV-010": build_pv_010_factor(pv, pool),
+        "PV-011": build_pv_011_factor(pv, pool),
+        "PV-012": build_pv_012_factor(pv, exposures, pool),
+        "PV-013": build_pv_013_factor(pv, pool),
+        "PV-014": build_pv_014_factor(pv, pool),
+        "PV-015": build_pv_015_factor(pv, pool),
+        "PV-017": build_pv_017_factor(pv, pool),
+        "PV-018": build_pv_018_factor(pv, pool),
+        "PV-019": build_pv_019_factor(pv, pool),
     }
+    factorlib = read_yearly(
+        "features/FACTORLIB/year={year}/part-{year}.parquet",
+        ALL_BASE_YEARS,
+    )
+    factors["PV-016"] = build_pv_016_factor(factorlib, pool)
     financial = pd.concat(
         [
             pd.read_parquet(path)
@@ -446,6 +511,12 @@ def main() -> None:
     factors["FR-003"] = build_fr_003_factor(financial, pool)
     factors["FR-004"] = build_fr_004_factor(financial, pool)
     factors["FR-005"] = build_fr_005_factor(financial, exposures, pool)
+    factors["FR-006"] = build_fr_006_factor(financial, pool)
+    factors["FR-007"] = build_fr_007_factor(financial, pool)
+    factors["FR-008"] = build_fr_008_factor(financial, pool)
+    factors["FR-009"] = build_fr_009_factor(financial, pool)
+    factors["FR-010"] = build_fr_010_factor(financial, pool)
+    factors["FR-011"] = build_fr_011_factor(financial, exposures, pool)
 
     hf = read_evaluation_family("HF")
     ob = read_evaluation_family("OB")
@@ -460,82 +531,122 @@ def main() -> None:
 
     metric_output: list[dict[str, object]] = []
     stability_output: list[dict[str, object]] = []
+    cached_metrics = pd.DataFrame()
+    cached_stability = pd.DataFrame()
+    cached_metric_ids: set[str] = set()
+    if args.resume_metrics:
+        metric_path = REPORTS / "first_round_metrics.csv"
+        stability_path = REPORTS / "first_round_stability.csv"
+        if metric_path.exists() and stability_path.exists():
+            cached_metrics = pd.read_csv(metric_path)
+            cached_stability = pd.read_csv(stability_path)
+            period_aliases = {
+                "selection_2022": "validation_2022",
+                "confirmation_2023": "validation_2023",
+            }
+            cached_metrics["period"] = cached_metrics["period"].replace(
+                period_aliases
+            )
+            cached_stability["period"] = cached_stability["period"].replace(
+                period_aliases
+            )
+            cached_metric_ids = set(cached_metrics["candidate_id"].astype(str))
     technical_output: list[dict[str, object]] = []
     clean_factors: dict[str, pd.DataFrame] = {}
     for candidate_id, factor in factors.items():
         clean, technical = eligible_factor(factor)
         clean_factors[candidate_id] = clean
         technical_output.append({"candidate_id": candidate_id, **technical})
-        periods = {
-            "development": clean.loc[clean["date"].dt.year.isin(DEVELOPMENT_YEARS)],
-            "selection_2022": clean.loc[clean["date"].dt.year.eq(SELECTION_YEAR)],
-            "confirmation_2023": clean.loc[
-                clean["date"].dt.year.eq(CONFIRMATION_YEAR)
-            ],
-            "frozen_test_2024": clean.loc[
-                clean["date"].dt.year.eq(FROZEN_TEST_YEAR)
-            ],
-        }
-        for period, block in periods.items():
-            if block.empty:
-                continue
-            dates = block["date"].unique()
-            period_labels = labels.loc[labels["date"].isin(dates)]
-            period_exposures = exposures.loc[exposures["date"].isin(dates)]
-            metric_output.extend(
-                metric_rows(
-                    candidate_id,
-                    period,
-                    block,
-                    period_labels,
-                    period_exposures,
+        if candidate_id not in cached_metric_ids:
+            periods = {
+                "development": clean.loc[
+                    clean["date"].dt.year.isin(DEVELOPMENT_YEARS)
+                ],
+                "validation_2022": clean.loc[
+                    clean["date"].dt.year.eq(VALIDATION_2022_YEAR)
+                ],
+                "validation_2023": clean.loc[
+                    clean["date"].dt.year.eq(VALIDATION_2023_YEAR)
+                ],
+            }
+            for period, block in periods.items():
+                if block.empty:
+                    continue
+                dates = block["date"].unique()
+                period_labels = labels.loc[labels["date"].isin(dates)]
+                period_exposures = exposures.loc[exposures["date"].isin(dates)]
+                metric_output.extend(
+                    metric_rows(
+                        candidate_id,
+                        period,
+                        block,
+                        period_labels,
+                        period_exposures,
+                    )
                 )
-            )
-            stability_output.extend(
-                stability_rows(candidate_id, period, block, period_labels)
-            )
-    metrics_frame = pd.DataFrame(metric_output)
-    stability_frame = pd.DataFrame(stability_output)
-    metrics_frame.to_csv(
-        REPORTS / "first_round_metrics.csv", index=False
-    )
-    stability_frame.to_csv(
-        REPORTS / "first_round_stability.csv", index=False
-    )
+                stability_output.extend(
+                    stability_rows(candidate_id, period, block, period_labels)
+                )
+    candidate_pool = candidate_pool_frame(clean_factors)
+    candidate_pool.to_parquet(DATA / "factors" / "candidate_pool.parquet", index=False)
     pd.DataFrame(technical_output).to_csv(
         REPORTS / "first_round_technical.csv", index=False
     )
 
+    metrics_frame = pd.concat(
+        [cached_metrics, pd.DataFrame(metric_output)],
+        ignore_index=True,
+    )
+    stability_frame = pd.concat(
+        [cached_stability, pd.DataFrame(stability_output)],
+        ignore_index=True,
+    )
+    expected_metric_ids = {
+        candidate_id
+        for candidate_id, factor in clean_factors.items()
+        if not factor.empty
+    }
+    actual_metric_ids = set(metrics_frame["candidate_id"].astype(str))
+    if actual_metric_ids != expected_metric_ids:
+        raise ValueError(
+            "metrics do not cover the current eligible pool; "
+            f"expected={sorted(expected_metric_ids)}, "
+            f"actual={sorted(actual_metric_ids)}"
+        )
+    metrics_frame.to_csv(REPORTS / "first_round_metrics.csv", index=False)
+    stability_frame.to_csv(REPORTS / "first_round_stability.csv", index=False)
+
     correlation_rows: list[dict[str, object]] = []
-    ids = sorted(clean_factors)
-    for left_index, left_id in enumerate(ids):
-        for right_id in ids[left_index + 1 :]:
-            merged = clean_factors[left_id].merge(
-                clean_factors[right_id],
-                on=["date", "instrument"],
-                how="inner",
-                suffixes=("_left", "_right"),
-            )
-            if merged.empty:
-                overlap_days = 0
-                mean_daily_spearman = float("nan")
-            else:
-                daily_corr = merged.groupby("date", sort=False).apply(
-                    lambda block: block["factor_left"].corr(
-                        block["factor_right"], method="spearman"
-                    ),
-                    include_groups=False,
+    if not args.skip_correlations:
+        ids = sorted(clean_factors)
+        for left_index, left_id in enumerate(ids):
+            for right_id in ids[left_index + 1 :]:
+                merged = clean_factors[left_id].merge(
+                    clean_factors[right_id],
+                    on=["date", "instrument"],
+                    how="inner",
+                    suffixes=("_left", "_right"),
                 )
-                overlap_days = int(daily_corr.notna().sum())
-                mean_daily_spearman = float(daily_corr.mean())
-            correlation_rows.append(
-                {
-                    "left": left_id,
-                    "right": right_id,
-                    "overlap_days": overlap_days,
-                    "mean_daily_spearman": mean_daily_spearman,
-                }
-            )
+                if merged.empty:
+                    overlap_days = 0
+                    mean_daily_spearman = float("nan")
+                else:
+                    daily_corr = merged.groupby("date", sort=False).apply(
+                        lambda block: block["factor_left"].corr(
+                            block["factor_right"], method="spearman"
+                        ),
+                        include_groups=False,
+                    )
+                    overlap_days = int(daily_corr.notna().sum())
+                    mean_daily_spearman = float(daily_corr.mean())
+                correlation_rows.append(
+                    {
+                        "left": left_id,
+                        "right": right_id,
+                        "overlap_days": overlap_days,
+                        "mean_daily_spearman": mean_daily_spearman,
+                    }
+                )
     pd.DataFrame(correlation_rows).to_csv(
         REPORTS / "first_round_correlations.csv", index=False
     )
@@ -550,20 +661,17 @@ def main() -> None:
                 "candidate_id": candidate_id,
                 "status": "technical_reject",
                 "technical_passed": False,
-                "single_factor_selection_passed": False,
-                "single_factor_confirmation_passed": False,
+                "single_factor_cross_regime_passed": False,
                 "development_stability_fraction": 0.0,
                 "development_failures": [
                     "candidate has no technically eligible evaluation metrics"
                 ],
-                "selection_failures": [],
-                "confirmation_failures": [],
+                "validation_2022_failures": [],
+                "validation_2023_failures": [],
                 "upload_ready": False,
             }
         )
     decisions.sort(key=lambda row: str(row["candidate_id"]))
-    candidate_pool = candidate_pool_frame(clean_factors)
-    candidate_pool.to_parquet(DATA / "factors" / "candidate_pool.parquet", index=False)
     (REPORTS / "first_round_decisions.json").write_text(
         json.dumps(decisions, ensure_ascii=False, indent=2),
         encoding="utf-8",

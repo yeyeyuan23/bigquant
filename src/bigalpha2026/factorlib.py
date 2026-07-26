@@ -75,3 +75,24 @@ def validate_factorlib_frame(frame: pd.DataFrame) -> None:
         raise ValueError("factorlib contains null keys")
     if frame.duplicated(list(FACTORLIB_KEY)).any():
         raise ValueError("factorlib contains duplicate date-instrument keys")
+
+
+def validate_factorlib_subset_frame(
+    frame: pd.DataFrame,
+    feature_columns: Iterable[str],
+) -> None:
+    """Validate an exact, pre-frozen subset exported for local modeling."""
+
+    expected = (*FACTORLIB_KEY, *tuple(feature_columns))
+    actual = tuple(frame.columns)
+    missing = [column for column in expected if column not in actual]
+    extra = [column for column in actual if column not in expected]
+    if missing or extra:
+        raise ValueError(
+            "factorlib subset columns do not match contract; "
+            f"missing={missing}, extra={extra}"
+        )
+    if frame.loc[:, list(FACTORLIB_KEY)].isna().any().any():
+        raise ValueError("factorlib subset contains null keys")
+    if frame.duplicated(list(FACTORLIB_KEY)).any():
+        raise ValueError("factorlib subset contains duplicate date-instrument keys")

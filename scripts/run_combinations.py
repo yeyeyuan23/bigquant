@@ -1,9 +1,8 @@
-"""Run the dynamic public-factor and self-developed factor-pool comparison.
+"""Run the frozen screened15 and self-developed factor-pool protocol.
 
-The old hard-coded FR-002/HF-001 research funnel has been removed.  This
-entrypoint only operates on the standard candidate pool and the competition
-factor library. Selection uses 2022, 2023 is confirmation only, and 2024 is
-reported only after the pipeline decisions are frozen.
+This entrypoint reuses completed S decisions, evaluates I against frozen
+screened15, and runs three isolated combination routes. The 2022 and 2023
+results are equal-status cross-regime validation years.
 """
 
 from __future__ import annotations
@@ -16,10 +15,11 @@ from typing import Sequence
 import pandas as pd
 
 from bigalpha2026.combinations import (
-    walk_forward_elastic_net,
+    walk_forward_elastic_net_with_weights,
     walk_forward_lightgbm,
 )
 from bigalpha2026.evaluation import (
+    FactorLibraryValidationConfig,
     evaluate_single_factor,
     factorlib_regularized_incremental_batch_validation,
 )
@@ -30,12 +30,11 @@ from bigalpha2026.factor_pool import (
     family_balanced_factor,
     screen_public_factors,
 )
-from bigalpha2026.factorlib import FACTORLIB_FEATURE_COLUMNS, validate_factorlib_frame
+from bigalpha2026.factorlib import validate_factorlib_subset_frame
 from bigalpha2026.research_policy import (
     COMBINATION_ADMISSION_GATE,
     FROZEN_FACTORLIB_SCREENED_FEATURES,
     FORMAL_EVALUATION_POLICY,
-    dual_factorlib_admission,
     factorlib_incremental_gate,
 )
 
@@ -43,20 +42,24 @@ from bigalpha2026.research_policy import (
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = ROOT / "data"
 DEFAULT_REPORTS = ROOT / "reports"
-YEARS = (2019, 2020, 2021, 2022, 2023, 2024)
+YEARS = (2019, 2020, 2021, 2022, 2023)
 DEVELOPMENT_YEARS = tuple(
     range(
         int(FORMAL_EVALUATION_POLICY.development_start[:4]),
         int(FORMAL_EVALUATION_POLICY.development_end[:4]) + 1,
     )
 )
-SELECTION_YEAR = int(FORMAL_EVALUATION_POLICY.selection_start[:4])
-CONFIRMATION_YEAR = int(FORMAL_EVALUATION_POLICY.confirmation_start[:4])
+VALIDATION_2022_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2022_start[:4])
+VALIDATION_2023_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4])
 FROZEN_TEST_YEAR = int(FORMAL_EVALUATION_POLICY.frozen_test_start[:4])
 PIPELINE_NAMES = (
     "self_factor_composite",
     "joint_elastic_net",
     "joint_lightgbm",
+)
+SCREENED_FACTORLIB_RAW_FEATURES = tuple(
+    feature.removeprefix("factorlib__")
+    for feature in FROZEN_FACTORLIB_SCREENED_FEATURES
 )
 
 
@@ -71,6 +74,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--check-files",
         action="store_true",
         help="optionally validate a locally materialized research-data snapshot",
+    )
+    parser.add_argument(
+        "--resume-incremental",
+        action="store_true",
+        help="reuse completed candidate I rows and evaluate only new candidates",
     )
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--reports-dir", type=Path, default=DEFAULT_REPORTS)
@@ -124,10 +132,10 @@ def load_factorlib(data_dir: Path, years: Sequence[int]) -> pd.DataFrame:
         part = pd.read_parquet(
             data_dir / f"features/FACTORLIB/year={year}/part-{year}.parquet"
         )
-        validate_factorlib_frame(part)
+        validate_factorlib_subset_frame(part, SCREENED_FACTORLIB_RAW_FEATURES)
         parts.append(part)
     combined = pd.concat(parts, ignore_index=True)
-    validate_factorlib_frame(combined)
+    validate_factorlib_subset_frame(combined, SCREENED_FACTORLIB_RAW_FEATURES)
     return combined
 
 
@@ -190,7 +198,7 @@ def load_dynamic_inputs(
         for candidate_id in candidate_ids
         if bool(
             decision_by_id[candidate_id].get(
-                "single_factor_selection_passed",
+                "single_factor_cross_regime_passed",
                 False,
             )
         )
@@ -200,6 +208,7 @@ def load_dynamic_inputs(
         factorlib,
         candidate_pool,
         admitted_candidates=candidate_ids,
+        public_feature_columns=SCREENED_FACTORLIB_RAW_FEATURES,
     )
     return (
         panel,
@@ -225,7 +234,9 @@ def contract_summary(
             {
                 "status": "missing_inputs",
                 "missing": missing,
-                "factorlib_expected_features": len(FACTORLIB_FEATURE_COLUMNS),
+                "factorlib_expected_features": len(
+                    SCREENED_FACTORLIB_RAW_FEATURES
+                ),
             },
             None,
         )
@@ -252,7 +263,7 @@ def contract_summary(
     status = (
         "ok"
         if (
-            len(public_columns) == len(FACTORLIB_FEATURE_COLUMNS)
+            len(public_columns) == len(SCREENED_FACTORLIB_RAW_FEATURES)
             and minimum_public_coverage >= FORMAL_EVALUATION_POLICY.minimum_coverage
         )
         else "invalid_factorlib_coverage"
@@ -262,7 +273,6 @@ def contract_summary(
         "rows": int(len(panel)),
         "duplicate_keys": int(panel.duplicated(list(KEY_COLUMNS)).sum()),
         "factorlib_reference": {
-            "all36_count": len(public_columns),
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
         },
@@ -285,7 +295,14 @@ def contract_summary(
         "neutral_fill_value": 0.0,
         "join": "historical universe left join",
     }
-    return summary, (panel, labels, exposures, coverage, candidate_pool)
+    return summary, (
+        panel,
+        labels,
+        exposures,
+        coverage,
+        candidate_pool,
+        single_factor_admitted,
+    )
 
 
 def synthetic_contract_summary() -> dict[str, object]:
@@ -301,7 +318,7 @@ def synthetic_contract_summary() -> dict[str, object]:
         ]
     )
     factorlib = universe.copy()
-    for index, column in enumerate(FACTORLIB_FEATURE_COLUMNS):
+    for index, column in enumerate(SCREENED_FACTORLIB_RAW_FEATURES):
         factorlib[column] = (
             pd.Series(range(len(factorlib)), dtype=float) + float(index)
         )
@@ -316,6 +333,7 @@ def synthetic_contract_summary() -> dict[str, object]:
             ["date", "instrument", "candidate_id", "factor_version", "factor"]
         ],
         admitted_candidates=("HF-TEST",),
+        public_feature_columns=SCREENED_FACTORLIB_RAW_FEATURES,
     )
     self_factor = family_balanced_factor(panel, self_columns)
     joint_factor = family_balanced_factor(
@@ -420,6 +438,8 @@ def run_experiments(
     self_columns: tuple[str, ...],
     single_factor_candidates: tuple[str, ...],
     reports_dir: Path,
+    *,
+    resume_incremental: bool = False,
 ) -> dict[str, object]:
     development_panel = panel.loc[panel["date"].dt.year.isin(DEVELOPMENT_YEARS)]
     development_labels = labels.loc[
@@ -432,83 +452,161 @@ def run_experiments(
         development_years=DEVELOPMENT_YEARS,
     )
     oriented = apply_feature_directions(panel, screening)
-    selected_public = tuple(
-        screening.loc[screening["selected"], "feature"].astype(str)
-    )
+    selected_public = tuple(public_columns)
     if selected_public != FROZEN_FACTORLIB_SCREENED_FEATURES:
         raise RuntimeError(
-            "development-only factorlib screening no longer matches the frozen "
-            "15-of-36 membership"
+            "local factorlib subset no longer matches the frozen 15 membership"
         )
 
-    development_and_selection = oriented.loc[
-        oriented["date"].dt.year.isin((*DEVELOPMENT_YEARS, SELECTION_YEAR))
+    incremental_evaluation_years = DEVELOPMENT_YEARS
+    incremental_config = FactorLibraryValidationConfig()
+    incremental_protocol = "|".join(
+        (
+            "screened15_incremental_v2",
+            f"years={','.join(map(str, incremental_evaluation_years))}",
+            f"train_days={incremental_config.train_window_days}",
+            f"test_days={incremental_config.test_window_days}",
+            f"alpha={incremental_config.alpha}",
+            f"l1_ratio={incremental_config.l1_ratio}",
+            "preprocessing=daily_cross_section_zscore_features_and_target",
+        )
+    )
+    development_for_incremental = oriented.loc[
+        oriented["date"].dt.year.isin(incremental_evaluation_years)
     ]
     incremental_labels = labels.loc[
-        labels["date"].dt.year.isin((*DEVELOPMENT_YEARS, SELECTION_YEAR))
+        labels["date"].dt.year.isin(incremental_evaluation_years)
     ]
-    all36_summary, _, _, _ = factorlib_regularized_incremental_batch_validation(
-        development_and_selection[
-            ["date", "instrument", *public_columns, *self_columns]
-        ],
-        incremental_labels,
-        public_columns,
-        self_columns,
+    cached_incremental = pd.DataFrame()
+    cached_features: set[str] = set()
+    incremental_path = reports_dir / "factor_pool_incremental.csv"
+    if resume_incremental and incremental_path.exists():
+        cached_incremental = pd.read_csv(incremental_path)
+        if (
+            "evaluation_protocol" in cached_incremental
+            and cached_incremental["evaluation_protocol"]
+            .astype(str)
+            .eq(incremental_protocol)
+            .all()
+        ):
+            cached_features = set(cached_incremental["candidate"].astype(str))
+        else:
+            cached_incremental = pd.DataFrame()
+    pending_self_columns = tuple(
+        column for column in self_columns if column not in cached_features
     )
-    screened_summary, _, _, _ = factorlib_regularized_incremental_batch_validation(
-        development_and_selection[
-            ["date", "instrument", *selected_public, *self_columns]
-        ],
-        incremental_labels,
-        selected_public,
-        self_columns,
+
+    availability_groups: dict[tuple[pd.Timestamp, ...], list[str]] = {}
+    for self_column in pending_self_columns:
+        active_dates = tuple(
+            pd.Timestamp(date)
+            for date in development_for_incremental.groupby("date", sort=True)[
+                self_column
+            ]
+            .nunique()
+            .loc[lambda values: values > 1]
+            .index
+        )
+        availability_groups.setdefault(active_dates, []).append(self_column)
+
+    screened_summaries: list[pd.DataFrame] = []
+    if not cached_incremental.empty:
+        screened_summaries.append(cached_incremental.copy())
+    baseline_references: list[dict[str, object]] = []
+    for group_index, (active_dates, group_candidates) in enumerate(
+        availability_groups.items(),
+        start=1,
+    ):
+        active_date_set = set(active_dates)
+        group_panel = development_for_incremental.loc[
+            development_for_incremental["date"].isin(active_date_set),
+            ["date", "instrument", *selected_public, *group_candidates],
+        ]
+        group_labels = incremental_labels.loc[
+            incremental_labels["date"].isin(active_date_set)
+        ]
+        group_summary, _, _, _ = (
+            factorlib_regularized_incremental_batch_validation(
+                group_panel,
+                group_labels,
+                selected_public,
+                group_candidates,
+                config=incremental_config,
+            )
+        )
+        group_summary["availability_group"] = group_index
+        group_summary["active_days"] = len(active_dates)
+        group_summary["evaluation_years"] = ",".join(
+            map(str, incremental_evaluation_years)
+        )
+        group_summary["evaluation_protocol"] = incremental_protocol
+        screened_summaries.append(group_summary)
+        baseline_references.append(
+            {
+                "availability_group": group_index,
+                "active_days": len(active_dates),
+                "candidate_count": len(group_candidates),
+                "evaluation_years": list(incremental_evaluation_years),
+                "baseline_oos_rank_ic": float(
+                    group_summary.iloc[0]["baseline_oos_rank_ic"]
+                ),
+            }
+        )
+    if not screened_summaries:
+        raise RuntimeError("no candidate incremental rows are available")
+    screened_summary = pd.concat(screened_summaries, ignore_index=True)
+    actual_incremental_features = set(
+        screened_summary["candidate"].astype(str)
     )
+    if actual_incremental_features != set(self_columns):
+        raise ValueError(
+            "incremental rows do not cover the current candidate pool; "
+            f"expected={sorted(self_columns)}, "
+            f"actual={sorted(actual_incremental_features)}"
+        )
     incremental_rows: list[dict[str, object]] = []
     admission_rows: list[dict[str, object]] = []
     admitted_self: list[str] = []
+    single_factor_features = {
+        f"self__{candidate_id}" for candidate_id in single_factor_candidates
+    }
     for self_column in self_columns:
-        all36_row = all36_summary.loc[
-            all36_summary["candidate"].eq(self_column)
-        ].iloc[0].to_dict()
         screened_row = screened_summary.loc[
             screened_summary["candidate"].eq(self_column)
         ].iloc[0].to_dict()
-        all36_passed, all36_reasons = factorlib_incremental_gate(all36_row)
         screened_passed, screened_reasons = factorlib_incremental_gate(
             screened_row
         )
-        incremental_rows.extend(
-            [
-                {
-                    "feature": self_column,
-                    "benchmark": "factorlib_all36",
-                    "passed": all36_passed,
-                    "reasons": all36_reasons,
-                    **all36_row,
-                },
-                {
-                    "feature": self_column,
-                    "benchmark": "factorlib_screened",
-                    "passed": screened_passed,
-                    "reasons": screened_reasons,
-                    **screened_row,
-                },
-            ]
-        )
-        admission = dual_factorlib_admission(
-            technical_passed=True,
-            all36_passed=all36_passed,
-            screened_passed=screened_passed,
+        incremental_rows.append(
+            {
+                **screened_row,
+                "feature": self_column,
+                "benchmark": "factorlib_screened15",
+                "passed": screened_passed,
+                "reasons": screened_reasons,
+            }
         )
         admission_rows.append(
             {
+                "candidate_id": self_column.removeprefix("self__"),
                 "feature": self_column,
-                "all36_passed": all36_passed,
-                "screened_passed": screened_passed,
-                **admission,
+                "single_factor_passed": self_column in single_factor_features,
+                "screened15_incremental_passed": screened_passed,
+                "enters_self_factor_composite": (
+                    self_column in single_factor_features
+                ),
+                "enters_joint_elastic_net": screened_passed,
+                "enters_joint_lightgbm": screened_passed,
+                "route_count": int(self_column in single_factor_features)
+                + 2 * int(screened_passed),
+                "status": (
+                    "admitted"
+                    if self_column in single_factor_features or screened_passed
+                    else "rejected"
+                ),
             }
         )
-        if admission["enters_training"]:
+        if screened_passed:
             admitted_self.append(self_column)
     if not admitted_self:
         raise RuntimeError(
@@ -521,9 +619,22 @@ def run_experiments(
         if f"self__{candidate_id}" in self_columns
     )
     if not self_features:
-        raise RuntimeError("no candidate passed the single-factor selection gate")
+        raise RuntimeError(
+            "no candidate passed the single-factor cross-regime gate"
+        )
     joint_self_features = tuple(admitted_self)
     joint_features = (*selected_public, *joint_self_features)
+    joint_elastic_net_factor, joint_elastic_net_weights = (
+        walk_forward_elastic_net_with_weights(
+            oriented,
+            labels,
+            feature_columns=joint_features,
+            prediction_years=(
+                VALIDATION_2022_YEAR,
+                VALIDATION_2023_YEAR,
+            ),
+        )
+    )
     pipelines: dict[tuple[str, str], pd.DataFrame] = {
         (
             "self_factor_composite",
@@ -532,16 +643,7 @@ def run_experiments(
         (
             "joint_elastic_net",
             "elastic_net",
-        ): walk_forward_elastic_net(
-            oriented,
-            labels,
-            feature_columns=joint_features,
-            prediction_years=(
-                SELECTION_YEAR,
-                CONFIRMATION_YEAR,
-                FROZEN_TEST_YEAR,
-            ),
-        ),
+        ): joint_elastic_net_factor,
         (
             "joint_lightgbm",
             "lightgbm",
@@ -550,18 +652,16 @@ def run_experiments(
             labels,
             feature_columns=joint_features,
             prediction_years=(
-                SELECTION_YEAR,
-                CONFIRMATION_YEAR,
-                FROZEN_TEST_YEAR,
+                VALIDATION_2022_YEAR,
+                VALIDATION_2023_YEAR,
             ),
         ),
     }
 
     metric_rows: list[dict[str, object]] = []
     periods = {
-        "selection_2022": SELECTION_YEAR,
-        "confirmation_2023": CONFIRMATION_YEAR,
-        "frozen_test_2024": FROZEN_TEST_YEAR,
+        "validation_2022": VALIDATION_2022_YEAR,
+        "validation_2023": VALIDATION_2023_YEAR,
     }
     for (experiment, method), factor in pipelines.items():
         for period, year in periods.items():
@@ -582,67 +682,95 @@ def run_experiments(
 
     decisions: list[dict[str, object]] = []
     for experiment, method in pipelines:
-        selection_ic = metric_value(
+        validation_2022_ic = metric_value(
             metrics,
             experiment,
             method,
-            "selection_2022",
+            "validation_2022",
             "raw_full",
             "rank_ic_mean",
         )
-        selection_t = metric_value(
+        validation_2022_t = metric_value(
             metrics,
             experiment,
             method,
-            "selection_2022",
+            "validation_2022",
             "raw_full",
             "rank_ic_t_stat",
         )
-        selection_tradable_ic = metric_value(
+        validation_2022_tradable_ic = metric_value(
             metrics,
             experiment,
             method,
-            "selection_2022",
+            "validation_2022",
             "raw_tradable",
             "rank_ic_mean",
         )
-        confirmation_ic = metric_value(
+        validation_2023_ic = metric_value(
             metrics,
             experiment,
             method,
-            "confirmation_2023",
+            "validation_2023",
             "raw_full",
             "rank_ic_mean",
         )
-        frozen_test_ic = metric_value(
+        validation_2023_t = metric_value(
             metrics,
             experiment,
             method,
-            "frozen_test_2024",
+            "validation_2023",
             "raw_full",
+            "rank_ic_t_stat",
+        )
+        validation_2023_tradable_ic = metric_value(
+            metrics,
+            experiment,
+            method,
+            "validation_2023",
+            "raw_tradable",
             "rank_ic_mean",
         )
-        passed_selection = (
-            selection_ic > 0
-            and selection_t >= COMBINATION_ADMISSION_GATE.minimum_rank_ic_t_stat
-            and selection_tradable_ic > 0
+        passed_validation = (
+            validation_2022_ic > 0
+            and validation_2023_ic > 0
+            and validation_2022_t
+            >= COMBINATION_ADMISSION_GATE.minimum_rank_ic_t_stat
+            and validation_2023_t
+            >= COMBINATION_ADMISSION_GATE.minimum_rank_ic_t_stat
+            and validation_2022_tradable_ic > 0
+            and validation_2023_tradable_ic > 0
         )
+        robust_rank_ic = min(validation_2022_ic, validation_2023_ic)
+        mean_rank_ic = (validation_2022_ic + validation_2023_ic) / 2.0
         decisions.append(
             {
                 "experiment": experiment,
                 "method": method,
-                "passed_selection_gate": passed_selection,
-                "selection_score_uses_2023": False,
-                "selection_rank_ic_mean": selection_ic,
-                "selection_rank_ic_t_stat": selection_t,
-                "selection_tradable_rank_ic_mean": selection_tradable_ic,
-                "confirmation_rank_ic_mean": confirmation_ic,
-                "frozen_test_rank_ic_mean": frozen_test_ic,
+                "passed_cross_regime_gate": passed_validation,
+                "validation_years": [
+                    VALIDATION_2022_YEAR,
+                    VALIDATION_2023_YEAR,
+                ],
+                "validation_2022_rank_ic_mean": validation_2022_ic,
+                "validation_2022_rank_ic_t_stat": validation_2022_t,
+                "validation_2022_tradable_rank_ic_mean": (
+                    validation_2022_tradable_ic
+                ),
+                "validation_2023_rank_ic_mean": validation_2023_ic,
+                "validation_2023_rank_ic_t_stat": validation_2023_t,
+                "validation_2023_tradable_rank_ic_mean": (
+                    validation_2023_tradable_ic
+                ),
+                "cross_regime_worst_year_rank_ic": robust_rank_ic,
+                "cross_regime_mean_rank_ic": mean_rank_ic,
             }
         )
-        decisions[-1]["confirmed_2023"] = confirmation_ic > 0
 
     reports_dir.mkdir(exist_ok=True)
+    joint_elastic_net_weights.to_csv(
+        reports_dir / "joint_elastic_net_weights.csv",
+        index=False,
+    )
     screening.to_csv(reports_dir / "factor_pool_screening.csv", index=False)
     pd.DataFrame(incremental_rows).drop(columns="reasons").to_csv(
         reports_dir / "factor_pool_incremental.csv",
@@ -672,20 +800,48 @@ def run_experiments(
             (
                 row
                 for row in decisions
-                if bool(row["passed_selection_gate"])
-                and bool(row["confirmed_2023"])
+                if bool(row["passed_cross_regime_gate"])
             ),
             key=lambda row: (
-                -float(row["selection_rank_ic_mean"]),
+                -float(row["cross_regime_worst_year_rank_ic"]),
+                -float(row["cross_regime_mean_rank_ic"]),
                 tie_priority[str(row["experiment"])],
             ),
         )
     ]
+    combination_summary = pd.DataFrame(decisions).rename(
+        columns={"experiment": "pipeline"}
+    )
+    rank_by_pipeline = {
+        pipeline: rank
+        for rank, pipeline in enumerate(frozen_submission_order, start=1)
+    }
+    combination_summary["rank"] = combination_summary["pipeline"].map(
+        rank_by_pipeline
+    )
+    combination_summary.to_csv(
+        reports_dir / "combination_summary.csv",
+        index=False,
+    )
     result = {
-        "protocol": "isolated_combination_pipelines_v2",
+        "protocol": "isolated_combination_pipelines_v3",
         "development_years": list(DEVELOPMENT_YEARS),
-        "selection_year": SELECTION_YEAR,
-        "confirmation_year": CONFIRMATION_YEAR,
+        "validation_years": [
+            VALIDATION_2022_YEAR,
+            VALIDATION_2023_YEAR,
+        ],
+        "incremental_protocol": {
+            "evaluation_years": list(incremental_evaluation_years),
+            "train_days": incremental_config.train_window_days,
+            "test_days": incremental_config.test_window_days,
+            "alpha": incremental_config.alpha,
+            "l1_ratio": incremental_config.l1_ratio,
+            "preprocessing": "daily_cross_section_zscore_features_and_target",
+            "cache_key": incremental_protocol,
+        },
+        "elastic_net_preprocessing": (
+            "daily_cross_section_zscore_features_and_target"
+        ),
         "frozen_test_year": FROZEN_TEST_YEAR,
         "frozen_test_changes_admission": False,
         "pipelines": {
@@ -703,14 +859,12 @@ def run_experiments(
             },
         },
         "factorlib_screened_reference": {
-            "source": "cached_from_dual_benchmark_admission",
+            "source": "frozen_screened15",
             "features": list(selected_public),
-            "selection_oos_rank_ic": float(
-                screened_summary.iloc[0]["baseline_oos_rank_ic"]
-            ),
+            "availability_groups": baseline_references,
         },
         "factorlib_incremental": incremental_rows,
-        "dual_benchmark_admission": admission_rows,
+        "screened15_incremental_admission": admission_rows,
         "pipeline_decisions": pipeline_decisions,
         "frozen_submission_order": frozen_submission_order,
         "frozen_winner": (
@@ -759,6 +913,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         self_columns,
         single_factor_candidates,
         args.reports_dir,
+        resume_incremental=args.resume_incremental,
     )
     print(json.dumps(result["pipeline_decisions"], ensure_ascii=False, indent=2))
     return 0

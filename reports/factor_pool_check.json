@@ -1,0 +1,38 @@
+{
+  "status": "ok",
+  "rows": 1214000,
+  "duplicate_keys": 0,
+  "factorlib_reference": {
+    "screened_features": [
+      "factorlib__amount",
+      "factorlib__atr_14",
+      "factorlib__bias_20",
+      "factorlib__cci_14",
+      "factorlib__float_market_cap",
+      "factorlib__kdj_d_9_3_3",
+      "factorlib__macd_diff_12_26_9",
+      "factorlib__macd_hist_12_26_9",
+      "factorlib__momentum_5",
+      "factorlib__net_profit_rate_ttm",
+      "factorlib__netflow_amount_rate_main",
+      "factorlib__total_market_cap",
+      "factorlib__turn",
+      "factorlib__volatility_5",
+      "factorlib__volume"
+    ],
+    "screened_count": 15
+  },
+  "combination_inputs": {
+    "all_candidate_count": 31,
+    "single_factor_candidates": [
+      "PV-003",
+      "PV-009",
+      "PV-014"
+    ],
+    "self_feature_count": 31
+  },
+  "minimum_public_coverage": 0.9985799011532125,
+  "minimum_self_coverage": 0.1614497528830313,
+  "neutral_fill_value": 0.0,
+  "join": "historical universe left join"
+}

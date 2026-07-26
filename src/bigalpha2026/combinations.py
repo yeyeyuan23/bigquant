@@ -10,6 +10,7 @@ from collections.abc import Mapping
 
 import pandas as pd
 
+from .evaluation import cross_section_zscore
 from .research_policy import fixed_weight_rank_combination
 
 
@@ -62,7 +63,7 @@ def fixed_rank_blend(
     return fixed_weight_rank_combination(factors, weights)
 
 
-def walk_forward_elastic_net(
+def _walk_forward_elastic_net(
     panel: pd.DataFrame,
     labels: pd.DataFrame,
     *,
@@ -73,8 +74,8 @@ def walk_forward_elastic_net(
     test_window_days: int = 20,
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
-) -> pd.DataFrame:
-    """Generate strict 60-day train / 20-day OOS Elastic Net predictions."""
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Generate predictions and coefficients under the shared EN contract."""
 
     from sklearn.linear_model import ElasticNet
 
@@ -83,8 +84,16 @@ def walk_forward_elastic_net(
         on=["date", "instrument"],
         how="inner",
         validate="one_to_one",
+    )
+    # Keep this identical to factorlib_regularized_incremental_batch_validation.
+    # A fixed Elastic Net alpha is meaningful only when both X and y use the
+    # same scale in screening and final training.
+    merged = cross_section_zscore(
+        merged,
+        [*feature_columns, label_column],
     ).dropna(subset=[*feature_columns, label_column])
     outputs: list[pd.DataFrame] = []
+    weight_rows: list[dict[str, object]] = []
     all_dates = pd.DatetimeIndex(sorted(merged["date"].unique()))
     prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
     for start in range(0, len(prediction_dates), test_window_days):
@@ -112,6 +121,14 @@ def walk_forward_elastic_net(
             train.loc[:, list(feature_columns)].to_numpy(dtype=float),
             train[label_column].to_numpy(dtype=float),
         )
+        weight_row: dict[str, object] = {
+            "train_start": pd.Timestamp(train_dates[0]),
+            "train_end": pd.Timestamp(train_dates[-1]),
+            "test_start": pd.Timestamp(test_dates[0]),
+            "test_end": pd.Timestamp(test_dates[-1]),
+        }
+        weight_row.update(dict(zip(feature_columns, model.coef_, strict=True)))
+        weight_rows.append(weight_row)
         block = test[["date", "instrument"]].copy()
         block["factor"] = model.predict(
             test.loc[:, list(feature_columns)].to_numpy(dtype=float)
@@ -125,9 +142,68 @@ def walk_forward_elastic_net(
         outputs.append(block)
     if not outputs:
         raise ValueError("no walk-forward prediction year had train and test rows")
-    return pd.concat(outputs, ignore_index=True).sort_values(
-        ["date", "instrument"]
-    ).reset_index(drop=True)
+    predictions = (
+        pd.concat(outputs, ignore_index=True)
+        .sort_values(["date", "instrument"])
+        .reset_index(drop=True)
+    )
+    weights = pd.DataFrame(weight_rows)
+    return predictions, weights
+
+
+def walk_forward_elastic_net(
+    panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    feature_columns: tuple[str, ...],
+    prediction_years: tuple[int, ...],
+    label_column: str = "ret_close_to_close",
+    train_window_days: int = 60,
+    test_window_days: int = 20,
+    alpha: float = 0.001,
+    l1_ratio: float = 0.5,
+) -> pd.DataFrame:
+    """Generate strict, scale-consistent Elastic Net predictions."""
+
+    predictions, _ = _walk_forward_elastic_net(
+        panel,
+        labels,
+        feature_columns=feature_columns,
+        prediction_years=prediction_years,
+        label_column=label_column,
+        train_window_days=train_window_days,
+        test_window_days=test_window_days,
+        alpha=alpha,
+        l1_ratio=l1_ratio,
+    )
+    return predictions
+
+
+def walk_forward_elastic_net_with_weights(
+    panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    feature_columns: tuple[str, ...],
+    prediction_years: tuple[int, ...],
+    label_column: str = "ret_close_to_close",
+    train_window_days: int = 60,
+    test_window_days: int = 20,
+    alpha: float = 0.001,
+    l1_ratio: float = 0.5,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return scale-consistent predictions plus per-window coefficients."""
+
+    return _walk_forward_elastic_net(
+        panel,
+        labels,
+        feature_columns=feature_columns,
+        prediction_years=prediction_years,
+        label_column=label_column,
+        train_window_days=train_window_days,
+        test_window_days=test_window_days,
+        alpha=alpha,
+        l1_ratio=l1_ratio,
+    )
 
 
 def walk_forward_lightgbm(

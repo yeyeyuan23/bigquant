@@ -210,13 +210,22 @@ def rank_ic_series(
     factor_column: str = "factor",
     label_column: str = "ret_close_to_close",
 ) -> pd.Series:
+    if merged.empty:
+        return pd.Series(dtype=float, name="rank_ic")
+
     def one_day(block: pd.DataFrame) -> float:
         valid = block[[factor_column, label_column]].dropna()
         if len(valid) < 5:
             return np.nan
         return valid[factor_column].rank().corr(valid[label_column].rank())
 
-    return merged.groupby("date", sort=False).apply(one_day, include_groups=False)
+    result = merged.groupby("date", sort=False).apply(
+        one_day,
+        include_groups=False,
+    )
+    if isinstance(result, pd.DataFrame):
+        return pd.Series(dtype=float, name="rank_ic")
+    return result
 
 
 def long_short_returns(
@@ -225,6 +234,9 @@ def long_short_returns(
     label_column: str = "ret_close_to_close",
     quantiles: int = 5,
 ) -> pd.Series:
+    if merged.empty:
+        return pd.Series(dtype=float, name="long_short_return")
+
     def one_day(block: pd.DataFrame) -> float:
         valid = block[[factor_column, label_column]].dropna()
         if len(valid) < quantiles * 2:
@@ -234,7 +246,13 @@ def long_short_returns(
         bottom = valid.loc[ranks <= 1.0 / quantiles, label_column].mean()
         return float(top - bottom)
 
-    return merged.groupby("date", sort=False).apply(one_day, include_groups=False)
+    result = merged.groupby("date", sort=False).apply(
+        one_day,
+        include_groups=False,
+    )
+    if isinstance(result, pd.DataFrame):
+        return pd.Series(dtype=float, name="long_short_return")
+    return result
 
 
 def quantile_group_returns(
@@ -244,6 +262,10 @@ def quantile_group_returns(
     quantiles: int = 5,
 ) -> pd.DataFrame:
     """Return daily equal-count group returns from low to high factor values."""
+
+    columns = [f"group_{group}" for group in range(1, quantiles + 1)]
+    if merged.empty:
+        return pd.DataFrame(columns=columns, dtype=float)
 
     def one_day(block: pd.DataFrame) -> pd.Series:
         valid = block[[factor_column, label_column]].dropna()
@@ -264,7 +286,7 @@ def quantile_group_returns(
         one_day,
         include_groups=False,
     )
-    result.columns = [f"group_{group}" for group in range(1, quantiles + 1)]
+    result.columns = columns
     return result
 
 
@@ -770,7 +792,17 @@ def factorlib_regularized_incremental_batch_validation(
         )
     )
     baseline_weights = pd.DataFrame(baseline_weight_rows)
-    candidate_weights = pd.DataFrame(candidate_weight_rows)
+    candidate_weights = pd.DataFrame(
+        candidate_weight_rows,
+        columns=[
+            "candidate",
+            "train_start",
+            "train_end",
+            "test_start",
+            "test_end",
+            "candidate_weight",
+        ],
+    )
 
     baseline_ic = rank_ic_series(
         baseline_predictions,

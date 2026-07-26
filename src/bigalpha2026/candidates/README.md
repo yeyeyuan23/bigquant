@@ -11,9 +11,13 @@
 
 `composite/` 不是第五类基础因子。它只放已经冻结实现的跨类组合或模型因子：
 
-- `INT-001` 的数据来源为 `FR + HF`；
-- `MICRO-EN-001` 的数据来源为 `HF + OB`，当前仍是
-  `development_watch`，训练和推理合同冻结前不创建实现文件。
+- `INT-001` 的数据来源为 `FR + HF`。
+
+未冻结、没有明确训练动作的 `watch` 候选不放入目录，也不保留在当前登记表。
+
+OAP A/B级26个候选的编号、忠实度、窗口、方向和S/I结果见
+[`OAP_CANDIDATES.md`](OAP_CANDIDATES.md)。该表与
+`docs/candidate_registry.md` 一起维护：前者面向实现，后者面向全项目状态。
 
 ## 队友新增候选
 
