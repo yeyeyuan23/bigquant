@@ -145,7 +145,7 @@ class WorkflowScriptTest(unittest.TestCase):
                     data_root=data_root,
                 )
 
-    def test_single_factor_gate_requires_both_validation_years(self):
+    def test_single_factor_gate_never_uses_validation_years_for_admission(self):
         rows = []
         for period in ("development", "validation_2022", "validation_2023"):
             for variant in ("raw_full", "neutral_full", "raw_tradable"):
@@ -163,10 +163,10 @@ class WorkflowScriptTest(unittest.TestCase):
         metrics = pd.DataFrame(rows)
         stability = pd.DataFrame(
             {
-                "candidate_id": ["PV-TEST"] * 4,
-                "period": ["development"] * 4,
-                "frequency": ["year"] * 4,
-                "positive": [True, True, True, True],
+                "candidate_id": ["PV-TEST"] * 10,
+                "period": ["development"] * 10,
+                "frequency": ["month"] * 10,
+                "positive": [True] * 6 + [False] * 4,
             }
         )
         passed = classify_candidates(metrics, stability)[0]
@@ -178,8 +178,8 @@ class WorkflowScriptTest(unittest.TestCase):
             "rank_ic_mean",
         ] = -0.01
         failed = classify_candidates(metrics, stability)[0]
-        self.assertFalse(failed["single_factor_cross_regime_passed"])
-        self.assertTrue(failed["validation_2023_failures"])
+        self.assertTrue(failed["single_factor_cross_regime_passed"])
+        self.assertTrue(failed["validation_2023_observations"])
 
 
 if __name__ == "__main__":

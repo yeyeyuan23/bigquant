@@ -24,10 +24,12 @@ from bigalpha2026.candidates.fr.fr_008 import build_fr_008_factor
 from bigalpha2026.candidates.fr.fr_009 import build_fr_009_factor
 from bigalpha2026.candidates.fr.fr_010 import build_fr_010_factor
 from bigalpha2026.candidates.fr.fr_011 import build_fr_011_factor
+from bigalpha2026.candidates.fr.fr_012 import build_fr_012_factor
 from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
 from bigalpha2026.candidates.ob.ob_001 import build_ob_001_factor_from_daily
 from bigalpha2026.candidates.ob.ob_002 import build_ob_002_factor_from_daily
+from bigalpha2026.candidates.ob.ob_003 import build_ob_003_factor_from_daily
 from bigalpha2026.candidates.pv.pv_001 import build_pv_001_factor
 from bigalpha2026.candidates.pv.pv_002 import build_pv_002_factor
 from bigalpha2026.candidates.pv.pv_003 import build_pv_003_factor
@@ -47,6 +49,7 @@ from bigalpha2026.candidates.pv.pv_016 import build_pv_016_factor
 from bigalpha2026.candidates.pv.pv_017 import build_pv_017_factor
 from bigalpha2026.candidates.pv.pv_018 import build_pv_018_factor
 from bigalpha2026.candidates.pv.pv_019 import build_pv_019_factor
+from bigalpha2026.candidates.pv.pv_020 import build_pv_020_factor
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
     rank_ic_series,
@@ -112,20 +115,8 @@ def candidate_input_manifest_paths() -> tuple[Path, ...]:
         [
             DATA / "manifest_FR_2017_2022.json",
             DATA / "manifest_FR_2023.json",
-            DATA / "manifest_OB_DAILY_FULL.json",
+            DATA / "manifest_MICRO_DAILY_FULL.json",
         ]
-    )
-    evaluation_months = {
-        *(
-            month
-            for month in HF_OB_MANDATORY_MONTHS
-            if int(month[:4]) <= VALIDATION_2023_YEAR
-        ),
-        *HF_OB_ACTIVATED_OPTIONAL_MONTHS,
-    }
-    paths.extend(
-        DATA / f"manifest_HFOB_{month}.json"
-        for month in sorted(evaluation_months)
     )
     missing = [str(path) for path in paths if not path.exists()]
     if missing:
@@ -163,34 +154,10 @@ def read_yearly(path_template: str, years: range) -> pd.DataFrame:
     )
 
 
-def read_evaluation_family(family: str) -> pd.DataFrame:
-    evaluation_months = (
-        *(
-            month
-            for month in HF_OB_MANDATORY_MONTHS
-            if int(month[:4]) <= VALIDATION_2023_YEAR
-        ),
-        *HF_OB_ACTIVATED_OPTIONAL_MONTHS,
-    )
-    paths = [
-        DATA
-        / "features"
-        / family
-        / f"year={month[:4]}"
-        / f"month={month[5:]}"
-        / f"part-{month}.parquet"
-        for month in evaluation_months
-    ]
-    missing = [str(path) for path in paths if not path.exists()]
-    if missing:
-        raise FileNotFoundError(f"missing evaluation {family} panels: {missing}")
-    return pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
+def read_full_micro_panel() -> pd.DataFrame:
+    """Read the shared complete daily panel required by every HF/OB factor."""
 
-
-def read_full_ob_001_panel() -> pd.DataFrame:
-    """Read the complete yearly AIStudio aggregation required by OB-001."""
-
-    directory = DATA / "features" / "OB_DAILY_FULL"
+    directory = DATA / "features" / "MICRO_DAILY_FULL"
     paths = [
         directory / f"year={year}" / f"part-{year}.parquet"
         for year in ALL_BASE_YEARS
@@ -198,8 +165,8 @@ def read_full_ob_001_panel() -> pd.DataFrame:
     missing = [str(path) for path in paths if not path.exists()]
     if missing:
         raise FileNotFoundError(
-            "missing full-history OB-001 daily panels; generate them with "
-            f"scripts/aistudio_build_ob_daily.py: {missing}"
+            "missing full-history MICRO daily panels; generate them with "
+            f"scripts/aistudio_build_micro_daily.py: {missing}"
         )
     return pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
 
@@ -449,31 +416,17 @@ def classify_candidates(
         return failures
 
     for candidate_id in sorted(metrics["candidate_id"].unique()):
-        family = candidate_id.split("-")[0]
-        if family in {"PV", "FR"}:
-            stable = stability.loc[
-                stability["candidate_id"].eq(candidate_id)
-                & stability["period"].eq("development")
-                & stability["frequency"].eq("year")
-            ]
-            stability_fraction = (
-                float(stable["positive"].mean()) if not stable.empty else 0.0
-            )
-            required_stability = (
-                FORMAL_EVALUATION_POLICY.minimum_positive_year_fraction
-            )
-        else:
-            stable = stability.loc[
-                stability["candidate_id"].eq(candidate_id)
-                & stability["period"].eq("development")
-                & stability["frequency"].eq("month")
-            ]
-            stability_fraction = (
-                float(stable["positive"].mean()) if not stable.empty else 0.0
-            )
-            required_stability = (
-                FORMAL_EVALUATION_POLICY.minimum_positive_subperiod_fraction
-            )
+        stable = stability.loc[
+            stability["candidate_id"].eq(candidate_id)
+            & stability["period"].eq("development")
+            & stability["frequency"].eq("month")
+        ]
+        stability_fraction = (
+            float(stable["positive"].mean()) if not stable.empty else 0.0
+        )
+        required_stability = (
+            FORMAL_EVALUATION_POLICY.minimum_positive_subperiod_fraction
+        )
 
         development_failures = period_failures(
             candidate_id,
@@ -483,26 +436,26 @@ def classify_candidates(
         )
         if stability_fraction < required_stability:
             development_failures.append(
-                "development subperiod sign stability is below the gate"
+                "development monthly sign stability is below the gate"
             )
-        validation_2022_failures = period_failures(
+        validation_2022_observations = period_failures(
             candidate_id,
             "validation_2022",
             "2022 validation",
             require_t_stat=False,
         )
-        validation_2023_failures = period_failures(
+        validation_2023_observations = period_failures(
             candidate_id,
             "validation_2023",
             "2023 validation",
             require_t_stat=False,
         )
 
-        if (
-            not development_failures
-            and not validation_2022_failures
-            and not validation_2023_failures
-        ):
+        # S is an admission decision, so validation-period outcomes must never
+        # change it.  Later periods remain diagnostic observations only.  The
+        # combination runner applies this historical gate causally before each
+        # 20-trading-day prediction block.
+        if not development_failures:
             status = "provisional_survivor"
         else:
             status = "rejected"
@@ -511,15 +464,11 @@ def classify_candidates(
                 "candidate_id": candidate_id,
                 "status": status,
                 "technical_passed": True,
-                "single_factor_cross_regime_passed": (
-                    not development_failures
-                    and not validation_2022_failures
-                    and not validation_2023_failures
-                ),
+                "single_factor_cross_regime_passed": not development_failures,
                 "development_stability_fraction": stability_fraction,
                 "development_failures": development_failures,
-                "validation_2022_failures": validation_2022_failures,
-                "validation_2023_failures": validation_2023_failures,
+                "validation_2022_observations": validation_2022_observations,
+                "validation_2023_observations": validation_2023_observations,
                 "upload_ready": False,
             }
         )
@@ -576,6 +525,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "PV-017": build_pv_017_factor(pv, pool),
         "PV-018": build_pv_018_factor(pv, pool),
         "PV-019": build_pv_019_factor(pv, pool),
+        "PV-020": build_pv_020_factor(pv, pool),
     }
     factorlib = read_yearly(
         "features/FACTORLIB/year={year}/part-{year}.parquet",
@@ -600,18 +550,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     factors["FR-009"] = build_fr_009_factor(financial, pool)
     factors["FR-010"] = build_fr_010_factor(financial, pool)
     factors["FR-011"] = build_fr_011_factor(financial, exposures, pool)
+    factors["FR-012"] = build_fr_012_factor(financial, pool)
 
-    hf = read_evaluation_family("HF")
-    ob = read_evaluation_family("OB")
-    ob_001_daily = read_full_ob_001_panel()
-    mandatory_dates = pd.DatetimeIndex(
-        sorted(pd.to_datetime(hf["date"]).dt.normalize().unique())
-    )
-    mandatory_pool = pool.loc[pool["date"].isin(mandatory_dates)]
-    factors["HF-001"] = build_hf_001_factor_from_daily(hf, mandatory_pool)
-    factors["HF-002"] = build_hf_002_factor_from_daily(hf, mandatory_pool)
-    factors["OB-001"] = build_ob_001_factor_from_daily(ob_001_daily, pool)
-    factors["OB-002"] = build_ob_002_factor_from_daily(ob, mandatory_pool)
+    micro = read_full_micro_panel()
+    factors["HF-001"] = build_hf_001_factor_from_daily(micro, pool)
+    factors["HF-002"] = build_hf_002_factor_from_daily(micro, pool)
+    factors["OB-001"] = build_ob_001_factor_from_daily(micro, pool)
+    factors["OB-002"] = build_ob_002_factor_from_daily(micro, pool)
+    factors["OB-003"] = build_ob_003_factor_from_daily(micro, pool)
 
     metric_output: list[dict[str, object]] = []
     stability_output: list[dict[str, object]] = []
@@ -759,8 +705,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "development_failures": [
                     "candidate has no technically eligible evaluation metrics"
                 ],
-                "validation_2022_failures": [],
-                "validation_2023_failures": [],
+                "validation_2022_observations": [],
+                "validation_2023_observations": [],
                 "upload_ready": False,
             }
         )

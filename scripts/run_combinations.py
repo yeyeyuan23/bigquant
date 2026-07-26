@@ -1,8 +1,8 @@
 """Run the frozen screened15 and self-developed factor-pool protocol.
 
-This entrypoint reuses completed S decisions, evaluates I against frozen
-screened15, and runs three isolated combination routes. The 2022 and 2023
-results are equal-status cross-regime validation years.
+This entrypoint reuses development-only monthly S decisions, evaluates I and T
+with strict 60-day train / 20-day OOS windows, and runs three isolated
+combination routes.  The 2022 and 2023 results never change admission.
 """
 
 from __future__ import annotations
@@ -766,7 +766,7 @@ def run_experiments(
     )
     if not self_features:
         raise RuntimeError(
-            "no candidate passed the single-factor cross-regime gate"
+            "no candidate passed the development monthly single-factor gate"
         )
     joint_self_features = tuple(admitted_self)
     joint_elastic_net_features = (*selected_public, *joint_self_features)

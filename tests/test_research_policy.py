@@ -28,7 +28,7 @@ class ResearchPolicyTest(unittest.TestCase):
         )
 
     def test_all_registered_candidates_are_available_to_first_round(self):
-        self.assertEqual(len(candidate_ids()), 34)
+        self.assertEqual(len(candidate_ids()), 37)
         self.assertEqual(len(candidate_ids("first_round")), 8)
         self.assertEqual(
             candidate_ids("oap_batch1"),
@@ -70,6 +70,10 @@ class ResearchPolicyTest(unittest.TestCase):
                 "PV-018",
                 "PV-019",
             ),
+        )
+        self.assertEqual(
+            candidate_ids("literature_round1"),
+            ("PV-020", "FR-012", "OB-003"),
         )
 
     def test_formal_periods_and_representative_months_are_frozen(self):

@@ -11,6 +11,16 @@ JOINT_SOURCE = ROOT / "submissions" / "factor_joint_elastic_net.py"
 JOINT_NOTEBOOK = ROOT / "submissions" / "factor_joint_elastic_net.ipynb"
 SELF_PV_SOURCE = ROOT / "submissions" / "factor_self_pv_rank.py"
 SELF_PV_NOTEBOOK = ROOT / "submissions" / "factor_self_pv_rank.ipynb"
+FINAL_SUBMISSIONS = (
+    (
+        ROOT / "submissions" / "factor_self_family_rank.py",
+        ROOT / "submissions" / "factor_self_family_rank.ipynb",
+    ),
+    (
+        ROOT / "submissions" / "factor_joint_lightgbm.py",
+        ROOT / "submissions" / "factor_joint_lightgbm.ipynb",
+    ),
+)
 
 
 class SubmissionTest(unittest.TestCase):
@@ -85,6 +95,34 @@ class SubmissionTest(unittest.TestCase):
             "".join(code_cells[0]["source"]),
             SELF_PV_SOURCE.read_text(encoding="utf-8"),
         )
+
+    def test_final_submission_sources_and_notebooks_match(self):
+        for source, notebook_path in FINAL_SUBMISSIONS:
+            with self.subTest(source=source.name):
+                tree = ast.parse(source.read_text(encoding="utf-8"))
+                functions = {
+                    node.name: node
+                    for node in tree.body
+                    if isinstance(node, ast.FunctionDef)
+                }
+                self.assertIn("main", functions)
+                self.assertEqual(
+                    [argument.arg for argument in functions["main"].args.args],
+                    ["datasources", "start_date", "end_date"],
+                )
+                notebook = json.loads(
+                    notebook_path.read_text(encoding="utf-8")
+                )
+                code_cells = [
+                    cell
+                    for cell in notebook["cells"]
+                    if cell["cell_type"] == "code"
+                ]
+                self.assertEqual(len(code_cells), 1)
+                self.assertEqual(
+                    "".join(code_cells[0]["source"]),
+                    source.read_text(encoding="utf-8"),
+                )
 
 
 if __name__ == "__main__":

@@ -7,9 +7,11 @@ daily aggregates. Raw minute rows are never downloaded.
 from __future__ import annotations
 
 import argparse
+import calendar
 from pathlib import Path
 
 import dai
+import pandas as pd
 
 
 def query_period(start_date: str, end_date: str):
@@ -110,18 +112,27 @@ def query_period(start_date: str, end_date: str):
         sequenced AS (
             SELECT
                 *,
-                close / NULLIF(
-                    lag(close) OVER (
+                CASE
+                    WHEN close > 0
+                         AND lag(close) OVER (
+                             PARTITION BY instrument, trading_day, session_id
+                             ORDER BY timestamp
+                         ) > 0
+                    THEN close / lag(close) OVER (
                         PARTITION BY instrument, trading_day, session_id
                         ORDER BY timestamp
-                    ),
-                    0
-                ) - 1.0 AS minute_return,
+                    ) - 1.0
+                    ELSE NULL
+                END AS minute_return,
                 ln(
-                    close / NULLIF(
-                        lag(close) OVER (
-                            PARTITION BY instrument, trading_day, session_id
-                            ORDER BY timestamp
+                    NULLIF(GREATEST(close, 0), 0)
+                    / NULLIF(
+                        GREATEST(
+                            lag(close) OVER (
+                                PARTITION BY instrument, trading_day, session_id
+                                ORDER BY timestamp
+                            ),
+                            0
                         ),
                         0
                     )
@@ -311,8 +322,56 @@ def main() -> int:
     parser.add_argument("--start-date", required=True)
     parser.add_argument("--end-date", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--monthly-chunks",
+        action="store_true",
+        help="query one calendar month at a time before writing one output file",
+    )
     args = parser.parse_args()
-    frame = query_period(args.start_date, args.end_date)
+    if args.monthly_chunks:
+        start = pd.Timestamp(args.start_date).normalize()
+        end = pd.Timestamp(args.end_date).normalize()
+        if end < start:
+            raise ValueError("end_date must not be before start_date")
+        parts = []
+        for month_start in pd.date_range(
+            start=start.replace(day=1),
+            end=end,
+            freq="MS",
+        ):
+            month_end = pd.Timestamp(
+                year=month_start.year,
+                month=month_start.month,
+                day=calendar.monthrange(month_start.year, month_start.month)[1],
+            )
+            chunk_start = max(start, month_start)
+            chunk_end = min(end, month_end)
+            print(
+                f"querying {chunk_start.date().isoformat()} "
+                f"through {chunk_end.date().isoformat()}",
+                flush=True,
+            )
+            part = query_period(
+                chunk_start.date().isoformat(),
+                chunk_end.date().isoformat(),
+            )
+            if not part.empty:
+                parts.append(part)
+        if not parts:
+            raise ValueError("monthly queries returned no rows")
+        frame = pd.concat(parts, ignore_index=True)
+        frame["date"] = pd.to_datetime(
+            frame["date"],
+            errors="coerce",
+        ).dt.normalize()
+        frame["instrument"] = frame["instrument"].astype(str)
+        if frame.duplicated(["date", "instrument"]).any():
+            raise ValueError(
+                "monthly chunks produced duplicate date-instrument keys"
+            )
+        frame = frame.sort_values(["date", "instrument"]).reset_index(drop=True)
+    else:
+        frame = query_period(args.start_date, args.end_date)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(args.output, index=False)
     print(

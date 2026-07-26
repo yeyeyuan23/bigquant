@@ -56,6 +56,24 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
     CandidateSpec("PV-017", "PV", "oap_volume_trend", stage="oap_b"),
     CandidateSpec("PV-018", "PV", "oap_long_term_reversal", stage="oap_b"),
     CandidateSpec("PV-019", "PV", "oap_residual_momentum_proxy", stage="oap_b"),
+    CandidateSpec(
+        "PV-020",
+        "PV",
+        "liquidity_conditioned_short_term_reversal",
+        stage="literature_round1",
+    ),
+    CandidateSpec(
+        "FR-012",
+        "FR",
+        "revenue_confirmed_earnings_surprise",
+        stage="literature_round1",
+    ),
+    CandidateSpec(
+        "OB-003",
+        "OB",
+        "directional_order_book_resilience_asymmetry",
+        stage="literature_round1",
+    ),
 )
 
 # Mechanical calendar samples frozen before the first formal factor evaluation.

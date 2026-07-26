@@ -86,33 +86,25 @@ tail_60_relative_spread_median,
 tail_60_depth_completeness_median,
 tail_60_bid_depth_imbalance_median,
 negative_mid_shock_q10_bid_depth_recovery_5m_median,
+positive_mid_shock_q90_ask_depth_recovery_5m_median,
 full_day_depth_shape_median,
 tail_60_depth_shape_median,
 tail_60_shape_sign_consistency
 ```
 
-首批可复用盘口底座由 `scripts/aistudio_build_ob_daily.py` 在 AIStudio 按年生成，
-落盘为 `~/work/ob_daily_full/ob_daily_YEAR.parquet`。该批先固化四个可直接复用
-的组件：
+正式微观底座由 `scripts/aistudio_build_micro_daily.py` 在 AIStudio 分月查询并
+按年合并，落盘为 `micro_daily_YEAR.parquet`。平台原件固定放在
+`data/raw/MICRO_DAILY_FULL/`，再由 `scripts/prepare_micro_daily_full.py`
+按历史股票池左连接并生成
+`data/features/MICRO_DAILY_FULL/year=YEAR/part-YEAR.parquet`。标准面板额外
+包含布尔列 `micro_snapshot_available`；源表不存在的日股组件保持 NaN，禁止
+在数据层伪装成0。2019—2023任一年度缺失都应直接失败，禁止退回代表月份继续
+正式评价。
 
-```text
-tail_60_relative_spread_median
-tail_60_depth_completeness_median
-tail_60_bid_depth_imbalance_median
-negative_mid_shock_q10_bid_depth_recovery_5m_median
-```
-
-平台下载原件固定放在
-`data/raw/OB_DAILY_FULL/ob_daily_YEAR.parquet`，再由
-`scripts/prepare_ob_daily_full.py` 按历史股票池左连接并生成
-`data/features/OB_DAILY_FULL/year=YEAR/part-YEAR.parquet`。标准面板额外包含
-布尔列 `ob_snapshot_available`：源表存在该日该股票盘口时为真；不存在时四个
-组件保持 NaN，禁止在数据层伪装成 0。2019—2023 任一年度缺失都应直接失败，
-禁止退回代表月份后继续生成正式数据快照。
-
-只将这些日级聚合结果同步回本地；原始分钟盘口行不下载、不进入 Git。新增盘口
-候选若需要合同中其余组件，应扩展同一按年聚合脚本并生成新的快照 manifest，
-不能在每个候选中重复拉取全量分钟明细。
+HF-001、HF-002、OB-001、OB-002和OB-003全部读取这一个连续面板。只将日级聚合结果同步
+回本地；原始分钟成交和盘口行不下载、不进入Git。新增微观候选若需要合同之外
+的组件，应扩展同一聚合脚本并生成新manifest，不能在每个候选内重复拉取全量
+分钟明细。
 
 ### FR：财务披露事件
 
