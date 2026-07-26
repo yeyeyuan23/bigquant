@@ -12,7 +12,7 @@
 ```text
 请打开比赛页面和 AIStudio，让我先完成登录。然后 clone
 https://github.com/yeyeyuan23/bigquant，完整阅读 docs/team_workflow.md，
-并严格按其中流程直接开发、测试、在 AIStudio 做真实评价和组合优化。
+并严格按其中权限边界开发候选因子、测试并在 AIStudio 做真实评价。
 有效结果可以直接上传比赛；完成后 push 候选分支并创建 MR/PR。
 如收到数据压缩包，按手册校验和解压；如因子需要新数据，按手册一并交付
 可复现的取数代码、数据合同、manifest 和增量包。
@@ -100,6 +100,28 @@ git switch -c factor/hf-003
 - Notebook 临时输出；
 - 密钥、Cookie 或账号信息；
 - 与本候选无关的格式化修改。
+
+### 修改权限
+
+队友的候选分支只允许修改：
+
+- 自己认领的 `src/bigalpha2026/candidates/<类别>/` 候选文件；
+- 对应类别的 `__init__.py` 导出；
+- `docs/candidate_registry.md` 中该候选的登记；
+- 该候选对应的测试和小型评价报告；
+- 新数据确有必要时，对应的取数 Notebook、`docs/data_contract.md`、manifest
+  和增量包说明。
+
+以下内容只读，不得在候选 MR/PR 中修改：
+
+- `src/bigalpha2026/evaluation.py` 和通用评价标准；
+- `src/bigalpha2026/combinations.py`、`scripts/run_combinations.py` 和组合训练逻辑；
+- `src/bigalpha2026/research_policy.py` 中的时间切分与准入门槛；
+- `src/bigalpha2026/candidates/composite/` 和 `artifacts/frozen/` 中的冻结版本；
+- `main` 分支。
+
+如果发现公共代码或规则有问题，只在 MR/PR 中说明，不把修复混入候选提交；由
+主仓库负责人单独处理。队友可以运行公共评价和组合代码，但不能修改它们。
 
 ## 3. 新增一个基础因子
 
@@ -342,6 +364,10 @@ src/bigalpha2026/combinations.py
 scripts/run_combinations.py
 ```
 
+本节是候选进入统一组合后的评价说明。队友可以使用现有入口检验自己的候选，
+但不得在候选分支修改组合代码、时间切分、筛选规则或模型参数；统一组合优化由
+主仓库负责人执行。
+
 本地只做接口、时间切分和防泄漏测试；通过后同步到 AIStudio 真实训练：
 
 ```bash
@@ -377,7 +403,7 @@ PYTHONPATH=src conda run --no-capture-output -n quant \
 
 ## 8. 比赛提交与代码交付
 
-候选完成 AIStudio 真实评价和训练、结果值得提交时，同队成员及其 AI
+候选完成 AIStudio 真实评价、结果值得提交时，同队成员及其 AI
 可以直接上传比赛，不需要再次询问队长。
 
 提交前必须：
@@ -421,7 +447,7 @@ MR/PR 简单说明：
 
 - 候选编号没有冲突；
 - 登记内容与代码方向一致；
-- 只修改本候选和必要的公共入口；
+- 只修改本候选及“修改权限”允许的配套文件；
 - 完整测试通过；
 - 没有数据文件、密钥或 Notebook 输出；
 - 本地测试结果和 AIStudio 真实有效性结论被明确区分；
