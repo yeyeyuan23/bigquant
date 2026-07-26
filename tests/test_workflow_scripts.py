@@ -7,6 +7,7 @@ import pandas as pd
 from scripts.run_combinations import (
     CONFIRMATION_YEAR,
     DEVELOPMENT_YEARS,
+    PIPELINE_NAMES,
     SELECTION_YEAR,
     contract_summary,
     parse_args,
@@ -21,12 +22,29 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(DEVELOPMENT_YEARS, (2019, 2020, 2021))
         self.assertEqual(SELECTION_YEAR, 2022)
         self.assertEqual(CONFIRMATION_YEAR, 2023)
+        self.assertEqual(
+            PIPELINE_NAMES,
+            (
+                "self_factor_composite",
+                "joint_elastic_net",
+                "joint_lightgbm",
+            ),
+        )
         args = parse_args(["--check"])
         self.assertTrue(args.check)
         summary = synthetic_contract_summary()
         self.assertEqual(summary["status"], "ok")
         self.assertEqual(summary["factorlib_features"], 36)
+        self.assertEqual(summary["factorlib_screened_features"], 15)
         self.assertEqual(summary["self_features"], 1)
+        self.assertEqual(
+            {
+                key
+                for key in summary
+                if key.endswith("_contract")
+            },
+            {f"{pipeline}_contract" for pipeline in PIPELINE_NAMES},
+        )
 
     def test_check_mode_reports_missing_inputs_without_training(self):
         with tempfile.TemporaryDirectory() as directory:

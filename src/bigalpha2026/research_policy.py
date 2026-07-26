@@ -127,6 +127,27 @@ TECHNICAL_GATE = TechnicalGate()
 COMBINATION_ADMISSION_GATE = CombinationAdmissionGate()
 FACTORLIB_INCREMENTAL_GATE = FactorLibraryIncrementalGate()
 
+# Frozen on 2026-07-26 from the competition's 36 public factors using only
+# 2019-2021 development data.  Later periods may validate this membership but
+# must not change it.
+FROZEN_FACTORLIB_SCREENED_FEATURES: tuple[str, ...] = (
+    "factorlib__amount",
+    "factorlib__atr_14",
+    "factorlib__bias_20",
+    "factorlib__cci_14",
+    "factorlib__float_market_cap",
+    "factorlib__kdj_d_9_3_3",
+    "factorlib__macd_diff_12_26_9",
+    "factorlib__macd_hist_12_26_9",
+    "factorlib__momentum_5",
+    "factorlib__net_profit_rate_ttm",
+    "factorlib__netflow_amount_rate_main",
+    "factorlib__total_market_cap",
+    "factorlib__turn",
+    "factorlib__volatility_5",
+    "factorlib__volume",
+)
+
 
 def candidate_ids(stage: str | None = None) -> tuple[str, ...]:
     selected = CANDIDATE_POOL
@@ -239,3 +260,37 @@ def factorlib_incremental_gate(
     if not np.isfinite(oos_days) or oos_days < policy.minimum_oos_days:
         reasons.append("too few out-of-sample evaluation days")
     return not reasons, reasons
+
+
+def dual_factorlib_admission(
+    *,
+    technical_passed: bool,
+    all36_passed: bool,
+    screened_passed: bool,
+) -> dict[str, object]:
+    """Classify a candidate after both frozen public-library comparisons.
+
+    Passing the development-screened public library is required to enter
+    combination training.  Passing the complete 36-factor comparison upgrades
+    the candidate from overlap-aware to core/orthogonal status.
+    """
+
+    if not technical_passed:
+        classification = "technical_reject"
+        enters_training = False
+    elif all36_passed and screened_passed:
+        classification = "core_candidate"
+        enters_training = True
+    elif screened_passed:
+        classification = "overlap_aware_candidate"
+        enters_training = True
+    elif all36_passed:
+        classification = "orthogonal_watch"
+        enters_training = False
+    else:
+        classification = "rejected"
+        enters_training = False
+    return {
+        "classification": classification,
+        "enters_training": enters_training,
+    }

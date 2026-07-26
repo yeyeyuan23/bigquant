@@ -16,11 +16,11 @@ import pandas as pd
 
 from bigalpha2026.combinations import (
     walk_forward_elastic_net,
-    walk_forward_tree_boosting,
+    walk_forward_lightgbm,
 )
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
-    factorlib_regularized_incremental_validation,
+    factorlib_regularized_incremental_batch_validation,
 )
 from bigalpha2026.factor_pool import (
     KEY_COLUMNS,
@@ -33,7 +33,9 @@ from bigalpha2026.factor_pool import (
 from bigalpha2026.factorlib import FACTORLIB_FEATURE_COLUMNS, validate_factorlib_frame
 from bigalpha2026.research_policy import (
     COMBINATION_ADMISSION_GATE,
+    FROZEN_FACTORLIB_SCREENED_FEATURES,
     FORMAL_EVALUATION_POLICY,
+    dual_factorlib_admission,
     factorlib_incremental_gate,
 )
 
@@ -50,6 +52,11 @@ DEVELOPMENT_YEARS = tuple(
 )
 SELECTION_YEAR = int(FORMAL_EVALUATION_POLICY.selection_start[:4])
 CONFIRMATION_YEAR = int(FORMAL_EVALUATION_POLICY.confirmation_start[:4])
+PIPELINE_NAMES = (
+    "self_factor_composite",
+    "joint_elastic_net",
+    "joint_lightgbm",
+)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -223,12 +230,12 @@ def contract_summary(
         "status": status,
         "rows": int(len(panel)),
         "duplicate_keys": int(panel.duplicated(list(KEY_COLUMNS)).sum()),
-        "factorlib_all36": {
-            "features": list(public_columns),
-            "count": len(public_columns),
+        "factorlib_reference": {
+            "all36_count": len(public_columns),
+            "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
+            "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
         },
-        "screened_factorlib_plus_self": {
-            "public_screening": "deferred_until_training",
+        "combination_inputs": {
             "self_candidates": list(admitted),
             "self_feature_count": len(self_columns),
         },
@@ -278,20 +285,24 @@ def synthetic_contract_summary() -> dict[str, object]:
         ],
         admitted_candidates=("HF-TEST",),
     )
-    baseline = family_balanced_factor(panel, public_columns)
-    augmented = family_balanced_factor(
+    self_factor = family_balanced_factor(panel, self_columns)
+    joint_factor = family_balanced_factor(
         panel,
-        (*public_columns, *self_columns),
+        (*FROZEN_FACTORLIB_SCREENED_FEATURES, *self_columns),
     )
     return {
         "status": "ok",
         "mode": "synthetic_structure_only",
         "rows": len(panel),
         "factorlib_features": len(public_columns),
+        "factorlib_screened_features": len(
+            FROZEN_FACTORLIB_SCREENED_FEATURES
+        ),
         "self_features": len(self_columns),
         "minimum_coverage": float(coverage["coverage"].min()),
-        "baseline_contract": list(baseline.columns),
-        "augmented_contract": list(augmented.columns),
+        "self_factor_composite_contract": list(self_factor.columns),
+        "joint_elastic_net_contract": list(joint_factor.columns),
+        "joint_lightgbm_contract": list(joint_factor.columns),
         "join": "historical universe left join",
         "neutral_fill_value": 0.0,
     }
@@ -391,80 +402,119 @@ def run_experiments(
     selected_public = tuple(
         screening.loc[screening["selected"], "feature"].astype(str)
     )
-    if not selected_public:
-        raise RuntimeError("no public factor passed development-only screening")
+    if selected_public != FROZEN_FACTORLIB_SCREENED_FEATURES:
+        raise RuntimeError(
+            "development-only factorlib screening no longer matches the frozen "
+            "15-of-36 membership"
+        )
 
-    incremental_rows: list[dict[str, object]] = []
-    admitted_self: list[str] = []
     development_and_selection = oriented.loc[
         oriented["date"].dt.year.isin((*DEVELOPMENT_YEARS, SELECTION_YEAR))
     ]
     incremental_labels = labels.loc[
         labels["date"].dt.year.isin((*DEVELOPMENT_YEARS, SELECTION_YEAR))
     ]
+    all36_summary, _, _, _ = factorlib_regularized_incremental_batch_validation(
+        development_and_selection[
+            ["date", "instrument", *public_columns, *self_columns]
+        ],
+        incremental_labels,
+        public_columns,
+        self_columns,
+    )
+    screened_summary, _, _, _ = factorlib_regularized_incremental_batch_validation(
+        development_and_selection[
+            ["date", "instrument", *selected_public, *self_columns]
+        ],
+        incremental_labels,
+        selected_public,
+        self_columns,
+    )
+    incremental_rows: list[dict[str, object]] = []
+    admission_rows: list[dict[str, object]] = []
+    admitted_self: list[str] = []
     for self_column in self_columns:
-        summary, _, _ = factorlib_regularized_incremental_validation(
-            development_and_selection[
-                ["date", "instrument", *public_columns, self_column]
-            ],
-            incremental_labels,
-            public_columns,
-            (self_column,),
+        all36_row = all36_summary.loc[
+            all36_summary["candidate"].eq(self_column)
+        ].iloc[0].to_dict()
+        screened_row = screened_summary.loc[
+            screened_summary["candidate"].eq(self_column)
+        ].iloc[0].to_dict()
+        all36_passed, all36_reasons = factorlib_incremental_gate(all36_row)
+        screened_passed, screened_reasons = factorlib_incremental_gate(
+            screened_row
         )
-        passed, reasons = factorlib_incremental_gate(summary)
-        incremental_rows.append(
+        incremental_rows.extend(
+            [
+                {
+                    "feature": self_column,
+                    "benchmark": "factorlib_all36",
+                    "passed": all36_passed,
+                    "reasons": all36_reasons,
+                    **all36_row,
+                },
+                {
+                    "feature": self_column,
+                    "benchmark": "factorlib_screened",
+                    "passed": screened_passed,
+                    "reasons": screened_reasons,
+                    **screened_row,
+                },
+            ]
+        )
+        admission = dual_factorlib_admission(
+            technical_passed=True,
+            all36_passed=all36_passed,
+            screened_passed=screened_passed,
+        )
+        admission_rows.append(
             {
                 "feature": self_column,
-                "passed": passed,
-                "reasons": reasons,
-                **summary,
+                "all36_passed": all36_passed,
+                "screened_passed": screened_passed,
+                **admission,
             }
         )
-        if passed:
+        if admission["enters_training"]:
             admitted_self.append(self_column)
     if not admitted_self:
-        raise RuntimeError("no self-developed factor passed factorlib increment gate")
+        raise RuntimeError(
+            "no self-developed factor passed the screened-factorlib training gate"
+        )
 
-    groups = {
-        "factorlib_all36": public_columns,
-        "screened_factorlib_plus_self": (
-            *selected_public,
-            *tuple(admitted_self),
+    self_features = tuple(admitted_self)
+    joint_features = (*selected_public, *self_features)
+    pipelines: dict[tuple[str, str], pd.DataFrame] = {
+        (
+            "self_factor_composite",
+            "family_equal_rank",
+        ): family_balanced_factor(oriented, self_features),
+        (
+            "joint_elastic_net",
+            "elastic_net",
+        ): walk_forward_elastic_net(
+            oriented,
+            labels,
+            feature_columns=joint_features,
+            prediction_years=(SELECTION_YEAR, CONFIRMATION_YEAR),
+        ),
+        (
+            "joint_lightgbm",
+            "lightgbm",
+        ): walk_forward_lightgbm(
+            oriented,
+            labels,
+            feature_columns=joint_features,
+            prediction_years=(SELECTION_YEAR, CONFIRMATION_YEAR),
         ),
     }
-    methods: dict[tuple[str, str], pd.DataFrame] = {}
-    for experiment, features in groups.items():
-        methods[(experiment, "family_equal_rank")] = family_balanced_factor(
-            oriented,
-            features,
-        )
-        methods[(experiment, "elastic_net")] = walk_forward_elastic_net(
-            oriented,
-            labels,
-            feature_columns=tuple(features),
-            prediction_years=(SELECTION_YEAR, CONFIRMATION_YEAR),
-        )
-        methods[(experiment, "lightgbm")] = walk_forward_tree_boosting(
-            oriented,
-            labels,
-            feature_columns=tuple(features),
-            prediction_years=(SELECTION_YEAR, CONFIRMATION_YEAR),
-            backend="lightgbm",
-        )
-        methods[(experiment, "xgboost")] = walk_forward_tree_boosting(
-            oriented,
-            labels,
-            feature_columns=tuple(features),
-            prediction_years=(SELECTION_YEAR, CONFIRMATION_YEAR),
-            backend="xgboost",
-        )
 
     metric_rows: list[dict[str, object]] = []
     periods = {
         "selection_2022": SELECTION_YEAR,
         "confirmation_2023": CONFIRMATION_YEAR,
     }
-    for (experiment, method), factor in methods.items():
+    for (experiment, method), factor in pipelines.items():
         for period, year in periods.items():
             block = factor.loc[factor["date"].dt.year.eq(year)]
             dates = block["date"].unique()
@@ -482,7 +532,7 @@ def run_experiments(
     metrics = pd.DataFrame(metric_rows)
 
     decisions: list[dict[str, object]] = []
-    for experiment, method in methods:
+    for experiment, method in pipelines:
         selection_ic = metric_value(
             metrics,
             experiment,
@@ -532,29 +582,7 @@ def run_experiments(
                 "confirmation_rank_ic_mean": confirmation_ic,
             }
         )
-    eligible = [row for row in decisions if row["passed_selection_gate"]]
-    selected = (
-        max(eligible, key=lambda row: float(row["selection_rank_ic_mean"]))
-        if eligible
-        else None
-    )
-    if selected is not None:
-        baseline_confirmation = metric_value(
-            metrics,
-            str(selected["experiment"]),
-            "family_equal_rank",
-            "confirmation_2023",
-            "raw_full",
-            "rank_ic_mean",
-        )
-        selected["confirmed_2023"] = (
-            float(selected["confirmation_rank_ic_mean"]) > 0
-            and (
-                str(selected["method"]) == "family_equal_rank"
-                or float(selected["confirmation_rank_ic_mean"])
-                > baseline_confirmation
-            )
-        )
+        decisions[-1]["confirmed_2023"] = confirmation_ic > 0
 
     reports_dir.mkdir(exist_ok=True)
     screening.to_csv(reports_dir / "factor_pool_screening.csv", index=False)
@@ -562,16 +590,48 @@ def run_experiments(
         reports_dir / "factor_pool_incremental.csv",
         index=False,
     )
-    metrics.to_csv(reports_dir / "factor_pool_metrics.csv", index=False)
+    pd.DataFrame(admission_rows).to_csv(
+        reports_dir / "factor_pool_admission.csv",
+        index=False,
+    )
+    for pipeline_name in PIPELINE_NAMES:
+        metrics.loc[metrics["experiment"].eq(pipeline_name)].to_csv(
+            reports_dir / f"{pipeline_name}_metrics.csv",
+            index=False,
+        )
+    pipeline_decisions = {
+        str(row["experiment"]): row
+        for row in decisions
+    }
     result = {
-        "protocol": "dynamic_factor_pool_v1",
+        "protocol": "isolated_combination_pipelines_v2",
         "development_years": list(DEVELOPMENT_YEARS),
         "selection_year": SELECTION_YEAR,
         "confirmation_year": CONFIRMATION_YEAR,
-        "groups": {name: list(features) for name, features in groups.items()},
+        "pipelines": {
+            "self_factor_composite": {
+                "method": "family_equal_rank",
+                "features": list(self_features),
+            },
+            "joint_elastic_net": {
+                "method": "elastic_net",
+                "features": list(joint_features),
+            },
+            "joint_lightgbm": {
+                "method": "lightgbm",
+                "features": list(joint_features),
+            },
+        },
+        "factorlib_screened_reference": {
+            "source": "cached_from_dual_benchmark_admission",
+            "features": list(selected_public),
+            "selection_oos_rank_ic": float(
+                screened_summary.iloc[0]["baseline_oos_rank_ic"]
+            ),
+        },
         "factorlib_incremental": incremental_rows,
-        "decisions": decisions,
-        "selected_by_2022_only": selected,
+        "dual_benchmark_admission": admission_rows,
+        "pipeline_decisions": pipeline_decisions,
     }
     (reports_dir / "factor_pool_decisions.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2),
@@ -614,7 +674,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         self_columns,
         args.reports_dir,
     )
-    print(json.dumps(result["selected_by_2022_only"], ensure_ascii=False, indent=2))
+    print(json.dumps(result["pipeline_decisions"], ensure_ascii=False, indent=2))
     return 0
 
 

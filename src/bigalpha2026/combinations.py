@@ -1,92 +1,55 @@
 """Deterministic factor-combination helpers.
 
-Training and method selection happen in the local research scripts.  A frozen
-submission only uses ``fixed_rank_blend`` with recorded coefficients.
+Training entrypoints are versioned locally and executed on real data in
+AIStudio.  A frozen submission only uses recorded features and parameters.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
 
-import numpy as np
 import pandas as pd
 
-from .evaluation import rank_ic_series
 from .research_policy import fixed_weight_rank_combination
 
-TreeBackend = Literal["lightgbm", "xgboost"]
 
+def lightgbm_model_config() -> dict[str, object]:
+    """Return the frozen, deliberately shallow LightGBM configuration."""
 
-def tree_model_config(backend: TreeBackend) -> dict[str, object]:
-    """Return the frozen, deliberately shallow configuration for a tree backend."""
-
-    common: dict[str, object] = {
+    return {
+        "model": "LGBMRegressor",
         "learning_rate": 0.03,
         "n_estimators": 200,
         "max_depth": 3,
         "random_state": 20260726,
         "training": "expanding_window",
+        "num_leaves": 7,
+        "min_child_samples": 100,
+        "subsample": 1.0,
+        "colsample_bytree": 1.0,
+        "reg_lambda": 1.0,
     }
-    if backend == "lightgbm":
-        return {
-            "model": "LGBMRegressor",
-            **common,
-            "num_leaves": 7,
-            "min_child_samples": 100,
-            "subsample": 1.0,
-            "colsample_bytree": 1.0,
-            "reg_lambda": 1.0,
-        }
-    if backend == "xgboost":
-        return {
-            "model": "XGBRegressor",
-            **common,
-            "min_child_weight": 100,
-            "subsample": 1.0,
-            "colsample_bytree": 1.0,
-            "reg_lambda": 1.0,
-            "tree_method": "hist",
-        }
-    raise ValueError(f"unsupported tree backend: {backend}")
 
 
-def _tree_regressor(backend: TreeBackend):
-    config = tree_model_config(backend)
-    if backend == "lightgbm":
-        from lightgbm import LGBMRegressor
+def _lightgbm_regressor():
+    from lightgbm import LGBMRegressor
 
-        return LGBMRegressor(
-            objective="regression",
-            learning_rate=float(config["learning_rate"]),
-            n_estimators=int(config["n_estimators"]),
-            max_depth=int(config["max_depth"]),
-            num_leaves=int(config["num_leaves"]),
-            min_child_samples=int(config["min_child_samples"]),
-            subsample=float(config["subsample"]),
-            colsample_bytree=float(config["colsample_bytree"]),
-            reg_lambda=float(config["reg_lambda"]),
-            random_state=int(config["random_state"]),
-            n_jobs=1,
-            deterministic=True,
-            force_col_wise=True,
-            verbosity=-1,
-        )
-    from xgboost import XGBRegressor
-
-    return XGBRegressor(
-        objective="reg:squarederror",
+    config = lightgbm_model_config()
+    return LGBMRegressor(
+        objective="regression",
         learning_rate=float(config["learning_rate"]),
         n_estimators=int(config["n_estimators"]),
         max_depth=int(config["max_depth"]),
-        min_child_weight=float(config["min_child_weight"]),
+        num_leaves=int(config["num_leaves"]),
+        min_child_samples=int(config["min_child_samples"]),
         subsample=float(config["subsample"]),
         colsample_bytree=float(config["colsample_bytree"]),
         reg_lambda=float(config["reg_lambda"]),
-        tree_method=str(config["tree_method"]),
         random_state=int(config["random_state"]),
         n_jobs=1,
-        verbosity=0,
+        deterministic=True,
+        force_col_wise=True,
+        verbosity=-1,
     )
 
 
@@ -97,36 +60,6 @@ def fixed_rank_blend(
     """Public submission-safe wrapper around the frozen rank blend."""
 
     return fixed_weight_rank_combination(factors, weights)
-
-
-def positive_ic_weights(
-    factors: Mapping[str, pd.DataFrame],
-    labels: pd.DataFrame,
-    *,
-    label_column: str = "ret_close_to_close",
-) -> dict[str, float]:
-    """Estimate non-negative fixed weights from a development window."""
-
-    raw: dict[str, float] = {}
-    for candidate_id, factor in factors.items():
-        merged = factor.merge(
-            labels[["date", "instrument", label_column]],
-            on=["date", "instrument"],
-            how="inner",
-        )
-        raw[candidate_id] = max(
-            0.0,
-            float(
-                rank_ic_series(
-                    merged,
-                    label_column=label_column,
-                ).mean()
-            ),
-        )
-    total = float(sum(raw.values()))
-    if not np.isfinite(total) or total <= 0:
-        return {candidate_id: 1.0 / len(raw) for candidate_id in raw}
-    return {candidate_id: value / total for candidate_id, value in raw.items()}
 
 
 def walk_forward_elastic_net(
@@ -187,17 +120,16 @@ def walk_forward_elastic_net(
     ).reset_index(drop=True)
 
 
-def walk_forward_tree_boosting(
+def walk_forward_lightgbm(
     panel: pd.DataFrame,
     labels: pd.DataFrame,
     *,
     feature_columns: tuple[str, ...],
     prediction_years: tuple[int, ...],
-    backend: TreeBackend,
     label_column: str = "ret_close_to_close",
     first_training_year: int = 2019,
 ) -> pd.DataFrame:
-    """Generate strictly expanding-window predictions from a tree backend."""
+    """Generate strictly expanding-window LightGBM predictions."""
 
     merged = panel.merge(
         labels[["date", "instrument", label_column]],
@@ -213,7 +145,7 @@ def walk_forward_tree_boosting(
         test = merged.loc[merged["date"].dt.year.eq(prediction_year)]
         if train.empty or test.empty:
             continue
-        model = _tree_regressor(backend)
+        model = _lightgbm_regressor()
         model.fit(
             train.loc[:, list(feature_columns)].to_numpy(dtype=float),
             train[label_column].to_numpy(dtype=float),

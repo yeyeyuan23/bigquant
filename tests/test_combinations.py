@@ -5,15 +5,14 @@ import pandas as pd
 
 from bigalpha2026.combinations import (
     fixed_rank_blend,
-    positive_ic_weights,
-    tree_model_config,
+    lightgbm_model_config,
     walk_forward_elastic_net,
-    walk_forward_tree_boosting,
+    walk_forward_lightgbm,
 )
 from bigalpha2026.research_policy import fixed_weight_rank_combination
 
 
-def _run_tree_backend_smoke(backend: str) -> None:
+def _run_lightgbm_smoke() -> None:
     dates = pd.to_datetime(
         ["2019-01-02"] * 120
         + ["2020-01-02"] * 120
@@ -30,12 +29,11 @@ def _run_tree_backend_smoke(backend: str) -> None:
     )
     labels = panel[["date", "instrument"]].copy()
     labels["ret_close_to_close"] = panel["FR-002"] / 1000
-    result = walk_forward_tree_boosting(
+    result = walk_forward_lightgbm(
         panel,
         labels,
         feature_columns=("FR-002", "HF-001"),
         prediction_years=(2020, 2021),
-        backend=backend,
     )
     assert set(result["date"].dt.year) == {2020, 2021}
     assert list(result.columns) == ["date", "instrument", "factor"]
@@ -74,30 +72,15 @@ class CombinationTest(unittest.TestCase):
         )
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test_positive_ic_weights_favor_predictive_member(self):
-        labels = self.fr[["date", "instrument"]].copy()
-        labels["ret_close_to_close"] = list(range(10)) * 2
-        weights = positive_ic_weights(
-            {"FR-002": self.fr, "HF-001": self.hf},
-            labels,
-        )
-        self.assertAlmostEqual(weights["FR-002"], 1.0)
-        self.assertAlmostEqual(weights["HF-001"], 0.0)
-
-    def test_tree_predictions_are_strictly_walk_forward(self):
-        for backend in ("lightgbm", "xgboost"):
-            with self.subTest(backend=backend):
-                process = get_context("spawn").Process(
-                    target=_run_tree_backend_smoke,
-                    args=(backend,),
-                )
-                process.start()
-                process.join(timeout=60)
-                if process.is_alive():
-                    process.terminate()
-                    process.join()
-                    self.fail(f"{backend} smoke test timed out")
-                self.assertEqual(process.exitcode, 0)
+    def test_lightgbm_predictions_are_strictly_walk_forward(self):
+        process = get_context("spawn").Process(target=_run_lightgbm_smoke)
+        process.start()
+        process.join(timeout=60)
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            self.fail("lightgbm smoke test timed out")
+        self.assertEqual(process.exitcode, 0)
 
     def test_elastic_net_predictions_are_strictly_walk_forward(self):
         dates = pd.to_datetime(
@@ -127,11 +110,10 @@ class CombinationTest(unittest.TestCase):
         self.assertFalse(result.duplicated(["date", "instrument"]).any())
         self.assertTrue(result["factor"].between(-1, 1).all())
 
-    def test_tree_model_configs_are_shallow_and_deterministic(self):
-        for backend in ("lightgbm", "xgboost"):
-            config = tree_model_config(backend)
-            self.assertEqual(config["random_state"], 20260726)
-            self.assertEqual(config["training"], "expanding_window")
+    def test_lightgbm_config_is_shallow_and_deterministic(self):
+        config = lightgbm_model_config()
+        self.assertEqual(config["random_state"], 20260726)
+        self.assertEqual(config["training"], "expanding_window")
 
 
 if __name__ == "__main__":

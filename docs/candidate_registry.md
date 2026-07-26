@@ -44,7 +44,7 @@ registered
 | `PV-006` | PV | OAP Corwin-Schultz 价差估计 | 估计价差越宽越高 | 1—20 日 | `rejected` |
 | `PV-007` | PV | OAP 零成交状态 | 零成交日占比越高越高 | 1—20 日 | `rejected` |
 | `FR-003` | FR | OAP 总资产增长 | 总资产同比增长越低越高 | 5—20 日 | `rejected` |
-| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `rejected` |
+| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `conditional_watch` |
 | `FR-005` | FR | OAP 经营现金流市值比 | 经营现金流/流通市值越高越高 | 5—20 日 | `combination_tested` |
 | `INT-001` | composite `[FR, HF]` | `FR-002/HF-001` 等权截面秩 | 两组件越高越高 | 1 日 | `submitted_smoke` |
 | `MICRO-EN-001` | composite `[HF, OB]` | 微观结构相对公开因子库的滚动 Elastic Net 增量 | 由训练窗学习 | 1 日 | `development_watch` |
@@ -127,11 +127,15 @@ registered
 结果见 `reports/oap_batch1_factorlib_incremental.csv` 和
 `reports/oap_batch1_factorlib_decisions.json`。
 
-严格增量门槛下只有 `FR-005` 通过，并在 2023 保持正增量。`PV-005` 在选择期和
-确认期均有正增量，但正方向权重比例未达门槛；当前编号淘汰，机制仅作后续新编号
-研究参考，不进入正式组合。
-`PV-003/004/006` 的确认期或选择期增量为负；`FR-003/004` 未通过选择期增量；
-`PV-007` 还因 21 日离散计数无法达到每日 50 个不同值的技术门槛而淘汰。
+双基准准入结果中，`FR-005` 同时通过 `factorlib_all36` 和冻结的
+`factorlib_screened（15/36）`，属于 `core_candidate`，且 2023 两套增量均为正。
+`FR-004` 只通过 screened 基准，属于 `overlap_aware_candidate`，可以进入挑战池；
+但它相对 screened 的 2023 增量转负，因此不得进入最终冻结主组合。
+
+其余候选不进入训练。`PV-005` 虽在选择期和确认期均有正增量，但正方向权重比例
+未达门槛；当前编号淘汰，只作后续新编号研究参考。`PV-003/004/006` 未通过双基准
+准入；`FR-003` 未通过 screened 方向稳定性；`PV-007` 还因 21 日离散计数无法达到
+每日 50 个不同值的技术门槛而淘汰。
 
 #### PV-003
 

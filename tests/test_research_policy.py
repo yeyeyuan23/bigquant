@@ -3,6 +3,7 @@ import unittest
 import pandas as pd
 
 from bigalpha2026.research_policy import (
+    FROZEN_FACTORLIB_SCREENED_FEATURES,
     COMBINATION_ADMISSION_GATE,
     FORMAL_EVALUATION_POLICY,
     HF_OB_ACTIVATED_OPTIONAL_MONTHS,
@@ -10,12 +11,23 @@ from bigalpha2026.research_policy import (
     HF_OB_MAX_OPTIONAL_MONTHS,
     HF_OB_OPTIONAL_MONTH_POOL,
     candidate_ids,
+    dual_factorlib_admission,
     fixed_weight_rank_combination,
     technical_gate,
 )
 
 
 class ResearchPolicyTest(unittest.TestCase):
+    def test_screened_factorlib_membership_is_frozen_at_15_of_36(self):
+        self.assertEqual(len(FROZEN_FACTORLIB_SCREENED_FEATURES), 15)
+        self.assertEqual(len(set(FROZEN_FACTORLIB_SCREENED_FEATURES)), 15)
+        self.assertTrue(
+            all(
+                feature.startswith("factorlib__")
+                for feature in FROZEN_FACTORLIB_SCREENED_FEATURES
+            )
+        )
+
     def test_all_registered_candidates_are_available_to_first_round(self):
         self.assertEqual(len(candidate_ids()), 16)
         self.assertEqual(len(candidate_ids("first_round")), 8)
@@ -97,6 +109,43 @@ class ResearchPolicyTest(unittest.TestCase):
         passed, reasons = technical_gate(0.99, 100, 60, 0.0)
         self.assertTrue(passed)
         self.assertEqual(reasons, [])
+
+    def test_dual_factorlib_admission_requires_screened_baseline(self):
+        self.assertEqual(
+            dual_factorlib_admission(
+                technical_passed=True,
+                all36_passed=True,
+                screened_passed=True,
+            ),
+            {"classification": "core_candidate", "enters_training": True},
+        )
+        self.assertEqual(
+            dual_factorlib_admission(
+                technical_passed=True,
+                all36_passed=False,
+                screened_passed=True,
+            ),
+            {
+                "classification": "overlap_aware_candidate",
+                "enters_training": True,
+            },
+        )
+        self.assertEqual(
+            dual_factorlib_admission(
+                technical_passed=True,
+                all36_passed=True,
+                screened_passed=False,
+            ),
+            {"classification": "orthogonal_watch", "enters_training": False},
+        )
+        self.assertEqual(
+            dual_factorlib_admission(
+                technical_passed=False,
+                all36_passed=True,
+                screened_passed=True,
+            ),
+            {"classification": "technical_reject", "enters_training": False},
+        )
 
 
 if __name__ == "__main__":

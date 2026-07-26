@@ -179,12 +179,17 @@ factorlib_regularized_incremental_batch_validation
 流程：
 
 1. 先冻结所有候选共用的股票日、标签、公开 36 因子和模型参数。
-2. 每个滚动窗口只使用过去 60 个交易日训练，随后 20 日 OOS 测试。
-3. 每个窗口的 36 因子基线只拟合一次并缓存预测，全部候选复用；数据合同、
-   标签、时间切分或模型参数改变时才重跑基线。
-4. 每个候选只新增一个“公开 36 因子 + 候选”的增强模型。
-5. 比较同一基线上的 OOS Rank IC，并记录候选权重、选择频率和与公开因子的
-   最大相关性。
+2. 只用 2019—2021 筛选并确定公开因子方向，得到冻结的
+   `factorlib_screened`；本轮真实结果为 36 个中保留 15 个，2022 和 2023 不得
+   用于修改其成员。
+3. 每个滚动窗口只使用过去 60 个交易日训练，随后 20 日 OOS 测试。
+4. 所有候选都必须完成两套评价基准：
+   - `factorlib_all36`：完整公开库正交性评价；
+   - `factorlib_screened`：实际训练组合增量评价。
+5. 每套评价基准在每个窗口只拟合一次并缓存预测，全部候选复用；数据合同、
+   标签、时间切分、筛选成员或模型参数改变时才重跑。
+6. 每个候选分别新增“评价基准 + 候选”的增强模型，比较 OOS Rank IC，并记录
+   候选权重、选择频率和与该评价基准的最大相关性。
 
 首批 8 个 OAP 候选统一入口为
 `scripts/run_oap_batch1_incremental.py`，禁止逐候选复制一套基线流程。
@@ -197,6 +202,20 @@ factorlib_regularized_incremental_batch_validation
 - 登记方向权重比例不低于 60%；
 - 与任一公开因子的最大绝对 Rank 相关不高于 0.80。
 
+双基准训练准入固定为：
+
+| `all36` | `screened` | 分类 | 进入组合训练 |
+|---|---|---|---|
+| 通过 | 通过 | `core_candidate` | 是 |
+| 未通过 | 通过 | `overlap_aware_candidate` | 是 |
+| 通过 | 未通过 | `orthogonal_watch` | 否 |
+| 未通过 | 未通过 | `rejected` | 否 |
+
+技术门槛未通过时直接标记 `technical_reject`。因此，
+`factorlib_screened` 通过是进入训练的必要条件；`factorlib_all36` 用于区分候选
+是否在完整公开库之外仍有稳定正交增量。不得为了让候选晋级而在查看 2022 或
+2023 后修改公开因子筛选成员。
+
 这是官方评分的代理检查，不等于真实比赛分数。
 
 ## 7. 组合与模型训练
@@ -206,14 +225,50 @@ factorlib_regularized_incremental_batch_validation
 - `src/bigalpha2026/combinations.py`
 - `scripts/run_combinations.py`
 
+两套评价基准只负责候选准入，不直接定义最终组合。组合阶段固定为三条彼此隔离的
+管线：
+
+1. `self_factor_composite`：所有获准自研因子按数据族内等权、族间等权合成；
+2. `joint_elastic_net`：冻结的 15 个公开因子与完整自研因子池联合进入
+   Elastic Net；
+3. `joint_lightgbm`：相同联合特征池进入浅层 LightGBM。
+
+三条管线不共享拟合后的权重、模型或预测，只共享输入面板、时间切分、缺失值处理
+和评价口径。每条管线分别输出指标和准入结论，禁止在同一个通用
+“输入池 × 模型”循环中临时增加第四种方案。
+
+`factorlib_screened` 的模型结果已经在第 6 节增量评价中计算并缓存，组合阶段仅将
+其作为固定参照，不再作为第三个方案重复训练。只有模型结构、训练窗口或样本合同
+改变时，才必须同步重算对应的公开库参照，否则不能声称联合模型存在增量。
+
+冻结的 15 个公开因子为：
+
+```text
+amount, atr_14, bias_20, cci_14, float_market_cap,
+kdj_d_9_3_3, macd_diff_12_26_9, macd_hist_12_26_9, momentum_5,
+net_profit_rate_ttm, netflow_amount_rate_main, total_market_cap,
+turn, volatility_5, volume
+```
+
+代码中的完整列名带 `factorlib__` 前缀，唯一事实来源为
+`research_policy.py` 的 `FROZEN_FACTORLIB_SCREENED_FEATURES`。
+
+不得把 `+FR-005`、`+FR-004` 之类的逐因子增强模型当作正式组合方案。逐因子加入
+只用于第 6 节准入评价和组合后的逐项删除归因；正式方案使用完整获准池，避免因
+反复挑选单个加入顺序而过拟合 2022。
+
 组合顺序：
 
-1. 公开库先做覆盖率、常数、有限值和主键检查，36 因子全部进入基线；
-2. 只用 2019—2021 的 Rank IC、滚动 Elastic Net 选择频率和相关性得到公开因子子集；
-3. 自研候选先通过首轮准入，再做“公开 36 因子 + 单个候选”的滚动正则增量检查；
-4. 正式只比较 `factorlib_all36` 与 `screened_factorlib_plus_self` 两组；
-5. 每组比较族内/族间等权、Elastic Net 和浅层 LightGBM，XGBoost只作对照；
-6. 2022 只选择实验组和方法，2023 只确认，不再筛选或调参。
+1. 公开库先做覆盖率、常数、有限值和主键检查；
+2. 只用 2019—2021 得到并冻结 `factorlib_screened`；
+3. 自研候选完成首轮准入和第 6 节双基准评价；
+4. 只有通过 `factorlib_screened` 的候选进入自研池；
+5. 分别执行规则组合、联合 Elastic Net、联合 LightGBM 三条管线；
+6. 2022 分别判断三条管线是否通过，不自动从中挑一个“最优”；2023 只确认，
+   不再筛选或调参。
+
+`core_candidate` 进入主自研池；`overlap_aware_candidate` 可以进入挑战池，但若
+2023 确认期相对 `factorlib_screened` 转负，则不得进入最终冻结主组合。
 
 训练代码在本地开发、测试和版本化，然后同步到 AIStudio 读取真实因子矩阵执行。
 新增因子只能扩充注册表和特征列，不能复制训练分支。所有模型共享股票池左表、
@@ -221,7 +276,8 @@ factorlib_regularized_incremental_batch_validation
 
 本地运行
 `PYTHONPATH=src conda run --no-capture-output -n quant python scripts/run_combinations.py --check`
-只使用合成数据验收动态列、左连接、中性填充和两组输出合同，不产生有效性结论。
+只使用合成数据验收动态列、左连接、中性填充和三条隔离管线的输出合同，不产生
+有效性结论。
 
 每增加一个输入都必须比较：
 
@@ -268,11 +324,15 @@ reports/
 ├── first_round_correlations.csv
 ├── first_round_decisions.json
 ├── oap_batch1_technical.csv
+├── oap_batch1_factorlib_screening.csv
 ├── oap_batch1_factorlib_incremental.csv
 ├── oap_batch1_factorlib_decisions.json
 ├── factor_pool_screening.csv
 ├── factor_pool_incremental.csv
-├── factor_pool_metrics.csv
+├── factor_pool_admission.csv
+├── self_factor_composite_metrics.csv
+├── joint_elastic_net_metrics.csv
+├── joint_lightgbm_metrics.csv
 └── factor_pool_decisions.json
 
 artifacts/frozen/

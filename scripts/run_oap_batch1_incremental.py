@@ -29,13 +29,19 @@ from bigalpha2026.evaluation import (
     factorlib_regularized_incremental_batch_validation,
     rank_ic_series,
 )
-from bigalpha2026.factor_pool import build_feature_panel
+from bigalpha2026.factor_pool import (
+    apply_feature_directions,
+    build_feature_panel,
+    screen_public_factors,
+)
 from bigalpha2026.factorlib import FACTORLIB_FEATURE_COLUMNS
 from bigalpha2026.research_policy import (
+    FROZEN_FACTORLIB_SCREENED_FEATURES,
     FORMAL_EVALUATION_POLICY,
     HF_OB_ACTIVATED_OPTIONAL_MONTHS,
     HF_OB_MANDATORY_MONTHS,
     TECHNICAL_GATE,
+    dual_factorlib_admission,
     factorlib_incremental_gate,
 )
 
@@ -147,6 +153,7 @@ def period_summary(
     public_columns: tuple[str, ...],
     self_columns: tuple[str, ...],
     *,
+    benchmark: str,
     period: str,
     start: str,
     end: str,
@@ -202,6 +209,7 @@ def period_summary(
         rows.append(
             {
                 "candidate_id": candidate.removeprefix("self__"),
+                "benchmark": benchmark,
                 "period": period,
                 "baseline_oos_rank_ic": baseline_mean,
                 "augmented_oos_rank_ic": augmented_mean,
@@ -322,89 +330,196 @@ def main(argv: Sequence[str] | None = None) -> int:
     ):
         raise ValueError("candidate pool does not contain the frozen eight candidates")
 
-    _, baseline_weights, candidate_weights, predictions = (
+    development_panel = panel.loc[panel["date"].dt.year.isin((2019, 2020, 2021))]
+    development_labels = evaluation_labels.loc[
+        evaluation_labels["date"].dt.year.isin((2019, 2020, 2021))
+    ]
+    screening = screen_public_factors(
+        development_panel,
+        development_labels,
+        public_columns,
+        development_years=(2019, 2020, 2021),
+    )
+    selected_public = tuple(
+        screening.loc[screening["selected"], "feature"].astype(str)
+    )
+    if selected_public != FROZEN_FACTORLIB_SCREENED_FEATURES:
+        raise RuntimeError(
+            "development-only factorlib screening no longer matches the frozen "
+            "15-of-36 membership"
+        )
+    oriented = apply_feature_directions(panel, screening)
+
+    _, all36_baseline_weights, all36_candidate_weights, all36_predictions = (
         factorlib_regularized_incremental_batch_validation(
-            panel,
+            oriented,
             evaluation_labels,
             public_columns,
             self_columns,
             config=CONFIG,
         )
     )
-    selection = period_summary(
-        panel,
-        predictions,
-        candidate_weights,
+    _, screened_baseline_weights, screened_candidate_weights, screened_predictions = (
+        factorlib_regularized_incremental_batch_validation(
+            oriented,
+            evaluation_labels,
+            selected_public,
+            self_columns,
+            config=CONFIG,
+        )
+    )
+    all36_selection = period_summary(
+        oriented,
+        all36_predictions,
+        all36_candidate_weights,
         public_columns,
         self_columns,
+        benchmark="factorlib_all36",
         period="development_and_selection_through_2022",
         start=FORMAL_EVALUATION_POLICY.development_start,
         end=FORMAL_EVALUATION_POLICY.selection_end,
     )
-    confirmation = period_summary(
-        panel,
-        predictions,
-        candidate_weights,
+    all36_confirmation = period_summary(
+        oriented,
+        all36_predictions,
+        all36_candidate_weights,
         public_columns,
         self_columns,
+        benchmark="factorlib_all36",
+        period="confirmation_2023",
+        start=FORMAL_EVALUATION_POLICY.confirmation_start,
+        end=FORMAL_EVALUATION_POLICY.confirmation_end,
+    )
+    screened_selection = period_summary(
+        oriented,
+        screened_predictions,
+        screened_candidate_weights,
+        selected_public,
+        self_columns,
+        benchmark="factorlib_screened",
+        period="development_and_selection_through_2022",
+        start=FORMAL_EVALUATION_POLICY.development_start,
+        end=FORMAL_EVALUATION_POLICY.selection_end,
+    )
+    screened_confirmation = period_summary(
+        oriented,
+        screened_predictions,
+        screened_candidate_weights,
+        selected_public,
+        self_columns,
+        benchmark="factorlib_screened",
         period="confirmation_2023",
         start=FORMAL_EVALUATION_POLICY.confirmation_start,
         end=FORMAL_EVALUATION_POLICY.confirmation_end,
     )
     decisions: list[dict[str, object]] = []
-    for row in selection.to_dict("records"):
+    for row in all36_selection.to_dict("records"):
+        candidate_id = row["candidate_id"]
         technical_row = technical.loc[
-            technical["candidate_id"].eq(row["candidate_id"])
+            technical["candidate_id"].eq(candidate_id)
         ].iloc[0]
-        passed, reasons = factorlib_incremental_gate(row)
+        screened_row = screened_selection.loc[
+            screened_selection["candidate_id"].eq(candidate_id)
+        ].iloc[0].to_dict()
+        all36_passed, all36_reasons = factorlib_incremental_gate(row)
+        screened_passed, screened_reasons = factorlib_incremental_gate(
+            screened_row
+        )
         if not technical_row["technical_passed"]:
-            reasons = [
+            technical_reasons = [
                 "candidate has fewer than 40 technically eligible days",
-                *reasons,
             ]
-        confirmation_row = confirmation.loc[
-            confirmation["candidate_id"].eq(row["candidate_id"])
+        else:
+            technical_reasons = []
+        all36_confirmation_row = all36_confirmation.loc[
+            all36_confirmation["candidate_id"].eq(candidate_id)
         ].iloc[0]
+        screened_confirmation_row = screened_confirmation.loc[
+            screened_confirmation["candidate_id"].eq(candidate_id)
+        ].iloc[0]
+        admission = dual_factorlib_admission(
+            technical_passed=bool(technical_row["technical_passed"]),
+            all36_passed=all36_passed,
+            screened_passed=screened_passed,
+        )
         decisions.append(
             {
-                "candidate_id": row["candidate_id"],
+                "candidate_id": candidate_id,
                 "technical_passed": bool(technical_row["technical_passed"]),
-                "selection_passed": bool(
-                    technical_row["technical_passed"] and passed
-                ),
-                "selection_reasons": reasons,
-                "selection_oos_rank_ic_increment": row["oos_rank_ic_increment"],
-                "confirmation_oos_rank_ic_increment": confirmation_row[
+                "all36_passed": all36_passed,
+                "screened_passed": screened_passed,
+                **admission,
+                "technical_reasons": technical_reasons,
+                "all36_reasons": all36_reasons,
+                "screened_reasons": screened_reasons,
+                "all36_selection_oos_rank_ic_increment": row[
                     "oos_rank_ic_increment"
                 ],
-                "confirmation_direction_preserved": bool(
-                    confirmation_row["oos_rank_ic_increment"] > 0
+                "screened_selection_oos_rank_ic_increment": screened_row[
+                    "oos_rank_ic_increment"
+                ],
+                "all36_confirmation_oos_rank_ic_increment": all36_confirmation_row[
+                    "oos_rank_ic_increment"
+                ],
+                "screened_confirmation_oos_rank_ic_increment": (
+                    screened_confirmation_row["oos_rank_ic_increment"]
                 ),
             }
         )
 
-    summary = pd.concat([selection, confirmation], ignore_index=True)
+    summary = pd.concat(
+        [
+            all36_selection,
+            all36_confirmation,
+            screened_selection,
+            screened_confirmation,
+        ],
+        ignore_index=True,
+    )
     summary.to_csv(reports_dir / "oap_batch1_factorlib_incremental.csv", index=False)
-    baseline_weights.to_csv(
-        reports_dir / "oap_batch1_factorlib_baseline_weights.csv",
+    all36_baseline_weights.to_csv(
+        reports_dir / "oap_batch1_factorlib_all36_baseline_weights.csv",
         index=False,
     )
-    candidate_weights.to_csv(
+    screened_baseline_weights.to_csv(
+        reports_dir / "oap_batch1_factorlib_screened_baseline_weights.csv",
+        index=False,
+    )
+    all36_candidate_weights["benchmark"] = "factorlib_all36"
+    screened_candidate_weights["benchmark"] = "factorlib_screened"
+    pd.concat(
+        [all36_candidate_weights, screened_candidate_weights],
+        ignore_index=True,
+    ).to_csv(
         reports_dir / "oap_batch1_factorlib_candidate_weights.csv",
         index=False,
     )
     technical.to_csv(reports_dir / "oap_batch1_technical.csv", index=False)
+    screening.to_csv(
+        reports_dir / "oap_batch1_factorlib_screening.csv",
+        index=False,
+    )
     coverage.to_csv(reports_dir / "oap_batch1_factor_coverage.csv", index=False)
     result = {
-        "protocol": "oap_batch1_shared_factorlib_baseline_v1",
+        "protocol": "oap_batch1_dual_factorlib_benchmark_v1",
         "factor_version": FACTOR_VERSION,
         "evaluation_months": list(months),
         "evaluation_dates": int(len(evaluation_dates)),
         "panel_rows": int(len(panel)),
         "public_factor_count": len(public_columns),
         "candidate_count": len(self_columns),
-        "rolling_baseline_fits": int(len(baseline_weights)),
-        "baseline_reused_for_candidates": list(OAP_BATCH1_IDS),
+        "benchmarks": {
+            "factorlib_all36": {
+                "public_factor_count": len(public_columns),
+                "rolling_baseline_fits": int(len(all36_baseline_weights)),
+            },
+            "factorlib_screened": {
+                "public_factor_count": len(selected_public),
+                "public_factors": list(selected_public),
+                "rolling_baseline_fits": int(len(screened_baseline_weights)),
+            },
+        },
+        "each_baseline_reused_for_candidates": list(OAP_BATCH1_IDS),
         "decisions": decisions,
     }
     (reports_dir / "oap_batch1_factorlib_decisions.json").write_text(
