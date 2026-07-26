@@ -3,9 +3,9 @@
 这份文档是新成员进入仓库后的操作入口。开始前依次阅读：
 
 1. `docs/team_workflow.md`：怎么协作和运行；
-2. `docs/candidate_registry.md`：哪些候选已经存在；
-3. `docs/data_contract.md`：允许使用哪些字段以及时间含义；
-4. `docs/factor_research_plan.md`：如何评价和晋级。
+2. `docs/factor_research_plan.md`：环境分工、研究流程、评价和晋级；
+3. `docs/candidate_registry.md`：哪些候选已经存在；
+4. `docs/data_contract.md`：允许使用哪些字段以及时间含义。
 
 ## 发给队友 AI 的启动 Prompt
 
@@ -125,66 +125,25 @@ git switch -c factor/hf-003
 
 ## 3. 新增一个基础因子
 
-### 第一步：选择类别
+候选分类、登记字段、实现规范、技术门槛和评价准入统一见
+`docs/factor_research_plan.md` 第 4—6 节；字段与时点只能引用
+`docs/data_contract.md`，不要在本文件复制一套规则。
 
-| 使用信息 | 目录 | 编号 |
-|---|---|---|
-| 日频价格和成交 | `candidates/pv/` | `PV-xxx` |
-| 分钟成交和价格路径 | `candidates/hf/` | `HF-xxx` |
-| 五档报价和深度 | `candidates/ob/` | `OB-xxx` |
-| 财务披露 | `candidates/fr/` | `FR-xxx` |
+队友的操作顺序只有：
 
-同时使用两个以上类别时，先分别确认基础组件有效。跨类候选只有进入组合阶段后
-才能放入 `candidates/composite/`。
+1. 在群里认领编号；
+2. 在 `docs/candidate_registry.md` 登记；
+3. 在自己的候选分支实现同编号模块和测试；
+4. 本地完整测试通过；
+5. 按第 4 节交给 AIStudio 做真实评价；
+6. 有效结果可以上传比赛，随后提交 MR/PR。
 
-### 第二步：登记候选
-
-登记内容必须在查看结果前写定：
-
-- 经济机制；
-- 使用字段；
-- 信息最早可用时间；
-- 因子正方向；
-- 预测周期；
-- 可能失败的市场状态；
-- 与现有因子或公开因子库的重复风险。
-
-如果只是把现有因子的窗口从 5 改成 6，不能自动算作新机制。
-
-### 第三步：实现
-
-文件名和编号一致，例如：
+文件名和编号必须一致，例如：
 
 ```text
 src/bigalpha2026/candidates/hf/hf_003.py
-```
-
-实现时遵守：
-
-1. 数据读取、组件计算和最终输出分离；
-2. 不在候选模块里读取未来标签；
-3. 滚动窗口只能使用当日及以前的数据；
-4. 输出严格为 `date、instrument、factor`；
-5. 因子值越大代表预期下一期收益越高；
-6. 对缺失值、停牌、午休、盘口空档或财务披露时点做显式处理；
-7. 在对应类别的 `__init__.py` 中导出公开函数。
-
-### 第四步：添加测试
-
-测试文件：
-
-```text
 tests/test_hf_003.py
 ```
-
-至少检查：
-
-- 缺少必要列时明确报错；
-- 输出列和主键正确；
-- 停牌或无数据股票仍符合股票池合同；
-- 修改未来输入不会改变过去输出；
-- 因子方向与登记一致；
-- 极端值不会产生无穷数。
 
 运行：
 
@@ -192,30 +151,21 @@ tests/test_hf_003.py
 conda run --no-capture-output -n quant python -m pytest -q
 ```
 
-所有测试通过后才能进入 AIStudio 真实数据验收。
-
 ## 4. AIStudio 真实计算
 
-本地代码通过测试后同步到 AIStudio。平台负责真实数据查询、因子计算、批量评价
-和模型训练；Notebook 不得临时改变已登记的方向、门槛、时间切分或模型规则。
+本地与 AIStudio 的职责、传入内容、回传产物和固定循环统一见
+`docs/factor_research_plan.md` 第 2 节；真实表的连接和聚合规则见
+`docs/data_contract.md`。
 
-顺序：
+实际操作：
 
-1. 用 2—5 个真实交易日和少量股票查询必要字段；
-2. 核对字段类型、分钟增量、交易时段、财务 PIT 和盘口空档；
-3. 扩到比赛股票池，检查每日行数、覆盖率和重复键；
-4. 在平台侧生成日级特征并运行候选轻检；
-5. 批量执行正式评价或训练；
-6. 只回传报告、特征重要性和预测结果；
-7. 记录数据合同变化，不把“可以运行”写成“因子有效”。
+1. 本地测试通过后，将已登记的候选代码和 Git 版本同步到 AIStudio；
+2. 先用 2—5 个交易日和少量股票验收三列输出；
+3. 验收通过后扩到正式区间，运行 plan 规定的评价；
+4. 将 plan 规定的小型报告回传本地；
+5. 新数据依赖按第 5 节交付增量包。
 
-原始表、公开 36 因子库和大型训练矩阵留在 AIStudio，不为本地训练下载副本。
-
-如果新因子需要现有 HF/OB 面板没有的新分钟逻辑，直接使用平台传入的
-`datasources["bar1m"]`。必须先做短窗验证，再聚合为以
-`date、instrument` 为主键的日级通用组件。分钟收益不能跨午休；
-`volume、amount、deal_number` 按分钟增量处理；五档盘口只有价格和数量均为正
-的档位有效。
+禁止把本地测试写成真实有效性结论，也禁止在 Notebook 中临时修改 plan。
 
 ## 5. 可选本地数据包同步
 
@@ -301,28 +251,12 @@ bigalpha_data_delta_HF-003_20260726.tar.gz.sha256
 
 ## 6. 评价新因子
 
-### 基础评价
-
-把候选接入评价代码，本地先运行：
+评价指标、公开因子库增量门槛和状态定义统一见
+`docs/factor_research_plan.md` 第 5—6 节。队友不修改评价实现，只执行：
 
 ```bash
 conda run --no-capture-output -n quant python -m pytest -q
 ```
-
-测试通过后，在 AIStudio 真实数据上批量运行同一评价逻辑，并将以下小型结果同步
-回本地：
-
-```text
-reports/first_round_technical.csv
-reports/first_round_metrics.csv
-reports/first_round_stability.csv
-reports/first_round_costs.csv
-reports/first_round_correlations.csv
-reports/first_round_decisions.json
-```
-
-本地测试不产生有效性结论。平台报告必须同时包含方向稳定性、分组单调性、
-可交易子集、中性化、换手和成本。
 
 如果已取得赛事允许共享的聚合日频面板，可选地在本地复现：
 
@@ -336,84 +270,29 @@ PYTHONPATH=src conda run --no-capture-output -n quant \
 `date、instrument、candidate_id、factor_version、factor`。它是组合层的标准
 自研候选输入，但本地结果仍不能替代 AIStudio 真实结论。
 
-### 公开因子库增量
-
-候选完成基础评价后，调用：
-
-```python
-factorlib_regularized_incremental_validation(...)
-```
-
-比较“仅公开因子库”和“公开因子库 + 候选”的严格前推 OOS 结果。记录：
-
-- Rank IC 增量；
-- 正增量日期和窗口比例；
-- 候选非零权重比例；
-- 权重方向稳定性；
-- 与公开因子的最大 Rank 相关。
-
-如果单因子弱但增量稳定，可登记为 `diversifier`；如果单因子和增量都不稳定，
-标记 `rejected`。
+正式评价必须在 AIStudio 运行，并按 plan 第 2.4、9 节回传和保存标准报告。
 
 ## 7. 进入组合层
 
-训练实现保存在：
-
-```text
-src/bigalpha2026/combinations.py
-scripts/run_combinations.py
-```
-
-本节是候选进入统一组合后的评价说明。队友可以使用现有入口检验自己的候选，
-但不得在候选分支修改组合代码、时间切分、筛选规则或模型参数；统一组合优化由
-主仓库负责人执行。
-
-本地只做接口、时间切分和防泄漏测试；通过后同步到 AIStudio 真实训练：
+组合顺序、时间切分、模型和准入门槛统一见
+`docs/factor_research_plan.md` 第 7 节。组合代码对队友只读；队友如需确认自己的
+候选能进入动态接口，只运行：
 
 ```bash
 PYTHONPATH=src conda run --no-capture-output -n quant \
   python scripts/run_combinations.py --check
 ```
 
-`--check` 只使用合成数据，不读取比赛数据、不训练模型。真实流程为：
-
-1. 36 个公开因子通过技术检查后全部进入基线；
-2. 只用 2019—2021 筛选公开因子；
-3. 首轮准入的自研因子逐个做公开库增量检查；
-4. 比较 `factorlib_all36` 与 `screened_factorlib_plus_self`；
-5. 每组比较族平衡等权、Elastic Net、LightGBM，XGBoost 只作对照；
-6. 2022 选择，2023 确认且不再调参。
-
-训练入口必须动态读取特征列，新增到 100 个因子时仍只扩充注册表和特征列。
-所有模型使用相同股票池、时间切分、缺失值和评价口径。AIStudio 只回传报告、
-特征重要性和预测结果。
-
-已经提交的 `INT-001` 不再由组合脚本生成；不可变记录位于
-`artifacts/frozen/int_001.json`。
-
-不要把一次训练产生的模型直接放进 `composite/`。必须先冻结：
-
-- 输入组件；
-- 训练区间；
-- 超参数；
-- 重训频率；
-- 缺失值处理；
-- 推理接口；
-- 输出方向。
+`--check` 只验证合成数据合同，不产生有效性结论。统一组合训练、冻结和
+`composite/` 登记由主仓库负责人完成。
 
 ## 8. 比赛提交与代码交付
 
 候选完成 AIStudio 真实评价、结果值得提交时，同队成员及其 AI
 可以直接上传比赛，不需要再次询问队长。
 
-提交前必须：
-
-- 冻结代码、参数和 Notebook；
-- 用 2—5 个真实交易日验证；
-- 输出严格为 `date、instrument、factor`；
-- 主键无重复，因子值有限，覆盖率合格；
-- 接受平台传入的任意日期范围；
-- 不读取本地文件、不访问外部网络、不写死评价区间。
+提交准入和冻结内容统一见 `docs/factor_research_plan.md` 第 8 节；Notebook
+接口统一见 `docs/data_contract.md` 的“候选输出合同”。本文件只规定协作交付。
 
 上传后只需告诉队长：
 
@@ -446,11 +325,9 @@ MR/PR 简单说明：
 ## 9. 合并前检查
 
 - 候选编号没有冲突；
-- 登记内容与代码方向一致；
 - 只修改本候选及“修改权限”允许的配套文件；
 - 完整测试通过；
 - 没有数据文件、密钥或 Notebook 输出；
-- 本地测试结果和 AIStudio 真实有效性结论被明确区分；
-- 失败结果已记录；
-- 新数据依赖已经交付生成代码、manifest 和增量包；
+- plan 规定的评价和冻结证据已经提供；
+- 新数据依赖已按第 5 节交付；
 - 最终代码已创建 MR/PR。
