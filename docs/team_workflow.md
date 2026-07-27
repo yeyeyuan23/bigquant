@@ -185,12 +185,12 @@ tar \
   --exclude='*.tmp' \
   --exclude='*.partial' \
   --exclude='.DS_Store' \
-  -czf data/transfers/bigalpha_research_data_20260727.tar.gz \
+  -czf data/transfers/bigalpha_research_data_v2.tar.gz \
   data
 
 shasum -a 256 \
-  data/transfers/bigalpha_research_data_20260727.tar.gz \
-  > data/transfers/bigalpha_research_data_20260727.tar.gz.sha256
+  data/transfers/bigalpha_research_data_v2.tar.gz \
+  > data/transfers/bigalpha_research_data_v2.tar.gz.sha256
 ```
 
 发送压缩包和同名 `.sha256` 文件。接收方将二者放到仓库的
@@ -198,14 +198,14 @@ shasum -a 256 \
 
 ```bash
 shasum -a 256 -c \
-  data/transfers/bigalpha_research_data_20260727.tar.gz.sha256
+  data/transfers/bigalpha_research_data_v2.tar.gz.sha256
 ```
 
 校验显示 `OK` 后解压：
 
 ```bash
 tar -xzf \
-  data/transfers/bigalpha_research_data_20260727.tar.gz \
+  data/transfers/bigalpha_research_data_v2.tar.gz \
   -C .
 ```
 
@@ -219,14 +219,15 @@ conda run --no-capture-output -n quant python -m pytest -q
 manifests，不包含原始分钟成交或盘口快照。`data/transfers/` 已被
 `.gitignore` 排除，禁止强制加入 Git。
 
-如果数据内容发生变化，使用当天日期生成新包，不覆盖旧包；双方通过 SHA-256
-确认使用的是同一份数据快照。
+如果数据内容发生变化，递增包版本号（`v2`、`v3`、`v4`），不覆盖旧包；即使
+一天内生成多个版本也必须使用不同版本号。双方通过 SHA-256 确认使用的是同一份
+数据快照。
 
 当前团队基础数据包：
 
 ```text
-bigalpha_research_data_20260727.tar.gz
-bigalpha_research_data_20260727.tar.gz.sha256
+bigalpha_research_data_v2.tar.gz
+bigalpha_research_data_v2.tar.gz.sha256
 SHA-256:
 459bb593a33d817dd850a2e8465db01523a229e6c9c56886ff4aeaf6c4bc48bd
 ```
@@ -246,8 +247,8 @@ SHA-256:
 增量包示例：
 
 ```text
-bigalpha_data_delta_HF-003_20260726.tar.gz
-bigalpha_data_delta_HF-003_20260726.tar.gz.sha256
+bigalpha_data_delta_HF-003_v1.tar.gz
+bigalpha_data_delta_HF-003_v1.tar.gz.sha256
 ```
 
 只打包新增组件，不重新发送完整数据包。队长解压后必须能运行同一评价代码得到
