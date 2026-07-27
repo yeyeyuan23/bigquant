@@ -4,9 +4,9 @@
 def main(datasources, start_date, end_date):
     """Return the frozen equal-rank combination as date, instrument, factor."""
 
+    import dai
     import numpy as np
     import pandas as pd
-    import dai
 
     bar1m = datasources["bar1m"]
     financial_table = datasources["financial"]

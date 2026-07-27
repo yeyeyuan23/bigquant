@@ -35,7 +35,6 @@ from bigalpha2026.candidates.pv.pv_007 import (
     compute_pv_007_daily,
 )
 
-
 INSTRUMENTS = ("A", "B", "C")
 
 

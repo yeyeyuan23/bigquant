@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 import pandas as pd
-
 
 FACTORLIB_TABLE = "bigalpha_2026_factorlib"
 FACTORLIB_KEY = ("date", "instrument")

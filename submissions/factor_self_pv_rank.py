@@ -4,9 +4,9 @@
 def main(datasources, start_date, end_date):
     """Return the frozen three-factor daily price-volume composite."""
 
+    import dai
     import numpy as np
     import pandas as pd
-    import dai
 
     start_ts = pd.Timestamp(start_date).normalize()
     end_ts = pd.Timestamp(end_date).normalize()

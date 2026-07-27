@@ -253,10 +253,10 @@ def _surprise_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     prior_growth = (0.05, 0.10, 0.02, 0.08, 0.03, 0.12, 0.04, 0.07, 0.06)
     latest_growth = {"A": 0.40, "B": -0.20, "C": 0.06}
     rows: list[dict[str, object]] = []
-    for instrument in latest_growth:
+    for instrument, latest_instrument_growth in latest_growth.items():
         earnings = 100.0
         revenue = 1_000.0
-        growth_path = (*prior_growth, latest_growth[instrument])
+        growth_path = (*prior_growth, latest_instrument_growth)
         rows.append(
             _financial_row(
                 instrument,

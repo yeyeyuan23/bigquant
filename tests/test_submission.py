@@ -3,7 +3,6 @@ import json
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "submissions" / "factor_int_001_equal_rank.py"
 NOTEBOOK = ROOT / "submissions" / "factor_int_001_equal_rank.ipynb"

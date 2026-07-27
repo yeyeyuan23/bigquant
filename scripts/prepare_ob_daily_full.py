@@ -5,12 +5,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
-
 
 ROOT = Path(__file__).resolve().parents[1]
 YEARS = (2019, 2020, 2021, 2022, 2023)
@@ -124,10 +123,10 @@ def prepare_year(
     return {
         "year": year,
         "source_path": str(source_path.relative_to(ROOT)),
-        "source_rows": int(len(source)),
+        "source_rows": len(source),
         "source_sha256": file_sha256(source_path),
         "path": str(target_path.relative_to(ROOT)),
-        "rows": int(len(canonical)),
+        "rows": len(canonical),
         "dates": int(canonical["date"].nunique()),
         "date_range": [
             canonical["date"].min().date().isoformat(),

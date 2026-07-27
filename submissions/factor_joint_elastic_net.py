@@ -9,9 +9,9 @@ module only rebuilds point-in-time features and applies the frozen model.
 def main(datasources, start_date, end_date):
     """Return a complete daily ``date, instrument, factor`` panel."""
 
+    import dai
     import numpy as np
     import pandas as pd
-    import dai
 
     factorlib_columns = (
         "amount",

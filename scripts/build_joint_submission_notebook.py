@@ -6,7 +6,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "submissions" / "factor_joint_elastic_net.py"
 TARGET = ROOT / "submissions" / "factor_joint_elastic_net.ipynb"
@@ -23,8 +22,10 @@ def rendered_notebook() -> str:
                 "source": [
                     "# BigAlpha 2026 joint Elastic Net submission\n",
                     "\n",
-                    "冻结的 15 个公开因子与 11 个通过增量门槛的自研因子联合模型。"
-                    "测试期只重建 PIT 特征并应用测试期前冻结的模型权重。",
+                    (
+                        "冻结的 15 个公开因子与 11 个通过增量门槛的自研因子联合模型。"
+                        "测试期只重建 PIT 特征并应用测试期前冻结的模型权重。"
+                    ),
                 ],
             },
             {

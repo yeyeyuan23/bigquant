@@ -6,7 +6,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "submissions" / "factor_int_001_equal_rank.py"
 TARGET = ROOT / "submissions" / "factor_int_001_equal_rank.ipynb"
@@ -23,8 +22,10 @@ def rendered_notebook() -> str:
                 "source": [
                     "# BigAlpha 2026 single-factor submission\n",
                     "\n",
-                    "因子：**INT-001 FR-002/HF-001 等权秩组合**。"
-                    "冻结版本 `combination_v2_2026-07-26`。",
+                    (
+                        "因子：**INT-001 FR-002/HF-001 等权秩组合**。"
+                        "冻结版本 `combination_v2_2026-07-26`。"
+                    ),
                 ],
             },
             {

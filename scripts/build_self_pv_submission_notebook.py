@@ -6,7 +6,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "submissions" / "factor_self_pv_rank.py"
 TARGET = ROOT / "submissions" / "factor_self_pv_rank.ipynb"
@@ -23,8 +22,10 @@ def rendered_notebook() -> str:
                 "source": [
                     "# BigAlpha 2026 three-factor price-volume composite\n",
                     "\n",
-                    "`PV-003`、`PV-009`、`PV-014` 先做日截面秩，再等权组合。"
-                    "2019—2021开发，2022与2023等地位验证；不使用测试期标签。",
+                    (
+                        "`PV-003`、`PV-009`、`PV-014` 先做日截面秩，再等权组合。"
+                        "2019—2021开发，2022与2023等地位验证；不使用测试期标签。"
+                    ),
                 ],
             },
             {

@@ -9,9 +9,9 @@ preceding 60 trading days, using only returns already observable by that block.
 def main(datasources, start_date, end_date):
     """Return the competition contract: ``date, instrument, factor``."""
 
+    import dai
     import numpy as np
     import pandas as pd
-    import dai
     from lightgbm import LGBMRegressor
 
     start_ts = pd.Timestamp(start_date).normalize()

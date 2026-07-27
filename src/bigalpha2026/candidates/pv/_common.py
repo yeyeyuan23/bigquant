@@ -7,7 +7,6 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-
 POOL_COLUMNS = ("date", "instrument")
 OUTPUT_COLUMNS = ("date", "instrument", "factor")
 

@@ -7,7 +7,6 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-
 BAR_COLUMNS = ("date", "instrument", "open", "close", "pre_close")
 POOL_COLUMNS = ("date", "instrument")
 OUTPUT_COLUMNS = ("date", "instrument", "factor")

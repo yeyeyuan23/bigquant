@@ -7,7 +7,6 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-
 LEVELS = range(1, 6)
 PRICE_COLUMNS = tuple(
     column

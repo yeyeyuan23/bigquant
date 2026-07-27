@@ -11,7 +11,6 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-
 BAR_COLUMNS = ("date", "instrument", "close", "amount", "volume", "deal_number")
 POOL_COLUMNS = ("date", "instrument")
 OUTPUT_COLUMNS = ("date", "instrument", "factor")
