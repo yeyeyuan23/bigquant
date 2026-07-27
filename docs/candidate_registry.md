@@ -297,7 +297,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 | pipeline | 冻结输入 | 2022 Rank IC | 2023 Rank IC | Notebook | 比赛状态 |
 | --- | --- | ---: | ---: | --- | --- |
 | `self_factor_composite` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/factor_self_family_rank.ipynb` | 2026-07-26 已提交，公榜计算中 |
-| `joint_lightgbm` | 冻结 `screened15` 加 `FR-002/004/011, HF-002/003, OB-005, PV-001/002/003/006/014` | 0.04409 | 0.03388 | `submissions/factor_joint_lightgbm.ipynb` | 2026-07-27 新版已提交，公榜计算中（`5f87e3a9-cae9-4035-940c-74a046017d6c`） |
+| `joint_lightgbm` | 冻结 `screened15` 加 `FR-002/004/011, HF-002/003, OB-005, PV-001/002/003/006/014` | 0.04409 | 0.03388 | `submissions/factor_joint_lightgbm.ipynb` | v3 已提交，公榜计算中（`a8170a82-afec-425a-b805-0065d9c4a4e2`） |
 
 两份 Notebook 均仅保留比赛要求的 `main(datasources, start_date, end_date)`，
 返回列固定为 `date, instrument, factor`。
