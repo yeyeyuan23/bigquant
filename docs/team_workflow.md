@@ -56,8 +56,11 @@ src/bigalpha2026/
 │   ├── ob/              # 五档盘口聚合
 │   ├── fr/              # PIT 财务披露
 │   └── composite/       # 已冻结的跨类组合或模型
-├── evaluation.py        # 单因子与公开因子库增量评价
-├── combinations.py      # 固定组合和前推树模型
+├── evaluation.py        # 共用评价原语
+├── single_factor_admission.py  # S 单因子准入
+├── incremental_admission.py    # I Elastic Net 增量准入
+├── tree_admission.py            # T LightGBM 增量准入
+├── combinations.py      # 准入后的三条组合训练原语
 ├── factorlib.py         # 公开基础因子库字段合同
 └── research_policy.py   # 候选、月份和准入门槛
 
@@ -127,7 +130,7 @@ git switch -c factor/hf-003
 ## 3. 新增一个基础因子
 
 候选分类、登记字段、实现规范、技术门槛和评价准入统一见
-`docs/factor_research_plan.md` 第 4—6 节；字段与时点只能引用
+`docs/factor_research_plan.md` 第 4—7 节；字段与时点只能引用
 `docs/data_contract.md`，不要在本文件复制一套规则。
 
 队友的操作顺序只有：
@@ -136,7 +139,7 @@ git switch -c factor/hf-003
 2. 在 `docs/candidate_registry.md` 登记；
 3. 在自己的候选分支实现同编号模块和测试；
 4. 本地完整测试通过；
-5. 按第 4 节交给 AIStudio 做真实评价；
+5. 按第 4 节交给 AIStudio 做真实数据核验；
 6. 有效结果可以上传比赛，随后提交 MR/PR。
 
 文件名和编号必须一致，例如：
@@ -232,7 +235,7 @@ SHA-256:
 459bb593a33d817dd850a2e8465db01523a229e6c9c56886ff4aeaf6c4bc48bd
 ```
 
-该快照已经包含最新的连续微观日级面板、冻结 screened15、标准化
+该快照已经包含最新的连续微观日级面板、冻结 screened15、标准候选长表
 `data/factors/candidate_pool.parquet` 和全部 manifests；不包含原始分钟数据
 或可由当前代码重算的 `data/cache/`。
 
@@ -264,23 +267,25 @@ bigalpha_data_delta_HF-003_v1.tar.gz.sha256
 conda run --no-capture-output -n quant python -m pytest -q
 ```
 
-取得经过核验的研究快照后，在本地正式运行：
+取得经过核验的研究快照后，在本地正式运行 S：
 
 ```bash
 PYTHONPATH=src conda run --no-capture-output -n quant \
   python scripts/run_first_round.py --resume-metrics
 ```
 
-该入口会额外生成
+该入口会生成
 `data/factors/candidate_pool.parquet`，列严格为
 `date、instrument、candidate_id、factor_version、factor`。它是组合层的标准
-自研候选输入。随后继续运行 I 与组合入口，并按 plan 第 9 节保存标准报告。
-`--resume-metrics` 只复用已有候选的完整S报告，新登记候选仍会正式计算。
+自研候选输入。`--resume-metrics` 只能在已有候选公式和输入均未变化时使用，
+脚本不会自动识别旧候选的代码变化；修改已有候选时必须同时使用
+`--refresh-candidate CANDIDATE_ID`，新登记候选因旧报告中没有同名记录，会自动
+正式计算。
 
 ## 7. 进入组合层
 
 组合顺序、时间切分、模型和准入门槛统一见
-`docs/factor_research_plan.md` 第 7 节。组合代码对队友只读；队友如需确认自己的
+`docs/factor_research_plan.md` 第 6—8 节。组合代码对队友只读；队友如需确认自己的
 候选能进入动态接口，只运行：
 
 ```bash
@@ -291,12 +296,27 @@ PYTHONPATH=src conda run --no-capture-output -n quant \
 `--check` 只验证合成数据合同，不产生有效性结论。统一组合训练、冻结和
 `composite/` 登记由主仓库负责人完成。
 
+主仓库负责人使用已核验快照正式运行 I、T 和三条组合管线：
+
+```bash
+PYTHONPATH=src conda run --no-capture-output -n quant \
+  python scripts/run_combinations.py
+```
+
+I 与 T 的内容寻址缓存分别位于 `data/cache/incremental_v3/` 和
+`data/cache/tree_v3/`，正常运行会自动复用完全相同的输入。新增或修改候选只会
+生成包含该候选的新缓存键；只有完成候选级与联合池确认的成员才能写入冻结池。
+不得通过删除缓存、改报告或沿用原编号绕过冻结验证。需要排查尚未冻结候选时，
+使用 `--refresh-incremental-candidate CANDIDATE_ID` 或
+`--refresh-tree-candidate CANDIDATE_ID` 精确重算；冻结候选发生机制或取值变化
+必须登记为新版本并重新走完整准入。
+
 ## 8. 比赛提交与代码交付
 
 候选完成本地真实快照评价并通过 AIStudio 短窗验收、结果值得提交时，同队成员及其 AI
 可以直接上传比赛，不需要再次询问队长。
 
-提交准入和冻结内容统一见 `docs/factor_research_plan.md` 第 8 节；Notebook
+提交准入和冻结内容统一见 `docs/factor_research_plan.md` 第 9 节；Notebook
 接口统一见 `docs/data_contract.md` 的“候选输出合同”。本文件只规定协作交付。
 
 正式提交只能在比赛页面点击顶部“提交代码”，从队伍的 AIStudio 私有工作区选择

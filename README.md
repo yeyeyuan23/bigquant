@@ -10,8 +10,10 @@
 - 研究流程、时间切分和准入门槛：[因子研究与评价流程](docs/factor_research_plan.md)
 - 字段、主键和可用时点：[数据合同](docs/data_contract.md)
 - 候选定义、方向和当前状态：[候选登记表](docs/candidate_registry.md)
-- 当次评价结果：`reports/`
-- 已提交或正式冻结的不可变配置：`artifacts/frozen/`
+- 当前可执行路由：`reports/factor_pool_admission.csv`
+- 当前三管线结果和成员：`reports/combination_summary.csv` 与
+  `reports/factor_pool_decisions.json`
+- 已提交版本的不可变配置：`artifacts/frozen/`
 
 文档职责保持分离：研究规则只在执行计划中定义，数据口径只在数据合同中定义，
 候选状态只在登记表中维护。代码侧的可执行研究配置以
@@ -79,8 +81,8 @@ scripts/
 └── build_submission_notebook.py
 
 docs/                     # 流程、合同、登记和协作规则
-reports/                  # 可复现的评价结果
-artifacts/frozen/         # 已提交或正式冻结的不可变配置
+reports/                  # 可复现的评价结果、当前路由和模型成员
+artifacts/frozen/         # 已提交版本的不可变配置
 tests/                    # 单元、接口和防泄漏测试
 ```
 

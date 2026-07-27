@@ -74,7 +74,7 @@ data/ 下经过核验的日级 Parquet
 对应 manifest、字段合同和查询版本
 ```
 
-本地生成的标准报告文件集合见第 9 节。原始分钟表不回传；只有开发全新分钟逻辑
+本地生成的标准报告文件集合见第 10 节。原始分钟表不回传；只有开发全新分钟逻辑
 且通用日级组件不足时，才按预先固定的代表月份同步最小必要分钟数据。
 
 如果新候选需要当前合同外的数据，AIStudio 还必须交付可复现取数代码、更新后的
@@ -98,7 +98,7 @@ data/ 下经过核验的日级 Parquet
 滚动长窗口因子不要求为了补齐开发期第一年而额外下载前史。若当前快照从2019年
 开始，则2019年可作为自然预热期，保持原窗口不变，从首次产生有效值的日期开始
 计算S和I；预热期缺失不算技术失败。只有扣除预热后样本仍低于统一门槛时才淘汰。
-当前34个候选均使用本地已有快照研究，不再为这些候选补拉2018年价格数据。
+当前已登记候选均使用本地已有快照研究，不再为这些候选补拉2018年价格数据。
 
 HF/OB 首轮可以使用冻结的代表月份以控制计算成本；候选通过内部门槛后再补完整
 年份。月份不得根据候选收益表现挑选。
@@ -419,7 +419,7 @@ AIStudio 做短窗验收与提交。
 模型输出只有在样本外稳定超过简单等权基准时才能保留。模型预测最终仍须转换为
 日度截面因子，且值越大代表预期收益越高。
 
-## 8. 冻结与提交
+## 9. 冻结与提交
 
 提交前必须冻结：
 
@@ -441,7 +441,7 @@ AIStudio 做短窗验收与提交。
 
 比赛网页最多选择两个私榜候选。未完成冻结的实验候选不得占用提交名额。
 
-## 9. 固定产物
+## 10. 固定产物
 
 每轮研究至少保存：
 
@@ -455,8 +455,16 @@ reports/
 ├── factor_pool_screening.csv
 ├── factor_pool_incremental.csv
 ├── factor_pool_admission.csv
+├── incremental_forward_admission.csv
+├── incremental_pool_promotion.csv
+├── tree_factor_admission.csv
+├── tree_factor_incremental.csv
+├── tree_group_increment.csv
+├── tree_pool_promotion.csv
+├── combination_summary.csv
 ├── self_factor_composite_metrics.csv
 ├── joint_elastic_net_metrics.csv
+├── joint_elastic_net_weights.csv
 ├── joint_lightgbm_metrics.csv
 └── factor_pool_decisions.json
 

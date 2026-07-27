@@ -11,7 +11,7 @@
 - `data_checked` 只表示数据可实现，不表示因子有效。
 - 所有最终因子均输出 `date、instrument、factor`，且值越大代表预期收益越高。
 
-状态流转：
+实现状态流转：
 
 ```text
 registered
@@ -25,70 +25,75 @@ registered
 ```
 
 失败候选标记为 `rejected` 并保留原因，不删除历史记录。
+评价完成后，当前组合路由直接写成 `admitted (S)`、`admitted (I)`、
+`admitted (T)` 或其组合；字母分别表示进入规则复合、Elastic Net 和
+LightGBM。唯一可执行路由以 `reports/factor_pool_admission.csv` 为准。
 
 ## 当前候选
 
 | ID | 类别 | 机制 | 方向 | 周期 | 当前状态 |
 |---|---|---|---|---|---|
-| `PV-001` | PV | 活动强度相对价格推进效率 | 推进越有效越高 | 1—3 日 | `rejected` |
+| `PV-001` | PV | 活动强度相对价格推进效率 | 推进越有效越高 | 1—3 日 | `admitted (T)` |
 | `PV-002` | PV | 隔夜冲击的日内吸收 | 负跳空回补为正，正跳空回落为负 | 1—3 日 | `rejected` |
-| `HF-001` | HF | 分钟价格冲击后的吸收与恢复 | 恢复越充分越高 | 1—3 日 | `rejected` |
+| `HF-001` | HF | 分钟价格冲击后的吸收与恢复 | 恢复越充分越高 | 1—3 日 | `admitted (S)` |
 | `HF-002` | HF | 成交碎片化条件下的价格效率 | 价格效率越高越高 | 1—3 日 | `rejected` |
-| `OB-001` | OB | 有效档位盘口韧性 | 价差更低、深度恢复更强越高 | 1 日 | `frozen` |
+| `OB-001` | OB | 有效档位盘口韧性 | 价差更低、深度恢复更强越高 | 1 日 | `admitted (T)` |
 | `OB-002` | OB | 盘口深度形状的持续偏斜 | 买方近端深度占优越高 | 1 日 | `rejected` |
 | `FR-001` | FR | 新披露现金转化质量改善 | 现金转化改善越强越高 | 5—20 日 | `rejected` |
-| `FR-002` | FR | 新披露资产效率改善 | 资产周转与 ROA 改善越强越高 | 5—20 日 | `frozen` |
-| `PV-003` | PV | OAP 过去月度最大单日收益 | 最大单日收益越低越高 | 1—20 日 | `combination_tested` |
+| `FR-002` | FR | 新披露资产效率改善 | 资产周转与 ROA 改善越强越高 | 5—20 日 | `admitted (S/I/T)` |
+| `PV-003` | PV | OAP 过去月度最大单日收益 | 最大单日收益越低越高 | 1—20 日 | `admitted (S)` |
 | `PV-004` | PV | OAP 日收益偏度 | 偏度越低越高 | 1—20 日 | `rejected` |
 | `PV-005` | PV | OAP Amihud 非流动性 | 单位成交额冲击越大越高 | 1—20 日 | `rejected` |
 | `PV-006` | PV | OAP Corwin-Schultz 价差估计 | 估计价差越宽越高 | 1—20 日 | `rejected` |
-| `PV-007` | PV | OAP 零成交状态 | 零成交日占比越高越高 | 1—20 日 | `rejected` |
+| `PV-007` | PV | OAP 零成交状态 | 零成交日占比越高越高 | 1—20 日 | `technical_reject` |
 | `FR-003` | FR | OAP 总资产增长 | 总资产同比增长越低越高 | 5—20 日 | `rejected` |
-| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `frozen` |
-| `FR-005` | FR | OAP 经营现金流市值比 | 经营现金流/流通市值越高越高 | 5—20 日 | `frozen` |
-| `FR-006` | FR | OAP-inspired TTM 净利润增长惊喜 | 净利润同比改善越高越高 | 5—20 日 | `frozen` |
-| `FR-007` | FR | OAP-inspired 连续盈利改善次数 | 连续改善次数越多越高 | 5—20 日 | `rejected` |
-| `PV-008` | PV | 52周高点接近度 | 越接近过去52周高点越高 | 1—20 日 | `frozen` |
-| `PV-009` | PV | 当期与滞后市场反应延迟 | 价格延迟越低越高 | 1—20 日 | `frozen` |
-| `PV-010` | PV | 市场协偏度 | 协偏度越低越高 | 1—20 日 | `rejected` |
-| `PV-011` | PV | 12至6个月中期动量 | 中期累计收益越高越高 | 1—20 日 | `frozen` |
-| `PV-012` | PV | 一级行业动量 | 所属行业过去收益越高越高 | 1—20 日 | `rejected` |
+| `FR-004` | FR | OAP-inspired TTM 收入增长惊喜 | 收入同比增长越高越高 | 5—20 日 | `admitted (S)` |
+| `FR-005` | FR | OAP 经营现金流市值比 | 经营现金流/流通市值越高越高 | 5—20 日 | `admitted (S/T)` |
+| `FR-006` | FR | OAP-inspired TTM 净利润增长惊喜 | 净利润同比改善越高越高 | 5—20 日 | `admitted (S)` |
+| `FR-007` | FR | OAP-inspired 连续盈利改善次数 | 连续改善次数越多越高 | 5—20 日 | `technical_reject` |
+| `PV-008` | PV | 52周高点接近度 | 越接近过去52周高点越高 | 1—20 日 | `rejected` |
+| `PV-009` | PV | 当期与滞后市场反应延迟 | 价格延迟越低越高 | 1—20 日 | `admitted (S/T)` |
+| `PV-010` | PV | 市场协偏度 | 协偏度越低越高 | 1—20 日 | `admitted (S)` |
+| `PV-011` | PV | 12至6个月中期动量 | 中期累计收益越高越高 | 1—20 日 | `admitted (S)` |
+| `PV-012` | PV | 一级行业动量 | 所属行业过去收益越高越高 | 1—20 日 | `technical_reject` |
 | `FR-008` | FR | 48个月盈利增长一致性 | 平均盈利增长越高越高 | 5—20 日 | `rejected` |
 | `FR-009` | FR | 5年收入增长加权排名 | 历史排名越高越高 | 5—20 日 | `rejected` |
 | `FR-010` | FR | 异常应计代理 | 现金应计越低越高 | 5—20 日 | `rejected` |
 | `FR-011` | FR | 总资产市值比 | 资产/市值越高越高 | 5—20 日 | `rejected` |
-| `PV-013` | PV | 12至1个月动量 | 累计收益越高越高 | 1—20 日 | `frozen` |
-| `PV-014` | PV | 21日CAPM残差波动率 | 残差波动越低越高 | 1—20 日 | `frozen` |
+| `PV-013` | PV | 12至1个月动量 | 累计收益越高越高 | 1—20 日 | `rejected` |
+| `PV-014` | PV | 21日CAPM残差波动率 | 残差波动越低越高 | 1—20 日 | `admitted (S/I/T)` |
 | `PV-015` | PV | 36月成交量波动 | 成交量波动越低越高 | 1—20 日 | `rejected` |
 | `PV-016` | PV | 36月换手率波动 | 换手波动越低越高 | 1—20 日 | `rejected` |
 | `PV-017` | PV | 60月成交量趋势 | 成交量上升趋势越弱越高 | 1—20 日 | `rejected` |
 | `PV-018` | PV | 36至13个月长期反转 | 长期收益越低越高 | 1—20 日 | `rejected` |
-| `PV-019` | PV | CAPM残差动量代理 | 残差动量越高越高 | 1—20 日 | `frozen` |
-| `PV-020` | PV | 流动性稀缺条件下的短期反转 | 低成交额状态下的标准化价格冲击越负，因子越高 | 1—3 日 | `registered` |
-| `FR-012` | FR | 营收确认的盈利惊喜 | 盈利与营收惊喜同向且越强，因子绝对值越大 | 5—20 日 | `frozen` |
-| `OB-003` | OB | 方向性盘口韧性不对称 | 跌价后买盘恢复相对涨价后卖盘恢复越强越高 | 1—3 日 | `frozen` |
-| `FR-013` | FR | 财报披露时点惊喜 | 相对自身同季度历史越早披露越高 | 5—20 日 | `registered` |
-| `PV-021` | PV | 成交量—收益状态切换 | 历史量价状态支持的延续或反转方向越强越高 | 1—3 日 | `registered` |
-| `INT-002` | composite `[FR, PV]` | 财报日异常隔夜反应漂移 | 财报生效日异常隔夜收益越高越高 | 1—20 日 | `registered` |
-| `HF-003` | HF | 分钟相对有符号跳跃 | 下行分钟变差相对占比越高，因子越高 | 1—5 日 | `implemented` |
-| `HF-004` | HF | 尾盘残余方向成交压力 | 未被同期价格解释的尾盘买压越高，因子越高 | 1 日 | `registered` |
-| `OB-004` | OB | 尾盘盘口失衡创新 | 尾盘买方深度相对全日常态增强越多，因子越高 | 1 日 | `implemented` |
-| `PV-022` | PV | 连续信息动量 | 过去12至1个月收益越连续且越高，因子越高 | 1—20 日 | `implemented` |
-| `PV-023` | PV | 隔夜上涨—日内回落异常共现 | 两种状态超出独立概率的共现越多，因子越高 | 1—20 日 | `implemented` |
-| `FR-014` | FR | PIT 盈利收益率 | 最新可见TTM净利润/当日流通市值越高，因子越高 | 5—20 日 | `implemented` |
-| `FR-015` | FR | PIT 净利率同比改善 | 最新TTM净利率相对同季度去年改善越多，因子越高 | 5—20 日 | `implemented` |
-| `OB-005` | OB | 尾盘微价格压力持续性 | 尾盘微价格偏向买方且方向越持续，因子越高 | 1 日 | `registered` |
-| `INT-003` | composite `[FR, OB]` | 盈利惊喜×事件日流动性摩擦 | 盈利惊喜在尾盘流动性恶化时被增强 | 1—20 日 | `implemented` |
+| `PV-019` | PV | CAPM残差动量代理 | 残差动量越高越高 | 1—20 日 | `rejected` |
+| `PV-020` | PV | 流动性稀缺条件下的短期反转 | 低成交额状态下的标准化价格冲击越负，因子越高 | 1—3 日 | `admitted (T)` |
+| `FR-012` | FR | 营收确认的盈利惊喜 | 盈利与营收惊喜同向且越强，因子绝对值越大 | 5—20 日 | `rejected` |
+| `OB-003` | OB | 方向性盘口韧性不对称 | 跌价后买盘恢复相对涨价后卖盘恢复越强越高 | 1—3 日 | `admitted (T)` |
+| `FR-013` | FR | 财报披露时点惊喜 | 相对自身同季度历史越早披露越高 | 5—20 日 | `rejected` |
+| `PV-021` | PV | 成交量—收益状态切换 | 历史量价状态支持的延续或反转方向越强越高 | 1—3 日 | `rejected` |
+| `INT-002` | composite `[FR, PV]` | 财报日异常隔夜反应漂移 | 财报生效日异常隔夜收益越高越高 | 1—20 日 | `rejected` |
+| `HF-003` | HF | 分钟相对有符号跳跃 | 下行分钟变差相对占比越高，因子越高 | 1—5 日 | `admitted (S/T)` |
+| `HF-004` | HF | 尾盘残余方向成交压力 | 未被同期价格解释的尾盘买压越高，因子越高 | 1 日 | `admitted (T)` |
+| `OB-004` | OB | 尾盘盘口失衡创新 | 尾盘买方深度相对全日常态增强越多，因子越高 | 1 日 | `rejected` |
+| `PV-022` | PV | 连续信息动量 | 过去12至1个月收益越连续且越高，因子越高 | 1—20 日 | `rejected` |
+| `PV-023` | PV | 隔夜上涨—日内回落异常共现 | 两种状态超出独立概率的共现越多，因子越高 | 1—20 日 | `rejected` |
+| `FR-014` | FR | PIT 盈利收益率 | 最新可见TTM净利润/当日流通市值越高，因子越高 | 5—20 日 | `admitted (S)` |
+| `FR-015` | FR | PIT 净利率同比改善 | 最新TTM净利率相对同季度去年改善越多，因子越高 | 5—20 日 | `admitted (S/T)` |
+| `OB-005` | OB | 尾盘微价格压力持续性 | 尾盘微价格偏向买方且方向越持续，因子越高 | 1 日 | `rejected` |
+| `INT-003` | composite `[FR, OB]` | 盈利惊喜×事件日流动性摩擦 | 盈利惊喜在尾盘流动性恶化时被增强 | 1—20 日 | `rejected` |
 | `INT-001` | composite `[FR, HF]` | `FR-002/HF-001` 等权截面秩 | 两组件越高越高 | 1 日 | `submitted_smoke` |
 
-表中状态来自本地核验快照上的统一评价：2019—2021 开发，2022、2023
-作为两个等权的跨市场状态验证年。长窗口候选允许2019年自然预热，从实际有效日期
-开始评价。
+表中状态来自 `literature_round4_v1_2026-07-27` 本地核验快照上的全量重跑：
+2019—2021 决定 S/I/T 准入，2022、2023 只评价冻结组合。长窗口候选允许
+2019 年自然预热，从实际有效日期开始评价。
 
-其中 `FR-002/004/005/006/012、OB-001/003、PV-008/009/011/013/014/019`
-已在 `literature_round2_v1_2026-07-26` 核验快照上通过候选级 I 以及两项联合
-池确认，冻结进入 Elastic Net。这里的 `frozen` 不代表其自动进入 LightGBM；
-T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
+当前 `frozen_I` 仅为 `FR-002、PV-014`；当前 `frozen_T` 为
+`FR-002/005/015、HF-003/004、OB-001/003、PV-001/009/014/020`。
+候选级 I 通过但未完成前向与池级确认的候选不进入 Elastic Net。两个冻结池相互
+独立；Git 中的成员证据为 `reports/factor_pool_decisions.json`，本地运行状态另存于
+`data/cache/incremental_v3/frozen/frozen_state.json` 和
+`data/cache/tree_v3/frozen/frozen_state.json`，缓存不进入 Git。
 
 ## 基础候选定义
 
@@ -133,8 +138,8 @@ T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
   5日均值的负值；上涨跳跃相对占优的股票因子更低。
 - 固定方向：`-mean_5d(RSJ)`，不根据评价结果翻转。
 - 主要重复风险：极端收益、`PV-003`和公开短期波动率。
-- status：S未通过；I候选级通过但池级未冻结；T候选级与池级均通过，已进入
-  `frozen_T`。
+- status：S、T通过，进入规则复合与 `frozen_T`；I候选级通过但未完成前向和
+  池级确认，不进入 Elastic Net。
 
 #### HF-004
 
@@ -146,7 +151,7 @@ T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
 - 约束：方向成交量是固定 logistic BVC 近似，不是真实主动买卖标记；新增聚合字段
   必须先在AIStudio短窗核验再生成全量面板。
 - 主要重复风险：公开`netflow_amount_rate_main`和普通成交量不平衡。
-- status：S/I/T均未通过，不进入组合。
+- status：S、I未通过；T通过并进入 `frozen_T`。
 
 ### OB
 
@@ -219,6 +224,8 @@ T 路由以 `reports/tree_factor_admission.csv` 的独立冻结结果为准。
   放大流动性稀缺状态下的反转。
 - 固定方向：`-return_shock * liquidity_scarcity`，两个历史尺度均整体滞后一期。
 - 主要重复风险：普通短期反转、Amihud 非流动性和 `PV-005`。
+- status：S未通过；I候选级通过但未完成前向和池级确认；T通过并进入
+  `frozen_T`。
 
 ### OAP A/B级候选
 
@@ -330,7 +337,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：5—20 日。
 - failure_conditions：法定截止日聚集压过公司自主时点、报告期类型映射不稳定。
 - duplication_risk：低；现有 FR 候选均以财务数值而非披露行为为核心。
-- status：`registered`
+- status：S/I/T均未通过，不进入组合。
 
 ### PV-021
 
@@ -349,7 +356,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1—3 日。
 - failure_conditions：滚动回归病态、异常成交额由停复牌或公司行动驱动。
 - duplication_risk：中低；与普通动量/反转共享收益输入，但方向由历史量价状态决定。
-- status：`registered`
+- status：S/I/T均未通过，不进入组合。
 
 ### INT-002
 
@@ -365,7 +372,8 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1—20 日。
 - failure_conditions：开盘价缺失、停牌复牌跳空、市场隔夜基准受极端横截面污染。
 - duplication_risk：中；与 `PV-002` 共享隔夜收益，但只在财报事件窗口激活。
-- status：`registered`
+- status：S 通过，但复合候选不递归进入规则复合；I/T未通过，最终不进入三条
+  组合管线。
 
 ### PV-022
 
@@ -383,7 +391,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1—20 日。
 - failure_conditions：长期停牌导致形成窗稀疏、除权价格未正确复权。
 - duplication_risk：中；与普通12—1月动量共享累计收益，但新增路径连续性。
-- status：S未通过；I候选级通过但池级未冻结；T未通过，不进入组合。
+- status：S/I/T均未通过，不进入组合。
 
 ### PV-023
 
@@ -415,7 +423,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：5—20 日。
 - failure_conditions：负利润、极小流通市值和财报/市值单位不一致。
 - duplication_risk：中；接近价值因子，但采用严格PIT盈利与流通市值。
-- status：S/I/T均未通过，不进入组合。
+- status：S通过，进入规则复合；I/T未通过。
 
 ### FR-015
 
@@ -432,7 +440,8 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：5—20 日。
 - failure_conditions：收入接近零、同季度历史缺失、主营业务发生结构性变化。
 - duplication_risk：中；与盈利增长和资产效率共享基本面信息，但直接刻画利润率。
-- status：S未通过；I候选级通过但池级未冻结；T未通过，不进入组合。
+- status：S、T通过，进入规则复合与 `frozen_T`；I候选级通过但未完成前向和
+  池级确认，不进入 Elastic Net。
 
 ### OB-005
 
@@ -450,7 +459,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 - expected_horizon：1 日。
 - failure_conditions：一档报价无效、价差为零、尾盘有效快照不足。
 - duplication_risk：中；与盘口失衡共享深度输入，但微价格按对侧价格加权。
-- status：S/I未通过；T候选级与池级均通过，已进入 `frozen_T`。
+- status：S/I/T均未通过，不进入组合。
 
 ### INT-003
 
