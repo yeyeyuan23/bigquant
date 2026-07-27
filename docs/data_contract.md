@@ -14,7 +14,10 @@
 使用合成数据的本地检查只证明接口和规则可复现；使用 AIStudio 核验快照的本地
 全量运行可以形成有效性和模型结论。比赛网页分数仍只能由真实提交确认。
 
-## 官方数据表
+## 比赛指定数据表
+
+比赛提交只允许使用下列五张表。提交代码、候选说明或构建脚本中出现其他平台
+表名，均不能解释为比赛可用数据。
 
 | 对象 | 表名 | 主键/粒度 | 关键规则 |
 |---|---|---|---|
@@ -22,16 +25,21 @@
 | 分钟行情与盘口 | `bigalpha_2026_stock_bar1m` | 股票分钟 | `volume、amount、deal_number` 是分钟增量 |
 | 财务披露 | `bigalpha_2026_financial` | 披露事件 | `date` 是可见日，`report_date` 是报告期 |
 | 风险暴露 | `bigalpha_2026_exposure` | 股票日 | 仅用于分层、中性化和增量诊断 |
-| 公共日线 | `cn_stock_bar1d` | 股票日 | PV 的优先数据源 |
-| 交易日历 | `all_trading_days` | 市场日 | 使用 `market_code='CN'` |
 | 公开因子库 | `bigalpha_2026_factorlib` | 股票日 | 首次筛选 36 列，日常评价只读取冻结 screened15 |
+
+`cn_stock_bar1d、cn_stock_bar1m、all_trading_days` 是平台通用研究表，不在本次
+比赛指定数据源中。它们不得出现在提交 Notebook，也不得作为“本地结果可由比赛
+运行时复现”的证据。
 
 ## 通用连接规则
 
 - 必须以比赛股票池为左表；分钟表不能反推股票池。
+- 提交 Notebook 只能读取上述五张比赛指定表；测试会扫描全部 `submissions/*.py`
+  及对应 Notebook，发现平台通用表名立即失败。
 - 池内停牌股票保留键，特征或标签允许缺失，不能跳到下一次交易日。
-- 下一期标签先由中国交易日历得到 `next_date`，再连接对应收益；禁止按单股
-  直接 `shift(-1)`。
+- 下一期标签按比赛股票池的相邻交易日映射 `next_date`，再连接
+  `bigalpha_2026_factorlib.daily_return`；禁止查询 `all_trading_days`，也禁止
+  按单股直接 `shift(-1)`。
 - DAI 查询必须带日期或证券过滤，只投影必要字段，优先在 DAI 侧聚合。
 - 禁止把标签、未来收益、公开评分或候选输出写入共享特征面板。
 
@@ -39,7 +47,8 @@
 
 ### PV：日频量价
 
-- 源表：`cn_stock_bar1d`
+- 比赛可复现源表：`bigalpha_2026_stock_bar1m`，按交易日聚合；收益标签优先读取
+  `bigalpha_2026_factorlib.daily_return`。
 - 主键：`date, instrument`
 - 可用时点：当日收盘后
 - 列：
@@ -149,6 +158,12 @@ disclosure_date, instrument, report_date, category, shift
 - 本地增量和动态组合代码读取的 DataFrame 必须严格包含
   `date、instrument` 和冻结的 15 个特征。
 - 固定目录为 `data/features/FACTORLIB/year=YYYY/part-YYYY.parquet`。
+- J 评分另外读取完整 all36，固定目录为
+  `data/features/FACTORLIB_ALL36/year=YYYY/part-YYYY.parquet`，并使用独立
+  manifest。all36 只定义 S/I/T 共用的 A/B/J 基础代理坐标，不代表平台动态
+  全局候选池，也不改变 screened15 的 I/T 训练成员。S/I/T 开发期准入必须具备
+  2019—2021；最终路线按 J 选优还必须具备 2022、2023。自研原子因子不得写入
+  all36 目录；最终三条兄弟路线只在一次独立的联合拥挤评分中临时加入评分模型。
 - manifest 必须区分可直接观测的数值尺度与平台生成来源；本地发现每日均值约为
   0、标准差约为 1 时只能记录为 `observed_value_scale`，在 AIStudio 取数代码
   未留档前不得声称标准化由官方表或某一段导出代码完成。
@@ -163,7 +178,8 @@ data/
 │   ├── HF/
 │   ├── OB/
 │   ├── FR/
-│   └── FACTORLIB/
+│   ├── FACTORLIB/
+│   └── FACTORLIB_ALL36/
 ├── exposures/
 ├── labels/
 └── factors/
@@ -200,4 +216,9 @@ date, instrument, factor
 - 不依赖本地文件或外部网络；
 - 不写死研究区间；
 - 只返回一个因子；
-- 保持官方模板的数据源包装和三列输出。
+- 只读取本文件列出的五张比赛指定表；
+- 保持官方模板的数据源包装和三列输出；
+- 通过平台前缀一致性检查：固定 `start_date` 和数据源，仅缩短
+  `end_date` 后，cutoff 当日及以前的输出必须逐格一致；
+- 分钟查询的结束边界覆盖 `end_date` 的完整交易日，但不得读取下一交易日；
+- `first`、`last` 等顺序敏感的分钟聚合必须显式写出时间排序。

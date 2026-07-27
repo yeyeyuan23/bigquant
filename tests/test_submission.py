@@ -1,23 +1,18 @@
 import ast
 import json
+import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "submissions" / "factor_int_001_equal_rank.py"
 NOTEBOOK = ROOT / "submissions" / "factor_int_001_equal_rank.ipynb"
-JOINT_SOURCE = ROOT / "submissions" / "factor_joint_elastic_net.py"
-JOINT_NOTEBOOK = ROOT / "submissions" / "factor_joint_elastic_net.ipynb"
 SELF_PV_SOURCE = ROOT / "submissions" / "factor_self_pv_rank.py"
 SELF_PV_NOTEBOOK = ROOT / "submissions" / "factor_self_pv_rank.ipynb"
 FINAL_SUBMISSIONS = (
     (
         ROOT / "submissions" / "factor_self_family_rank.py",
         ROOT / "submissions" / "factor_self_family_rank.ipynb",
-    ),
-    (
-        ROOT / "submissions" / "factor_joint_lightgbm.py",
-        ROOT / "submissions" / "factor_joint_lightgbm.ipynb",
     ),
 )
 CURRENT_LEARNED_SUBMISSIONS = (
@@ -44,6 +39,26 @@ CURRENT_LEARNED_SUBMISSIONS = (
         ),
     ),
 )
+ALLOWED_COMPETITION_TABLES = {
+    "bigalpha_2026_exposure",
+    "bigalpha_2026_factorlib",
+    "bigalpha_2026_financial",
+    "bigalpha_2026_instruments",
+    "bigalpha_2026_stock_bar1m",
+}
+FORBIDDEN_PLATFORM_TABLES = {
+    "all_trading_days",
+    "cn_stock_bar1d",
+    "cn_stock_bar1m",
+}
+SQL_TABLE_PATTERN = re.compile(
+    r"^\s*(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+    flags=re.IGNORECASE | re.MULTILINE,
+)
+SQL_CTE_PATTERN = re.compile(
+    r"(?:\bwith\b|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s+as\s*\(",
+    flags=re.IGNORECASE,
+)
 
 
 class SubmissionTest(unittest.TestCase):
@@ -69,30 +84,6 @@ class SubmissionTest(unittest.TestCase):
         self.assertEqual(
             "".join(code_cells[0]["source"]),
             SOURCE.read_text(encoding="utf-8"),
-        )
-
-    def test_joint_source_is_self_contained_and_has_main(self):
-        tree = ast.parse(JOINT_SOURCE.read_text(encoding="utf-8"))
-        functions = {
-            node.name: node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef)
-        }
-        self.assertIn("main", functions)
-        self.assertEqual(
-            [argument.arg for argument in functions["main"].args.args],
-            ["datasources", "start_date", "end_date"],
-        )
-
-    def test_joint_notebook_has_one_code_cell_and_exact_source(self):
-        notebook = json.loads(JOINT_NOTEBOOK.read_text(encoding="utf-8"))
-        code_cells = [
-            cell for cell in notebook["cells"] if cell["cell_type"] == "code"
-        ]
-        self.assertEqual(len(code_cells), 1)
-        self.assertEqual(
-            "".join(code_cells[0]["source"]),
-            JOINT_SOURCE.read_text(encoding="utf-8"),
         )
 
     def test_self_pv_source_is_self_contained_and_has_main(self):
@@ -147,52 +138,6 @@ class SubmissionTest(unittest.TestCase):
                     source.read_text(encoding="utf-8"),
                 )
 
-    def test_lightgbm_submission_matches_submitted_artifact(self):
-        source_path = ROOT / "submissions" / "factor_joint_lightgbm.py"
-        tree = ast.parse(source_path.read_text(encoding="utf-8"))
-        main = next(
-            node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == "main"
-        )
-        self_columns = None
-        for node in ast.walk(main):
-            if not isinstance(node, ast.Assign):
-                continue
-            if any(
-                isinstance(target, ast.Name) and target.id == "self_columns"
-                for target in node.targets
-            ):
-                self_columns = tuple(ast.literal_eval(node.value))
-                break
-        self.assertIsNotNone(self_columns)
-
-        submitted_artifact = json.loads(
-            (
-                ROOT
-                / "artifacts"
-                / "frozen"
-                / "joint_lightgbm_submitted_v3.json"
-            ).read_text(encoding="utf-8")
-        )
-        expected = tuple(submitted_artifact["members"])
-        self.assertEqual(self_columns, expected)
-
-        source = source_path.read_text(encoding="utf-8")
-        for required in (
-            'panel["HF-003"]',
-            'panel["OB-005"]',
-            "downside_realized_volatility",
-            "tail_60_microprice_gap_median",
-            "tail_60_microprice_gap_sign_consistency",
-            '"label_observed_date": all_dates[1:]',
-            '"date": all_dates[:-1]',
-        ):
-            with self.subTest(required=required):
-                self.assertIn(required, source)
-        self.assertNotIn(".shift(-", source)
-        self.assertNotIn(" lead(", source.lower())
-
     def test_current_learned_submissions_match_frozen_pools(self):
         for source_path, notebook_path, expected_members in (
             CURRENT_LEARNED_SUBMISSIONS
@@ -240,8 +185,74 @@ class SubmissionTest(unittest.TestCase):
 
         self.assertIn("bigalpha_2026_factorlib", elastic_source)
         self.assertIn("bigalpha_2026_stock_bar1m", lightgbm_source)
-        self.assertIn("first(open) AS open", lightgbm_source)
-        self.assertIn("last(close) AS close", lightgbm_source)
+        self.assertIn(
+            "first(open ORDER BY timestamp) AS open",
+            lightgbm_source,
+        )
+        self.assertIn(
+            "last(close ORDER BY timestamp) AS close",
+            lightgbm_source,
+        )
+        self.assertIn(
+            "first(pre_close ORDER BY timestamp) AS pre_close",
+            lightgbm_source,
+        )
+        self.assertIn(
+            "intraday_end_ts = (",
+            lightgbm_source,
+        )
+        self.assertIn(
+            "month_end = min(intraday_end_ts, cursor.end_time)",
+            lightgbm_source,
+        )
+        self.assertNotIn(
+            "month_end = min(end_ts, cursor.end_time.normalize())",
+            lightgbm_source,
+        )
+
+    def test_every_submission_uses_only_competition_tables(self):
+        sources = sorted((ROOT / "submissions").glob("*.py"))
+        self.assertTrue(sources)
+        for source_path in sources:
+            with self.subTest(source=source_path.name):
+                source = source_path.read_text(encoding="utf-8")
+                notebook_path = source_path.with_suffix(".ipynb")
+                self.assertTrue(notebook_path.exists())
+                notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+                code_cells = [
+                    cell
+                    for cell in notebook["cells"]
+                    if cell["cell_type"] == "code"
+                ]
+                self.assertEqual(len(code_cells), 1)
+                self.assertEqual("".join(code_cells[0]["source"]), source)
+                lowered = source.lower()
+                for forbidden in FORBIDDEN_PLATFORM_TABLES:
+                    self.assertNotIn(forbidden, lowered)
+                sql_strings = [
+                    node.value
+                    for node in ast.walk(ast.parse(source))
+                    if isinstance(node, ast.Constant)
+                    and isinstance(node.value, str)
+                    and "SELECT" in node.value
+                    and "FROM" in node.value
+                ]
+                cte_names = {
+                    match.group(1).lower()
+                    for sql in sql_strings
+                    for match in SQL_CTE_PATTERN.finditer(sql)
+                }
+                literal_tables = {
+                    match.group(1).lower()
+                    for sql in sql_strings
+                    for match in SQL_TABLE_PATTERN.finditer(sql)
+                }
+                self.assertEqual(
+                    literal_tables
+                    - cte_names
+                    - ALLOWED_COMPETITION_TABLES,
+                    set(),
+                )
 
 
 if __name__ == "__main__":

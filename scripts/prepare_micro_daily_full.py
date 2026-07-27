@@ -157,6 +157,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest = {
         "dataset": "MICRO_DAILY_FULL",
         "created_at": datetime.now().astimezone().isoformat(),
+        "source_table": "bigalpha_2026_stock_bar1m",
+        "aggregation_script": "scripts/aistudio_build_micro_daily.py",
+        "preparation_script": "scripts/prepare_micro_daily_full.py",
+        "minute_counter_semantics": "incremental",
         "years": list(YEARS),
         "key_columns": list(KEY_COLUMNS),
         "availability_column": AVAILABILITY_COLUMN,

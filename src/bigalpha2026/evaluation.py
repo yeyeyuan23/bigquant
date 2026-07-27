@@ -390,7 +390,7 @@ class ElasticNetConfig:
     alpha: float = 0.001
     l1_ratio: float = 0.5
     coefficient_epsilon: float = 1e-10
-    positive: bool = True
+    positive: bool = False
 
 
 @dataclass(frozen=True)
@@ -426,7 +426,7 @@ def rolling_elastic_net_scores(
         on=["date", "instrument"],
         how="inner",
     )
-    merged = cross_section_rank_scale(
+    merged = cross_section_zscore(
         merged,
         [*factor_columns, target_column],
     )

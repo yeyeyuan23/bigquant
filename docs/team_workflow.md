@@ -163,18 +163,35 @@ conda run --no-capture-output -n quant python -m pytest -q
 
 实际操作：
 
-1. AIStudio 查询并核验股票池、标签、共享面板、风险暴露和冻结 screened15；
+1. AIStudio 查询并核验股票池、标签、共享面板、风险暴露、冻结 screened15，
+   以及只供 J 基础代理评分使用的独立 all36 参考面板；
 2. 将日级 Parquet、manifest 和查询版本同步到本地；
 3. 本地运行 plan 规定的正式评价和三条组合管线；
 4. 冻结赢家后，将其代码和 Git 版本同步回 AIStudio；
-5. 用 2—5 个交易日验收三列输出，然后生成比赛提交。
+5. 用 2—5 个交易日验收三列输出；
+6. 对完全相同的提交源码运行平台口径的全窗/截断窗前缀一致性检查；
+7. 只有逐格零差异后才生成比赛提交。
+
+前缀一致性探针必须在 AIStudio 运行，并使用真实比赛数据源。例如：
+
+```bash
+python scripts/aistudio_submission_lookahead_probe.py \
+  submissions/factor_joint_lightgbm_current.py \
+  --start 2024-07-01 \
+  --cutoff 2024-07-05 \
+  --end 2024-07-10
+```
+
+结果必须同时满足 `status=ok`、`difference_rows=0` 和退出码 `0`。缩短历史窗口
+可以用于快速定位，但最终提交前必须用提交源码的原始历史参数再跑一次。短窗三列
+合同通过不能替代该检查。
 
 禁止把合成数据测试写成有效性结论，也禁止在 Notebook 中临时修改 plan。使用
 已核验真实快照的本地全量结果属于正式研究结果。
 
 ## 5. 可选本地数据包同步
 
-比赛数据不进入 Git。经过核验的日级面板、screened15 和训练矩阵可在赛事规则允许
+比赛数据不进入 Git。经过核验的日级面板、screened15、J-all36 参考和训练矩阵可在赛事规则允许
 的同队成员之间同步；原始分钟数据仅在开发新分钟逻辑时按最小月份同步。需要同步时，
 在仓库根目录执行：
 
@@ -188,12 +205,12 @@ tar \
   --exclude='*.tmp' \
   --exclude='*.partial' \
   --exclude='.DS_Store' \
-  -czf data/transfers/bigalpha_research_data_v2.tar.gz \
+  -czf data/transfers/bigalpha_research_data_v3.tar.gz \
   data
 
 shasum -a 256 \
-  data/transfers/bigalpha_research_data_v2.tar.gz \
-  > data/transfers/bigalpha_research_data_v2.tar.gz.sha256
+  data/transfers/bigalpha_research_data_v3.tar.gz \
+  > data/transfers/bigalpha_research_data_v3.tar.gz.sha256
 ```
 
 发送压缩包和同名 `.sha256` 文件。接收方将二者放到仓库的
@@ -201,14 +218,14 @@ shasum -a 256 \
 
 ```bash
 shasum -a 256 -c \
-  data/transfers/bigalpha_research_data_v2.tar.gz.sha256
+  data/transfers/bigalpha_research_data_v3.tar.gz.sha256
 ```
 
 校验显示 `OK` 后解压：
 
 ```bash
 tar -xzf \
-  data/transfers/bigalpha_research_data_v2.tar.gz \
+  data/transfers/bigalpha_research_data_v3.tar.gz \
   -C .
 ```
 
@@ -229,15 +246,26 @@ manifests，不包含原始分钟成交或盘口快照。`data/transfers/` 已�
 当前团队基础数据包：
 
 ```text
-bigalpha_research_data_v2.tar.gz
-bigalpha_research_data_v2.tar.gz.sha256
-SHA-256:
-459bb593a33d817dd850a2e8465db01523a229e6c9c56886ff4aeaf6c4bc48bd
+bigalpha_research_data_v3.tar.gz
+bigalpha_research_data_v3.tar.gz.sha256
+SHA-256: 4fd914654a38f11fc2f6b0bd1153d9db32c927e6a157ffaeb26a9b11c407e912
 ```
 
 该快照已经包含最新的连续微观日级面板、冻结 screened15、标准候选长表
-`data/factors/candidate_pool.parquet` 和全部 manifests；不包含原始分钟数据
-或可由当前代码重算的 `data/cache/`。
+`data/factors/candidate_pool.parquet`、2019—2023 完整
+`FACTORLIB_ALL36` 和全部 manifests；不包含原始分钟数据或可由当前代码重算的
+`data/cache/`。all36 只作为新 J 合同的基础代理参考池，不能把 screened15
+复制后冒充完整参考池，也不能把我方当前或历史路线称为平台全局候选池。
+
+完整包作为私有仓库 Release 资产交付，不进入 Git 历史。仓库 collaborator
+完成 `gh auth login` 后可直接下载：
+
+```bash
+gh release download data-v3-2026-07-27 \
+  --repo yeyeyuan23/bigquant \
+  --pattern 'bigalpha_research_data_v3.tar.gz*' \
+  --dir data/transfers
+```
 
 如果候选引入当前包中没有的新日级组件，开发者必须同时交付：
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v2"
+TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v3-J"
 PREDICTION_COLUMNS = ("date", "instrument", "factor")
 
 
@@ -148,6 +148,7 @@ class TreePredictionCache:
         label_column: str,
         train_window_days: int,
         test_window_days: int,
+        force_refresh: bool = False,
         compute: Callable[[], pd.DataFrame],
     ) -> tuple[pd.DataFrame, bool, str]:
         """Load one exact prediction or atomically materialize it."""
@@ -162,7 +163,12 @@ class TreePredictionCache:
         key = content_digest(payload)
         parquet_path = self.cache_dir / f"{key}.parquet"
         metadata_path = self.cache_dir / f"{key}.json"
-        if not self.refresh and parquet_path.exists() and metadata_path.exists():
+        if (
+            not self.refresh
+            and not force_refresh
+            and parquet_path.exists()
+            and metadata_path.exists()
+        ):
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             if metadata == payload:
                 cached = pd.read_parquet(parquet_path)

@@ -1,6 +1,6 @@
 {
   "schema_version": "candidate-pool-v2",
-  "generated_at": "2026-07-27T14:40:29+08:00",
+  "generated_at": "2026-07-27T19:33:52+08:00",
   "generation_entrypoint": "scripts/run_first_round.py",
   "relative_path": "factors/candidate_pool.parquet",
   "factor_version": "literature_round4_v1_2026-07-27",
@@ -127,7 +127,7 @@
     "data/manifest_2023.json": "38390c8a4f26bb1e71eb8cb2574fb75c22ca59012f196107bf79fb19d0cee74a",
     "data/manifest_FR_2017_2022.json": "325a99d26a64d514913aaf2643eb52ce8dcd428e467a646d97c74a3d3d0de61d",
     "data/manifest_FR_2023.json": "7672a31d52b4ec8079151a97ce5705d5b5164319325f52bc2b7dea9611fef7ee",
-    "data/manifest_MICRO_DAILY_FULL.json": "2d1f764a4c6513956e2067c5f8b080af0ae1317b44c7700d2f481c2ed144eb20"
+    "data/manifest_MICRO_DAILY_FULL.json": "481f86c1d1a8bdb14fef51503804c9296ebef4ed21887c43fba61dd2f72c8e4b"
   },
   "result_role": "local_verified_research_snapshot",
   "aistudio_truth_required": false

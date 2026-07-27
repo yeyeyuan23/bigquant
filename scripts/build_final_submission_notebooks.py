@@ -1,4 +1,4 @@
-"""Build the two frozen competition submission notebooks."""
+"""Build the frozen rule-composite competition submission notebook."""
 
 from __future__ import annotations
 
@@ -13,12 +13,6 @@ SUBMISSIONS = (
         ROOT / "submissions" / "factor_self_family_rank.ipynb",
         "# BigAlpha 2026 family-balanced rank composite\n",
         "2019—2021 准入后冻结的 FR/PV 家族等权规则复合。",
-    ),
-    (
-        ROOT / "submissions" / "factor_joint_lightgbm.py",
-        ROOT / "submissions" / "factor_joint_lightgbm.ipynb",
-        "# BigAlpha 2026 rolling LightGBM\n",
-        "冻结特征准入与超参数，按 60 个交易日训练、20 个交易日预测。",
     ),
 )
 

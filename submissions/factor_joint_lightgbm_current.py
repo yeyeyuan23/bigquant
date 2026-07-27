@@ -16,6 +16,15 @@ def main(datasources, start_date, end_date):
 
     start_ts = pd.Timestamp(start_date).normalize()
     end_ts = pd.Timestamp(end_date).normalize()
+    # BigAlpha's look-ahead self-check reruns main() with a truncated
+    # end_date.  Daily tables use midnight dates, while bar1m timestamps span
+    # the whole session.  Query the complete final trading day so the cutoff
+    # day's factor is identical in the full and truncated runs.
+    intraday_end_ts = (
+        end_ts
+        + pd.Timedelta(days=1)
+        - pd.Timedelta(microseconds=1)
+    )
     history_start = start_ts - pd.Timedelta(days=500)
     financial_start = start_ts - pd.Timedelta(days=1500)
     hf_start = history_start
@@ -254,11 +263,11 @@ def main(datasources, start_date, end_date):
         SELECT
             CAST(trading_day AS DATETIME) AS date,
             instrument,
-            first(open) AS open,
+            first(open ORDER BY timestamp) AS open,
             max(high) AS high,
             min(low) AS low,
-            last(close) AS close,
-            first(pre_close) AS pre_close,
+            last(close ORDER BY timestamp) AS close,
+            first(pre_close ORDER BY timestamp) AS pre_close,
             sum(deal_number) AS deal_number,
             sqrt(sum(minute_log_return * minute_log_return))
                 AS realized_volatility,
@@ -322,7 +331,7 @@ def main(datasources, start_date, end_date):
     final_period = end_ts.to_period("M")
     while cursor <= final_period:
         month_start = max(hf_start, cursor.start_time.normalize())
-        month_end = min(end_ts, cursor.end_time.normalize())
+        month_end = min(intraday_end_ts, cursor.end_time)
         hf_parts.append(
             dai.query(
                 hf_sql,

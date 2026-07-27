@@ -20,7 +20,10 @@
       "factorlib__volatility_5",
       "factorlib__volume"
     ],
-    "screened_count": 15
+    "screened_count": 15,
+    "j_reference": "factorlib_all36_base_proxy",
+    "j_reference_count": 36,
+    "j_reference_columns_present": 36
   },
   "candidate_pool_reference": {
     "factor_version": "literature_round4_v1_2026-07-27",

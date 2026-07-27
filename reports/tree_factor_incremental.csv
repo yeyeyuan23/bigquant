@@ -1,41 +1,41 @@
-candidate,individual_baseline_oos_rank_ic,individual_augmented_oos_rank_ic,individual_oos_rank_ic_increment,individual_positive_window_ratio,individual_positive_years,individual_oos_days,individual_windows,conditional_baseline_oos_rank_ic,conditional_augmented_oos_rank_ic,conditional_oos_rank_ic_increment,conditional_positive_window_ratio,conditional_positive_years,conditional_oos_days,conditional_windows,individual_passed,conditional_passed,evaluation_protocol
-self__FR-001,0.060752123555366,0.0607091178661132,-4.300568925286347e-05,0.4411764705882353,1.0,670.0,34.0,0.060752123555366,0.0607091178661132,-4.300568925286347e-05,0.4411764705882353,1.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-002,0.060752123555366,0.0620580259975732,0.0013059024422071,0.6470588235294118,2.0,670.0,34.0,0.060752123555366,0.0620580259975732,0.0013059024422071,0.6470588235294118,2.0,670.0,34.0,True,True,frozen_prior_T
-self__FR-003,0.060752123555366,0.0602854339055902,-0.0004666896497758,0.3823529411764705,0.0,670.0,34.0,0.060752123555366,0.0602854339055902,-0.0004666896497758,0.3823529411764705,0.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-004,0.060752123555366,0.0606944386333674,-5.768492199863388e-05,0.5882352941176471,2.0,670.0,34.0,0.060752123555366,0.0606944386333674,-5.768492199863388e-05,0.5882352941176471,2.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-005,0.060752123555366,0.060973521929627,0.0002213983742609,0.6176470588235294,2.0,670.0,34.0,0.060752123555366,0.060973521929627,0.0002213983742609,0.6176470588235294,2.0,670.0,34.0,True,True,frozen_prior_T
-self__FR-006,0.060752123555366,0.0604565902490698,-0.0002955333062962,0.4705882352941176,2.0,670.0,34.0,0.060752123555366,0.0604565902490698,-0.0002955333062962,0.4705882352941176,2.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-010,0.060752123555366,0.0608649522375589,0.0001128286821928,0.5882352941176471,1.0,670.0,34.0,0.060752123555366,0.0608649522375589,0.0001128286821928,0.5882352941176471,1.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-011,0.060752123555366,0.0598993373323699,-0.0008527862229961,0.4117647058823529,1.0,670.0,34.0,0.060752123555366,0.0598993373323699,-0.0008527862229961,0.4117647058823529,1.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-012,0.060752123555366,0.0603583771903106,-0.0003937463650554,0.2058823529411764,0.0,670.0,34.0,0.060752123555366,0.0603583771903106,-0.0003937463650554,0.2058823529411764,0.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-014,0.060752123555366,0.0604461921132133,-0.0003059314421527,0.5,1.0,670.0,34.0,0.060752123555366,0.0604461921132133,-0.0003059314421527,0.5,1.0,670.0,34.0,False,False,frozen_prior_T
-self__FR-015,0.060752123555366,0.0609847473860747,0.0002326238307086,0.6176470588235294,2.0,670.0,34.0,0.060752123555366,0.0609847473860747,0.0002326238307086,0.6176470588235294,2.0,670.0,34.0,True,True,frozen_prior_T
-self__HF-001,0.060752123555366,0.0606474876857722,-0.0001046358695938,0.5588235294117647,1.0,670.0,34.0,0.060752123555366,0.0606474876857722,-0.0001046358695938,0.5588235294117647,1.0,670.0,34.0,False,False,frozen_prior_T
-self__HF-002,0.060752123555366,0.0614976958917247,0.0007455723363586,0.5,2.0,670.0,34.0,0.060752123555366,0.0614976958917247,0.0007455723363586,0.5,2.0,670.0,34.0,False,False,frozen_prior_T
-self__HF-003,0.060752123555366,0.0615944384384734,0.0008423148831073,0.7647058823529411,3.0,670.0,34.0,0.060752123555366,0.0615944384384734,0.0008423148831073,0.7647058823529411,3.0,670.0,34.0,True,True,frozen_prior_T
-self__HF-004,0.060752123555366,0.0610201262639587,0.0002680027085926,0.5588235294117647,2.0,670.0,34.0,0.060752123555366,0.0610201262639587,0.0002680027085926,0.5588235294117647,2.0,670.0,34.0,True,True,frozen_prior_T
-self__INT-002,0.060752123555366,0.061116749266154,0.0003646257107879,0.5,2.0,670.0,34.0,0.060752123555366,0.061116749266154,0.0003646257107879,0.5,2.0,670.0,34.0,False,False,frozen_prior_T
-self__OB-001,0.060752123555366,0.0608107984840431,5.8674928677078625e-05,0.6470588235294118,2.0,670.0,34.0,0.060752123555366,0.0608107984840431,5.8674928677078625e-05,0.6470588235294118,2.0,670.0,34.0,True,True,frozen_prior_T
-self__OB-002,0.060752123555366,0.0604745136168323,-0.0002776099385337,0.3823529411764705,1.0,670.0,34.0,0.060752123555366,0.0604745136168323,-0.0002776099385337,0.3823529411764705,1.0,670.0,34.0,False,False,frozen_prior_T
-self__OB-003,0.060752123555366,0.0613255899047893,0.0005734663494232,0.6764705882352942,3.0,670.0,34.0,0.060752123555366,0.0613255899047893,0.0005734663494232,0.6764705882352942,3.0,670.0,34.0,True,True,frozen_prior_T
-self__OB-004,0.060752123555366,0.0608868452073607,0.0001347216519946,0.6176470588235294,1.0,670.0,34.0,0.060752123555366,0.0608868452073607,0.0001347216519946,0.6176470588235294,1.0,670.0,34.0,False,False,frozen_prior_T
-self__OB-005,0.060752123555366,0.0606404995702473,-0.0001116239851187,0.2647058823529412,1.0,670.0,34.0,0.060752123555366,0.0606404995702473,-0.0001116239851187,0.2647058823529412,1.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-001,0.060752123555366,0.0630013084886816,0.0022491849333155,0.7647058823529411,3.0,670.0,34.0,0.060752123555366,0.0630013084886816,0.0022491849333155,0.7647058823529411,3.0,670.0,34.0,True,True,frozen_prior_T
-self__PV-002,0.060752123555366,0.060473006617615,-0.000279116937751,0.6176470588235294,2.0,670.0,34.0,0.060752123555366,0.060473006617615,-0.000279116937751,0.6176470588235294,2.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-003,0.060752123555366,0.0606059641475518,-0.0001461594078141,0.6176470588235294,1.0,670.0,34.0,0.060752123555366,0.0606059641475518,-0.0001461594078141,0.6176470588235294,1.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-004,0.060752123555366,0.0603759136880335,-0.0003762098673325,0.3823529411764705,0.0,670.0,34.0,0.060752123555366,0.0603759136880335,-0.0003762098673325,0.3823529411764705,0.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-005,0.060752123555366,0.0604624091372652,-0.0002897144181008,0.3235294117647059,1.0,670.0,34.0,0.060752123555366,0.0604624091372652,-0.0002897144181008,0.3235294117647059,1.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-006,0.060752123555366,0.0591885778409396,-0.0015635457144264,0.3235294117647059,0.0,670.0,34.0,0.060752123555366,0.0591885778409396,-0.0015635457144264,0.3235294117647059,0.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-008,0.060752123555366,0.0616867141533151,0.000934590597949,0.4705882352941176,1.0,670.0,34.0,0.060752123555366,0.0616867141533151,0.000934590597949,0.4705882352941176,1.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-009,0.060752123555366,0.0611247146109748,0.0003725910556087,0.5588235294117647,2.0,670.0,34.0,0.060752123555366,0.0611247146109748,0.0003725910556087,0.5588235294117647,2.0,670.0,34.0,True,True,frozen_prior_T
-self__PV-010,0.060752123555366,0.0611780514078401,0.000425927852474,0.3529411764705882,2.0,670.0,34.0,0.060752123555366,0.0611780514078401,0.000425927852474,0.3529411764705882,2.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-011,0.060752123555366,0.0620888177308873,0.0013366941755212,0.4117647058823529,2.0,670.0,34.0,0.060752123555366,0.0620888177308873,0.0013366941755212,0.4117647058823529,2.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-013,0.060752123555366,0.0615110114571656,0.0007588879017995,0.3823529411764705,2.0,670.0,34.0,0.060752123555366,0.0615110114571656,0.0007588879017995,0.3823529411764705,2.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-014,0.060752123555366,0.0629012221516478,0.0021490985962817,0.9117647058823528,3.0,670.0,34.0,0.060752123555366,0.0629012221516478,0.0021490985962817,0.9117647058823528,3.0,670.0,34.0,True,True,frozen_prior_T
-self__PV-015,0.060752123555366,0.0606186093099527,-0.0001335142454133,0.088235294117647,0.0,670.0,34.0,0.060752123555366,0.0606186093099527,-0.0001335142454133,0.088235294117647,0.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-016,0.060752123555366,0.0605826035179758,-0.0001695200373902,0.1470588235294117,0.0,670.0,34.0,0.060752123555366,0.0605826035179758,-0.0001695200373902,0.1470588235294117,0.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-019,0.060752123555366,0.0607963877496734,4.426419430737854e-05,0.2647058823529412,1.0,670.0,34.0,0.060752123555366,0.0607963877496734,4.426419430737854e-05,0.2647058823529412,1.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-020,0.060752123555366,0.0617458086750878,0.0009936851197217,0.5588235294117647,2.0,670.0,34.0,0.060752123555366,0.0617458086750878,0.0009936851197217,0.5588235294117647,2.0,670.0,34.0,True,True,frozen_prior_T
-self__PV-021,0.060752123555366,0.0609052974669139,0.0001531739115478,0.5,2.0,670.0,34.0,0.060752123555366,0.0609052974669139,0.0001531739115478,0.5,2.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-022,0.060752123555366,0.061576157053504,0.0008240334981379,0.3823529411764705,2.0,670.0,34.0,0.060752123555366,0.061576157053504,0.0008240334981379,0.3823529411764705,2.0,670.0,34.0,False,False,frozen_prior_T
-self__PV-023,0.060752123555366,0.0605675709056303,-0.0001845526497357,0.3823529411764705,0.0,670.0,34.0,0.060752123555366,0.0605675709056303,-0.0001845526497357,0.3823529411764705,0.0,670.0,34.0,False,False,frozen_prior_T
+candidate,evaluation_protocol,candidate_level_J_computed,candidate_level_J_reason
+self__FR-001,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-002,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-003,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-004,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-005,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-006,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-010,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-011,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-012,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-014,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__FR-015,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__HF-001,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__HF-002,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__HF-003,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__HF-004,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__INT-002,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__OB-001,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__OB-002,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__OB-003,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__OB-004,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__OB-005,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-001,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-002,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-003,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-004,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-005,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-006,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-008,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-009,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-010,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-011,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-013,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-014,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-015,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-016,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-019,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-020,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-021,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-022,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once
+self__PV-023,direct_interaction_pool_T_v4_official_J,False,preserve LightGBM interactions; score the complete route once

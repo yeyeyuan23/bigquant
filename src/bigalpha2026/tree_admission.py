@@ -11,16 +11,42 @@ import pandas as pd
 
 from .combinations import (
     lightgbm_model_config,
-    paired_factor_rank_ic_increment,
     walk_forward_lightgbm,
 )
-from .research_policy import TREE_INCREMENTAL_GATE, tree_incremental_track_gate
+from .competition_score_proxy import CompetitionScoreReference
+from .research_policy import (
+    COMPETITION_SCORE_INCREMENT_GATE,
+    TREE_INCREMENTAL_GATE,
+    CompetitionScoreIncrementGate,
+    competition_score_increment_gate,
+)
 from .tree_cache import (
     TREE_CACHE_SCHEMA_VERSION,
     TreePredictionCache,
     feature_fingerprints,
     frame_column_fingerprint,
 )
+
+
+TREE_SCORE_GATE = CompetitionScoreIncrementGate(
+    minimum_score_increment=(
+        COMPETITION_SCORE_INCREMENT_GATE.minimum_score_increment
+    ),
+    minimum_score_days=TREE_INCREMENTAL_GATE.minimum_oos_days,
+    minimum_score_windows=TREE_INCREMENTAL_GATE.minimum_windows,
+    minimum_positive_score_window_ratio=(
+        TREE_INCREMENTAL_GATE.minimum_positive_window_ratio
+    ),
+    minimum_positive_score_years=TREE_INCREMENTAL_GATE.minimum_positive_years,
+)
+
+
+def tree_score_increment_gate(
+    summary: Mapping[str, float],
+) -> tuple[bool, list[str]]:
+    """Apply T sample sufficiency and positive full-period J."""
+
+    return competition_score_increment_gate(summary, TREE_SCORE_GATE)
 
 
 def promote_frozen_tree_pool(
@@ -138,6 +164,7 @@ class TreeAdmissionResult:
     evaluation_state_path: Path
     oriented: pd.DataFrame = field(repr=False)
     labels: pd.DataFrame = field(repr=False)
+    score_reference: CompetitionScoreReference = field(repr=False)
     cache_keys: set[str] = field(default_factory=set, repr=False)
 
     @property
@@ -189,20 +216,20 @@ class TreeAdmissionResult:
     def promotion_row(self) -> dict[str, object]:
         return {
             "pending_candidates": ",".join(self.pending_candidates),
-            "candidate_gate_passed": ",".join(self.pending_passed),
+            "direct_pool_candidates": ",".join(self.pending_passed),
             "provisional_pool_count": len(self.provisional_pool),
             "provisional_vs_screened_increment": (
-                self.provisional_group_increment["oos_rank_ic_increment"]
+                self.provisional_group_increment["delta_score_proxy"]
             ),
             "provisional_vs_screened_passed": self.provisional_group_passed,
             "provisional_vs_frozen_increment": (
-                self.promotion_increment["oos_rank_ic_increment"]
+                self.promotion_increment["delta_score_proxy"]
             ),
             "provisional_vs_frozen_positive_window_ratio": (
-                self.promotion_increment["positive_window_ratio"]
+                self.promotion_increment["positive_score_window_ratio"]
             ),
             "provisional_vs_frozen_positive_years": (
-                self.promotion_increment["positive_years"]
+                self.promotion_increment["positive_score_years"]
             ),
             "provisional_vs_frozen_passed": self.promotion_passed,
             "pool_promoted": self.pool_promoted,
@@ -212,8 +239,9 @@ class TreeAdmissionResult:
     def protocol_summary(self) -> dict[str, object]:
         return {
             "baseline": "lightgbm_screened15",
-            "individual": "baseline_plus_one_candidate",
-            "conditional": "frozen_T_pool_plus_one_candidate",
+            "candidate_filter": "technical_eligibility_only",
+            "admission_metric": "delta_official_score_proxy",
+            "selection": "direct_interaction_pool",
             "evaluation_years": list(self.development_years),
             "train_days": 60,
             "test_days": 20,
@@ -251,6 +279,7 @@ class TreeAdmissionResult:
             },
             "label_fingerprint": self.label_fingerprint,
             "model_config": lightgbm_model_config(),
+            "score_protocol": dict(self.score_reference.protocol()),
         }
         if self.pool_promoted or not self.frozen_state_path.exists():
             self.frozen_state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -269,6 +298,7 @@ class TreeAdmissionResult:
                     },
                     "label_fingerprint": self.label_fingerprint,
                     "model_config": lightgbm_model_config(),
+                    "score_protocol": dict(self.score_reference.protocol()),
                     "pending_candidates": list(self.pending_candidates),
                     "candidate_gate_passed": list(self.pending_passed),
                     "promoted_candidates": [
@@ -302,6 +332,7 @@ def run_tree_admission(
     labels: pd.DataFrame,
     selected_public: tuple[str, ...],
     self_columns: tuple[str, ...],
+    score_reference: CompetitionScoreReference,
     *,
     development_years: tuple[int, ...],
     prior_admission_path: Path,
@@ -313,6 +344,9 @@ def run_tree_admission(
 
     development = oriented.loc[
         oriented["date"].dt.year.isin(development_years)
+    ]
+    development_labels = labels.loc[
+        labels["date"].dt.year.isin(development_years)
     ]
     active_days_by_feature = {
         self_column: int(
@@ -333,25 +367,39 @@ def run_tree_admission(
         raise RuntimeError(
             "no self-developed factor has enough active days for tree admission"
         )
+    refresh_features = {
+        candidate
+        if str(candidate).startswith("self__")
+        else f"self__{candidate}"
+        for candidate in refresh_candidates
+    }
     fingerprints = feature_fingerprints(
+        development,
+        (*selected_public, *eligible),
+    )
+    prediction_fingerprints = feature_fingerprints(
         oriented,
         (*selected_public, *eligible),
     )
     label_fingerprint = frame_column_fingerprint(
+        development_labels,
+        "ret_close_to_close",
+    )
+    prediction_label_fingerprint = frame_column_fingerprint(
         labels,
         "ret_close_to_close",
     )
     frozen_cache = TreePredictionCache(
         cache_dir / "frozen_predictions",
-        feature_fingerprints=fingerprints,
-        label_fingerprint=label_fingerprint,
+        feature_fingerprints=prediction_fingerprints,
+        label_fingerprint=prediction_label_fingerprint,
         model_config=lightgbm_model_config(),
         refresh=refresh_cache,
     )
     validation_cache = TreePredictionCache(
         cache_dir / "validation_predictions",
-        feature_fingerprints=fingerprints,
-        label_fingerprint=label_fingerprint,
+        feature_fingerprints=prediction_fingerprints,
+        label_fingerprint=prediction_label_fingerprint,
         model_config=lightgbm_model_config(),
         refresh=refresh_cache,
     )
@@ -368,6 +416,9 @@ def run_tree_admission(
             label_column="ret_close_to_close",
             train_window_days=60,
             test_window_days=20,
+            force_refresh=bool(
+                set(feature_columns).intersection(refresh_features)
+            ),
             compute=lambda: walk_forward_lightgbm(
                 oriented,
                 labels,
@@ -404,6 +455,10 @@ def run_tree_admission(
             incompatibilities.append("label_fingerprint")
         if loaded_state.get("model_config") != lightgbm_model_config():
             incompatibilities.append("model_config")
+        if loaded_state.get("score_protocol") != dict(
+            score_reference.protocol()
+        ):
+            incompatibilities.append("score_protocol")
         if incompatibilities:
             raise RuntimeError(
                 "frozen T state is incompatible with the current evaluation "
@@ -423,19 +478,16 @@ def run_tree_admission(
             loaded_state.get("schema_version") == TREE_CACHE_SCHEMA_VERSION
             and loaded_state.get("label_fingerprint") == label_fingerprint
             and loaded_state.get("model_config") == lightgbm_model_config()
+            and loaded_state.get("score_protocol") == dict(
+                score_reference.protocol()
+            )
         ):
             evaluation_state = loaded_state
     evaluated_fingerprints = dict(
         evaluation_state.get("candidate_fingerprints", {})
     )
-    refresh_features = {
-        candidate
-        if str(candidate).startswith("self__")
-        else f"self__{candidate}"
-        for candidate in refresh_candidates
-    }
     has_compatible_evaluation_state = bool(evaluation_state)
-    pending = unresolved_tree_candidates(
+    unresolved = unresolved_tree_candidates(
         eligible,
         refresh_features=refresh_features,
         prior_candidates=set(prior_rows),
@@ -454,6 +506,13 @@ def run_tree_admission(
         # must re-evaluate every eligible candidate rather than bootstrap its
         # pool from rows produced by an older contract.
         frozen_before = ()
+    # Every technically eligible non-frozen factor remains a T challenger.
+    # A previously rejected factor may become useful when a new interaction
+    # partner arrives; only frozen members are excluded from the pending pool.
+    pending = tuple(
+        candidate for candidate in eligible if candidate not in frozen_before
+    )
+    del unresolved
 
     baseline_factor = cached_prediction(
         frozen_cache,
@@ -484,7 +543,15 @@ def run_tree_admission(
             }
             continue
         if self_column not in pending:
-            prior_row = dict(prior_rows[self_column])
+            prior_row = dict(
+                prior_rows.get(
+                    self_column,
+                    {
+                        "candidate": self_column,
+                        "tree_incremental_passed": True,
+                    },
+                )
+            )
             prior_row["active_days"] = active_days
             prior_row["tree_data_eligible"] = True
             prior_row["evaluation_status"] = "frozen_prior_evaluation"
@@ -500,67 +567,33 @@ def run_tree_admission(
             )
             continue
 
-        individual_factor = cached_prediction(
-            validation_cache,
-            (*selected_public, self_column),
-            development_years,
-        )
-        individual_summary = paired_factor_rank_ic_increment(
-            baseline_factor,
-            individual_factor,
-            labels,
-        )
-        conditional_factor = cached_prediction(
-            validation_cache,
-            (*frozen_features, self_column),
-            development_years,
-        )
-        conditional_summary = paired_factor_rank_ic_increment(
-            frozen_factor,
-            conditional_factor,
-            labels,
-        )
         row = {
             "candidate": self_column,
-            **{
-                f"individual_{key}": value
-                for key, value in individual_summary.items()
-            },
-            **{
-                f"conditional_{key}": value
-                for key, value in conditional_summary.items()
-            },
-            "evaluation_protocol": "frozen_pool_increment_T_v2",
+            "evaluation_protocol": "direct_interaction_pool_T_v4_official_J",
+            "candidate_level_J_computed": False,
+            "candidate_level_J_reason": (
+                "preserve LightGBM interactions; score the complete route once"
+            ),
         }
         incremental_rows.append(row)
-        individual_passed, individual_reasons = (
-            tree_incremental_track_gate(individual_summary)
-        )
-        conditional_passed, conditional_reasons = (
-            tree_incremental_track_gate(conditional_summary)
-        )
-        tree_passed = individual_passed or conditional_passed
-        reasons = []
-        if not individual_passed:
-            reasons.append("individual: " + "; ".join(individual_reasons))
-        if not conditional_passed:
-            reasons.append("conditional: " + "; ".join(conditional_reasons))
         admission[self_column] = {
             **row,
             "active_days": active_days,
             "tree_data_eligible": True,
-            "individual_passed": individual_passed,
-            "conditional_passed": conditional_passed,
-            "tree_incremental_passed": tree_passed,
+            "individual_passed": None,
+            "conditional_passed": None,
+            "tree_incremental_passed": True,
             "evaluation_status": "pending_group_confirmation",
-            "reasons": " | ".join(reasons),
+            "marginal_reasons": "not computed; direct interaction pool",
+            "reasons": "",
         }
 
-    pending_passed = tuple(
-        candidate
-        for candidate in pending
-        if bool(admission[candidate]["tree_incremental_passed"])
-    )
+    # One complete LightGBM route preserves interactions and lets the model
+    # perform its own feature selection.  Candidate-level subset search would
+    # duplicate that work and explode combinatorially.
+    pending_passed = pending
+    for candidate in pending:
+        admission[candidate]["direct_pool_selected"] = True
     provisional_pool = tuple(
         dict.fromkeys((*frozen_before, *pending_passed))
     )
@@ -574,21 +607,21 @@ def run_tree_admission(
         if pending
         else frozen_factor
     )
-    provisional_group_increment = paired_factor_rank_ic_increment(
+    provisional_group_increment = score_reference.paired_increment(
         baseline_factor,
         provisional_factor,
-        labels,
+        include_stability=False,
     )
     provisional_group_passed, provisional_group_reasons = (
-        tree_incremental_track_gate(provisional_group_increment)
+        tree_score_increment_gate(provisional_group_increment)
     )
-    promotion_increment = paired_factor_rank_ic_increment(
+    promotion_increment = score_reference.paired_increment(
         frozen_factor,
         provisional_factor,
-        labels,
+        include_stability=False,
     )
     promotion_passed, promotion_reasons = (
-        tree_incremental_track_gate(promotion_increment)
+        tree_score_increment_gate(promotion_increment)
         if pending_passed
         else (True, [])
     )
@@ -601,21 +634,32 @@ def run_tree_admission(
     active_development_factor = (
         provisional_factor if pool_promoted else frozen_factor
     )
-    group_increment = paired_factor_rank_ic_increment(
+    group_increment = score_reference.paired_increment(
         baseline_factor,
         active_development_factor,
-        labels,
+        include_stability=False,
     )
-    group_passed, group_reasons = tree_incremental_track_gate(
+    group_passed, group_reasons = tree_score_increment_gate(
         group_increment
     )
     for candidate in pending:
+        admitted_candidate = candidate in admitted
+        admission[candidate]["tree_incremental_passed"] = admitted_candidate
+        admission[candidate]["reasons"] = (
+            ""
+            if admitted_candidate
+            else "; ".join(
+                dict.fromkeys(
+                    (*provisional_group_reasons, *promotion_reasons)
+                )
+            )
+        )
         admission[candidate]["frozen_after_validation"] = (
-            candidate in admitted
+            admitted_candidate
         )
         admission[candidate]["evaluation_status"] = (
             "promoted_to_frozen_T"
-            if candidate in admitted
+            if admitted_candidate
             else "evaluated_not_frozen"
         )
     return TreeAdmissionResult(
@@ -647,5 +691,6 @@ def run_tree_admission(
         evaluation_state_path=evaluation_state_path,
         oriented=oriented,
         labels=labels,
+        score_reference=score_reference,
         cache_keys=cache_keys,
     )

@@ -17,8 +17,10 @@ import pandas as pd
 from bigalpha2026.combinations import (
     walk_forward_elastic_net_with_weights,
 )
+from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
+    rank_ic_series,
 )
 from bigalpha2026.factor_pool import (
     CANDIDATE_POOL_VERSION,
@@ -30,17 +32,25 @@ from bigalpha2026.factor_pool import (
     screen_public_factors,
     validate_candidate_pool_manifest,
 )
-from bigalpha2026.factorlib import validate_factorlib_subset_frame
+from bigalpha2026.factorlib import (
+    FACTORLIB_FEATURE_COLUMNS,
+    validate_factorlib_frame,
+    validate_factorlib_subset_frame,
+)
 from bigalpha2026.incremental_admission import (
+    IncrementalAdmissionResult,
     run_incremental_admission,
 )
 from bigalpha2026.research_policy import (
-    COMBINATION_ADMISSION_GATE,
     FORMAL_EVALUATION_POLICY,
     FROZEN_FACTORLIB_SCREENED_FEATURES,
-    factorlib_incremental_gate,
+)
+from bigalpha2026.single_factor_admission import (
+    SingleFactorRouteAdmissionResult,
+    run_single_factor_route_admission,
 )
 from bigalpha2026.tree_admission import (
+    TreeAdmissionResult,
     run_tree_admission,
 )
 
@@ -63,8 +73,7 @@ PIPELINE_NAMES = (
     "joint_lightgbm",
 )
 SCREENED_FACTORLIB_RAW_FEATURES = tuple(
-    feature.removeprefix("factorlib__")
-    for feature in FROZEN_FACTORLIB_SCREENED_FEATURES
+    feature.removeprefix("factorlib__") for feature in FROZEN_FACTORLIB_SCREENED_FEATURES
 )
 BASE_SELF_FAMILIES = frozenset({"FR", "HF", "OB", "PV"})
 
@@ -96,10 +105,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="compatibility flag; exact I cache reuse is automatic",
     )
     parser.add_argument(
+        "--single-factor-cache-dir",
+        type=Path,
+        default=None,
+        help="frozen S state (default: DATA/cache/single_factor_v1_J)",
+    )
+    parser.add_argument(
         "--incremental-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed I cache (default: DATA/cache/incremental_v3)",
+        help="content-addressed I cache (default: DATA/cache/incremental_v4_J)",
     )
     parser.add_argument(
         "--refresh-incremental-cache",
@@ -116,7 +131,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--tree-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed LightGBM prediction cache (default: DATA/cache/tree_v3)",
+        help="content-addressed LightGBM cache (default: DATA/cache/tree_v4_J)",
     )
     parser.add_argument(
         "--refresh-tree-cache",
@@ -136,10 +151,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def read_yearly(data_dir: Path, template: str, years: Sequence[int]) -> pd.DataFrame:
     return pd.concat(
-        [
-            pd.read_parquet(data_dir / template.format(year=year))
-            for year in years
-        ],
+        [pd.read_parquet(data_dir / template.format(year=year)) for year in years],
         ignore_index=True,
     )
 
@@ -157,6 +169,11 @@ def required_paths(
                 data_dir / f"labels/year={year}/part-{year}.parquet",
                 data_dir / f"exposures/year={year}/part-{year}.parquet",
                 data_dir / f"features/FACTORLIB/year={year}/part-{year}.parquet",
+                *(
+                    [data_dir / (f"features/FACTORLIB_ALL36/year={year}/part-{year}.parquet")]
+                    if year in YEARS
+                    else []
+                ),
             ]
         )
     paths.extend(
@@ -164,6 +181,7 @@ def required_paths(
             data_dir / "factors/candidate_pool.parquet",
             data_dir / "manifest_candidate_pool.json",
             data_dir / "features/FACTORLIB/manifest.json",
+            data_dir / "features/FACTORLIB_ALL36/manifest.json",
             reports_dir / "first_round_decisions.json",
         ]
     )
@@ -181,15 +199,11 @@ def load_factorlib(data_dir: Path, years: Sequence[int]) -> pd.DataFrame:
     manifest_path = data_dir / "features/FACTORLIB/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("features") != list(SCREENED_FACTORLIB_RAW_FEATURES):
-        raise ValueError(
-            "factorlib manifest no longer matches the frozen screened15 membership"
-        )
+        raise ValueError("factorlib manifest no longer matches the frozen screened15 membership")
     parts: list[pd.DataFrame] = []
     for year in years:
         path = data_dir / f"features/FACTORLIB/year={year}/part-{year}.parquet"
-        part = pd.read_parquet(
-            path
-        )
+        part = pd.read_parquet(path)
         validate_factorlib_subset_frame(part, SCREENED_FACTORLIB_RAW_FEATURES)
         expected = manifest.get("years", {}).get(str(year), {})
         if int(expected.get("rows", -1)) != len(part):
@@ -202,6 +216,32 @@ def load_factorlib(data_dir: Path, years: Sequence[int]) -> pd.DataFrame:
     return combined
 
 
+def load_factorlib_all36(
+    data_dir: Path,
+    years: Sequence[int],
+) -> pd.DataFrame:
+    """Load the independent all36 J reference without changing screened15."""
+
+    directory = data_dir / "features" / "FACTORLIB_ALL36"
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("features") != list(FACTORLIB_FEATURE_COLUMNS):
+        raise ValueError("J reference manifest does not match factorlib all36")
+    parts: list[pd.DataFrame] = []
+    for year in years:
+        path = directory / f"year={year}" / f"part-{year}.parquet"
+        part = pd.read_parquet(path)
+        validate_factorlib_frame(part)
+        expected = manifest.get("years", {}).get(str(year), {})
+        if int(expected.get("rows", -1)) != len(part):
+            raise ValueError(f"all36 factorlib {year} rows do not match manifest")
+        if expected.get("sha256") != file_sha256(path):
+            raise ValueError(f"all36 factorlib {year} SHA-256 mismatch")
+        parts.append(part)
+    combined = pd.concat(parts, ignore_index=True)
+    validate_factorlib_frame(combined)
+    return combined
+
+
 def load_dynamic_inputs(
     data_dir: Path,
     reports_dir: Path,
@@ -211,13 +251,10 @@ def load_dynamic_inputs(
     pd.DataFrame,
     pd.DataFrame,
     pd.DataFrame,
+    pd.DataFrame,
     tuple[str, ...],
 ]:
-    missing = [
-        str(path)
-        for path in required_paths(data_dir, reports_dir)
-        if not path.exists()
-    ]
+    missing = [str(path) for path in required_paths(data_dir, reports_dir) if not path.exists()]
     if missing:
         raise FileNotFoundError(f"dynamic combination inputs are missing: {missing}")
 
@@ -241,6 +278,7 @@ def load_dynamic_inputs(
         frame["instrument"] = frame["instrument"].astype(str)
 
     factorlib = load_factorlib(data_dir, YEARS)
+    factorlib_all36 = load_factorlib_all36(data_dir, YEARS)
     candidate_path = data_dir / "factors/candidate_pool.parquet"
     candidate_pool = pd.read_parquet(candidate_path)
     validate_candidate_pool_manifest(
@@ -264,17 +302,10 @@ def load_dynamic_inputs(
         .unique()
     )
     if not ob_dates.sort_values().equals(universe_dates.sort_values()):
-        raise ValueError(
-            "OB-001 does not cover the full historical universe calendar"
-        )
+        raise ValueError("OB-001 does not cover the full historical universe calendar")
     decisions = load_decisions(reports_dir / "first_round_decisions.json")
-    candidate_ids = tuple(
-        sorted(candidate_pool["candidate_id"].astype(str).unique())
-    )
-    decision_by_id = {
-        str(row["candidate_id"]): row
-        for row in decisions
-    }
+    candidate_ids = tuple(sorted(candidate_pool["candidate_id"].astype(str).unique()))
+    decision_by_id = {str(row["candidate_id"]): row for row in decisions}
     missing_decisions = sorted(set(candidate_ids).difference(decision_by_id))
     if missing_decisions:
         raise ValueError(
@@ -298,12 +329,21 @@ def load_dynamic_inputs(
         admitted_candidates=candidate_ids,
         public_feature_columns=SCREENED_FACTORLIB_RAW_FEATURES,
     )
+    all36_reference = factorlib_all36.rename(
+        columns={column: f"factorlib__{column}" for column in FACTORLIB_FEATURE_COLUMNS}
+    )
+    all36_reference["date"] = pd.to_datetime(
+        all36_reference["date"],
+        errors="coerce",
+    ).dt.normalize()
+    all36_reference["instrument"] = all36_reference["instrument"].astype(str)
     return (
         panel,
         labels,
         exposures,
         coverage,
         candidate_pool,
+        all36_reference,
         single_factor_admitted,
     )
 
@@ -312,19 +352,13 @@ def contract_summary(
     data_dir: Path,
     reports_dir: Path,
 ) -> tuple[dict[str, object], tuple[pd.DataFrame, ...] | None]:
-    missing = [
-        str(path)
-        for path in required_paths(data_dir, reports_dir)
-        if not path.exists()
-    ]
+    missing = [str(path) for path in required_paths(data_dir, reports_dir) if not path.exists()]
     if missing:
         return (
             {
                 "status": "missing_inputs",
                 "missing": missing,
-                "factorlib_expected_features": len(
-                    SCREENED_FACTORLIB_RAW_FEATURES
-                ),
+                "factorlib_expected_features": len(SCREENED_FACTORLIB_RAW_FEATURES),
             },
             None,
         )
@@ -335,17 +369,14 @@ def contract_summary(
         exposures,
         coverage,
         candidate_pool,
+        all36_reference,
         single_factor_admitted,
     ) = load_dynamic_inputs(data_dir, reports_dir)
     candidate_manifest = json.loads(
         (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
     )
-    public_columns = tuple(
-        column for column in panel.columns if column.startswith("factorlib__")
-    )
-    self_columns = tuple(
-        column for column in panel.columns if column.startswith("self__")
-    )
+    public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
+    self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
     public_coverage = coverage.loc[
         coverage["feature"].isin(public_columns),
         "coverage",
@@ -366,6 +397,11 @@ def contract_summary(
         "factorlib_reference": {
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
+            "j_reference": "factorlib_all36_base_proxy",
+            "j_reference_count": len(FACTORLIB_FEATURE_COLUMNS),
+            "j_reference_columns_present": len(
+                [column for column in all36_reference if column.startswith("factorlib__")]
+            ),
         },
         "candidate_pool_reference": {
             "factor_version": CANDIDATE_POOL_VERSION,
@@ -396,6 +432,7 @@ def contract_summary(
         exposures,
         coverage,
         candidate_pool,
+        all36_reference,
         single_factor_admitted,
     )
 
@@ -406,17 +443,11 @@ def synthetic_contract_summary() -> dict[str, object]:
     dates = pd.to_datetime(["2022-01-04", "2022-01-05"])
     instruments = ("A", "B", "C")
     universe = pd.DataFrame(
-        [
-            {"date": date, "instrument": instrument}
-            for date in dates
-            for instrument in instruments
-        ]
+        [{"date": date, "instrument": instrument} for date in dates for instrument in instruments]
     )
     factorlib = universe.copy()
     for index, column in enumerate(SCREENED_FACTORLIB_RAW_FEATURES):
-        factorlib[column] = (
-            pd.Series(range(len(factorlib)), dtype=float) + float(index)
-        )
+        factorlib[column] = pd.Series(range(len(factorlib)), dtype=float) + float(index)
     candidate_pool = universe.copy()
     candidate_pool["candidate_id"] = "HF-TEST"
     candidate_pool["factor_version"] = "synthetic-v1"
@@ -424,9 +455,7 @@ def synthetic_contract_summary() -> dict[str, object]:
     panel, public_columns, self_columns, coverage = build_feature_panel(
         universe,
         factorlib,
-        candidate_pool[
-            ["date", "instrument", "candidate_id", "factor_version", "factor"]
-        ],
+        candidate_pool[["date", "instrument", "candidate_id", "factor_version", "factor"]],
         admitted_candidates=("HF-TEST",),
         public_feature_columns=SCREENED_FACTORLIB_RAW_FEATURES,
     )
@@ -440,9 +469,9 @@ def synthetic_contract_summary() -> dict[str, object]:
         "mode": "synthetic_structure_only",
         "rows": len(panel),
         "factorlib_features": len(public_columns),
-        "factorlib_screened_features": len(
-            FROZEN_FACTORLIB_SCREENED_FEATURES
-        ),
+        "factorlib_screened_features": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
+        "competition_J_reference": "factorlib_all36_base_proxy",
+        "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS),
         "self_features": len(self_columns),
         "minimum_coverage": float(coverage["coverage"].min()),
         "self_factor_composite_contract": list(self_factor.columns),
@@ -525,123 +554,164 @@ def metric_value(
     return float(row.iloc[0][column])
 
 
-def run_experiments(
+def rank_submission_routes(
+    decisions: Sequence[dict[str, object]],
+) -> list[str]:
+    """Rank score-ready routes by competition J, never by Rank IC."""
+
+    tie_priority = {
+        "self_factor_composite": 0,
+        "joint_elastic_net": 1,
+        "joint_lightgbm": 2,
+    }
+    ranked = sorted(
+        (row for row in decisions if bool(row["score_ranking_eligible"])),
+        key=lambda row: (
+            -float(row["robust_score_proxy"]),
+            -float(row["validation_combined_base_score_proxy"]),
+            tie_priority.get(str(row["experiment"]), len(tie_priority)),
+            str(row["experiment"]),
+        ),
+    )
+    return [str(row["experiment"]) for row in ranked]
+
+
+def orient_j_reference(
+    reference_panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    reference_columns: Sequence[str],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Freeze high-is-good all36 directions on development data only."""
+
+    development = reference_panel.loc[reference_panel["date"].dt.year.isin(DEVELOPMENT_YEARS)]
+    development_labels = labels.loc[
+        labels["date"].dt.year.isin(DEVELOPMENT_YEARS),
+        ["date", "instrument", "ret_close_to_close"],
+    ]
+    merged = development.merge(
+        development_labels,
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    rows: list[dict[str, object]] = []
+    oriented = reference_panel.copy()
+    for column in reference_columns:
+        ic = rank_ic_series(
+            merged,
+            factor_column=column,
+            label_column="ret_close_to_close",
+        ).dropna()
+        mean_ic = float(ic.mean()) if not ic.empty else float("nan")
+        direction = 1.0 if pd.isna(mean_ic) or mean_ic >= 0 else -1.0
+        oriented[column] = pd.to_numeric(oriented[column], errors="coerce") * direction
+        rows.append(
+            {
+                "feature": column,
+                "raw_development_rank_ic": mean_ic,
+                "frozen_direction": direction,
+            }
+        )
+    return oriented, pd.DataFrame(rows)
+
+
+def prepare_experiment_context(
     panel: pd.DataFrame,
     labels: pd.DataFrame,
     exposures: pd.DataFrame,
+    all36_reference: pd.DataFrame,
     public_columns: tuple[str, ...],
     self_columns: tuple[str, ...],
     single_factor_candidates: tuple[str, ...],
-    reports_dir: Path,
-    *,
-    resume_incremental: bool = False,
-    incremental_cache_dir: Path | None = None,
-    refresh_incremental_cache: bool = False,
-    refresh_incremental_candidates: Sequence[str] = (),
-    tree_cache_dir: Path | None = None,
-    refresh_tree_cache: bool = False,
-    refresh_tree_candidates: Sequence[str] = (),
-) -> dict[str, object]:
+) -> tuple[
+    pd.DataFrame,
+    tuple[str, ...],
+    pd.DataFrame,
+    pd.DataFrame,
+    CompetitionScoreReference,
+    tuple[str, ...],
+]:
+    """Freeze feature directions and the all36 competition-score reference."""
+
     development_panel = panel.loc[panel["date"].dt.year.isin(DEVELOPMENT_YEARS)]
-    development_labels = labels.loc[
-        labels["date"].dt.year.isin(DEVELOPMENT_YEARS)
-    ]
+    development_labels = labels.loc[labels["date"].dt.year.isin(DEVELOPMENT_YEARS)]
     screening = screen_public_factors(
         development_panel,
         development_labels,
         public_columns,
         development_years=DEVELOPMENT_YEARS,
-    )
-    screening = screening.rename(
-        columns={"selected": "diagnostic_selected_under_current_contract"}
-    )
+    ).rename(columns={"selected": "diagnostic_selected_under_current_contract"})
     screening["selected"] = screening["feature"].isin(public_columns)
     oriented = apply_feature_directions(panel, screening)
     selected_public = tuple(public_columns)
     if selected_public != FROZEN_FACTORLIB_SCREENED_FEATURES:
-        raise RuntimeError(
-            "local factorlib subset no longer matches the frozen 15 membership"
+        raise RuntimeError("local factorlib subset no longer matches the frozen 15 membership")
+
+    j_reference_columns = tuple(f"factorlib__{column}" for column in FACTORLIB_FEATURE_COLUMNS)
+    oriented_j_reference, j_reference_directions = orient_j_reference(
+        all36_reference,
+        labels,
+        j_reference_columns,
+    )
+    score_reference = CompetitionScoreReference(
+        oriented_j_reference,
+        labels,
+        exposures,
+        j_reference_columns,
+    )
+    s_candidate_features = tuple(
+        f"self__{candidate_id}"
+        for candidate_id in single_factor_candidates
+        if (
+            f"self__{candidate_id}" in self_columns
+            and enters_family_equal_rank(f"self__{candidate_id}")
         )
-
-    resolved_incremental_cache_dir = (
-        Path(incremental_cache_dir)
-        if incremental_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "incremental_v3"
     )
-    del resume_incremental
-    incremental_result = run_incremental_admission(
+    return (
         oriented,
-        labels,
         selected_public,
-        self_columns,
-        development_years=DEVELOPMENT_YEARS,
-        cache_dir=resolved_incremental_cache_dir,
-        refresh_cache=refresh_incremental_cache,
-        refresh_candidates=refresh_incremental_candidates,
+        screening,
+        j_reference_directions,
+        score_reference,
+        s_candidate_features,
     )
-    screened_summary = incremental_result.screened_summary
-    frozen_incremental_after = incremental_result.frozen_after
-    resolved_tree_cache_dir = (
-        Path(tree_cache_dir)
-        if tree_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "tree_v3"
-    )
-    tree_result = run_tree_admission(
-        oriented,
-        labels,
-        selected_public,
-        self_columns,
-        development_years=DEVELOPMENT_YEARS,
-        prior_admission_path=reports_dir / "tree_factor_admission.csv",
-        cache_dir=resolved_tree_cache_dir,
-        refresh_cache=refresh_tree_cache,
-        refresh_candidates=refresh_tree_candidates,
-    )
-    tree_admission_by_feature = tree_result.admission_by_feature
-    tree_summary = tree_result.incremental_summary
-    pending_tree_candidates = tree_result.pending_candidates
-    pending_tree_passed = tree_result.pending_passed
-    provisional_tree_pool = tree_result.provisional_pool
-    provisional_tree_group_increment = (
-        tree_result.provisional_group_increment
-    )
-    provisional_tree_group_passed = tree_result.provisional_group_passed
-    tree_promotion_increment = tree_result.promotion_increment
-    tree_promotion_passed = tree_result.promotion_passed
-    tree_admitted_self = list(tree_result.admitted_candidates)
-    tree_pool_promoted = tree_result.pool_promoted
-    tree_group_increment = tree_result.group_increment
-    tree_group_passed = tree_result.group_passed
-    tree_group_reasons = tree_result.group_reasons
 
+
+def build_admission_audit_rows(
+    self_columns: tuple[str, ...],
+    single_factor_features: Sequence[str],
+    incremental_result: IncrementalAdmissionResult,
+    tree_result: TreeAdmissionResult,
+) -> tuple[tuple[dict[str, object], ...], tuple[dict[str, object], ...]]:
+    """Describe which candidate enters each isolated combination route."""
 
     incremental_rows: list[dict[str, object]] = []
     admission_rows: list[dict[str, object]] = []
-    admitted_self = list(frozen_incremental_after)
-    single_factor_features = {
-        f"self__{candidate_id}" for candidate_id in single_factor_candidates
-    }
+    single_factor_set = set(single_factor_features)
+    elastic_pool_inputs = set(incremental_result.individual_passed)
+    admitted_incremental = set(incremental_result.frozen_after)
+    admitted_tree = set(tree_result.admitted_candidates)
     for self_column in self_columns:
-        screened_row = screened_summary.loc[
-            screened_summary["candidate"].eq(self_column)
-        ].iloc[0].to_dict()
-        screened_passed, screened_reasons = factorlib_incremental_gate(
-            screened_row
+        screened_row = (
+            incremental_result.screened_summary.loc[
+                incremental_result.screened_summary["candidate"].eq(self_column)
+            ]
+            .iloc[0]
+            .to_dict()
         )
-        tree_passed = bool(
-            tree_admission_by_feature[self_column]["tree_incremental_passed"]
-        )
-        enters_tree_model = self_column in tree_admitted_self
-        enters_incremental_model = self_column in admitted_self
-        enters_self_composite = (
-            self_column in single_factor_features
-            and enters_family_equal_rank(self_column)
+        screened_passed = self_column in elastic_pool_inputs
+        screened_reasons: list[str] = []
+        tree_passed = bool(tree_result.admission_by_feature[self_column]["tree_incremental_passed"])
+        enters_incremental_model = self_column in admitted_incremental
+        enters_tree_model = self_column in admitted_tree
+        enters_self_composite = self_column in single_factor_set and enters_family_equal_rank(
+            self_column
         )
         incremental_rows.append(
             {
                 **screened_row,
                 "feature": self_column,
-                "benchmark": "factorlib_screened15",
+                "benchmark": "direct_elastic_net_pool",
                 "passed": screened_passed,
                 "reasons": screened_reasons,
             }
@@ -650,16 +720,13 @@ def run_experiments(
             {
                 "candidate_id": self_column.removeprefix("self__"),
                 "feature": self_column,
-                "single_factor_passed": self_column in single_factor_features,
-                "screened15_incremental_passed": screened_passed,
+                "single_factor_passed": self_column in single_factor_set,
+                "candidate_level_incremental_J_computed": False,
+                "elastic_net_pool_input": screened_passed,
                 "incremental_evaluation_status": (
                     "frozen_I"
                     if enters_incremental_model
-                    else (
-                        "pending_passed_not_frozen"
-                        if screened_passed
-                        else "I_rejected"
-                    )
+                    else "direct_pool_not_promoted"
                 ),
                 "enters_self_factor_composite": enters_self_composite,
                 "enters_joint_elastic_net": enters_incremental_model,
@@ -670,60 +737,211 @@ def run_experiments(
                 + int(enters_tree_model),
                 "status": (
                     "admitted"
-                    if (
-                        enters_self_composite
-                        or enters_incremental_model
-                        or enters_tree_model
-                    )
+                    if (enters_self_composite or enters_incremental_model or enters_tree_model)
                     else "rejected"
                 ),
             }
         )
-    self_features = tuple(
-        f"self__{candidate_id}"
-        for candidate_id in single_factor_candidates
-        if (
-            f"self__{candidate_id}" in self_columns
-            and enters_family_equal_rank(f"self__{candidate_id}")
-        )
+    return tuple(incremental_rows), tuple(admission_rows)
+
+
+def run_route_admissions(
+    oriented: pd.DataFrame,
+    labels: pd.DataFrame,
+    selected_public: tuple[str, ...],
+    self_columns: tuple[str, ...],
+    score_reference: CompetitionScoreReference,
+    s_candidate_features: tuple[str, ...],
+    reports_dir: Path,
+    *,
+    single_factor_cache_dir: Path | None,
+    incremental_cache_dir: Path | None,
+    refresh_incremental_cache: bool,
+    refresh_incremental_candidates: Sequence[str],
+    tree_cache_dir: Path | None,
+    refresh_tree_cache: bool,
+    refresh_tree_candidates: Sequence[str],
+) -> tuple[
+    SingleFactorRouteAdmissionResult,
+    IncrementalAdmissionResult,
+    TreeAdmissionResult,
+]:
+    """Run S, I and T independently without cross-route pre-filtering."""
+
+    single_factor_state = (
+        Path(single_factor_cache_dir)
+        if single_factor_cache_dir is not None
+        else reports_dir.parent / "data" / "cache" / "single_factor_v1_J"
+    ) / "frozen_state.json"
+    single_factor = run_single_factor_route_admission(
+        oriented.loc[oriented["date"].dt.year.isin(DEVELOPMENT_YEARS)],
+        score_reference,
+        s_candidate_features,
+        frozen_state_path=single_factor_state,
     )
-    if not self_features:
-        raise RuntimeError(
-            "no candidate passed the development monthly single-factor gate"
-        )
-    joint_self_features = tuple(admitted_self)
-    joint_elastic_net_features = (*selected_public, *joint_self_features)
-    joint_lightgbm_features = (*selected_public, *tree_admitted_self)
-    joint_elastic_net_factor, joint_elastic_net_weights = (
-        walk_forward_elastic_net_with_weights(
-            oriented,
-            labels,
-            feature_columns=joint_elastic_net_features,
-            prediction_years=(
-                VALIDATION_2022_YEAR,
-                VALIDATION_2023_YEAR,
-            ),
-        )
+    if not single_factor.admitted_candidates:
+        raise RuntimeError("no candidate passed the J-based S route admission")
+
+    resolved_incremental_cache = (
+        Path(incremental_cache_dir)
+        if incremental_cache_dir is not None
+        else reports_dir.parent / "data" / "cache" / "incremental_v4_J"
     )
-    pipelines: dict[tuple[str, str], pd.DataFrame] = {
+    incremental = run_incremental_admission(
+        oriented,
+        labels,
+        selected_public,
+        self_columns,
+        score_reference,
+        development_years=DEVELOPMENT_YEARS,
+        cache_dir=resolved_incremental_cache,
+        refresh_cache=refresh_incremental_cache,
+        refresh_candidates=refresh_incremental_candidates,
+    )
+
+    resolved_tree_cache = (
+        Path(tree_cache_dir)
+        if tree_cache_dir is not None
+        else reports_dir.parent / "data" / "cache" / "tree_v4_J"
+    )
+    tree = run_tree_admission(
+        oriented,
+        labels,
+        selected_public,
+        self_columns,
+        score_reference,
+        development_years=DEVELOPMENT_YEARS,
+        prior_admission_path=reports_dir / "tree_factor_admission.csv",
+        cache_dir=resolved_tree_cache,
+        refresh_cache=refresh_tree_cache,
+        refresh_candidates=refresh_tree_candidates,
+    )
+    return single_factor, incremental, tree
+
+
+def build_validation_pipelines(
+    oriented: pd.DataFrame,
+    labels: pd.DataFrame,
+    selected_public: tuple[str, ...],
+    score_reference: CompetitionScoreReference,
+    self_features: tuple[str, ...],
+    incremental_result: IncrementalAdmissionResult,
+    tree_result: TreeAdmissionResult,
+) -> tuple[
+    dict[tuple[str, str], pd.DataFrame],
+    pd.DataFrame,
+    tuple[str, ...],
+    tuple[str, ...],
+    dict[str, dict[str, float]],
+    dict[str, dict[str, object]],
+]:
+    """Train and orient the three routes on their independent admitted pools."""
+
+    elastic_net_features = (
+        *selected_public,
+        *incremental_result.frozen_after,
+    )
+    lightgbm_features = (
+        *selected_public,
+        *tree_result.admitted_candidates,
+    )
+    elastic_net_factor, elastic_net_weights = walk_forward_elastic_net_with_weights(
+        oriented,
+        labels,
+        feature_columns=elastic_net_features,
+        prediction_years=(
+            VALIDATION_2022_YEAR,
+            VALIDATION_2023_YEAR,
+        ),
+    )
+    raw_pipelines: dict[tuple[str, str], pd.DataFrame] = {
         (
             "self_factor_composite",
             "family_equal_rank",
-        ): family_balanced_factor(oriented, self_features),
+        ): family_balanced_factor(
+            oriented,
+            self_features,
+        ),
         (
             "joint_elastic_net",
             "elastic_net",
-        ): joint_elastic_net_factor,
+        ): elastic_net_factor,
         (
             "joint_lightgbm",
             "lightgbm",
-        ): tree_result.predict_joint(
-            (
-                VALIDATION_2022_YEAR,
-                VALIDATION_2023_YEAR,
-            ),
-        ),
+        ): tree_result.predict_joint((VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)),
     }
+    validation_years = (VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)
+    factors: dict[tuple[str, str], pd.DataFrame] = {}
+    score_summaries: dict[str, dict[str, float]] = {}
+    for (experiment, method), factor in raw_pipelines.items():
+        validation_block = factor.loc[factor["date"].dt.year.isin(validation_years)].copy()
+        direction_score = score_reference.score_best_direction(validation_block)
+        direction = float(direction_score["selected_direction"])
+        oriented_factor = factor.copy()
+        oriented_factor["factor"] = (
+            pd.to_numeric(oriented_factor["factor"], errors="coerce") * direction
+        )
+        factors[(experiment, method)] = oriented_factor
+        combined_block = oriented_factor.loc[oriented_factor["date"].dt.year.isin(validation_years)]
+        year_scores = {
+            year: score_reference.score(
+                oriented_factor.loc[oriented_factor["date"].dt.year.eq(year)]
+            )
+            for year in validation_years
+        }
+        score_summaries[experiment] = {
+            "selected_direction": direction,
+            "positive_score_proxy": float(direction_score["positive_score_proxy"]),
+            "negative_score_proxy": float(direction_score["negative_score_proxy"]),
+            "validation_combined_base_score_proxy": float(
+                score_reference.score(combined_block)["score_proxy"]
+            ),
+            "validation_2022_score_proxy": float(year_scores[VALIDATION_2022_YEAR]["score_proxy"]),
+            "validation_2023_score_proxy": float(year_scores[VALIDATION_2023_YEAR]["score_proxy"]),
+        }
+    validation_routes = {
+        experiment: factor.loc[
+            factor["date"].dt.year.isin(validation_years)
+        ]
+        for (experiment, _method), factor in factors.items()
+    }
+    common_crowding_dates = set.intersection(
+        *(
+            set(pd.to_datetime(route["date"]).dt.normalize().unique())
+            for route in validation_routes.values()
+        )
+    )
+    if not common_crowding_dates:
+        raise RuntimeError("final routes have no common dates for crowding J")
+    crowding_scores = score_reference.score_joint_routes(
+        {
+            experiment: route.loc[
+                route["date"].isin(common_crowding_dates)
+            ]
+            for experiment, route in validation_routes.items()
+        }
+    )
+    return (
+        factors,
+        elastic_net_weights,
+        elastic_net_features,
+        lightgbm_features,
+        score_summaries,
+        crowding_scores,
+    )
+
+
+def evaluate_validation_pipelines(
+    pipelines: dict[tuple[str, str], pd.DataFrame],
+    score_summaries: dict[str, dict[str, float]],
+    crowding_scores: dict[str, dict[str, object]],
+    labels: pd.DataFrame,
+    exposures: pd.DataFrame,
+    *,
+    tree_group_passed: bool,
+) -> tuple[pd.DataFrame, list[dict[str, object]]]:
+    """Calculate diagnostics and competition-score ranking inputs."""
 
     metric_rows: list[dict[str, object]] = []
     periods = {
@@ -734,17 +952,16 @@ def run_experiments(
         for period, year in periods.items():
             block = factor.loc[factor["date"].dt.year.eq(year)]
             dates = block["date"].unique()
-            period_labels = labels.loc[labels["date"].isin(dates)]
-            period_exposures = exposures.loc[exposures["date"].isin(dates)]
-            new_metrics = period_metrics(
-                experiment,
-                method,
-                period,
-                block,
-                period_labels,
-                period_exposures,
+            metric_rows.extend(
+                period_metrics(
+                    experiment,
+                    method,
+                    period,
+                    block,
+                    labels.loc[labels["date"].isin(dates)],
+                    exposures.loc[exposures["date"].isin(dates)],
+                )
             )
-            metric_rows.extend(new_metrics)
     metrics = pd.DataFrame(metric_rows)
 
     decisions: list[dict[str, object]] = []
@@ -797,50 +1014,82 @@ def run_experiments(
             "raw_tradable",
             "rank_ic_mean",
         )
-        passed_validation = (
-            validation_2022_ic > 0
-            and validation_2023_ic > 0
-            and validation_2022_t
-            >= COMBINATION_ADMISSION_GATE.minimum_rank_ic_t_stat
-            and validation_2023_t
-            >= COMBINATION_ADMISSION_GATE.minimum_rank_ic_t_stat
-            and validation_2022_tradable_ic > 0
-            and validation_2023_tradable_ic > 0
+        score_summary = score_summaries[experiment]
+        crowded_score = float(crowding_scores[experiment]["score_proxy"])
+        score_values = (
+            float(score_summary["validation_combined_base_score_proxy"]),
+            float(score_summary["validation_2022_score_proxy"]),
+            float(score_summary["validation_2023_score_proxy"]),
+            crowded_score,
         )
-        if experiment == "joint_lightgbm":
-            passed_validation = passed_validation and tree_group_passed
-        robust_rank_ic = min(validation_2022_ic, validation_2023_ic)
-        mean_rank_ic = (validation_2022_ic + validation_2023_ic) / 2.0
+        score_ranking_eligible = all(pd.notna(value) for value in score_values)
         decisions.append(
             {
                 "experiment": experiment,
                 "method": method,
-                "passed_cross_regime_gate": passed_validation,
+                "score_ranking_eligible": score_ranking_eligible,
+                "passed_cross_regime_gate": score_ranking_eligible,
                 "validation_years": [
                     VALIDATION_2022_YEAR,
                     VALIDATION_2023_YEAR,
                 ],
+                **score_summary,
+                "validation_joint_crowding_score_proxy": crowded_score,
+                "robust_score_proxy": min(score_values),
                 "validation_2022_rank_ic_mean": validation_2022_ic,
                 "validation_2022_rank_ic_t_stat": validation_2022_t,
-                "validation_2022_tradable_rank_ic_mean": (
-                    validation_2022_tradable_ic
-                ),
+                "validation_2022_tradable_rank_ic_mean": (validation_2022_tradable_ic),
                 "validation_2023_rank_ic_mean": validation_2023_ic,
                 "validation_2023_rank_ic_t_stat": validation_2023_t,
-                "validation_2023_tradable_rank_ic_mean": (
-                    validation_2023_tradable_ic
+                "validation_2023_tradable_rank_ic_mean": (validation_2023_tradable_ic),
+                "cross_regime_worst_year_rank_ic": min(
+                    validation_2022_ic,
+                    validation_2023_ic,
                 ),
-                "cross_regime_worst_year_rank_ic": robust_rank_ic,
-                "cross_regime_mean_rank_ic": mean_rank_ic,
+                "cross_regime_mean_rank_ic": (validation_2022_ic + validation_2023_ic) / 2.0,
+                "rank_ic_is_diagnostic_only": True,
+                "tradable_rank_ic_is_diagnostic_only": True,
+                "tree_group_gate_diagnostic": (
+                    tree_group_passed if experiment == "joint_lightgbm" else None
+                ),
             }
         )
+    return metrics, decisions
+
+
+def write_experiment_reports(
+    reports_dir: Path,
+    screening: pd.DataFrame,
+    j_reference_directions: pd.DataFrame,
+    single_factor_result: SingleFactorRouteAdmissionResult,
+    incremental_result: IncrementalAdmissionResult,
+    tree_result: TreeAdmissionResult,
+    incremental_rows: Sequence[dict[str, object]],
+    admission_rows: Sequence[dict[str, object]],
+    elastic_net_weights: pd.DataFrame,
+    metrics: pd.DataFrame,
+    decisions: Sequence[dict[str, object]],
+) -> tuple[dict[str, dict[str, object]], list[str]]:
+    """Write route audits and return the frozen submission ranking."""
 
     reports_dir.mkdir(exist_ok=True)
-    joint_elastic_net_weights.to_csv(
+    elastic_net_weights.to_csv(
         reports_dir / "joint_elastic_net_weights.csv",
         index=False,
     )
     screening.to_csv(reports_dir / "factor_pool_screening.csv", index=False)
+    j_reference_directions.to_csv(
+        reports_dir / "competition_J_reference_directions.csv",
+        index=False,
+    )
+    pd.DataFrame(single_factor_result.evaluations).to_csv(
+        reports_dir / "single_factor_route_admission.csv",
+        index=False,
+    )
+    pd.DataFrame([single_factor_result.promotion_summary]).to_csv(
+        reports_dir / "single_factor_route_promotion.csv",
+        index=False,
+    )
     pd.DataFrame(incremental_rows).drop(columns="reasons").to_csv(
         reports_dir / "factor_pool_incremental.csv",
         index=False,
@@ -849,71 +1098,62 @@ def run_experiments(
         reports_dir / "factor_pool_admission.csv",
         index=False,
     )
-    incremental_promotion_report_path = (
-        reports_dir / "incremental_pool_promotion.csv"
-    )
-    if (
-        incremental_result.individual_pending
-        or not incremental_promotion_report_path.exists()
-    ):
-        pd.DataFrame(
-            [incremental_result.promotion_row()]
-        ).to_csv(
-            incremental_promotion_report_path,
-            index=False,
-        )
-    pd.DataFrame(incremental_result.forward_evaluations).to_csv(
-        reports_dir / "incremental_forward_admission.csv",
+    incremental_promotion_path = reports_dir / "incremental_pool_promotion.csv"
+    pd.DataFrame([incremental_result.promotion_row()]).to_csv(
+        incremental_promotion_path,
         index=False,
     )
-    tree_summary.to_csv(
+    pd.DataFrame([incremental_result.promotion_row()]).to_csv(
+        reports_dir / "incremental_direct_pool.csv",
+        index=False,
+    )
+    (reports_dir / "incremental_backward_admission.csv").unlink(
+        missing_ok=True,
+    )
+    tree_result.incremental_summary.to_csv(
         reports_dir / "tree_factor_incremental.csv",
         index=False,
     )
-    pd.DataFrame(tree_admission_by_feature.values()).to_csv(
+    pd.DataFrame(tree_result.admission_by_feature.values()).to_csv(
         reports_dir / "tree_factor_admission.csv",
         index=False,
     )
     pd.DataFrame(
         [
             {
-                **tree_group_increment,
-                "passed": tree_group_passed,
-                "reasons": "; ".join(tree_group_reasons),
-                "selected_candidate_count": len(tree_admitted_self),
+                **tree_result.group_increment,
+                "passed": tree_result.group_passed,
+                "reasons": "; ".join(tree_result.group_reasons),
+                "selected_candidate_count": len(tree_result.admitted_candidates),
             }
         ]
     ).to_csv(
         reports_dir / "tree_group_increment.csv",
         index=False,
     )
-    if pending_tree_candidates:
+    if tree_result.pending_candidates:
         pd.DataFrame(
             [
                 {
-                    "pending_candidates": ",".join(pending_tree_candidates),
-                    "candidate_gate_passed": ",".join(pending_tree_passed),
-                    "provisional_pool_count": len(provisional_tree_pool),
+                    "pending_candidates": ",".join(tree_result.pending_candidates),
+                    "candidate_gate_passed": ",".join(tree_result.pending_passed),
+                    "provisional_pool_count": len(tree_result.provisional_pool),
                     "provisional_vs_screened_increment": (
-                        provisional_tree_group_increment[
-                            "oos_rank_ic_increment"
-                        ]
+                        tree_result.provisional_group_increment["delta_score_proxy"]
                     ),
-                    "provisional_vs_screened_passed": (
-                        provisional_tree_group_passed
-                    ),
+                    "provisional_vs_screened_passed": (tree_result.provisional_group_passed),
                     "provisional_vs_frozen_increment": (
-                        tree_promotion_increment["oos_rank_ic_increment"]
+                        tree_result.promotion_increment["delta_score_proxy"]
                     ),
                     "provisional_vs_frozen_positive_window_ratio": (
-                        tree_promotion_increment["positive_window_ratio"]
+                        tree_result.promotion_increment["positive_score_window_ratio"]
                     ),
                     "provisional_vs_frozen_positive_years": (
-                        tree_promotion_increment["positive_years"]
+                        tree_result.promotion_increment["positive_score_years"]
                     ),
-                    "provisional_vs_frozen_passed": tree_promotion_passed,
-                    "pool_promoted": tree_pool_promoted,
-                    "frozen_candidates_after": ",".join(tree_admitted_self),
+                    "provisional_vs_frozen_passed": (tree_result.promotion_passed),
+                    "pool_promoted": tree_result.pool_promoted,
+                    "frozen_candidates_after": ",".join(tree_result.admitted_candidates),
                 }
             ]
         ).to_csv(
@@ -925,94 +1165,215 @@ def run_experiments(
             reports_dir / f"{pipeline_name}_metrics.csv",
             index=False,
         )
-    pipeline_decisions = {
-        str(row["experiment"]): row
-        for row in decisions
-    }
-    tie_priority = {
-        "self_factor_composite": 0,
-        "joint_elastic_net": 1,
-        "joint_lightgbm": 2,
-    }
-    frozen_submission_order = [
-        str(row["experiment"])
-        for row in sorted(
-            (
-                row
-                for row in decisions
-                if bool(row["passed_cross_regime_gate"])
-            ),
-            key=lambda row: (
-                -float(row["cross_regime_worst_year_rank_ic"]),
-                -float(row["cross_regime_mean_rank_ic"]),
-                tie_priority[str(row["experiment"])],
-            ),
-        )
-    ]
-    combination_summary = pd.DataFrame(decisions).rename(
-        columns={"experiment": "pipeline"}
-    )
+    pipeline_decisions = {str(row["experiment"]): dict(row) for row in decisions}
+    frozen_submission_order = rank_submission_routes(decisions)
+    combination_summary = pd.DataFrame(decisions).rename(columns={"experiment": "pipeline"})
     rank_by_pipeline = {
-        pipeline: rank
-        for rank, pipeline in enumerate(frozen_submission_order, start=1)
+        pipeline: rank for rank, pipeline in enumerate(frozen_submission_order, start=1)
     }
-    combination_summary["rank"] = combination_summary["pipeline"].map(
-        rank_by_pipeline
-    )
+    combination_summary["rank"] = combination_summary["pipeline"].map(rank_by_pipeline)
     combination_summary.to_csv(
         reports_dir / "combination_summary.csv",
         index=False,
     )
     tree_result.write_states()
+    return pipeline_decisions, frozen_submission_order
 
-    result = {
-        "protocol": "isolated_combination_pipelines_v9_rank_constrained_I_and_T",
+
+def build_experiment_result(
+    selected_public: tuple[str, ...],
+    s_candidate_features: tuple[str, ...],
+    score_reference: CompetitionScoreReference,
+    single_factor_result: SingleFactorRouteAdmissionResult,
+    incremental_result: IncrementalAdmissionResult,
+    tree_result: TreeAdmissionResult,
+    elastic_net_features: tuple[str, ...],
+    lightgbm_features: tuple[str, ...],
+    incremental_rows: Sequence[dict[str, object]],
+    admission_rows: Sequence[dict[str, object]],
+    pipeline_decisions: dict[str, dict[str, object]],
+    frozen_submission_order: list[str],
+) -> dict[str, object]:
+    """Build the stable JSON contract consumed by downstream tools."""
+
+    return {
+        "protocol": "isolated_combination_pipelines_v11_score_first_J",
         "development_years": list(DEVELOPMENT_YEARS),
         "validation_years": [
             VALIDATION_2022_YEAR,
             VALIDATION_2023_YEAR,
         ],
         "incremental_protocol": incremental_result.protocol_summary(),
-        "learned_model_preprocessing": (
-            "daily_centered_rank_features_and_target_neutral_fill"
-        ),
+        "competition_score_protocol": dict(score_reference.protocol()),
+        "final_route_selection": {
+            "primary_metric": "robust_score_proxy",
+            "components": [
+                "validation_2022_score_proxy",
+                "validation_2023_score_proxy",
+                "validation_combined_base_score_proxy",
+                "validation_joint_crowding_score_proxy",
+            ],
+            "direction": "best_of_z_and_negative_z_on_combined_validation_J",
+            "crowding_scope": ("one_joint_fit_of_current_sibling_routes_not_global_history"),
+            "rank_ic_and_tradability": "diagnostic_only",
+        },
+        "single_factor_route_admission": {
+            "eligible_candidates": list(s_candidate_features),
+            "admitted_candidates": list(single_factor_result.admitted_candidates),
+            "selection": "family_balanced_direct_pool",
+            "promotion": single_factor_result.promotion_summary,
+        },
+        "learned_model_preprocessing": ("daily_centered_rank_features_and_target_neutral_fill"),
         "tree_incremental_protocol": tree_result.protocol_summary(),
         "frozen_test_year": FROZEN_TEST_YEAR,
         "frozen_test_changes_admission": False,
         "pipelines": {
             "self_factor_composite": {
                 "method": "family_equal_rank",
-                "features": list(self_features),
+                "features": list(single_factor_result.admitted_candidates),
             },
             "joint_elastic_net": {
                 "method": "elastic_net",
-                "features": list(joint_elastic_net_features),
+                "features": list(elastic_net_features),
             },
             "joint_lightgbm": {
                 "method": "lightgbm",
-                "features": list(joint_lightgbm_features),
+                "features": list(lightgbm_features),
                 "admission": "tree_incremental_T",
-                "development_group_increment": tree_group_increment,
-                "development_group_increment_passed": tree_group_passed,
+                "development_group_increment": tree_result.group_increment,
+                "development_group_increment_passed": tree_result.group_passed,
             },
         },
         "factorlib_screened_reference": {
             "source": "frozen_screened15",
             "features": list(selected_public),
             "candidate_samples": "isolated_active_date_calendars",
+            "candidate_samples_v10": "common_development_calendar",
         },
-        "factorlib_incremental": incremental_rows,
-        "screened15_incremental_admission": admission_rows,
-        "tree_incremental_admission": list(
-            tree_admission_by_feature.values()
-        ),
+        "factorlib_incremental": list(incremental_rows),
+        "screened15_incremental_admission": list(admission_rows),
+        "tree_incremental_admission": list(tree_result.admission_by_feature.values()),
         "pipeline_decisions": pipeline_decisions,
         "frozen_submission_order": frozen_submission_order,
-        "frozen_winner": (
-            frozen_submission_order[0] if frozen_submission_order else None
-        ),
+        "frozen_winner": (frozen_submission_order[0] if frozen_submission_order else None),
         "winner_uses_2024": False,
     }
+
+
+def run_experiments(
+    panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    exposures: pd.DataFrame,
+    all36_reference: pd.DataFrame,
+    public_columns: tuple[str, ...],
+    self_columns: tuple[str, ...],
+    single_factor_candidates: tuple[str, ...],
+    reports_dir: Path,
+    *,
+    resume_incremental: bool = False,
+    single_factor_cache_dir: Path | None = None,
+    incremental_cache_dir: Path | None = None,
+    refresh_incremental_cache: bool = False,
+    refresh_incremental_candidates: Sequence[str] = (),
+    tree_cache_dir: Path | None = None,
+    refresh_tree_cache: bool = False,
+    refresh_tree_candidates: Sequence[str] = (),
+) -> dict[str, object]:
+    del resume_incremental
+    (
+        oriented,
+        selected_public,
+        screening,
+        j_reference_directions,
+        score_reference,
+        s_candidate_features,
+    ) = prepare_experiment_context(
+        panel,
+        labels,
+        exposures,
+        all36_reference,
+        public_columns,
+        self_columns,
+        single_factor_candidates,
+    )
+    (
+        single_factor_result,
+        incremental_result,
+        tree_result,
+    ) = run_route_admissions(
+        oriented,
+        labels,
+        selected_public,
+        self_columns,
+        score_reference,
+        s_candidate_features,
+        reports_dir,
+        single_factor_cache_dir=single_factor_cache_dir,
+        incremental_cache_dir=incremental_cache_dir,
+        refresh_incremental_cache=refresh_incremental_cache,
+        refresh_incremental_candidates=refresh_incremental_candidates,
+        tree_cache_dir=tree_cache_dir,
+        refresh_tree_cache=refresh_tree_cache,
+        refresh_tree_candidates=refresh_tree_candidates,
+    )
+    incremental_rows, admission_rows = build_admission_audit_rows(
+        self_columns,
+        single_factor_result.admitted_candidates,
+        incremental_result,
+        tree_result,
+    )
+    (
+        pipelines,
+        elastic_net_weights,
+        elastic_net_features,
+        lightgbm_features,
+        score_summaries,
+        crowding_scores,
+    ) = build_validation_pipelines(
+        oriented,
+        labels,
+        selected_public,
+        score_reference,
+        single_factor_result.admitted_candidates,
+        incremental_result,
+        tree_result,
+    )
+    metrics, decisions = evaluate_validation_pipelines(
+        pipelines,
+        score_summaries,
+        crowding_scores,
+        labels,
+        exposures,
+        tree_group_passed=tree_result.group_passed,
+    )
+
+    pipeline_decisions, frozen_submission_order = write_experiment_reports(
+        reports_dir,
+        screening,
+        j_reference_directions,
+        single_factor_result,
+        incremental_result,
+        tree_result,
+        incremental_rows,
+        admission_rows,
+        elastic_net_weights,
+        metrics,
+        decisions,
+    )
+    result = build_experiment_result(
+        selected_public,
+        s_candidate_features,
+        score_reference,
+        single_factor_result,
+        incremental_result,
+        tree_result,
+        elastic_net_features,
+        lightgbm_features,
+        incremental_rows,
+        admission_rows,
+        pipeline_decisions,
+        frozen_submission_order,
+    )
     (reports_dir / "factor_pool_decisions.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -1025,7 +1386,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.check:
         print(json.dumps(synthetic_contract_summary(), ensure_ascii=False, indent=2))
         return 0
-
     summary, loaded = contract_summary(args.data_dir, args.reports_dir)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     if summary["status"] != "ok":
@@ -1039,35 +1399,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     assert loaded is not None
-    panel, labels, exposures, _, _, single_factor_candidates = loaded
-    public_columns = tuple(
-        column for column in panel.columns if column.startswith("factorlib__")
-    )
-    self_columns = tuple(
-        column for column in panel.columns if column.startswith("self__")
-    )
+    (
+        panel,
+        labels,
+        exposures,
+        _,
+        _,
+        all36_reference,
+        single_factor_candidates,
+    ) = loaded
+    public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
+    self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
     result = run_experiments(
         panel,
         labels,
         exposures,
+        all36_reference,
         public_columns,
         self_columns,
         single_factor_candidates,
         args.reports_dir,
         resume_incremental=args.resume_incremental,
+        single_factor_cache_dir=(
+            args.single_factor_cache_dir
+            if args.single_factor_cache_dir is not None
+            else args.data_dir / "cache" / "single_factor_v1_J"
+        ),
         incremental_cache_dir=(
             args.incremental_cache_dir
             if args.incremental_cache_dir is not None
-            else args.data_dir / "cache" / "incremental_v3"
+            else args.data_dir / "cache" / "incremental_v4_J"
         ),
         refresh_incremental_cache=args.refresh_incremental_cache,
-        refresh_incremental_candidates=(
-            args.refresh_incremental_candidate
-        ),
+        refresh_incremental_candidates=(args.refresh_incremental_candidate),
         tree_cache_dir=(
             args.tree_cache_dir
             if args.tree_cache_dir is not None
-            else args.data_dir / "cache" / "tree_v3"
+            else args.data_dir / "cache" / "tree_v4_J"
         ),
         refresh_tree_cache=args.refresh_tree_cache,
         refresh_tree_candidates=args.refresh_tree_candidate,

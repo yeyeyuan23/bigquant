@@ -44,10 +44,10 @@ HF/OB 正式评价统一读取 `MICRO_DAILY_FULL`，不再读取代表月份或�
 旧 `features/HF/`、`features/OB/`、`features/OB_DAILY_FULL/` 及对应 manifest
 只属于历史诊断，不得进入候选池的正式输入清单。
 
-公开 36 因子库和大型训练矩阵默认留在 AIStudio；本目录只接收评价报告、特征
-重要性和预测结果，不要求为本地训练下载完整副本。只有需要离线复现时，才按
-`features/FACTORLIB/year=YYYY/part-YYYY.parquet` 保存可选快照，并使用
-`run_combinations.py --check-files` 验收；默认的 `--check` 不读取比赛数据。
+公开 36 因子库的完整离线参考快照保存在
+`features/FACTORLIB_ALL36/year=YYYY/part-YYYY.parquet`，仅用于比赛 J
+基础代理评分；screened15 训练输入仍保存在 `features/FACTORLIB/`。两者均使用
+`run_combinations.py --check-files` 验收，默认的 `--check` 不读取比赛数据。
 当前 screened15 快照在本地可观测为“每日截面均值约 0、标准差约 1”；manifest
 将该事实记录为 `observed_value_scale`，但标准化究竟由平台表还是导出代码产生，
 仍须在 AIStudio 确认，不能仅凭本地数值反推来源。

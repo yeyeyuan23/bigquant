@@ -13,10 +13,10 @@ from bigalpha2026.tree_cache import (
 
 
 class TreePredictionCacheTest(unittest.TestCase):
-    def test_rank_monotone_contract_uses_v2_schema(self):
+    def test_official_J_contract_uses_v3_schema(self):
         self.assertEqual(
             TREE_CACHE_SCHEMA_VERSION,
-            "tree-prediction-cache-v2",
+            "tree-prediction-cache-v3-J",
         )
 
     def setUp(self):
@@ -146,6 +146,33 @@ class TreePredictionCacheTest(unittest.TestCase):
                 test_window_days=20,
             )
             self.assertEqual(old_baseline, new_baseline)
+
+    def test_force_refresh_bypasses_an_exact_cache_hit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = self.cache(Path(directory), ("base",))
+            first, first_hit, first_key = cache.get_or_compute(
+                ("base",),
+                prediction_years=(2021,),
+                label_column="ret_close_to_close",
+                train_window_days=60,
+                test_window_days=20,
+                compute=lambda: self.prediction,
+            )
+            refreshed, second_hit, second_key = cache.get_or_compute(
+                ("base",),
+                prediction_years=(2021,),
+                label_column="ret_close_to_close",
+                train_window_days=60,
+                test_window_days=20,
+                force_refresh=True,
+                compute=lambda: self.prediction.assign(
+                    factor=self.prediction["factor"] + 1
+                ),
+            )
+            self.assertFalse(first_hit)
+            self.assertFalse(second_hit)
+            self.assertEqual(first_key, second_key)
+            self.assertFalse(first["factor"].equals(refreshed["factor"]))
 
 
 if __name__ == "__main__":

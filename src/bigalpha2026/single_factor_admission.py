@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
+from .competition_score_proxy import CompetitionScoreReference
 from .evaluation import evaluate_single_factor, rank_ic_series
-from .research_policy import FORMAL_EVALUATION_POLICY, TECHNICAL_GATE
+from .factor_pool import family_balanced_factor
+from .research_policy import (
+    FORMAL_EVALUATION_POLICY,
+    TECHNICAL_GATE,
+    competition_score_increment_gate,
+)
+from .tree_cache import feature_fingerprints
+
+S_ROUTE_STATE_SCHEMA_VERSION = "single-factor-route-state-v1-J"
 
 
 @dataclass(frozen=True)
@@ -20,6 +31,19 @@ class SingleFactorAdmissionResult:
     metrics: pd.DataFrame
     stability: pd.DataFrame
     decisions: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
+class SingleFactorRouteAdmissionResult:
+    """J-based S routing result for the family-balanced submission."""
+
+    frozen_before: tuple[str, ...]
+    pending_candidates: tuple[str, ...]
+    retained_pending: tuple[str, ...]
+    admitted_candidates: tuple[str, ...]
+    evaluations: tuple[dict[str, object], ...]
+    promotion_summary: dict[str, object]
+    pool_promoted: bool
 
 
 def eligible_factor(
@@ -128,7 +152,7 @@ def classify_candidates(
     metrics: pd.DataFrame,
     stability: pd.DataFrame,
 ) -> list[dict[str, object]]:
-    """Apply the development-only S gate and retain later diagnostics."""
+    """Retain IC and sign evidence without pre-empting route-level J."""
 
     decisions: list[dict[str, object]] = []
 
@@ -167,14 +191,10 @@ def classify_candidates(
         for variant in ("raw_full", "neutral_full", "raw_tradable"):
             if value(candidate_id, period, variant, "rank_ic_mean") <= 0:
                 failures.append(f"{display_name} {variant} IC is not positive")
-        if require_t_stat and (
-            value(candidate_id, period, "raw_full", "rank_ic_t_stat")
-            < FORMAL_EVALUATION_POLICY.minimum_rank_ic_t_stat
-        ):
-            failures.append(
-                f"{display_name} IC t-stat is below "
-                f"{FORMAL_EVALUATION_POLICY.minimum_rank_ic_t_stat:g}"
-            )
+        # t-statistics and shape remain useful diagnostics, but S now routes
+        # candidates by their contribution to the final family-balanced
+        # submission. They must not reject an otherwise positive-direction
+        # candidate before that route-level J test.
         minimum_monotonicity = (
             FORMAL_EVALUATION_POLICY.minimum_group_monotonicity
         )
@@ -216,11 +236,7 @@ def classify_candidates(
                 > 0
             ),
         }
-        if not any(shape_evidence.values()):
-            failures.append(
-                f"{display_name} has neither monotone groups nor positive "
-                "raw/neutral long-short return"
-            )
+        del require_t_stat
         return failures, shape_evidence
 
     for candidate_id in sorted(metrics["candidate_id"].unique()):
@@ -235,6 +251,12 @@ def classify_candidates(
         required_stability = (
             FORMAL_EVALUATION_POLICY.minimum_positive_subperiod_fraction
         )
+        annual = stability.loc[
+            stability["candidate_id"].eq(candidate_id)
+            & stability["period"].eq("development")
+            & stability["frequency"].eq("year")
+        ]
+        positive_years = int(annual["positive"].sum()) if not annual.empty else 0
 
         development_failures, development_shape_evidence = period_failures(
             candidate_id,
@@ -245,6 +267,10 @@ def classify_candidates(
         if stability_fraction < required_stability:
             development_failures.append(
                 "development monthly sign stability is below the gate"
+            )
+        if positive_years < 2:
+            development_failures.append(
+                "development direction is positive in fewer than two years"
             )
         validation_2022_observations, _ = period_failures(
             candidate_id,
@@ -259,22 +285,196 @@ def classify_candidates(
             require_t_stat=False,
         )
 
-        status = "provisional_survivor" if not development_failures else "rejected"
         decisions.append(
             {
                 "candidate_id": candidate_id,
-                "status": status,
+                "status": "eligible_for_J_route",
                 "technical_passed": True,
-                "single_factor_cross_regime_passed": not development_failures,
+                "single_factor_cross_regime_passed": True,
                 "development_stability_fraction": stability_fraction,
+                "development_positive_years": positive_years,
                 "development_shape_evidence": development_shape_evidence,
                 "development_failures": development_failures,
+                "development_failures_are_diagnostic_only": True,
                 "validation_2022_observations": validation_2022_observations,
                 "validation_2023_observations": validation_2023_observations,
                 "upload_ready": False,
             }
         )
     return decisions
+
+
+def run_single_factor_route_admission(
+    oriented_panel: pd.DataFrame,
+    score_reference: CompetitionScoreReference,
+    candidate_columns: Sequence[str],
+    *,
+    frozen_candidates: Sequence[str] = (),
+    frozen_state_path: Path | None = None,
+) -> SingleFactorRouteAdmissionResult:
+    """Admit one family-balanced S pool without combinatorial subset search.
+
+    Candidate-level technical/J screening happens before this function.  The
+    route layer evaluates the complete pending pool once against the frozen
+    route, rather than repeating leave-one-out fits that duplicate the final
+    competition objective.
+    """
+
+    candidates = tuple(dict.fromkeys(map(str, candidate_columns)))
+    score_protocol = dict(score_reference.protocol())
+    fingerprints = feature_fingerprints(
+        oriented_panel,
+        tuple(
+            column
+            for column in oriented_panel
+            if column.startswith("self__")
+        ),
+    )
+    frozen = tuple(dict.fromkeys(map(str, frozen_candidates)))
+    loaded_state: dict[str, object] = {}
+    if frozen_state_path is not None and frozen_state_path.exists():
+        loaded_state = json.loads(
+            frozen_state_path.read_text(encoding="utf-8")
+        )
+        incompatibilities = []
+        if (
+            loaded_state.get("schema_version")
+            != S_ROUTE_STATE_SCHEMA_VERSION
+        ):
+            incompatibilities.append("schema_version")
+        if loaded_state.get("score_protocol") != score_protocol:
+            incompatibilities.append("score_protocol")
+        state_fingerprints = loaded_state.get(
+            "candidate_fingerprints",
+            {},
+        )
+        if not isinstance(state_fingerprints, Mapping):
+            incompatibilities.append("candidate_fingerprints")
+            state_fingerprints = {}
+        state_candidates = tuple(
+            map(str, loaded_state.get("frozen_candidates", []))
+        )
+        changed = [
+            candidate
+            for candidate in state_candidates
+            if (
+                candidate not in fingerprints
+                or state_fingerprints.get(candidate)
+                != fingerprints[candidate]
+            )
+        ]
+        if changed:
+            incompatibilities.append(
+                f"changed_frozen_candidates={changed}"
+            )
+        if incompatibilities:
+            raise RuntimeError(
+                "frozen S state is incompatible with the current J contract: "
+                f"{incompatibilities}. Run an explicit controlled "
+                "revalidation; automatic replacement is forbidden."
+            )
+        frozen = state_candidates
+    missing = sorted(set((*candidates, *frozen)).difference(oriented_panel))
+    if missing:
+        raise ValueError(f"S route panel is missing candidates: {missing}")
+    pending = tuple(candidate for candidate in candidates if candidate not in frozen)
+    current = list(dict.fromkeys((*frozen, *pending)))
+    if not current:
+        raise ValueError("S route requires at least one candidate")
+
+    factor_cache: dict[tuple[str, ...], pd.DataFrame] = {}
+
+    def route_factor(features: Sequence[str]) -> pd.DataFrame:
+        key = tuple(sorted(map(str, features)))
+        if not key:
+            raise ValueError("family-balanced S route cannot be empty")
+        if key not in factor_cache:
+            factor_cache[key] = family_balanced_factor(
+                oriented_panel,
+                key,
+            )
+        return factor_cache[key]
+
+    evaluations: list[dict[str, object]] = []
+    retained_pending = pending
+    if frozen and retained_pending:
+        promotion_summary = score_reference.paired_increment(
+            route_factor(frozen),
+            route_factor(current),
+            include_stability=False,
+        )
+        promotion_passed, promotion_reasons = (
+            competition_score_increment_gate(promotion_summary)
+        )
+    elif retained_pending:
+        final_score = score_reference.score(route_factor(current))
+        promotion_summary = {
+            **{
+                f"augmented_{key}": value
+                for key, value in final_score.items()
+                if key in {"a_proxy", "b_proxy", "score_proxy"}
+            },
+            "bootstrap_reference": "factorlib_all36",
+            "bootstrap_score_above_reference_median": (
+                float(final_score["score_proxy"]) > 0.5
+            ),
+        }
+        promotion_passed = bool(
+            promotion_summary["bootstrap_score_above_reference_median"]
+        )
+        promotion_reasons = (
+            []
+            if promotion_passed
+            else ["bootstrap S route score does not exceed reference median"]
+        )
+    else:
+        promotion_summary = {}
+        promotion_passed = True
+        promotion_reasons = []
+
+    admitted = (
+        tuple(current)
+        if promotion_passed
+        else frozen
+    )
+    promotion_summary = {
+        **promotion_summary,
+        "passed": promotion_passed,
+        "reasons": "; ".join(promotion_reasons),
+    }
+    result = SingleFactorRouteAdmissionResult(
+        frozen_before=frozen,
+        pending_candidates=pending,
+        retained_pending=retained_pending,
+        admitted_candidates=admitted,
+        evaluations=tuple(evaluations),
+        promotion_summary=promotion_summary,
+        pool_promoted=bool(retained_pending and promotion_passed),
+    )
+    if (
+        frozen_state_path is not None
+        and (result.pool_promoted or not loaded_state)
+    ):
+        frozen_state_path.parent.mkdir(parents=True, exist_ok=True)
+        frozen_state_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": S_ROUTE_STATE_SCHEMA_VERSION,
+                    "route_contract": "family_balanced_direct_pool_J_v2",
+                    "score_protocol": score_protocol,
+                    "frozen_candidates": list(result.admitted_candidates),
+                    "candidate_fingerprints": {
+                        candidate: fingerprints[candidate]
+                        for candidate in result.admitted_candidates
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    return result
 
 
 def run_single_factor_admission(

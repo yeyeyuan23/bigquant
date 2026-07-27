@@ -10,12 +10,17 @@ from bigalpha2026.factor_pool import (
     write_candidate_pool_manifest,
 )
 from bigalpha2026.incremental_admission import (
+    iterative_backward_select,
     ordered_pending_candidates,
     promote_frozen_incremental_pool,
     sequential_forward_select,
     validated_frozen_incremental_pool,
 )
 from bigalpha2026.single_factor_admission import classify_candidates
+from bigalpha2026.single_factor_admission import (
+    run_single_factor_route_admission,
+)
+from bigalpha2026.research_policy import competition_score_increment_gate
 from bigalpha2026.tree_admission import (
     promote_frozen_tree_pool,
     unresolved_tree_candidates,
@@ -30,6 +35,7 @@ from scripts.run_combinations import (
     contract_summary,
     enters_family_equal_rank,
     parse_args,
+    rank_submission_routes,
     required_paths,
     synthetic_contract_summary,
 )
@@ -54,7 +60,7 @@ class WorkflowScriptTest(unittest.TestCase):
         )
         self.assertEqual(pending, ("self__A", "self__B"))
 
-    def test_incremental_forward_order_uses_isolated_increment(self):
+    def test_incremental_order_uses_isolated_J_increment(self):
         summary = pd.DataFrame(
             {
                 "candidate": [
@@ -62,7 +68,7 @@ class WorkflowScriptTest(unittest.TestCase):
                     "self__FROZEN",
                     "self__HIGH",
                 ],
-                "oos_rank_ic_increment": [0.001, 0.010, 0.003],
+                "delta_score_proxy": [0.001, 0.010, 0.003],
             }
         )
         order = ordered_pending_candidates(
@@ -80,10 +86,11 @@ class WorkflowScriptTest(unittest.TestCase):
             passed = candidate != "self__FAIL"
             return (
                 {
-                    "oos_rank_ic_increment": 0.001 if passed else -0.001,
-                    "oos_days": 200,
-                    "positive_increment_day_ratio": 0.60,
-                    "positive_years": 2,
+                    "delta_score_proxy": 0.01 if passed else -0.01,
+                    "score_days": 200,
+                    "score_windows": 9,
+                    "positive_score_window_ratio": 0.60,
+                    "positive_score_years": 2,
                 },
                 f"cache-{candidate}",
             )
@@ -107,6 +114,34 @@ class WorkflowScriptTest(unittest.TestCase):
             [True, False, True],
         )
 
+    def test_backward_selection_removes_harmful_candidate_symmetrically(self):
+        evaluated = []
+
+        def evaluate(full_pool, candidate):
+            evaluated.append((full_pool, candidate))
+            passed = candidate != "self__HARM"
+            return (
+                {
+                    "delta_score_proxy": 0.02 if passed else -0.02,
+                    "score_days": 200,
+                    "score_windows": 9,
+                    "positive_score_window_ratio": 0.70,
+                    "positive_score_years": 2,
+                    "candidate_min_nonzero_window_ratio": 0.80,
+                },
+                f"cache-{candidate}",
+            )
+
+        retained, rows = iterative_backward_select(
+            ("self__FROZEN",),
+            ("self__GOOD", "self__HARM"),
+            evaluate,
+        )
+        self.assertEqual(retained, ("self__GOOD",))
+        self.assertTrue(
+            all("self__FROZEN" in row["full_candidate_pool"] for row in rows)
+        )
+
     def test_incremental_pool_changes_only_after_both_confirmation_gates(self):
         frozen = ("self__FR-002",)
         unchanged, promoted = promote_frozen_incremental_pool(
@@ -126,6 +161,79 @@ class WorkflowScriptTest(unittest.TestCase):
         )
         self.assertTrue(promoted)
         self.assertEqual(updated, ("self__FR-002", "self__PV-TEST"))
+
+    def test_J_gate_does_not_fall_back_to_positive_rank_ic(self):
+        passed, reasons = competition_score_increment_gate(
+            {
+                "delta_score_proxy": -0.001,
+                "oos_rank_ic_increment": 0.02,
+                "score_days": 200,
+                "score_windows": 9,
+                "positive_score_window_ratio": 0.70,
+                "positive_score_years": 2,
+            }
+        )
+        self.assertFalse(passed)
+        self.assertIn("score proxy increment is not positive", reasons[0])
+
+    def test_positive_J_is_not_vetoed_by_stability_diagnostics(self):
+        passed, reasons = competition_score_increment_gate(
+            {
+                "delta_score_proxy": 0.001,
+                "score_days": 200,
+                "score_weight_windows": 9,
+                "score_windows": 0,
+                "positive_score_window_ratio": 0.0,
+                "positive_score_years": 0,
+            }
+        )
+        self.assertTrue(passed, reasons)
+        self.assertEqual(reasons, [])
+
+    def test_S_frozen_state_rejects_silent_factor_change(self):
+        class FakeScoreReference:
+            def protocol(self):
+                return {"reference": "all36-test"}
+
+            def score(self, _factor):
+                return {
+                    "a_proxy": 0.6,
+                    "b_proxy": 0.6,
+                    "score_proxy": 0.6,
+                }
+
+        dates = pd.to_datetime(["2020-01-02", "2020-01-03"])
+        panel = pd.DataFrame(
+            {
+                "date": dates.repeat(3),
+                "instrument": ["A", "B", "C"] * 2,
+                "self__PV-TEST": [1.0, 2.0, 3.0, 3.0, 2.0, 1.0],
+            }
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "frozen_state.json"
+            result = run_single_factor_route_admission(
+                panel,
+                FakeScoreReference(),
+                ("self__PV-TEST",),
+                frozen_state_path=state_path,
+            )
+            self.assertEqual(
+                result.admitted_candidates,
+                ("self__PV-TEST",),
+            )
+            changed = panel.copy()
+            changed.loc[0, "self__PV-TEST"] = 9.0
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "frozen S state is incompatible",
+            ):
+                run_single_factor_route_admission(
+                    changed,
+                    FakeScoreReference(),
+                    ("self__PV-TEST",),
+                    frozen_state_path=state_path,
+                )
 
     def test_frozen_incremental_pool_rejects_implicit_content_change(self):
         state = {
@@ -236,6 +344,10 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(summary["status"], "ok")
         self.assertEqual(summary["factorlib_features"], 15)
         self.assertEqual(summary["factorlib_screened_features"], 15)
+        self.assertEqual(
+            summary["competition_J_reference"],
+            "factorlib_all36_base_proxy",
+        )
         self.assertEqual(summary["self_features"], 1)
         self.assertEqual(
             {
@@ -255,6 +367,44 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(
             len(summary["missing"]),
             len(required_paths(root / "data", root / "reports")),
+        )
+
+    def test_final_J_ranking_requires_all36_for_both_validation_years(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = required_paths(root / "data", root / "reports")
+        all36_paths = {
+            path
+            for path in paths
+            if "FACTORLIB_ALL36" in str(path) and path.suffix == ".parquet"
+        }
+        self.assertTrue(
+            any("year=2022" in str(path) for path in all36_paths)
+        )
+        self.assertTrue(
+            any("year=2023" in str(path) for path in all36_paths)
+        )
+
+    def test_final_route_order_uses_J_even_when_rank_ic_disagrees(self):
+        decisions = [
+            {
+                "experiment": "self_factor_composite",
+                "score_ranking_eligible": True,
+                "robust_score_proxy": 0.42,
+                "validation_combined_base_score_proxy": 0.45,
+                "cross_regime_worst_year_rank_ic": 0.05,
+            },
+            {
+                "experiment": "joint_elastic_net",
+                "score_ranking_eligible": True,
+                "robust_score_proxy": 0.58,
+                "validation_combined_base_score_proxy": 0.60,
+                "cross_regime_worst_year_rank_ic": -0.01,
+            },
+        ]
+        self.assertEqual(
+            rank_submission_routes(decisions),
+            ["joint_elastic_net", "self_factor_composite"],
         )
 
     def test_first_round_candidate_pool_has_stable_long_contract(self):
@@ -349,12 +499,26 @@ class WorkflowScriptTest(unittest.TestCase):
                 )
         metrics = pd.DataFrame(rows)
         stability = pd.DataFrame(
-            {
-                "candidate_id": ["PV-TEST"] * 10,
-                "period": ["development"] * 10,
-                "frequency": ["month"] * 10,
-                "positive": [True] * 6 + [False] * 4,
-            }
+            [
+                *[
+                    {
+                        "candidate_id": "PV-TEST",
+                        "period": "development",
+                        "frequency": "month",
+                        "positive": positive,
+                    }
+                    for positive in [True] * 6 + [False] * 4
+                ],
+                *[
+                    {
+                        "candidate_id": "PV-TEST",
+                        "period": "development",
+                        "frequency": "year",
+                        "positive": positive,
+                    }
+                    for positive in (True, True, False)
+                ],
+            ]
         )
         passed = classify_candidates(metrics, stability)[0]
         self.assertTrue(passed["single_factor_cross_regime_passed"])
@@ -368,7 +532,7 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertTrue(failed["single_factor_cross_regime_passed"])
         self.assertTrue(failed["validation_2023_observations"])
 
-    def test_single_factor_shape_gate_accepts_positive_long_short(self):
+    def test_single_factor_shape_is_diagnostic_not_a_gate(self):
         rows = []
         for period in ("development", "validation_2022", "validation_2023"):
             for variant in ("raw_full", "neutral_full", "raw_tradable"):
@@ -388,12 +552,26 @@ class WorkflowScriptTest(unittest.TestCase):
                 )
         metrics = pd.DataFrame(rows)
         stability = pd.DataFrame(
-            {
-                "candidate_id": ["HF-TEST"] * 10,
-                "period": ["development"] * 10,
-                "frequency": ["month"] * 10,
-                "positive": [True] * 6 + [False] * 4,
-            }
+            [
+                *[
+                    {
+                        "candidate_id": "HF-TEST",
+                        "period": "development",
+                        "frequency": "month",
+                        "positive": positive,
+                    }
+                    for positive in [True] * 6 + [False] * 4
+                ],
+                *[
+                    {
+                        "candidate_id": "HF-TEST",
+                        "period": "development",
+                        "frequency": "year",
+                        "positive": positive,
+                    }
+                    for positive in (True, True, False)
+                ],
+            ]
         )
         decision = classify_candidates(metrics, stability)[0]
         self.assertTrue(decision["single_factor_cross_regime_passed"])
@@ -408,10 +586,48 @@ class WorkflowScriptTest(unittest.TestCase):
             "long_short_mean",
         ] = -0.001
         decision = classify_candidates(metrics, stability)[0]
-        self.assertFalse(decision["single_factor_cross_regime_passed"])
-        self.assertIn(
-            "neither monotone groups nor positive raw/neutral long-short return",
-            decision["development_failures"][0],
+        self.assertTrue(decision["single_factor_cross_regime_passed"])
+        self.assertFalse(
+            decision["development_shape_evidence"][
+                "neutral_long_short_return"
+            ]
+        )
+
+    def test_single_factor_ic_and_stability_do_not_veto_route_J(self):
+        rows = []
+        for period in ("development", "validation_2022", "validation_2023"):
+            for variant in ("raw_full", "neutral_full", "raw_tradable"):
+                rows.append(
+                    {
+                        "candidate_id": "OB-INVERTED",
+                        "period": period,
+                        "variant": variant,
+                        "label": "ret_close_to_close",
+                        "rank_ic_mean": -0.02,
+                        "rank_ic_t_stat": -3.0,
+                        "group_monotonicity": 0.2,
+                        "long_short_mean": -0.001,
+                    }
+                )
+        stability = pd.DataFrame(
+            [
+                {
+                    "candidate_id": "OB-INVERTED",
+                    "period": "development",
+                    "frequency": frequency,
+                    "positive": False,
+                }
+                for frequency in ("month", "year")
+            ]
+        )
+        decision = classify_candidates(
+            pd.DataFrame(rows),
+            stability,
+        )[0]
+        self.assertTrue(decision["single_factor_cross_regime_passed"])
+        self.assertTrue(decision["development_failures"])
+        self.assertTrue(
+            decision["development_failures_are_diagnostic_only"]
         )
 
 

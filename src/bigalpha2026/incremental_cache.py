@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .tree_cache import content_digest
 
-INCREMENTAL_CACHE_SCHEMA_VERSION = "elastic-net-incremental-cache-v2"
+INCREMENTAL_CACHE_SCHEMA_VERSION = "elastic-net-incremental-cache-v3-J"
 
 
 class IncrementalSummaryCache:

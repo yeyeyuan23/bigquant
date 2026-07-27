@@ -11,7 +11,11 @@ from pathlib import Path
 import pandas as pd
 
 from bigalpha2026.factor_pool import file_sha256
-from bigalpha2026.factorlib import validate_factorlib_subset_frame
+from bigalpha2026.factorlib import (
+    FACTORLIB_FEATURE_COLUMNS,
+    validate_factorlib_frame,
+    validate_factorlib_subset_frame,
+)
 from bigalpha2026.feature_contracts import validate_feature_frame
 from bigalpha2026.research_policy import FROZEN_FACTORLIB_SCREENED_FEATURES
 
@@ -171,6 +175,52 @@ def refresh_factorlib_manifest(
     return str(manifest_path.relative_to(ROOT))
 
 
+def refresh_factorlib_all36_manifest(
+    data_dir: Path,
+    *,
+    validated_at: str,
+) -> str:
+    """Create the independent all36 manifest used only by the J scorer."""
+
+    directory = data_dir / "features" / "FACTORLIB_ALL36"
+    paths = sorted(directory.glob("year=*/part-*.parquet"))
+    if not paths:
+        raise FileNotFoundError(
+            "FACTORLIB_ALL36 has no yearly Parquet files"
+        )
+    years: dict[str, object] = {}
+    for path in paths:
+        year = path.parent.name.removeprefix("year=")
+        frame = pd.read_parquet(path)
+        validate_factorlib_frame(frame)
+        years[year] = {
+            "relative_path": str(path.relative_to(ROOT)),
+            "rows": len(frame),
+            "sha256": file_sha256(path),
+            "columns": list(frame.columns),
+            "duplicate_keys": 0,
+            "coverage_min": float(
+                frame.loc[:, list(FACTORLIB_FEATURE_COLUMNS)]
+                .notna()
+                .mean()
+                .min()
+            ),
+        }
+    manifest = {
+        "schema_version": "factorlib-all36-J-reference-v1",
+        "validated_at": validated_at,
+        "source_table": "bigalpha_2026_factorlib",
+        "reference_role": "competition_J_external_reference_only",
+        "features": list(FACTORLIB_FEATURE_COLUMNS),
+        "key": ["date", "instrument"],
+        "years": years,
+        "self_developed_factors_included": False,
+    }
+    manifest_path = directory / "manifest.json"
+    write_json_atomic(manifest_path, manifest)
+    return str(manifest_path.relative_to(ROOT))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     validated_at = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -184,6 +234,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             validated_at=validated_at,
         )
     )
+    all36_directory = args.data_dir / "features" / "FACTORLIB_ALL36"
+    if all36_directory.exists():
+        refreshed.append(
+            refresh_factorlib_all36_manifest(
+                args.data_dir,
+                validated_at=validated_at,
+            )
+        )
     print(json.dumps({"status": "ok", "refreshed": refreshed}, indent=2))
     return 0
 

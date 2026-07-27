@@ -244,11 +244,23 @@ class TreeIncrementalGate:
     minimum_oos_rank_ic_increment: float = 0.0
 
 
+@dataclass(frozen=True)
+class CompetitionScoreIncrementGate:
+    """Shared score-first J gate; stability fields are report references."""
+
+    minimum_score_increment: float = 0.0
+    minimum_score_days: int = 180
+    minimum_score_windows: int = 9
+    minimum_positive_score_window_ratio: float = 0.60
+    minimum_positive_score_years: int = 2
+
+
 TECHNICAL_GATE = TechnicalGate()
 COMBINATION_ADMISSION_GATE = CombinationAdmissionGate()
 FACTORLIB_INCREMENTAL_GATE = FactorLibraryIncrementalGate()
 FACTORLIB_POOL_GATE = FactorLibraryPoolGate()
 TREE_INCREMENTAL_GATE = TreeIncrementalGate()
+COMPETITION_SCORE_INCREMENT_GATE = CompetitionScoreIncrementGate()
 
 # Frozen on 2026-07-26 from the competition's 36 public factors using only
 # 2019-2021 development data.  Later periods may validate this membership but
@@ -348,6 +360,41 @@ def technical_gate(
         reasons.append("too few labelled trading days")
     if not np.isfinite(future_leak_max_past_diff) or future_leak_max_past_diff > 0:
         reasons.append("future perturbation changed past factor values")
+    return not reasons, reasons
+
+
+def competition_score_increment_gate(
+    summary: Mapping[str, float],
+    policy: CompetitionScoreIncrementGate = (
+        COMPETITION_SCORE_INCREMENT_GATE
+    ),
+) -> tuple[bool, list[str]]:
+    """Require positive J and enough observations to estimate it."""
+
+    reasons: list[str] = []
+    increment = float(summary.get("delta_score_proxy", np.nan))
+    score_days = float(summary.get("score_days", np.nan))
+    score_windows = float(
+        summary.get(
+            "score_weight_windows",
+            summary.get("score_windows", np.nan),
+        )
+    )
+    if (
+        not np.isfinite(increment)
+        or increment <= policy.minimum_score_increment
+    ):
+        reasons.append("official A/B score proxy increment is not positive")
+    if (
+        not np.isfinite(score_days)
+        or score_days < policy.minimum_score_days
+    ):
+        reasons.append("too few paired score days")
+    if (
+        not np.isfinite(score_windows)
+        or score_windows < policy.minimum_score_windows
+    ):
+        reasons.append("too few paired full-period score weight windows")
     return not reasons, reasons
 
 

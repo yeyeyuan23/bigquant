@@ -9,7 +9,8 @@
 - 跨类组合不是第五类，统一登记为 `composite`，并显式列出 `data_sources`。
 - 先登记、后写代码；看过结果后不得在原编号上翻转方向或改变机制。
 - `data_checked` 只表示数据可实现，不表示因子有效。
-- 所有最终因子均输出 `date、instrument、factor`，且值越大代表预期收益越高。
+- 所有最终因子均输出 `date、instrument、factor`；提交方向由冻结期对 `z` 与
+  `-z` 的 J 比较决定，不能仅因传统收益解释而覆盖高分方向。
 
 实现状态流转：
 
@@ -28,6 +29,12 @@ registered
 评价完成后，当前组合路由直接写成 `admitted (S)`、`admitted (I)`、
 `admitted (T)` 或其组合；字母分别表示进入规则复合、Elastic Net 和
 LightGBM。唯一可执行路由以 `reports/factor_pool_admission.csv` 为准。
+
+> 2026-07-27 已将 S/I/T 准入合同升级为 all36 基础代理的 A/B/J 路由增量；
+> 最终路线另做一次兄弟路线联合拥挤评分，该场景不是平台全局历史的替代品。
+> 下表和现有 `reports/` 仍是升级前的 Rank IC 合同历史结果；在
+> `FACTORLIB_ALL36` 快照导出、manifest 核验和完整 J 重评完成前，不得把这些
+> 状态当作新合同下的当前路由，也不得据此改写冻结池。
 
 ## 当前候选
 
@@ -88,12 +95,13 @@ LightGBM。唯一可执行路由以 `reports/factor_pool_admission.csv` 为准�
 2019—2021 决定 S/I/T 准入，2022、2023 只评价冻结组合。长窗口候选允许
 2019 年自然预热，从实际有效日期开始评价。
 
-当前 `frozen_I` 仅为 `FR-002、PV-014`；当前 `frozen_T` 为
+旧合同的 `frozen_I` 为 `FR-002、PV-014`；旧合同的 `frozen_T` 为
 `FR-002/005/015、HF-003/004、OB-001/003、PV-001/009/014/020`。
-候选级 I 通过但未完成前向与池级确认的候选不进入 Elastic Net。两个冻结池相互
-独立；Git 中的成员证据为 `reports/factor_pool_decisions.json`，本地运行状态另存于
+这些成员必须在 J 合同下重新评价，不能自动迁移。两个旧冻结池相互独立；历史
+Git 证据为 `reports/factor_pool_decisions.json`，旧本地运行状态另存于
 `data/cache/incremental_v3/frozen/frozen_state.json` 和
-`data/cache/tree_v3/frozen/frozen_state.json`，缓存不进入 Git。
+`data/cache/tree_v3/frozen/frozen_state.json`。新合同使用独立
+`single_factor_v1_J、incremental_v4_J、tree_v4_J` 缓存目录，缓存不进入 Git。
 
 ## 基础候选定义
 
@@ -305,9 +313,8 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 | --- | --- | ---: | ---: | --- | --- |
 | `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/factor_self_family_rank.ipynb` | 2026-07-26 已提交，保留为历史对照 |
 | `self_factor_composite / local-current` | `FR-002/004/005/006/014/015 + HF-001/003 + PV-003/009/010/011/014`，家族内等权后 FR/HF/PV 等权 | 0.05464 | 0.05178 | 尚未生成新提交 Notebook | 新 S 规则本地重跑通过，尚未提交 |
-| `joint_elastic_net / local-current` | 冻结 `screened15 + FR-002 + PV-014`；日度截面秩目标、非负系数 | 0.07334 | 0.07020 | 尚未生成新提交 Notebook | 新 I 合同完整重评并冻结，尚未提交 |
-| `joint_lightgbm / submitted-v3` | 冻结 `screened15` 加 `FR-002/004/011, HF-002/003, OB-005, PV-001/002/003/006/014` | 0.04409 | 0.03388 | `submissions/factor_joint_lightgbm.ipynb` | 已提交历史版本（`a8170a82-afec-425a-b805-0065d9c4a4e2`） |
-| `joint_lightgbm / local-current` | 冻结 `screened15` 加 `FR-002/005/015, HF-003/004, OB-001/003, PV-001/009/014/020`；日度截面秩目标、正单调约束 | 0.07377 | 0.06965 | 尚未生成新提交 Notebook | 新 T 合同完整重评并冻结，尚未提交 |
+| `joint_elastic_net / local-current` | 冻结 `screened15 + FR-002 + PV-014`；日度截面秩目标、非负系数 | 0.07334 | 0.07020 | `submissions/factor_joint_elastic_net_current.ipynb` | 新 I 合同完整重评并冻结 |
+| `joint_lightgbm / local-current` | 冻结 `screened15` 加 `FR-002/005/015, HF-003/004, OB-001/003, PV-001/009/014/020`；日度截面秩目标、正单调约束 | 0.07377 | 0.06965 | `submissions/factor_joint_lightgbm_current.ipynb` | 新 T 合同完整重评并冻结 |
 
 已提交 Notebook 均仅保留比赛要求的
 `main(datasources, start_date, end_date)`，返回列固定为
@@ -343,7 +350,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 
 - candidate_id：`PV-021`
 - data_family：`PV`
-- data_sources：`cn_stock_bar1d`
+- data_sources：`bigalpha_2026_stock_bar1m` 日级聚合
 - mechanism：高成交状态下的收益可能来自信息交易并延续，低成交状态更可能是
   流动性冲击并反转；每只股票用自身历史估计状态方向。
 - source_fields：`close、pre_close、amount`
@@ -379,7 +386,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 
 - candidate_id：`PV-022`
 - data_family：`PV`
-- data_sources：`cn_stock_bar1d`
+- data_sources：`bigalpha_2026_stock_bar1m` 日级聚合
 - mechanism：把过去12至1个月动量按日收益符号的连续程度加权，区分持续小幅
   信息进入和少数离散跳跃造成的相同累计收益。
 - source_fields：`close、pre_close`
@@ -397,7 +404,7 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 
 - candidate_id：`PV-023`
 - data_family：`PV`
-- data_sources：`cn_stock_bar1d`
+- data_sources：`bigalpha_2026_stock_bar1m` 日级聚合
 - mechanism：识别正隔夜收益与负日内收益之间超出各自边际频率的异常共现，
   表达隔夜与日内投资者的方向分歧。
 - source_fields：`open、close、pre_close`
