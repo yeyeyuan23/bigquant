@@ -167,9 +167,13 @@ class SubmissionTest(unittest.TestCase):
             "downside_realized_volatility",
             "tail_60_microprice_gap_median",
             "tail_60_microprice_gap_sign_consistency",
+            '"label_observed_date": all_dates[1:]',
+            '"date": all_dates[:-1]',
         ):
             with self.subTest(required=required):
                 self.assertIn(required, source)
+        self.assertNotIn(".shift(-", source)
+        self.assertNotIn(" lead(", source.lower())
 
 
 if __name__ == "__main__":

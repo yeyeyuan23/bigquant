@@ -724,16 +724,40 @@ def main(datasources, start_date, end_date):
         panel[column] = ((values - mean) / std.replace(0, np.nan)).fillna(0.0)
 
     panel = panel.sort_values(["instrument", "date"]).reset_index(drop=True)
-    panel["target_raw"] = panel.groupby("instrument", sort=False)[
-        "stock_return"
-    ].shift(-1)
+    all_dates = pd.DatetimeIndex(sorted(panel["date"].dropna().unique()))
+    label_calendar = pd.DataFrame(
+        {
+            "label_observed_date": all_dates[1:],
+            "date": all_dates[:-1],
+        }
+    )
+    target_frame = (
+        panel[["date", "instrument", "stock_return"]]
+        .rename(
+            columns={
+                "date": "label_observed_date",
+                "stock_return": "target_raw",
+            }
+        )
+        .merge(
+            label_calendar,
+            on="label_observed_date",
+            how="inner",
+            validate="many_to_one",
+        )[["date", "instrument", "target_raw"]]
+    )
+    panel = panel.merge(
+        target_frame,
+        on=["date", "instrument"],
+        how="left",
+        validate="one_to_one",
+    )
     target_mean = panel.groupby("date", sort=False)["target_raw"].transform("mean")
     target_std = panel.groupby("date", sort=False)["target_raw"].transform("std")
     panel["target"] = (
         (panel["target_raw"] - target_mean) / target_std.replace(0, np.nan)
     )
 
-    all_dates = pd.DatetimeIndex(sorted(panel["date"].dropna().unique()))
     prediction_dates = all_dates[
         (all_dates >= start_ts) & (all_dates <= end_ts)
     ]
