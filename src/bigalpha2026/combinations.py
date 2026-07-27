@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping
 import numpy as np
 import pandas as pd
 
-from .evaluation import cross_section_zscore, rank_ic_series
+from .evaluation import cross_section_rank_scale, rank_ic_series
 from .research_policy import fixed_weight_rank_combination
 
 
@@ -30,10 +30,13 @@ def lightgbm_model_config() -> dict[str, object]:
         "subsample": 1.0,
         "colsample_bytree": 1.0,
         "reg_lambda": 1.0,
+        "feature_transform": "daily_centered_percentile_rank",
+        "target_transform": "daily_centered_percentile_rank",
+        "monotone_constraints": "all_features_positive",
     }
 
 
-def _lightgbm_regressor():
+def _lightgbm_regressor(feature_count: int):
     from lightgbm import LGBMRegressor
 
     config = lightgbm_model_config()
@@ -52,6 +55,7 @@ def _lightgbm_regressor():
         deterministic=True,
         force_col_wise=True,
         verbosity=-1,
+        monotone_constraints=[1] * feature_count,
     )
 
 
@@ -79,13 +83,13 @@ def _prepare_joint_model_frame(
         how="inner",
         validate="one_to_one",
     )
-    merged = cross_section_zscore(
+    merged = cross_section_rank_scale(
         merged,
         [*feature_columns, label_column],
     )
-    # A feature with no cross-sectional dispersion has no signal that day.
-    # Keep the date and use the standardized neutral value instead of deleting
-    # the complete cross-section. The target remains mandatory.
+    # A missing or constant rank feature has no signal that day. Keep the date
+    # and use the neutral value instead of deleting the complete cross-section.
+    # The rank target remains mandatory.
     merged.loc[:, list(feature_columns)] = merged.loc[
         :, list(feature_columns)
     ].fillna(0.0)
@@ -141,6 +145,7 @@ def _walk_forward_elastic_net(
             fit_intercept=True,
             max_iter=20_000,
             random_state=0,
+            positive=True,
         )
         model.fit(
             train.loc[:, list(feature_columns)].to_numpy(dtype=float),
@@ -294,7 +299,7 @@ def _walk_forward_lightgbm_prepared(
         test = prepared.loc[prepared["date"].isin(test_dates)]
         if train.empty or test.empty:
             continue
-        model = _lightgbm_regressor()
+        model = _lightgbm_regressor(len(feature_columns))
         model.fit(
             train.loc[:, list(feature_columns)].to_numpy(dtype=float),
             train[label_column].to_numpy(dtype=float),

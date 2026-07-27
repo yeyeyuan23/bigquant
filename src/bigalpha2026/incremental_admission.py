@@ -272,13 +272,14 @@ def run_incremental_admission(
     config = FactorLibraryValidationConfig()
     model_protocol = "|".join(
         (
-            "screened15_incremental_v4_frozen_I",
+            "screened15_incremental_v5_rank_positive_frozen_I",
             f"years={','.join(map(str, evaluation_years))}",
             f"train_days={config.train_window_days}",
             f"test_days={config.test_window_days}",
             f"alpha={config.alpha}",
             f"l1_ratio={config.l1_ratio}",
-            "preprocessing=daily_cross_section_zscore_features_and_target",
+            "preprocessing=daily_centered_rank_features_and_target",
+            "positive_coefficients=true",
         )
     )
     protocol = f"{model_protocol}|admission=ordered_forward_v1"
@@ -303,13 +304,8 @@ def run_incremental_admission(
         "alpha": config.alpha,
         "l1_ratio": config.l1_ratio,
         "coefficient_epsilon": config.coefficient_epsilon,
-        "preprocessing": (
-            "daily_cross_section_zscore_features_and_target"
-            "_neutral_feature_fill"
-        ),
-        # The fitted model contract is unchanged, so an existing frozen_I
-        # remains compatible. The new forward-admission policy is carried by
-        # pool cache payloads and reports instead of rewriting frozen members.
+        "positive": config.positive,
+        "preprocessing": "daily_centered_rank_features_and_target_neutral_fill",
         "evaluation_protocol": model_protocol,
     }
     cache = IncrementalSummaryCache(

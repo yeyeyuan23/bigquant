@@ -139,6 +139,14 @@ class FactorLibraryTest(unittest.TestCase):
         )
         self.assertGreater(summary["oos_rank_ic_increment"], 0)
         self.assertEqual(summary["candidate_min_nonzero_window_ratio"], 1.0)
+        self.assertTrue(
+            weights.drop(
+                columns=["train_start", "train_end", "test_start", "test_end"]
+            )
+            .ge(-1e-12)
+            .all()
+            .all()
+        )
         self.assertFalse(weights.empty)
         self.assertFalse(predictions.empty)
         passed, reasons = factorlib_incremental_gate(summary)

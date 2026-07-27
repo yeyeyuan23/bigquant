@@ -18,6 +18,7 @@ from bigalpha2026.incremental_admission import (
 from bigalpha2026.single_factor_admission import classify_candidates
 from bigalpha2026.tree_admission import (
     promote_frozen_tree_pool,
+    unresolved_tree_candidates,
     validated_frozen_tree_pool,
 )
 from scripts.run_combinations import (
@@ -42,6 +43,17 @@ from scripts.run_first_round import (
 
 
 class WorkflowScriptTest(unittest.TestCase):
+    def test_new_tree_contract_cannot_bootstrap_from_an_old_report(self):
+        pending = unresolved_tree_candidates(
+            ("self__A", "self__B"),
+            refresh_features=set(),
+            prior_candidates={"self__A", "self__B"},
+            evaluated_fingerprints={},
+            current_fingerprints={"self__A": "a", "self__B": "b"},
+            has_compatible_evaluation_state=False,
+        )
+        self.assertEqual(pending, ("self__A", "self__B"))
+
     def test_incremental_forward_order_uses_isolated_increment(self):
         summary = pd.DataFrame(
             {

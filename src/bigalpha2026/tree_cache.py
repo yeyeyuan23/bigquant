@@ -10,8 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
-TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v1"
+TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v2"
 PREDICTION_COLUMNS = ("date", "instrument", "factor")
 
 

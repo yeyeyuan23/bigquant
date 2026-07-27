@@ -6,12 +6,11 @@ computed with real competition data in the web AIStudio environment.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
-
 
 LABEL_COLUMNS = (
     "ret_close_to_close",
@@ -155,7 +154,7 @@ def preprocess_factor(
         return frame[["date", "instrument", "factor"]]
 
     residuals = pd.Series(np.nan, index=frame.index, dtype=float)
-    for _, indices in frame.groupby("date", sort=False).groups.items():
+    for indices in frame.groupby("date", sort=False).groups.values():
         block = frame.loc[indices]
         valid = block["factor"].notna()
         if numeric_columns:
@@ -202,6 +201,29 @@ def cross_section_zscore(
         mean = values.groupby(result["date"], sort=False).transform("mean")
         std = values.groupby(result["date"], sort=False).transform("std").replace(0, np.nan)
         result[column] = (values - mean) / std
+    return result
+
+
+def cross_section_rank_scale(
+    frame: pd.DataFrame,
+    columns: Sequence[str],
+) -> pd.DataFrame:
+    """Map each daily cross-section to centered percentile ranks.
+
+    The transformation is monotone, has an exact zero daily mean (including
+    ties), and preserves missing values. It therefore aligns a regression
+    target with the Rank IC objective without leaking information across dates.
+    """
+
+    result = frame.copy()
+    dates = result["date"]
+    for column in columns:
+        values = pd.to_numeric(result[column], errors="coerce")
+        grouped = values.groupby(dates, sort=False)
+        ranks = grouped.rank(method="average")
+        counts = grouped.transform("count")
+        scaled = 2.0 * (ranks - (counts + 1.0) / 2.0) / counts
+        result[column] = scaled.where(values.notna())
     return result
 
 
@@ -368,6 +390,7 @@ class ElasticNetConfig:
     alpha: float = 0.001
     l1_ratio: float = 0.5
     coefficient_epsilon: float = 1e-10
+    positive: bool = True
 
 
 @dataclass(frozen=True)
@@ -379,6 +402,7 @@ class FactorLibraryValidationConfig:
     alpha: float = 0.001
     l1_ratio: float = 0.5
     coefficient_epsilon: float = 1e-10
+    positive: bool = True
 
 
 def rolling_elastic_net_scores(
@@ -386,10 +410,12 @@ def rolling_elastic_net_scores(
     target: pd.DataFrame,
     factor_columns: Sequence[str],
     target_column: str = "ret_close_to_close",
-    config: ElasticNetConfig = ElasticNetConfig(),
+    config: ElasticNetConfig | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Approximate the disclosed 60-day/20-day Elastic Net ModelScore."""
 
+    if config is None:
+        config = ElasticNetConfig()
     try:
         from sklearn.linear_model import ElasticNet
     except ImportError as exc:  # pragma: no cover
@@ -400,7 +426,14 @@ def rolling_elastic_net_scores(
         on=["date", "instrument"],
         how="inner",
     )
-    merged = cross_section_zscore(merged, [*factor_columns, target_column])
+    merged = cross_section_rank_scale(
+        merged,
+        [*factor_columns, target_column],
+    )
+    merged.loc[:, list(factor_columns)] = merged.loc[
+        :, list(factor_columns)
+    ].fillna(0.0)
+    merged = merged.dropna(subset=[target_column])
     dates = np.array(sorted(pd.to_datetime(merged["date"].dropna().unique())))
     rows: list[dict[str, object]] = []
     for end_index in range(config.window_days, len(dates) + 1, config.step_days):
@@ -416,6 +449,7 @@ def rolling_elastic_net_scores(
             fit_intercept=True,
             max_iter=10000,
             random_state=0,
+            positive=config.positive,
         )
         model.fit(
             train.loc[:, factor_columns].to_numpy(dtype=float),
@@ -461,7 +495,7 @@ def factorlib_regularized_incremental_validation(
     base_factor_columns: Sequence[str],
     candidate_columns: Sequence[str],
     target_column: str = "ret_close_to_close",
-    config: FactorLibraryValidationConfig = FactorLibraryValidationConfig(),
+    config: FactorLibraryValidationConfig | None = None,
 ) -> tuple[dict[str, float], pd.DataFrame, pd.DataFrame]:
     """Compare public-factor and public-plus-candidate Elastic Net models.
 
@@ -470,6 +504,8 @@ def factorlib_regularized_incremental_validation(
     rows so the measured increment cannot come from a changing sample.
     """
 
+    if config is None:
+        config = FactorLibraryValidationConfig()
     try:
         from sklearn.linear_model import ElasticNet
     except ImportError as exc:  # pragma: no cover
@@ -507,9 +543,12 @@ def factorlib_regularized_incremental_validation(
         validate="one_to_one",
     )
     all_features = (*base_columns, *candidates)
-    merged = cross_section_zscore(merged, [*all_features, target_column])
-    # Match final-model preprocessing: a missing/constant standardized feature
-    # is neutral, while the target remains mandatory. This prevents another
+    merged = cross_section_rank_scale(
+        merged,
+        [*all_features, target_column],
+    )
+    # Match final-model preprocessing: a missing/constant rank feature is
+    # neutral, while the target remains mandatory. This prevents another
     # candidate's sparse rows from changing the paired sample.
     merged.loc[:, list(all_features)] = merged.loc[
         :, list(all_features)
@@ -537,6 +576,7 @@ def factorlib_regularized_incremental_validation(
             fit_intercept=True,
             max_iter=10000,
             random_state=0,
+            positive=config.positive,
         )
         augmented = ElasticNet(
             alpha=config.alpha,
@@ -544,6 +584,7 @@ def factorlib_regularized_incremental_validation(
             fit_intercept=True,
             max_iter=10000,
             random_state=0,
+            positive=config.positive,
         )
         baseline.fit(
             train.loc[:, base_columns].to_numpy(dtype=float),
@@ -669,7 +710,7 @@ def factorlib_regularized_incremental_batch_validation(
     base_factor_columns: Sequence[str],
     candidate_columns: Sequence[str],
     target_column: str = "ret_close_to_close",
-    config: FactorLibraryValidationConfig = FactorLibraryValidationConfig(),
+    config: FactorLibraryValidationConfig | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Evaluate many candidates while fitting each rolling baseline only once.
 
@@ -679,6 +720,8 @@ def factorlib_regularized_incremental_batch_validation(
     directly comparable and avoids repeating the 36-factor baseline work.
     """
 
+    if config is None:
+        config = FactorLibraryValidationConfig()
     try:
         from sklearn.linear_model import ElasticNet
     except ImportError as exc:  # pragma: no cover
@@ -720,7 +763,10 @@ def factorlib_regularized_incremental_batch_validation(
         validate="one_to_one",
     )
     all_features = (*base_columns, *candidates)
-    merged = cross_section_zscore(merged, [*all_features, target_column])
+    merged = cross_section_rank_scale(
+        merged,
+        [*all_features, target_column],
+    )
     # Candidates grouped on the same active-date calendar share this sample.
     # Feature gaps are neutralized instead of deleting another candidate's
     # otherwise valid stock-day.
@@ -752,6 +798,7 @@ def factorlib_regularized_incremental_batch_validation(
             fit_intercept=True,
             max_iter=10000,
             random_state=0,
+            positive=config.positive,
         )
         baseline.fit(
             train.loc[:, base_columns].to_numpy(dtype=float),
@@ -783,6 +830,7 @@ def factorlib_regularized_incremental_batch_validation(
                 fit_intercept=True,
                 max_iter=10000,
                 random_state=0,
+                positive=config.positive,
             )
             augmented.fit(
                 train.loc[:, augmented_columns].to_numpy(dtype=float),

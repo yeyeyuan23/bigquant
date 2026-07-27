@@ -2,10 +2,19 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bigalpha2026.incremental_cache import IncrementalSummaryCache
+from bigalpha2026.incremental_cache import (
+    INCREMENTAL_CACHE_SCHEMA_VERSION,
+    IncrementalSummaryCache,
+)
 
 
 class IncrementalSummaryCacheTest(unittest.TestCase):
+    def test_rank_positive_contract_uses_v2_schema(self):
+        self.assertEqual(
+            INCREMENTAL_CACHE_SCHEMA_VERSION,
+            "elastic-net-incremental-cache-v2",
+        )
+
     def test_exact_inputs_reuse_summary(self):
         with tempfile.TemporaryDirectory() as directory:
             calls = []

@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from bigalpha2026.tree_cache import (
+    TREE_CACHE_SCHEMA_VERSION,
     TreePredictionCache,
     feature_fingerprints,
     frame_column_fingerprint,
@@ -12,6 +13,12 @@ from bigalpha2026.tree_cache import (
 
 
 class TreePredictionCacheTest(unittest.TestCase):
+    def test_rank_monotone_contract_uses_v2_schema(self):
+        self.assertEqual(
+            TREE_CACHE_SCHEMA_VERSION,
+            "tree-prediction-cache-v2",
+        )
+
     def setUp(self):
         self.panel = pd.DataFrame(
             {

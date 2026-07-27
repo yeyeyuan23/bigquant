@@ -82,6 +82,30 @@ def validated_frozen_tree_pool(
     return frozen_candidates
 
 
+def unresolved_tree_candidates(
+    eligible: Sequence[str],
+    *,
+    refresh_features: set[str],
+    prior_candidates: set[str],
+    evaluated_fingerprints: Mapping[str, str],
+    current_fingerprints: Mapping[str, str],
+    has_compatible_evaluation_state: bool,
+) -> tuple[str, ...]:
+    """Require a full T rebuild when no compatible evaluation state exists."""
+
+    return tuple(
+        candidate
+        for candidate in eligible
+        if (
+            not has_compatible_evaluation_state
+            or candidate in refresh_features
+            or candidate not in prior_candidates
+            or evaluated_fingerprints.get(candidate)
+            != current_fingerprints[candidate]
+        )
+    )
+
+
 @dataclass
 class TreeAdmissionResult:
     """Complete T-stage result plus its content-addressed prediction runtime."""
@@ -410,18 +434,14 @@ def run_tree_admission(
         else f"self__{candidate}"
         for candidate in refresh_candidates
     }
-    pending = tuple(
-        candidate
-        for candidate in eligible
-        if (
-            candidate in refresh_features
-            or candidate not in prior_rows
-            or (
-                evaluated_fingerprints
-                and evaluated_fingerprints.get(candidate)
-                != fingerprints[candidate]
-            )
-        )
+    has_compatible_evaluation_state = bool(evaluation_state)
+    pending = unresolved_tree_candidates(
+        eligible,
+        refresh_features=refresh_features,
+        prior_candidates=set(prior_rows),
+        evaluated_fingerprints=evaluated_fingerprints,
+        current_fingerprints=fingerprints,
+        has_compatible_evaluation_state=has_compatible_evaluation_state,
     )
     if frozen_state:
         frozen_before = validated_frozen_tree_pool(
@@ -430,23 +450,10 @@ def run_tree_admission(
             candidate_fingerprints=fingerprints,
         )
     else:
-        frozen_before = tuple(
-            candidate
-            for candidate in eligible
-            if (
-                candidate in prior_rows
-                and bool(
-                    prior_rows[candidate].get(
-                        "enters_joint_lightgbm",
-                        prior_rows[candidate].get(
-                            "tree_incremental_passed",
-                            False,
-                        ),
-                    )
-                )
-                and candidate not in pending
-            )
-        )
+        # A report is an audit artifact, not frozen state. A new model contract
+        # must re-evaluate every eligible candidate rather than bootstrap its
+        # pool from rows produced by an older contract.
+        frozen_before = ()
 
     baseline_factor = cached_prediction(
         frozen_cache,

@@ -99,7 +99,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--incremental-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed I cache (default: DATA/cache/incremental_v2)",
+        help="content-addressed I cache (default: DATA/cache/incremental_v3)",
     )
     parser.add_argument(
         "--refresh-incremental-cache",
@@ -116,7 +116,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--tree-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed LightGBM prediction cache (default: DATA/cache/tree_v2)",
+        help="content-addressed LightGBM prediction cache (default: DATA/cache/tree_v3)",
     )
     parser.add_argument(
         "--refresh-tree-cache",
@@ -552,6 +552,10 @@ def run_experiments(
         public_columns,
         development_years=DEVELOPMENT_YEARS,
     )
+    screening = screening.rename(
+        columns={"selected": "diagnostic_selected_under_current_contract"}
+    )
+    screening["selected"] = screening["feature"].isin(public_columns)
     oriented = apply_feature_directions(panel, screening)
     selected_public = tuple(public_columns)
     if selected_public != FROZEN_FACTORLIB_SCREENED_FEATURES:
@@ -562,7 +566,7 @@ def run_experiments(
     resolved_incremental_cache_dir = (
         Path(incremental_cache_dir)
         if incremental_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "incremental_v2"
+        else reports_dir.parent / "data" / "cache" / "incremental_v3"
     )
     del resume_incremental
     incremental_result = run_incremental_admission(
@@ -580,7 +584,7 @@ def run_experiments(
     resolved_tree_cache_dir = (
         Path(tree_cache_dir)
         if tree_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "tree_v2"
+        else reports_dir.parent / "data" / "cache" / "tree_v3"
     )
     tree_result = run_tree_admission(
         oriented,
@@ -962,7 +966,7 @@ def run_experiments(
     tree_result.write_states()
 
     result = {
-        "protocol": "isolated_combination_pipelines_v8_frozen_I_and_T",
+        "protocol": "isolated_combination_pipelines_v9_rank_constrained_I_and_T",
         "development_years": list(DEVELOPMENT_YEARS),
         "validation_years": [
             VALIDATION_2022_YEAR,
@@ -970,8 +974,7 @@ def run_experiments(
         ],
         "incremental_protocol": incremental_result.protocol_summary(),
         "learned_model_preprocessing": (
-            "daily_cross_section_zscore_features_and_target"
-            "_neutral_feature_fill"
+            "daily_centered_rank_features_and_target_neutral_fill"
         ),
         "tree_incremental_protocol": tree_result.protocol_summary(),
         "frozen_test_year": FROZEN_TEST_YEAR,
@@ -1055,7 +1058,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         incremental_cache_dir=(
             args.incremental_cache_dir
             if args.incremental_cache_dir is not None
-            else args.data_dir / "cache" / "incremental_v2"
+            else args.data_dir / "cache" / "incremental_v3"
         ),
         refresh_incremental_cache=args.refresh_incremental_cache,
         refresh_incremental_candidates=(
@@ -1064,7 +1067,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         tree_cache_dir=(
             args.tree_cache_dir
             if args.tree_cache_dir is not None
-            else args.data_dir / "cache" / "tree_v2"
+            else args.data_dir / "cache" / "tree_v3"
         ),
         refresh_tree_cache=args.refresh_tree_cache,
         refresh_tree_candidates=args.refresh_tree_candidate,

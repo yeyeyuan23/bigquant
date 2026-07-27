@@ -195,7 +195,7 @@ class CombinationTest(unittest.TestCase):
         self.assertEqual(result["date"].nunique(), 2)
         self.assertEqual(len(result), 240)
 
-    def test_learned_models_share_standardized_samples(self):
+    def test_learned_models_share_centered_rank_samples(self):
         dates = pd.to_datetime(
             ["2022-01-04"] * 10 + ["2022-01-05"] * 10
         )
@@ -223,11 +223,28 @@ class CombinationTest(unittest.TestCase):
         self.assertTrue(
             daily["ret_close_to_close"].mean().abs().lt(1e-12).all()
         )
+        self.assertTrue(
+            prepared.groupby("date", sort=False)["dense"]
+            .apply(lambda values: values.is_monotonic_increasing)
+            .all()
+        )
 
     def test_lightgbm_config_is_shallow_and_deterministic(self):
         config = lightgbm_model_config()
         self.assertEqual(config["random_state"], 20260726)
         self.assertEqual(config["training"], "rolling_60_train_20_test")
+        self.assertEqual(
+            config["feature_transform"],
+            "daily_centered_percentile_rank",
+        )
+        self.assertEqual(
+            config["target_transform"],
+            "daily_centered_percentile_rank",
+        )
+        self.assertEqual(
+            config["monotone_constraints"],
+            "all_features_positive",
+        )
 
     def test_paired_tree_increment_uses_daily_oos_rank_ic(self):
         dates = pd.bdate_range("2021-01-04", periods=40)

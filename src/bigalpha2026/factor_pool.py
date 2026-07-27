@@ -382,8 +382,15 @@ def screen_public_factors(
             }
         )
     screening = pd.DataFrame(rows)
+    oriented_for_model = merged[["date", "instrument", *columns]].copy()
+    direction_by_feature = screening.set_index("feature")["direction"]
+    for column in columns:
+        oriented_for_model[column] = (
+            pd.to_numeric(oriented_for_model[column], errors="coerce")
+            * float(direction_by_feature.loc[column])
+        )
     scores, _ = rolling_elastic_net_scores(
-        merged[["date", "instrument", *columns]],
+        oriented_for_model,
         merged[["date", "instrument", label_column]],
         columns,
         target_column=label_column,
