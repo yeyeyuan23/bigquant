@@ -72,6 +72,11 @@ PIPELINE_NAMES = (
     "joint_elastic_net",
     "joint_lightgbm",
 )
+OBSOLETE_REPORT_FILES = (
+    "incremental_direct_pool.csv",
+    "incremental_backward_admission.csv",
+    "tree_pool_promotion.csv",
+)
 SCREENED_FACTORLIB_RAW_FEATURES = tuple(
     feature.removeprefix("factorlib__") for feature in FROZEN_FACTORLIB_SCREENED_FEATURES
 )
@@ -85,6 +90,33 @@ def enters_family_equal_rank(feature: str) -> bool:
         return False
     candidate_id = feature.removeprefix("self__")
     return candidate_id.split("-", maxsplit=1)[0] in BASE_SELF_FAMILIES
+
+
+def cleanup_obsolete_reports(reports_dir: Path) -> None:
+    """Remove report files whose names encode retired admission semantics."""
+
+    for filename in OBSOLETE_REPORT_FILES:
+        (reports_dir / filename).unlink(missing_ok=True)
+
+
+def first_round_reports_dir(reports_dir: Path) -> Path:
+    return reports_dir / "first_round"
+
+
+def route_reports_dir(reports_dir: Path) -> Path:
+    return reports_dir / "routes"
+
+
+def existing_report_path(reports_dir: Path, relative: str) -> Path:
+    """Return the current layered report path, falling back to legacy root."""
+
+    layered = reports_dir / relative
+    if layered.exists():
+        return layered
+    legacy = reports_dir / Path(relative).name
+    if legacy.exists():
+        return legacy
+    return layered
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -114,7 +146,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--incremental-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed I cache (default: DATA/cache/incremental_v4_J)",
+        help="content-addressed I cache (default: DATA/cache/incremental_v5_factorwise_J)",
     )
     parser.add_argument(
         "--refresh-incremental-cache",
@@ -131,7 +163,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--tree-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed LightGBM cache (default: DATA/cache/tree_v4_J)",
+        help="content-addressed LightGBM cache (default: DATA/cache/tree_v5_factorwise_J)",
     )
     parser.add_argument(
         "--refresh-tree-cache",
@@ -182,7 +214,10 @@ def required_paths(
             data_dir / "manifest_candidate_pool.json",
             data_dir / "features/FACTORLIB/manifest.json",
             data_dir / "features/FACTORLIB_ALL36/manifest.json",
-            reports_dir / "first_round_decisions.json",
+            existing_report_path(
+                reports_dir,
+                "first_round/first_round_decisions.json",
+            ),
         ]
     )
     return tuple(paths)
@@ -303,7 +338,12 @@ def load_dynamic_inputs(
     )
     if not ob_dates.sort_values().equals(universe_dates.sort_values()):
         raise ValueError("OB-001 does not cover the full historical universe calendar")
-    decisions = load_decisions(reports_dir / "first_round_decisions.json")
+    decisions = load_decisions(
+        existing_report_path(
+            reports_dir,
+            "first_round/first_round_decisions.json",
+        )
+    )
     candidate_ids = tuple(sorted(candidate_pool["candidate_id"].astype(str).unique()))
     decision_by_id = {str(row["candidate_id"]): row for row in decisions}
     missing_decisions = sorted(set(candidate_ids).difference(decision_by_id))
@@ -690,6 +730,7 @@ def build_admission_audit_rows(
     single_factor_set = set(single_factor_features)
     elastic_pool_inputs = set(incremental_result.individual_passed)
     admitted_incremental = set(incremental_result.frozen_after)
+    conditional_incremental = set(incremental_result.pending_passed)
     admitted_tree = set(tree_result.admitted_candidates)
     for self_column in self_columns:
         screened_row = (
@@ -711,23 +752,32 @@ def build_admission_audit_rows(
             {
                 **screened_row,
                 "feature": self_column,
-                "benchmark": "direct_elastic_net_pool",
+                "benchmark": "factorwise_elastic_net_J",
                 "passed": screened_passed,
                 "reasons": screened_reasons,
             }
         )
+        if enters_incremental_model:
+            incremental_status = "frozen_I"
+        elif self_column in conditional_incremental:
+            incremental_status = "conditional_passed_not_promoted"
+        elif screened_passed:
+            incremental_status = "individual_passed_conditional_failed"
+        else:
+            incremental_status = "individual_failed"
         admission_rows.append(
             {
                 "candidate_id": self_column.removeprefix("self__"),
                 "feature": self_column,
                 "single_factor_passed": self_column in single_factor_set,
-                "candidate_level_incremental_J_computed": False,
-                "elastic_net_pool_input": screened_passed,
-                "incremental_evaluation_status": (
-                    "frozen_I"
-                    if enters_incremental_model
-                    else "direct_pool_not_promoted"
+                "candidate_level_incremental_J_computed": bool(
+                    screened_row.get("candidate_level_J_computed", False)
                 ),
+                "individual_I_passed": screened_passed,
+                # Backward-compatible alias. It means the candidate passed the
+                # individual I gate, not that it entered the frozen I model.
+                "elastic_net_pool_input": screened_passed,
+                "incremental_evaluation_status": incremental_status,
                 "enters_self_factor_composite": enters_self_composite,
                 "enters_joint_elastic_net": enters_incremental_model,
                 "tree_incremental_passed": tree_passed,
@@ -785,7 +835,7 @@ def run_route_admissions(
     resolved_incremental_cache = (
         Path(incremental_cache_dir)
         if incremental_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "incremental_v4_J"
+        else reports_dir.parent / "data" / "cache" / "incremental_v5_factorwise_J"
     )
     incremental = run_incremental_admission(
         oriented,
@@ -802,7 +852,7 @@ def run_route_admissions(
     resolved_tree_cache = (
         Path(tree_cache_dir)
         if tree_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "tree_v4_J"
+        else reports_dir.parent / "data" / "cache" / "tree_v5_factorwise_J"
     )
     tree = run_tree_admission(
         oriented,
@@ -811,7 +861,10 @@ def run_route_admissions(
         self_columns,
         score_reference,
         development_years=DEVELOPMENT_YEARS,
-        prior_admission_path=reports_dir / "tree_factor_admission.csv",
+        prior_admission_path=existing_report_path(
+            reports_dir,
+            "routes/tree_factor_admission.csv",
+        ),
         cache_dir=resolved_tree_cache,
         refresh_cache=refresh_tree_cache,
         refresh_candidates=refresh_tree_candidates,
@@ -1073,49 +1126,66 @@ def write_experiment_reports(
     """Write route audits and return the frozen submission ranking."""
 
     reports_dir.mkdir(exist_ok=True)
+    routes_dir = route_reports_dir(reports_dir)
+    routes_dir.mkdir(exist_ok=True)
     elastic_net_weights.to_csv(
-        reports_dir / "joint_elastic_net_weights.csv",
+        routes_dir / "joint_elastic_net_weights.csv",
         index=False,
     )
-    screening.to_csv(reports_dir / "factor_pool_screening.csv", index=False)
+    screening.to_csv(routes_dir / "factor_pool_screening.csv", index=False)
     j_reference_directions.to_csv(
-        reports_dir / "competition_J_reference_directions.csv",
+        routes_dir / "competition_J_reference_directions.csv",
         index=False,
     )
     pd.DataFrame(single_factor_result.evaluations).to_csv(
-        reports_dir / "single_factor_route_admission.csv",
+        routes_dir / "single_factor_route_admission.csv",
         index=False,
     )
     pd.DataFrame([single_factor_result.promotion_summary]).to_csv(
-        reports_dir / "single_factor_route_promotion.csv",
+        routes_dir / "single_factor_route_promotion.csv",
         index=False,
     )
     pd.DataFrame(incremental_rows).drop(columns="reasons").to_csv(
-        reports_dir / "factor_pool_incremental.csv",
+        routes_dir / "factor_pool_incremental.csv",
+        index=False,
+    )
+    incremental_result.screened_summary.to_csv(
+        routes_dir / "incremental_factorwise_admission.csv",
         index=False,
     )
     pd.DataFrame(admission_rows).to_csv(
         reports_dir / "factor_pool_admission.csv",
         index=False,
     )
-    incremental_promotion_path = reports_dir / "incremental_pool_promotion.csv"
+    incremental_promotion_path = routes_dir / "incremental_pool_promotion.csv"
     pd.DataFrame([incremental_result.promotion_row()]).to_csv(
         incremental_promotion_path,
         index=False,
     )
-    pd.DataFrame([incremental_result.promotion_row()]).to_csv(
-        reports_dir / "incremental_direct_pool.csv",
+    pd.DataFrame(incremental_result.backward_evaluations).to_csv(
+        routes_dir / "incremental_conditional_forward.csv",
         index=False,
     )
-    (reports_dir / "incremental_backward_admission.csv").unlink(
-        missing_ok=True,
+    pd.DataFrame([incremental_result.promotion_row()]).to_csv(
+        routes_dir / "incremental_factorwise_promotion.csv",
+        index=False,
+    )
+    (reports_dir / "incremental_direct_pool.csv").unlink(missing_ok=True)
+    (reports_dir / "incremental_backward_admission.csv").unlink(missing_ok=True)
+    tree_result.incremental_summary.to_csv(
+        routes_dir / "tree_factor_incremental.csv",
+        index=False,
     )
     tree_result.incremental_summary.to_csv(
-        reports_dir / "tree_factor_incremental.csv",
+        routes_dir / "tree_factorwise_admission.csv",
+        index=False,
+    )
+    tree_result.importance_summary.to_csv(
+        routes_dir / "tree_factorwise_importance.csv",
         index=False,
     )
     pd.DataFrame(tree_result.admission_by_feature.values()).to_csv(
-        reports_dir / "tree_factor_admission.csv",
+        routes_dir / "tree_factor_admission.csv",
         index=False,
     )
     pd.DataFrame(
@@ -1128,7 +1198,7 @@ def write_experiment_reports(
             }
         ]
     ).to_csv(
-        reports_dir / "tree_group_increment.csv",
+        routes_dir / "tree_group_increment.csv",
         index=False,
     )
     if tree_result.pending_candidates:
@@ -1136,7 +1206,10 @@ def write_experiment_reports(
             [
                 {
                     "pending_candidates": ",".join(tree_result.pending_candidates),
-                    "candidate_gate_passed": ",".join(tree_result.pending_passed),
+                    "selection": "factorwise_then_conditional_forward",
+                    "conditional_passed_candidates": ",".join(
+                        tree_result.pending_passed
+                    ),
                     "provisional_pool_count": len(tree_result.provisional_pool),
                     "provisional_vs_screened_increment": (
                         tree_result.provisional_group_increment["delta_score_proxy"]
@@ -1157,12 +1230,13 @@ def write_experiment_reports(
                 }
             ]
         ).to_csv(
-            reports_dir / "tree_pool_promotion.csv",
+            routes_dir / "tree_factorwise_promotion.csv",
             index=False,
         )
+    (reports_dir / "tree_pool_promotion.csv").unlink(missing_ok=True)
     for pipeline_name in PIPELINE_NAMES:
         metrics.loc[metrics["experiment"].eq(pipeline_name)].to_csv(
-            reports_dir / f"{pipeline_name}_metrics.csv",
+            routes_dir / f"{pipeline_name}_metrics.csv",
             index=False,
         )
     pipeline_decisions = {str(row["experiment"]): dict(row) for row in decisions}
@@ -1398,6 +1472,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.check_files:
         return 0
 
+    cleanup_obsolete_reports(args.reports_dir)
     assert loaded is not None
     (
         panel,
@@ -1428,14 +1503,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         incremental_cache_dir=(
             args.incremental_cache_dir
             if args.incremental_cache_dir is not None
-            else args.data_dir / "cache" / "incremental_v4_J"
+            else args.data_dir / "cache" / "incremental_v5_factorwise_J"
         ),
         refresh_incremental_cache=args.refresh_incremental_cache,
         refresh_incremental_candidates=(args.refresh_incremental_candidate),
         tree_cache_dir=(
             args.tree_cache_dir
             if args.tree_cache_dir is not None
-            else args.data_dir / "cache" / "tree_v4_J"
+            else args.data_dir / "cache" / "tree_v5_factorwise_J"
         ),
         refresh_tree_cache=args.refresh_tree_cache,
         refresh_tree_candidates=args.refresh_tree_candidate,

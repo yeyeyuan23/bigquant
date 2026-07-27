@@ -1,0 +1,29 @@
+{
+  "status": "ok",
+  "evidence_scope": "AIStudio real competition data prefix-invariance probe",
+  "submission_source": "submissions/factor_joint_lightgbm_current.py",
+  "submission_source_sha256": "0bcffbb6c98e46858fc2b6d9c90084281c888c9031bf46f5483224e4375a54e3",
+  "submission_notebook": "submissions/factor_joint_lightgbm_current.ipynb",
+  "submission_notebook_sha256": "15f1e51d6c0962b4b06a8ab88238e77ceea33bedc4c4556fac138ef2635c4715",
+  "probe_script": "scripts/aistudio_submission_lookahead_probe.py",
+  "data_sources": {
+    "bar1m": "bigalpha_2026_stock_bar1m",
+    "financial": "bigalpha_2026_financial"
+  },
+  "start": "2024-07-01",
+  "cutoff": "2024-07-05",
+  "end": "2024-07-10",
+  "history_days": 500,
+  "compared_rows": 5000,
+  "difference_rows": 0,
+  "first_difference_date": null,
+  "full_seconds": 248.599,
+  "cut_seconds": 243.873,
+  "exit_code": 0,
+  "verified_at": "2026-07-27",
+  "notes": [
+    "The final probe used the unmodified submission source and its original 500-day history setting.",
+    "A prior diagnostic probe reproduced 4872 differences before ordered intraday first/last aggregation was added.",
+    "This evidence verifies the platform-style end-date prefix check; it does not replace competition scoring."
+  ]
+}

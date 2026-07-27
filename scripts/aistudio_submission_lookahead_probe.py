@@ -35,7 +35,7 @@ def normalized_factor(
     frame: pd.DataFrame,
     cutoff: pd.Timestamp,
 ) -> pd.DataFrame:
-    missing = set((*KEY_COLUMNS, "factor")) - set(frame.columns)
+    missing = {*KEY_COLUMNS, "factor"} - set(frame.columns)
     if missing:
         raise ValueError(f"submission output missing columns: {sorted(missing)}")
     result = frame[[*KEY_COLUMNS, "factor"]].copy()
@@ -95,8 +95,8 @@ def compare_prefixes(
     return {
         "status": "ok" if differences.empty else "lookahead_suspected",
         "cutoff": cutoff.strftime("%Y-%m-%d"),
-        "compared_rows": int(len(merged)),
-        "difference_rows": int(len(differences)),
+        "compared_rows": len(merged),
+        "difference_rows": len(differences),
         "first_difference_date": (
             None
             if differences.empty
@@ -113,7 +113,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("submission", type=Path)
     parser.add_argument("--start", required=True)
-    parser.add_argument("--cutoff", required=True)
+    parser.add_argument(
+        "--cutoff",
+        action="append",
+        required=True,
+        help="repeat for multiple prefix-invariance cutoffs",
+    )
     parser.add_argument("--end", required=True)
     parser.add_argument(
         "--bar1m",
@@ -124,9 +129,14 @@ def main() -> int:
         default="bigalpha_2026_financial",
     )
     args = parser.parse_args()
-    cutoff = pd.Timestamp(args.cutoff).normalize()
-    if not pd.Timestamp(args.start) <= cutoff < pd.Timestamp(args.end):
-        raise ValueError("require start <= cutoff < end")
+    cutoffs = tuple(pd.Timestamp(value).normalize() for value in args.cutoff)
+    if len(set(cutoffs)) != len(cutoffs):
+        raise ValueError("cutoffs must be unique")
+    if any(
+        not pd.Timestamp(args.start) <= cutoff < pd.Timestamp(args.end)
+        for cutoff in cutoffs
+    ):
+        raise ValueError("require start <= every cutoff < end")
 
     submission = load_submission(args.submission)
     datasources = {
@@ -136,12 +146,37 @@ def main() -> int:
     started = time.perf_counter()
     full = submission.main(datasources, args.start, args.end)
     full_seconds = time.perf_counter() - started
-    started = time.perf_counter()
-    cut = submission.main(datasources, args.start, args.cutoff)
-    cut_seconds = time.perf_counter() - started
-    summary = compare_prefixes(full, cut, cutoff)
-    summary["full_seconds"] = round(full_seconds, 3)
-    summary["cut_seconds"] = round(cut_seconds, 3)
+    cutoff_results = []
+    for cutoff in cutoffs:
+        started = time.perf_counter()
+        cut = submission.main(
+            datasources,
+            args.start,
+            cutoff.strftime("%Y-%m-%d"),
+        )
+        cut_seconds = time.perf_counter() - started
+        result = compare_prefixes(full, cut, cutoff)
+        result["cut_seconds"] = round(cut_seconds, 3)
+        cutoff_results.append(result)
+    summary = {
+        "status": (
+            "ok"
+            if all(result["status"] == "ok" for result in cutoff_results)
+            else "lookahead_suspected"
+        ),
+        "start": args.start,
+        "end": args.end,
+        "full_seconds": round(full_seconds, 3),
+        "cutoffs": cutoff_results,
+        "total_compared_rows": sum(
+            int(result["compared_rows"])
+            for result in cutoff_results
+        ),
+        "total_difference_rows": sum(
+            int(result["difference_rows"])
+            for result in cutoff_results
+        ),
+    }
     print(json.dumps(summary, ensure_ascii=False, indent=2, default=str))
     return int(summary["status"] != "ok")
 

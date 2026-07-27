@@ -12,6 +12,7 @@ import pandas as pd
 from .combinations import (
     lightgbm_model_config,
     walk_forward_lightgbm,
+    walk_forward_lightgbm_with_importance,
 )
 from .competition_score_proxy import CompetitionScoreReference
 from .research_policy import (
@@ -138,6 +139,7 @@ class TreeAdmissionResult:
 
     admission_by_feature: dict[str, dict[str, object]]
     incremental_summary: pd.DataFrame
+    importance_summary: pd.DataFrame
     eligible_candidates: tuple[str, ...]
     frozen_before: tuple[str, ...]
     pending_candidates: tuple[str, ...]
@@ -214,9 +216,17 @@ class TreeAdmissionResult:
         )
 
     def promotion_row(self) -> dict[str, object]:
+        individual_passed = tuple(
+            str(row["candidate"])
+            for row in self.incremental_summary.to_dict(orient="records")
+            if bool(row.get("individual_passed"))
+            and str(row["candidate"]) in self.pending_candidates
+        )
         return {
             "pending_candidates": ",".join(self.pending_candidates),
-            "direct_pool_candidates": ",".join(self.pending_passed),
+            "selection": "factorwise_then_conditional_forward",
+            "individual_passed_candidates": ",".join(individual_passed),
+            "conditional_passed_candidates": ",".join(self.pending_passed),
             "provisional_pool_count": len(self.provisional_pool),
             "provisional_vs_screened_increment": (
                 self.provisional_group_increment["delta_score_proxy"]
@@ -241,7 +251,7 @@ class TreeAdmissionResult:
             "baseline": "lightgbm_screened15",
             "candidate_filter": "technical_eligibility_only",
             "admission_metric": "delta_official_score_proxy",
-            "selection": "direct_interaction_pool",
+            "selection": "factorwise_then_conditional_forward",
             "evaluation_years": list(self.development_years),
             "train_days": 60,
             "test_days": 20,
@@ -301,6 +311,7 @@ class TreeAdmissionResult:
                     "score_protocol": dict(self.score_reference.protocol()),
                     "pending_candidates": list(self.pending_candidates),
                     "candidate_gate_passed": list(self.pending_passed),
+                    "selection": "factorwise_then_conditional_forward",
                     "promoted_candidates": [
                         candidate
                         for candidate in self.pending_passed
@@ -340,7 +351,7 @@ def run_tree_admission(
     refresh_cache: bool = False,
     refresh_candidates: Sequence[str] = (),
 ) -> TreeAdmissionResult:
-    """Run individual, conditional, and joint T admission."""
+    """Run factorwise, conditional, and joint T admission."""
 
     development = oriented.loc[
         oriented["date"].dt.year.isin(development_years)
@@ -428,6 +439,32 @@ def run_tree_admission(
         )
         cache_keys.add(cache_key)
         return prediction
+
+    def cached_prediction_with_importance(
+        cache: TreePredictionCache,
+        feature_columns: tuple[str, ...],
+        prediction_years: tuple[int, ...],
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        prediction, importance, _cache_hit, cache_key = (
+            cache.get_or_compute_with_importance(
+                feature_columns,
+                prediction_years=prediction_years,
+                label_column="ret_close_to_close",
+                train_window_days=60,
+                test_window_days=20,
+                force_refresh=bool(
+                    set(feature_columns).intersection(refresh_features)
+                ),
+                compute=lambda: walk_forward_lightgbm_with_importance(
+                    oriented,
+                    labels,
+                    feature_columns=feature_columns,
+                    prediction_years=prediction_years,
+                ),
+            )
+        )
+        cache_keys.add(cache_key)
+        return prediction, importance
 
     prior_tree = (
         pd.read_csv(prior_admission_path)
@@ -527,6 +564,23 @@ def run_tree_admission(
     )
     admission: dict[str, dict[str, object]] = {}
     incremental_rows: list[dict[str, object]] = []
+    importance_rows: list[pd.DataFrame] = []
+
+    def record_importance(
+        importance: pd.DataFrame,
+        *,
+        candidate: str,
+        evaluation_stage: str,
+        baseline_candidates: Sequence[str],
+    ) -> None:
+        if importance.empty:
+            return
+        block = importance.copy()
+        block.insert(0, "candidate", candidate)
+        block.insert(1, "evaluation_stage", evaluation_stage)
+        block.insert(2, "baseline_candidates", ",".join(baseline_candidates))
+        importance_rows.append(block)
+
     for self_column in self_columns:
         active_days = active_days_by_feature[self_column]
         if self_column not in eligible:
@@ -567,46 +621,151 @@ def run_tree_admission(
             )
             continue
 
+        individual_features = (*selected_public, *frozen_before, self_column)
+        individual_factor, individual_importance = cached_prediction_with_importance(
+            validation_cache,
+            individual_features,
+            development_years,
+        )
+        record_importance(
+            individual_importance,
+            candidate=self_column,
+            evaluation_stage="individual",
+            baseline_candidates=frozen_before,
+        )
+        individual_increment = score_reference.paired_increment(
+            frozen_factor,
+            individual_factor,
+            include_stability=False,
+        )
+        individual_passed, individual_reasons = tree_score_increment_gate(
+            individual_increment
+        )
         row = {
             "candidate": self_column,
-            "evaluation_protocol": "direct_interaction_pool_T_v4_official_J",
-            "candidate_level_J_computed": False,
-            "candidate_level_J_reason": (
-                "preserve LightGBM interactions; score the complete route once"
-            ),
+            "evaluation_protocol": "factorwise_T_v5_official_J",
+            "candidate_level_J_computed": True,
+            "individual_baseline_candidates": ",".join(frozen_before),
+            **individual_increment,
+            "individual_passed": individual_passed,
+            "individual_reasons": "; ".join(individual_reasons),
         }
-        incremental_rows.append(row)
+        incremental_rows.append(dict(row))
         admission[self_column] = {
             **row,
             "active_days": active_days,
             "tree_data_eligible": True,
-            "individual_passed": None,
-            "conditional_passed": None,
-            "tree_incremental_passed": True,
-            "evaluation_status": "pending_group_confirmation",
-            "marginal_reasons": "not computed; direct interaction pool",
-            "reasons": "",
+            "conditional_passed": False,
+            "tree_incremental_passed": False,
+            "evaluation_status": (
+                "individual_passed_pending_conditional"
+                if individual_passed
+                else "individual_failed"
+            ),
+            "marginal_reasons": "; ".join(individual_reasons),
+            "reasons": "; ".join(individual_reasons),
         }
 
-    # One complete LightGBM route preserves interactions and lets the model
-    # perform its own feature selection.  Candidate-level subset search would
-    # duplicate that work and explode combinatorially.
-    pending_passed = pending
-    for candidate in pending:
-        admission[candidate]["direct_pool_selected"] = True
+    individual_passed_candidates = tuple(
+        row["candidate"]
+        for row in incremental_rows
+        if bool(row.get("individual_passed"))
+        and row["candidate"] in pending
+    )
+    ordered_candidates = tuple(
+        row["candidate"]
+        for row in sorted(
+            (
+                row
+                for row in incremental_rows
+                if row["candidate"] in individual_passed_candidates
+            ),
+            key=lambda row: (
+                -float(row.get("delta_score_proxy", float("-inf"))),
+                str(row["candidate"]),
+            ),
+        )
+    )
+    accepted: list[str] = []
+    current_factor = frozen_factor
+    for order, candidate in enumerate(ordered_candidates, start=1):
+        baseline_candidates = tuple(dict.fromkeys((*frozen_before, *accepted)))
+        augmented_candidates = tuple(dict.fromkeys((*baseline_candidates, candidate)))
+        augmented_factor, conditional_importance = cached_prediction_with_importance(
+            validation_cache,
+            (*selected_public, *augmented_candidates),
+            development_years,
+        )
+        record_importance(
+            conditional_importance,
+            candidate=candidate,
+            evaluation_stage="conditional_forward",
+            baseline_candidates=baseline_candidates,
+        )
+        conditional_increment = score_reference.paired_increment(
+            current_factor,
+            augmented_factor,
+            include_stability=False,
+        )
+        conditional_passed, conditional_reasons = tree_score_increment_gate(
+            conditional_increment
+        )
+        admission[candidate].update(
+            {
+                "conditional_order": order,
+                "conditional_baseline_candidates": ",".join(baseline_candidates),
+                "conditional_delta_score_proxy": conditional_increment.get(
+                    "delta_score_proxy"
+                ),
+                "conditional_positive_window_ratio": conditional_increment.get(
+                    "positive_score_window_ratio"
+                ),
+                "conditional_positive_years": conditional_increment.get(
+                    "positive_score_years"
+                ),
+                "conditional_passed": conditional_passed,
+                "conditional_reasons": "; ".join(conditional_reasons),
+                "evaluation_status": (
+                    "conditional_passed_pending_pool_confirmation"
+                    if conditional_passed
+                    else "conditional_failed"
+                ),
+                "reasons": "; ".join(conditional_reasons),
+            }
+        )
+        for row in incremental_rows:
+            if row["candidate"] == candidate:
+                row.update(
+                    {
+                        "conditional_order": order,
+                        "conditional_baseline_candidates": ",".join(
+                            baseline_candidates
+                        ),
+                        "conditional_delta_score_proxy": (
+                            conditional_increment.get("delta_score_proxy")
+                        ),
+                        "conditional_positive_window_ratio": (
+                            conditional_increment.get(
+                                "positive_score_window_ratio"
+                            )
+                        ),
+                        "conditional_positive_years": (
+                            conditional_increment.get("positive_score_years")
+                        ),
+                        "conditional_passed": conditional_passed,
+                        "conditional_reasons": "; ".join(conditional_reasons),
+                    }
+                )
+                break
+        if conditional_passed:
+            accepted.append(candidate)
+            current_factor = augmented_factor
+
+    pending_passed = tuple(accepted)
     provisional_pool = tuple(
         dict.fromkeys((*frozen_before, *pending_passed))
     )
-    provisional_features = (*selected_public, *provisional_pool)
-    provisional_factor = (
-        cached_prediction(
-            validation_cache,
-            provisional_features,
-            development_years,
-        )
-        if pending
-        else frozen_factor
-    )
+    provisional_factor = current_factor
     provisional_group_increment = score_reference.paired_increment(
         baseline_factor,
         provisional_factor,
@@ -653,6 +812,8 @@ def run_tree_admission(
                     (*provisional_group_reasons, *promotion_reasons)
                 )
             )
+            if candidate in pending_passed
+            else str(admission[candidate].get("reasons", ""))
         )
         admission[candidate]["frozen_after_validation"] = (
             admitted_candidate
@@ -660,11 +821,33 @@ def run_tree_admission(
         admission[candidate]["evaluation_status"] = (
             "promoted_to_frozen_T"
             if admitted_candidate
-            else "evaluated_not_frozen"
+            else (
+                "conditional_passed_not_promoted"
+                if candidate in pending_passed
+                else str(admission[candidate]["evaluation_status"])
+            )
         )
     return TreeAdmissionResult(
         admission_by_feature=admission,
         incremental_summary=pd.DataFrame(incremental_rows),
+        importance_summary=(
+            pd.concat(importance_rows, ignore_index=True)
+            if importance_rows
+            else pd.DataFrame(
+                columns=[
+                    "candidate",
+                    "evaluation_stage",
+                    "baseline_candidates",
+                    "train_start",
+                    "train_end",
+                    "test_start",
+                    "test_end",
+                    "feature",
+                    "split_importance",
+                    "gain_importance",
+                ]
+            )
+        ),
         eligible_candidates=eligible,
         frozen_before=frozen_before,
         pending_candidates=pending,

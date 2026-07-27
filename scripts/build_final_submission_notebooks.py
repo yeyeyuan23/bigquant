@@ -14,6 +14,15 @@ SUBMISSIONS = (
         "# BigAlpha 2026 family-balanced rank composite\n",
         "2019—2021 准入后冻结的 FR/PV 家族等权规则复合。",
     ),
+    (
+        ROOT / "submissions" / "rule_v03.py",
+        ROOT / "submissions" / "rule_v03.ipynb",
+        "# BigAlpha 2026 S-route FR/HF/PV family-balanced rank composite v03\n",
+        (
+            "S 路线冻结因子 FR-002、FR-005、HF-001、HF-003、"
+            "PV-010、PV-011、PV-014；族内等权、FR/HF/PV 族间等权。"
+        ),
+    ),
 )
 
 

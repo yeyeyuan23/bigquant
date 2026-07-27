@@ -64,7 +64,7 @@ OAP 公式只作为文献机制来源。正式实现必须使用比赛指定数�
 
 ## 4. 第一轮结论
 
-机器可读清单见 `reports/oap_signal_shortlist.csv`。
+机器可读清单见 `reports/diagnostics/oap_signal_shortlist.csv`。
 
 | 层级 | 数量 | 含义 |
 |---|---:|---|
@@ -114,7 +114,7 @@ OAP 公式只作为文献机制来源。正式实现必须使用比赛指定数�
 | 7 | cfp | FR | PIT经营现金流与当日流通市值的财务估值机制 |
 | 8 | RevenueSurprise | FR | 现有 PIT 收入历史即可构造A股改写版 |
 
-精确结果见统一输出 `reports/factor_pool_incremental.csv` 和
+精确结果见统一输出 `reports/routes/factor_pool_incremental.csv` 和
 `reports/factor_pool_admission.csv`。当前 `PV-003` 仅通过 S，进入规则复合；
 `FR-004、FR-005` 仅通过 I，进入两个联合模型。`PV-007/zerotrade1M` 因 21 日
 离散计数无法达到每日 50 个不同值的技术门槛而淘汰，其余本批候选未获准。

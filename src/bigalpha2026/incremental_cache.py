@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .tree_cache import content_digest
 
-INCREMENTAL_CACHE_SCHEMA_VERSION = "elastic-net-incremental-cache-v3-J"
+INCREMENTAL_CACHE_SCHEMA_VERSION = "elastic-net-incremental-cache-v4-factorwise-J"
 
 
 class IncrementalSummaryCache:
@@ -24,6 +24,8 @@ class IncrementalSummaryCache:
         self,
         payload: Mapping[str, object],
         compute: Callable[[], Mapping[str, object]],
+        *,
+        force_refresh: bool = False,
     ) -> tuple[dict[str, object], bool, str]:
         cache_payload = {
             "schema_version": INCREMENTAL_CACHE_SCHEMA_VERSION,
@@ -31,7 +33,7 @@ class IncrementalSummaryCache:
         }
         key = content_digest(cache_payload)
         path = self.cache_dir / f"{key}.json"
-        if not self.refresh and path.exists():
+        if not self.refresh and not force_refresh and path.exists():
             artifact = json.loads(path.read_text(encoding="utf-8"))
             if artifact.get("payload") == cache_payload:
                 summary = artifact.get("summary")

@@ -81,6 +81,8 @@ from bigalpha2026.single_factor_admission import (
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 REPORTS = ROOT / "reports"
+FIRST_ROUND_REPORTS = REPORTS / "first_round"
+DIAGNOSTIC_REPORTS = REPORTS / "diagnostics"
 DEVELOPMENT_YEARS = range(
     int(FORMAL_EVALUATION_POLICY.development_start[:4]),
     int(FORMAL_EVALUATION_POLICY.development_end[:4]) + 1,
@@ -309,7 +311,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise ValueError(
             "frozen optional months no longer match the factor-free state check"
         )
-    (REPORTS / "market_state_coverage.json").write_text(
+    FIRST_ROUND_REPORTS.mkdir(parents=True, exist_ok=True)
+    DIAGNOSTIC_REPORTS.mkdir(parents=True, exist_ok=True)
+    (DIAGNOSTIC_REPORTS / "market_state_coverage.json").write_text(
         json.dumps(state_check, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -383,8 +387,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     cached_metrics = pd.DataFrame()
     cached_stability = pd.DataFrame()
     if args.resume_metrics:
-        metric_path = REPORTS / "first_round_metrics.csv"
-        stability_path = REPORTS / "first_round_stability.csv"
+        metric_path = FIRST_ROUND_REPORTS / "first_round_metrics.csv"
+        stability_path = FIRST_ROUND_REPORTS / "first_round_stability.csv"
+        if not metric_path.exists():
+            metric_path = REPORTS / "first_round_metrics.csv"
+        if not stability_path.exists():
+            stability_path = REPORTS / "first_round_stability.csv"
         if metric_path.exists() and stability_path.exists():
             cached_metrics = pd.read_csv(metric_path)
             cached_stability = pd.read_csv(stability_path)
@@ -428,12 +436,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     refresh_candidate_pool_manifest(candidate_pool)
     technical_frame.to_csv(
-        REPORTS / "first_round_technical.csv",
+        FIRST_ROUND_REPORTS / "first_round_technical.csv",
         index=False,
     )
-    metrics_frame.to_csv(REPORTS / "first_round_metrics.csv", index=False)
+    metrics_frame.to_csv(FIRST_ROUND_REPORTS / "first_round_metrics.csv", index=False)
     stability_frame.to_csv(
-        REPORTS / "first_round_stability.csv",
+        FIRST_ROUND_REPORTS / "first_round_stability.csv",
         index=False,
     )
 
@@ -470,10 +478,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                     }
                 )
     pd.DataFrame(correlation_rows).to_csv(
-        REPORTS / "first_round_correlations.csv", index=False
+        FIRST_ROUND_REPORTS / "first_round_correlations.csv", index=False
     )
     decisions = single_result.decisions
-    (REPORTS / "first_round_decisions.json").write_text(
+    (FIRST_ROUND_REPORTS / "first_round_decisions.json").write_text(
         json.dumps(decisions, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )

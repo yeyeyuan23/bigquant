@@ -237,19 +237,21 @@ I 的候选评价、联合池确认、冻结池晋级和缓存状态写入统一
 2. screened15 已经用 2019—2021 从公开 36 因子中筛选并冻结；不得重复筛选，
    也不得用 2022 或 2023 修改成员。
 3. 每个滚动窗口只使用过去 60 个交易日训练，随后 20 日 OOS 测试。
-4. 全部候选一次进入联合 Elastic Net；L1 正则负责把无用特征权重置零，不另做
-   单候选 J 预筛。
+4. 每个 pending 候选先单独训练 `screened15 + frozen_I + candidate`
+   Elastic Net，并和 `screened15 + frozen_I` 做同样股票日上的配对 J 增量。
 5. 所有候选使用相同开发日历；特征与标签均按日转换为中心化截面百分位秩，
    缺失或无截面离散度的候选值按中性值 0 处理，禁止通过各自活跃日期改变
    baseline 样本。
 6. 所有公开因子和自研因子已按 2019—2021 冻结方向统一为
    “值越大越好”，因此 Elastic Net 固定使用非负系数，禁止短窗口噪声把已验证
    信号反向使用。
-7. 联合候选池只完成两项全池确认：
-   `screened15 + frozen_I + pending` 相对 `screened15` 通过池级门槛；
-   同一新联合模型相对旧 `screened15 + frozen_I` 也通过池级门槛。两项均通过
+7. 个人 `delta_J > 0` 的候选按个人增量从高到低进入条件前向确认；每一步都以
+   当前 `screened15 + frozen_I + accepted` 为 baseline，只接收仍有正增量的候选。
+8. 条件通过的临时池还要完成两项确认：
+   `screened15 + frozen_I + accepted` 相对 `screened15` 通过整体门槛；
+   同一新联合模型相对旧 `screened15 + frozen_I` 也通过增量门槛。两项均通过
    才原子更新 `frozen_I`；任一失败时保持 `evaluated_not_frozen`。
-8. 最终 Elastic Net 只读取 `screened15 + frozen_I`。2022、2023 的表现不得
+9. 最终 Elastic Net 只读取 `screened15 + frozen_I`。2022、2023 的表现不得
    反向修改候选级 I、联合确认或冻结成员。
 
 I 的正式增量门槛：
@@ -261,7 +263,7 @@ I 的正式增量门槛：
 
 I 缓存分成两层：
 
-- `validation`：保存完整池验证摘要，不拥有正式成员状态；
+- `validation`：保存逐因子和条件前向验证摘要，不拥有正式成员状态；
 - `frozen`：只保存完成两项联合确认后的 `frozen_I`。
 
 缓存键必须包含候选实际取值、screened15 实际取值、标签、有效日期、2019—2021
@@ -287,19 +289,20 @@ T 的独立准入模块为 `src/bigalpha2026/tree_admission.py`，核心入口�
 `run_tree_admission`。模块拥有完整池确认、冻结池晋级及缓存状态；
 `scripts/run_combinations.py` 只负责准备共享输入并调用该入口。
 
-T 只使用 2019—2021 开发期。满足至少 240 个截面可用开发日的候选一次进入
-联合 LightGBM，模型自己完成非线性和交互选择；不运行单候选模型或逐项删除。
+T 只使用 2019—2021 开发期。满足至少 240 个截面可用开发日的候选先逐个训练
+`screened15 + frozen_T + candidate` LightGBM，并和 `screened15 + frozen_T`
+做配对 J 增量；个人通过者按增量从高到低做条件前向确认。
 所有输入按相同股票日、标签、60 日训练、20 日 OOS 和中心化截面百分位秩处理，
 并固定浅层 LightGBM 参数和正单调约束。
 
-T 的正式完整池门槛：
+T 的正式逐因子和条件门槛：
 
 - 配对 `delta_J > 0`；
 - 至少 180 个共同评分日、9 个可计算评分窗口。
 
 正 J 窗口比例和正 J 年份数继续报告，但不再作为否决完整期正 J 的门槛。
 
-T 池只完成两项联合确认：
+条件通过后的 T 池还要完成两项联合确认：
 
 1. `screened15 + frozen_T + pending_passed` 相对 `screened15` 通过相同整体门槛；
 2. 新联合模型相对旧的 `screened15 + frozen_T` 也通过相同增量门槛。
@@ -374,8 +377,8 @@ turn, volatility_5, volume
 `research_policy.py` 的 `FROZEN_FACTORLIB_SCREENED_FEATURES`。
 
 不得把 `+FR-005`、`+FR-004` 之类的逐因子增强模型当作正式组合方案。
-I 路线一次性输入完整候选池，由 Elastic Net 的 L1 权重完成选择；不运行逐候选
-增量筛选、加入排序或组合后的逐项删除。
+逐因子模型只服务 I/T 准入：先计算个人增量，再做条件前向和整体确认。正式组合
+只读取已经冻结的 `frozen_I` 或 `frozen_T` 成员。
 
 组合顺序：
 
@@ -409,6 +412,22 @@ AIStudio 做短窗验收与提交。
 `PYTHONPATH=src conda run --no-capture-output -n quant python scripts/run_combinations.py --check`
 只使用合成数据验收动态列、左连接、中性填充和三条隔离管线的输出合同，不产生
 有效性结论；读取已核验真实快照的完整运行属于正式研究结果。
+
+真实快照检查和训练入口：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports \
+  --check-files
+```
+
+`--check-files` 只打印并保存快照合同，不训练。完整训练去掉 `--check-files`。需要
+强制重算所有 I/T 因子时增加 `--refresh-incremental-cache --refresh-tree-cache`；
+只重算单个候选时使用 `--refresh-incremental-candidate CANDIDATE_ID` 和
+`--refresh-tree-candidate CANDIDATE_ID`。
 
 每条最终管线都必须比较：
 
@@ -453,29 +472,36 @@ AIStudio 做短窗验收与提交。
 
 ```text
 reports/
-├── first_round_technical.csv
-├── first_round_metrics.csv
-├── first_round_stability.csv
-├── first_round_decisions.json
 ├── factor_pool_check.json
-├── competition_J_reference_directions.csv
-├── factor_pool_screening.csv
-├── single_factor_route_admission.csv
-├── single_factor_route_promotion.csv
-├── factor_pool_incremental.csv
 ├── factor_pool_admission.csv
-├── incremental_direct_pool.csv
-├── incremental_pool_promotion.csv
-├── tree_factor_admission.csv
-├── tree_factor_incremental.csv
-├── tree_group_increment.csv
-├── tree_pool_promotion.csv
 ├── combination_summary.csv
-├── self_factor_composite_metrics.csv
-├── joint_elastic_net_metrics.csv
-├── joint_elastic_net_weights.csv
-├── joint_lightgbm_metrics.csv
-└── factor_pool_decisions.json
+├── factor_pool_decisions.json
+├── first_round/
+│   ├── first_round_technical.csv
+│   ├── first_round_metrics.csv
+│   ├── first_round_stability.csv
+│   └── first_round_decisions.json
+├── routes/
+│   ├── competition_J_reference_directions.csv
+│   ├── factor_pool_screening.csv
+│   ├── single_factor_route_admission.csv
+│   ├── single_factor_route_promotion.csv
+│   ├── factor_pool_incremental.csv
+│   ├── incremental_factorwise_admission.csv
+│   ├── incremental_conditional_forward.csv
+│   ├── incremental_factorwise_promotion.csv
+│   ├── incremental_pool_promotion.csv
+│   ├── tree_factor_admission.csv
+│   ├── tree_factor_incremental.csv
+│   ├── tree_group_increment.csv
+│   ├── tree_factorwise_admission.csv
+│   ├── tree_factorwise_importance.csv
+│   ├── tree_factorwise_promotion.csv
+│   ├── self_factor_composite_metrics.csv
+│   ├── joint_elastic_net_metrics.csv
+│   ├── joint_elastic_net_weights.csv
+│   └── joint_lightgbm_metrics.csv
+└── diagnostics/
 
 artifacts/frozen/
 └── int_001.json             # 已提交历史版本，因子池实验不得覆盖

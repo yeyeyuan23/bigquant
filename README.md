@@ -9,6 +9,7 @@
 - 团队开发与交付：[协作手册](docs/team_workflow.md)
 - 研究流程、时间切分和准入门槛：[因子研究与评价流程](docs/factor_research_plan.md)
 - 字段、主键和可用时点：[数据合同](docs/data_contract.md)
+- 报告目录地图和 CSV 字段读法：[Reports 说明](reports/README.md)
 - 候选定义、方向和当前状态：[候选登记表](docs/candidate_registry.md)
 - 当前可执行路由：`reports/factor_pool_admission.csv`
 - 当前三管线结果和成员：`reports/combination_summary.csv` 与
@@ -18,6 +19,19 @@
 文档职责保持分离：研究规则只在执行计划中定义，数据口径只在数据合同中定义，
 候选状态只在登记表中维护。代码侧的可执行研究配置以
 `src/bigalpha2026/research_policy.py` 为准。
+
+## 阅读顺序
+
+如果目的是理解整个工程，按这个顺序读：
+
+1. `README.md`：仓库边界、目录和稳定入口。
+2. `docs/data_contract.md`：比赛允许的数据表、主键、时点和本地落盘格式。
+3. `docs/candidate_registry.md`：候选编号、机制和当前候选池版本。
+4. `docs/factor_research_plan.md`：S/I/T 准入、J 代理、训练窗口、冻结规则。
+5. `reports/README.md`：每个稳定报告文件的目录位置和字段含义。
+6. `docs/team_workflow.md`：实际执行命令、数据同步、AIStudio 验收和提交协作。
+7. `scripts/run_first_round.py`：候选长表和单因子报告生成入口。
+8. `scripts/run_combinations.py`：S/I/T、三条组合管线和最终报告生成入口。
 
 ## 固定研究边界
 
@@ -61,6 +75,64 @@
 具体时间区间、门槛、模型参数和固定产物清单统一见
 [因子研究与评价流程](docs/factor_research_plan.md)，不在 README 复制。
 
+## 本地执行入口
+
+只检查代码结构和三条组合管线的合成数据合同：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py --check
+```
+
+只检查真实快照文件和 manifest，不训练模型：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports \
+  --check-files
+```
+
+完整重跑 S/I/T 和三条组合管线：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports
+```
+
+强制重算所有 I/T 因子的训练增量：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports \
+  --refresh-incremental-cache \
+  --refresh-tree-cache
+```
+
+只重算某个新增或修改因子的 I/T 增量：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports \
+  --refresh-incremental-candidate CANDIDATE_ID \
+  --refresh-tree-candidate CANDIDATE_ID
+```
+
+其中 `--check-files` 打印真实快照合同后立即退出，不会训练；不带
+`--check-files` 时，打印同一份合同后会继续训练。
+
 ## 工程结构
 
 ```text
@@ -86,6 +158,25 @@ reports/                  # 可复现的评价结果、当前路由和模型成�
 artifacts/frozen/         # 已提交版本的不可变配置
 tests/                    # 单元、接口和防泄漏测试
 ```
+
+## 结果文件读法
+
+- `reports/factor_pool_check.json`：真实快照合同检查结果。
+- `reports/first_round/first_round_*.csv/json`：候选单因子技术、指标和稳定性诊断。
+- `reports/routes/incremental_factorwise_admission.csv`：I 中每个因子的 Elastic Net 个人
+  增量、条件前向和冻结状态。
+- `reports/routes/incremental_conditional_forward.csv`：I 条件前向每一步的 baseline、
+  candidate 和配对 J 增量。
+- `reports/routes/tree_factorwise_admission.csv`：T 中每个因子的 LightGBM 个人增量、
+  条件前向和冻结状态。
+- `reports/routes/tree_factorwise_importance.csv`：T 中每次 LightGBM 训练的 split/gain
+  importance。
+- `reports/routes/tree_factorwise_promotion.csv`：T 条件通过池的整体确认结果。
+- `reports/factor_pool_admission.csv`：每个候选最终进入 S/I/T 哪些路线。
+- `reports/combination_summary.csv`：三条最终路线的验证期表现和排序。
+- `reports/factor_pool_decisions.json`：机器可读的完整路由、模型和评分合同。
+
+字段细节见 [Reports 说明](reports/README.md)。
 
 ## 本地环境
 

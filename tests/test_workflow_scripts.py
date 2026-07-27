@@ -10,7 +10,6 @@ from bigalpha2026.factor_pool import (
     write_candidate_pool_manifest,
 )
 from bigalpha2026.incremental_admission import (
-    iterative_backward_select,
     ordered_pending_candidates,
     promote_frozen_incremental_pool,
     sequential_forward_select,
@@ -32,6 +31,7 @@ from scripts.run_combinations import (
     PIPELINE_NAMES,
     VALIDATION_2022_YEAR,
     VALIDATION_2023_YEAR,
+    cleanup_obsolete_reports,
     contract_summary,
     enters_family_equal_rank,
     parse_args,
@@ -49,6 +49,28 @@ from scripts.run_first_round import (
 
 
 class WorkflowScriptTest(unittest.TestCase):
+    def test_cleanup_obsolete_combination_reports_removes_only_retired_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            reports_dir = Path(directory)
+            retired_names = (
+                "incremental_direct_pool.csv",
+                "incremental_backward_admission.csv",
+                "tree_pool_promotion.csv",
+            )
+            for filename in retired_names:
+                (reports_dir / filename).write_text("stale\n", encoding="utf-8")
+            current_report = reports_dir / "tree_factorwise_admission.csv"
+            current_report.write_text("current\n", encoding="utf-8")
+
+            cleanup_obsolete_reports(reports_dir)
+
+            for filename in retired_names:
+                self.assertFalse((reports_dir / filename).exists())
+            self.assertEqual(
+                current_report.read_text(encoding="utf-8"),
+                "current\n",
+            )
+
     def test_new_tree_contract_cannot_bootstrap_from_an_old_report(self):
         pending = unresolved_tree_candidates(
             ("self__A", "self__B"),
@@ -112,34 +134,6 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(
             [row["forward_passed"] for row in rows],
             [True, False, True],
-        )
-
-    def test_backward_selection_removes_harmful_candidate_symmetrically(self):
-        evaluated = []
-
-        def evaluate(full_pool, candidate):
-            evaluated.append((full_pool, candidate))
-            passed = candidate != "self__HARM"
-            return (
-                {
-                    "delta_score_proxy": 0.02 if passed else -0.02,
-                    "score_days": 200,
-                    "score_windows": 9,
-                    "positive_score_window_ratio": 0.70,
-                    "positive_score_years": 2,
-                    "candidate_min_nonzero_window_ratio": 0.80,
-                },
-                f"cache-{candidate}",
-            )
-
-        retained, rows = iterative_backward_select(
-            ("self__FROZEN",),
-            ("self__GOOD", "self__HARM"),
-            evaluate,
-        )
-        self.assertEqual(retained, ("self__GOOD",))
-        self.assertTrue(
-            all("self__FROZEN" in row["full_candidate_pool"] for row in rows)
         )
 
     def test_incremental_pool_changes_only_after_both_confirmation_gates(self):

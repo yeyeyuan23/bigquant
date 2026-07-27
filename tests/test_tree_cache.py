@@ -16,7 +16,7 @@ class TreePredictionCacheTest(unittest.TestCase):
     def test_official_J_contract_uses_v3_schema(self):
         self.assertEqual(
             TREE_CACHE_SCHEMA_VERSION,
-            "tree-prediction-cache-v3-J",
+            "tree-prediction-cache-v4-factorwise-J",
         )
 
     def setUp(self):
@@ -36,6 +36,17 @@ class TreePredictionCacheTest(unittest.TestCase):
         )
         self.prediction = self.panel[["date", "instrument"]].assign(
             factor=[-0.5, 0.5, 0.25, -0.25]
+        )
+        self.importance = pd.DataFrame(
+            {
+                "train_start": pd.to_datetime(["2021-01-04", "2021-01-04"]),
+                "train_end": pd.to_datetime(["2021-01-04", "2021-01-04"]),
+                "test_start": pd.to_datetime(["2021-01-05", "2021-01-05"]),
+                "test_end": pd.to_datetime(["2021-01-05", "2021-01-05"]),
+                "feature": ["base", "candidate_a"],
+                "split_importance": [1.0, 2.0],
+                "gain_importance": [0.5, 1.5],
+            }
         )
 
     def cache(self, directory: Path, columns):
@@ -79,6 +90,43 @@ class TreePredictionCacheTest(unittest.TestCase):
             self.assertEqual(second_key, key)
             self.assertEqual(calls, ["fit"])
             pd.testing.assert_frame_equal(cached, self.prediction)
+
+    def test_prediction_with_importance_is_reused_across_cache_instances(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            calls = []
+            first = self.cache(path, ("base", "candidate_a"))
+            actual, actual_importance, hit, key = first.get_or_compute_with_importance(
+                ("base", "candidate_a"),
+                prediction_years=(2021,),
+                label_column="ret_close_to_close",
+                train_window_days=60,
+                test_window_days=20,
+                compute=lambda: calls.append("fit")
+                or (self.prediction, self.importance),
+            )
+            self.assertFalse(hit)
+            self.assertEqual(calls, ["fit"])
+            pd.testing.assert_frame_equal(actual, self.prediction)
+            pd.testing.assert_frame_equal(actual_importance, self.importance)
+
+            second = self.cache(path, ("base", "candidate_a"))
+            cached, cached_importance, hit, second_key = (
+                second.get_or_compute_with_importance(
+                    ("base", "candidate_a"),
+                    prediction_years=(2021,),
+                    label_column="ret_close_to_close",
+                    train_window_days=60,
+                    test_window_days=20,
+                    compute=lambda: calls.append("unexpected")
+                    or (self.prediction, self.importance),
+                )
+            )
+            self.assertTrue(hit)
+            self.assertEqual(second_key, key)
+            self.assertEqual(calls, ["fit"])
+            pd.testing.assert_frame_equal(cached, self.prediction)
+            pd.testing.assert_frame_equal(cached_importance, self.importance)
 
     def test_changed_factor_value_invalidates_affected_prediction(self):
         with tempfile.TemporaryDirectory() as directory:

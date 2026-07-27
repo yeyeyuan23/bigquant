@@ -26,6 +26,15 @@ SUBMISSIONS = (
             "60 个交易日训练、20 个交易日预测。"
         ),
     ),
+    (
+        ROOT / "submissions" / "lgbm_v02.py",
+        ROOT / "submissions" / "lgbm_v02.ipynb",
+        "# BigAlpha 2026 platform-safe rolling LightGBM v02\n",
+        (
+            "screened15 + 11个冻结自研因子；修正 DAI 查询边界，"
+            "所有数据查询均不超过 end_date。"
+        ),
+    ),
 )
 
 

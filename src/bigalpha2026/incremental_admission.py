@@ -223,55 +223,6 @@ def sequential_forward_select(
     return tuple(accepted), audit_rows
 
 
-def iterative_backward_select(
-    frozen_pool: Sequence[str],
-    pending_candidates: Sequence[str],
-    evaluate: Callable[
-        [tuple[str, ...], str],
-        tuple[Mapping[str, object], str],
-    ],
-) -> tuple[tuple[str, ...], list[dict[str, object]]]:
-    """Remove conditionally harmful I candidates without order dependence."""
-
-    current = list(dict.fromkeys(map(str, pending_candidates)))
-    audit_rows: list[dict[str, object]] = []
-    round_number = 0
-    while current:
-        round_number += 1
-        full_pool = tuple(dict.fromkeys((*frozen_pool, *current)))
-        rows: list[dict[str, object]] = []
-        for candidate in tuple(current):
-            summary, cache_key = evaluate(full_pool, candidate)
-            summary = dict(summary)
-            passed, reasons = incremental_score_gate(summary)
-            row = {
-                "backward_round": round_number,
-                "candidate": candidate,
-                "full_candidate_pool": ",".join(full_pool),
-                **summary,
-                "backward_passed": passed,
-                # Compatibility field for the existing report consumer.
-                "forward_passed": passed,
-                "backward_reasons": "; ".join(reasons),
-                "forward_reasons": "; ".join(reasons),
-                "evaluation_cache_key": cache_key,
-            }
-            rows.append(row)
-            audit_rows.append(row)
-        failing = [row for row in rows if not row["backward_passed"]]
-        if not failing:
-            break
-        worst = min(
-            failing,
-            key=lambda row: (
-                float(row.get("delta_score_proxy", float("-inf"))),
-                str(row["candidate"]),
-            ),
-        )
-        current.remove(str(worst["candidate"]))
-    return tuple(current), audit_rows
-
-
 @dataclass(frozen=True)
 class IncrementalAdmissionResult:
     """Complete I-stage result consumed by routing and reporting."""
@@ -304,8 +255,9 @@ class IncrementalAdmissionResult:
 
         return {
             "frozen_candidates_before": ",".join(self.frozen_before),
-            "selection": "direct_elastic_net_pool",
-            "direct_pool_candidates": ",".join(self.pending_passed),
+            "selection": "factorwise_then_conditional_forward",
+            "individual_passed_candidates": ",".join(self.individual_passed),
+            "conditional_passed_candidates": ",".join(self.pending_passed),
             "provisional_pool_count": len(self.provisional_pool),
             "provisional_vs_screened_increment": (
                 self.provisional_vs_screened_summary.get(
@@ -341,8 +293,9 @@ class IncrementalAdmissionResult:
             "preprocessing": self.model_config["preprocessing"],
             "cache_schema": INCREMENTAL_CACHE_SCHEMA_VERSION,
             "frozen_pool_state_digest": self.frozen_pool_state_digest,
-            "selection": "direct_elastic_net_pool",
-            "direct_pool_candidates": list(self.pending_passed),
+            "selection": "factorwise_then_conditional_forward",
+            "individual_passed_candidates": list(self.individual_passed),
+            "conditional_passed_candidates": list(self.pending_passed),
             "pool_promoted": self.pool_promoted,
             "cache_hits": self.cache_hits,
             "cache_misses": self.cache_misses,
@@ -361,14 +314,12 @@ def run_incremental_admission(
     refresh_cache: bool = False,
     refresh_candidates: Sequence[str] = (),
 ) -> IncrementalAdmissionResult:
-    """Run candidate-level and pool-level I admission."""
-
-    del refresh_candidates
+    """Run factorwise and conditional I admission."""
     evaluation_years = development_years
     config = FactorLibraryValidationConfig()
     model_protocol = "|".join(
         (
-            "screened15_direct_pool_v7_official_J_frozen_I",
+            "screened15_factorwise_v8_official_J_frozen_I",
             f"years={','.join(map(str, evaluation_years))}",
             f"train_days={config.train_window_days}",
             f"test_days={config.test_window_days}",
@@ -376,11 +327,11 @@ def run_incremental_admission(
             f"l1_ratio={config.l1_ratio}",
             "preprocessing=daily_centered_rank_features_and_target",
             "positive_coefficients=true",
-            "candidate_filter=none_elastic_net_l1_selects",
-            "admission_metric=joint_route_delta_official_score_proxy",
+            "candidate_filter=factorwise_positive_J_then_conditional_forward",
+            "admission_metric=factorwise_delta_official_score_proxy",
         )
     )
-    protocol = f"{model_protocol}|admission=direct_positive_J_pool_v2"
+    protocol = f"{model_protocol}|admission=factorwise_positive_J_v1"
     development = oriented.loc[
         oriented["date"].dt.year.isin(evaluation_years)
     ]
@@ -425,28 +376,6 @@ def run_incremental_admission(
         feature: fingerprints[feature] for feature in selected_public
     }
     cache_keys: dict[str, str] = {}
-    screened_rows = [
-        {
-            "candidate": self_column,
-            "candidate_level_J_computed": False,
-            "selection_role": "direct_elastic_net_pool_input",
-            "selection_reason": "Elastic Net L1 performs feature selection",
-            "active_days": len(active_dates_by_candidate[self_column]),
-            "evaluation_years": ",".join(map(str, evaluation_years)),
-            "evaluation_protocol": protocol,
-        }
-        for self_column in self_columns
-    ]
-
-    screened_summary = pd.DataFrame(screened_rows)
-    actual_features = set(screened_summary["candidate"].astype(str))
-    if actual_features != set(self_columns):
-        raise ValueError(
-            "incremental rows do not cover the current candidate pool; "
-            f"expected={sorted(self_columns)}, actual={sorted(actual_features)}"
-        )
-
-    individual_passed = self_columns
     base_digest = content_digest(
         {
             "base_feature_fingerprints": base_fingerprint_payload,
@@ -488,10 +417,15 @@ def run_incremental_admission(
         else ()
     )
     individual_pending = tuple(
-        candidate for candidate in individual_passed
+        candidate for candidate in self_columns
         if candidate not in frozen_before
     )
-    backward_candidates: tuple[str, ...] = ()
+    refresh_features = {
+        candidate
+        if str(candidate).startswith("self__")
+        else f"self__{candidate}"
+        for candidate in refresh_candidates
+    }
 
     def pool_summary(
         *,
@@ -538,18 +472,126 @@ def run_incremental_admission(
                 ),
             }
 
-        summary, _, key = cache.get_or_compute(payload, compute_pool)
+        summary, _, key = cache.get_or_compute(
+            payload,
+            compute_pool,
+            force_refresh=bool(
+                set(candidate_columns).intersection(refresh_features)
+            ),
+        )
         return dict(summary), key
 
-    pending_passed = individual_pending
-    backward_evaluations: list[dict[str, object]] = []
+    screened_rows: list[dict[str, object]] = []
+    for self_column in self_columns:
+        base_row: dict[str, object] = {
+            "candidate": self_column,
+            "candidate_level_J_computed": self_column in individual_pending,
+            "selection_role": "factorwise_elastic_net_candidate",
+            "selection_reason": "positive factorwise J increment against screened15+frozen_I",
+            "active_days": len(active_dates_by_candidate[self_column]),
+            "evaluation_years": ",".join(map(str, evaluation_years)),
+            "evaluation_protocol": protocol,
+        }
+        if self_column not in individual_pending:
+            screened_rows.append(
+                {
+                    **base_row,
+                    "individual_passed": True,
+                    "individual_reasons": "",
+                    "evaluation_status": "frozen_prior_I",
+                }
+            )
+            continue
+        summary, cache_key = pool_summary(
+            kind="factorwise_positive_J_vs_frozen_I",
+            base_columns=(*selected_public, *frozen_before),
+            candidate_columns=(self_column,),
+        )
+        passed, reasons = incremental_score_gate(summary)
+        screened_rows.append(
+            {
+                **base_row,
+                **summary,
+                "individual_passed": passed,
+                "individual_reasons": "; ".join(reasons),
+                "individual_cache_key": cache_key,
+                "force_refreshed": self_column in refresh_features,
+                "evaluation_status": (
+                    "individual_passed_pending_conditional"
+                    if passed
+                    else "individual_failed"
+                ),
+            }
+        )
+
+    screened_summary = pd.DataFrame(screened_rows)
+    actual_features = set(screened_summary["candidate"].astype(str))
+    if actual_features != set(self_columns):
+        raise ValueError(
+            "incremental rows do not cover the current candidate pool; "
+            f"expected={sorted(self_columns)}, actual={sorted(actual_features)}"
+        )
+
+    individual_passed = tuple(
+        row["candidate"]
+        for row in screened_rows
+        if bool(row.get("individual_passed"))
+        and row["candidate"] in individual_pending
+    )
+    ordered_candidates = ordered_pending_candidates(
+        screened_summary,
+        individual_passed,
+        frozen_before,
+    )
+    pending_passed, backward_evaluations = sequential_forward_select(
+        frozen_before,
+        ordered_candidates,
+        lambda baseline, candidate: pool_summary(
+            kind="conditional_forward_positive_J_vs_current_I",
+            base_columns=(*selected_public, *baseline),
+            candidate_columns=(candidate,),
+        ),
+    )
+    backward_candidates = ordered_candidates
+    conditional_by_candidate = {
+        str(row["candidate"]): row for row in backward_evaluations
+    }
+    for index, row in screened_summary.iterrows():
+        candidate = str(row["candidate"])
+        conditional = conditional_by_candidate.get(candidate)
+        if conditional is None:
+            continue
+        screened_summary.at[index, "conditional_order"] = conditional[
+            "forward_order"
+        ]
+        screened_summary.at[index, "conditional_passed"] = conditional[
+            "forward_passed"
+        ]
+        screened_summary.at[index, "conditional_reasons"] = conditional[
+            "forward_reasons"
+        ]
+        screened_summary.at[index, "conditional_delta_score_proxy"] = (
+            conditional.get("delta_score_proxy")
+        )
+        screened_summary.at[index, "conditional_cache_key"] = conditional[
+            "evaluation_cache_key"
+        ]
+        screened_summary.at[index, "conditional_baseline_candidates"] = (
+            conditional["baseline_candidates"]
+        )
+        screened_summary.at[index, "evaluation_status"] = (
+            "conditional_passed_pending_pool_confirmation"
+            if conditional["forward_passed"]
+            else "conditional_failed"
+        )
+
     provisional_pool = tuple(
         dict.fromkeys((*frozen_before, *pending_passed))
     )
 
     if pending_passed:
         provisional_vs_screened_summary, screened_key = pool_summary(
-            kind="direct_positive_J_pool_vs_screened15",
+            kind="factorwise_positive_J_pool_vs_screened15",
             base_columns=selected_public,
             candidate_columns=provisional_pool,
         )
@@ -560,7 +602,7 @@ def run_incremental_admission(
             provisional_vs_screened_summary
         )
         provisional_vs_frozen_summary, frozen_key = pool_summary(
-            kind="direct_positive_J_pool_vs_frozen_I",
+            kind="factorwise_positive_J_pool_vs_frozen_I",
             base_columns=(*selected_public, *frozen_before),
             candidate_columns=pending_passed,
         )
@@ -584,6 +626,26 @@ def run_incremental_admission(
         provisional_vs_screened_passed=provisional_vs_screened_passed,
         provisional_vs_frozen_passed=provisional_vs_frozen_passed,
     )
+    final_status = {
+        candidate: (
+            "promoted_to_frozen_I"
+            if candidate in frozen_after
+            else (
+                "conditional_passed_not_promoted"
+                if candidate in pending_passed
+                else None
+            )
+        )
+        for candidate in self_columns
+    }
+    for index, row in screened_summary.iterrows():
+        candidate = str(row["candidate"])
+        status = final_status.get(candidate)
+        if status:
+            screened_summary.at[index, "evaluation_status"] = status
+        screened_summary.at[index, "frozen_after_validation"] = (
+            candidate in frozen_after
+        )
     frozen_cache_state = {
         "schema_version": INCREMENTAL_CACHE_SCHEMA_VERSION,
         "base_state_digest": base_digest,
@@ -621,8 +683,10 @@ def run_incremental_admission(
         json.dumps(
             {
                 "schema_version": INCREMENTAL_CACHE_SCHEMA_VERSION,
-                "selection": "direct_elastic_net_pool",
-                "direct_pool_candidates": list(pending_passed),
+                "selection": "factorwise_then_conditional_forward",
+                "individual_passed_candidates": list(individual_passed),
+                "conditional_passed_candidates": list(pending_passed),
+                "conditional_evaluations": backward_evaluations,
                 "provisional_vs_screened_passed": (
                     provisional_vs_screened_passed
                 ),

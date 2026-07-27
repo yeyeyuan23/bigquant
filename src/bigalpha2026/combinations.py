@@ -254,6 +254,35 @@ def walk_forward_lightgbm(
         feature_columns=feature_columns,
         label_column=label_column,
     )
+    predictions, _ = _walk_forward_lightgbm_prepared(
+        merged,
+        feature_columns=feature_columns,
+        prediction_years=prediction_years,
+        label_column=label_column,
+        train_window_days=train_window_days,
+        test_window_days=test_window_days,
+    )
+    return predictions
+
+
+def walk_forward_lightgbm_with_importance(
+    panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    feature_columns: tuple[str, ...],
+    prediction_years: tuple[int, ...],
+    label_column: str = "ret_close_to_close",
+    train_window_days: int = 60,
+    test_window_days: int = 20,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Generate LightGBM predictions plus per-window feature importance."""
+
+    merged = _prepare_joint_model_frame(
+        panel,
+        labels,
+        feature_columns=feature_columns,
+        label_column=label_column,
+    )
     return _walk_forward_lightgbm_prepared(
         merged,
         feature_columns=feature_columns,
@@ -272,7 +301,7 @@ def _walk_forward_lightgbm_prepared(
     label_column: str = "ret_close_to_close",
     train_window_days: int = 60,
     test_window_days: int = 20,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit LightGBM on a pre-standardized common sample."""
 
     missing = sorted(
@@ -283,6 +312,7 @@ def _walk_forward_lightgbm_prepared(
     if missing:
         raise ValueError(f"prepared frame is missing required columns: {missing}")
     outputs: list[pd.DataFrame] = []
+    importance_rows: list[dict[str, object]] = []
     all_dates = pd.DatetimeIndex(sorted(prepared["date"].unique()))
     prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
     for start in range(0, len(prediction_dates), test_window_days):
@@ -304,6 +334,26 @@ def _walk_forward_lightgbm_prepared(
             train.loc[:, list(feature_columns)].to_numpy(dtype=float),
             train[label_column].to_numpy(dtype=float),
         )
+        booster = model.booster_
+        split_importance = booster.feature_importance(importance_type="split")
+        gain_importance = booster.feature_importance(importance_type="gain")
+        for feature, split_value, gain_value in zip(
+            feature_columns,
+            split_importance,
+            gain_importance,
+            strict=True,
+        ):
+            importance_rows.append(
+                {
+                    "train_start": pd.Timestamp(train_dates[0]),
+                    "train_end": pd.Timestamp(train_dates[-1]),
+                    "test_start": pd.Timestamp(test_dates[0]),
+                    "test_end": pd.Timestamp(test_dates[-1]),
+                    "feature": feature,
+                    "split_importance": float(split_value),
+                    "gain_importance": float(gain_value),
+                }
+            )
         block = test[["date", "instrument"]].copy()
         block["factor"] = model.predict(
             test.loc[:, list(feature_columns)].to_numpy(dtype=float)
@@ -317,9 +367,11 @@ def _walk_forward_lightgbm_prepared(
         outputs.append(block)
     if not outputs:
         raise ValueError("no walk-forward prediction year had train and test rows")
-    return pd.concat(outputs, ignore_index=True).sort_values(
+    predictions = pd.concat(outputs, ignore_index=True).sort_values(
         ["date", "instrument"]
     ).reset_index(drop=True)
+    importance = pd.DataFrame(importance_rows)
+    return predictions, importance
 
 
 def paired_factor_rank_ic_increment(
@@ -413,7 +465,7 @@ def lightgbm_candidate_incremental_validation(
         )
 
         def predict(features: tuple[str, ...]) -> pd.DataFrame:
-            return _walk_forward_lightgbm_prepared(
+            predictions, _importance = _walk_forward_lightgbm_prepared(
                 prepared,
                 feature_columns=features,
                 prediction_years=prediction_years,
@@ -421,6 +473,7 @@ def lightgbm_candidate_incremental_validation(
                 train_window_days=train_window_days,
                 test_window_days=test_window_days,
             )
+            return predictions
 
     else:
         predict = prediction_loader

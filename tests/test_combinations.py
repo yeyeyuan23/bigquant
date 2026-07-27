@@ -11,6 +11,7 @@ from bigalpha2026.combinations import (
     walk_forward_elastic_net,
     walk_forward_elastic_net_with_weights,
     walk_forward_lightgbm,
+    walk_forward_lightgbm_with_importance,
 )
 from bigalpha2026.research_policy import fixed_weight_rank_combination
 
@@ -44,6 +45,46 @@ def _run_lightgbm_smoke() -> None:
     assert list(result.columns) == ["date", "instrument", "factor"]
     assert not result.duplicated(["date", "instrument"]).any()
     assert result["factor"].between(-1, 1).all()
+
+
+def _run_lightgbm_importance_smoke() -> None:
+    dates = pd.to_datetime(
+        ["2019-01-02"] * 120
+        + ["2020-01-02"] * 120
+        + ["2021-01-04"] * 120
+    )
+    values = list(range(120)) * 3
+    panel = pd.DataFrame(
+        {
+            "date": dates,
+            "instrument": [str(value) for value in range(120)] * 3,
+            "FR-002": values,
+            "HF-001": list(reversed(values[:120])) * 3,
+        }
+    )
+    labels = panel[["date", "instrument"]].copy()
+    labels["ret_close_to_close"] = panel["FR-002"] / 1000
+    prediction, importance = walk_forward_lightgbm_with_importance(
+        panel,
+        labels,
+        feature_columns=("FR-002", "HF-001"),
+        prediction_years=(2020, 2021),
+        train_window_days=1,
+        test_window_days=1,
+    )
+    assert list(prediction.columns) == ["date", "instrument", "factor"]
+    assert set(importance.columns) == {
+        "train_start",
+        "train_end",
+        "test_start",
+        "test_end",
+        "feature",
+        "split_importance",
+        "gain_importance",
+    }
+    assert set(importance["feature"]) == {"FR-002", "HF-001"}
+    assert importance["split_importance"].notna().all()
+    assert importance["gain_importance"].notna().all()
 
 
 class CombinationTest(unittest.TestCase):
@@ -85,6 +126,18 @@ class CombinationTest(unittest.TestCase):
             process.terminate()
             process.join()
             self.fail("lightgbm smoke test timed out")
+        self.assertEqual(process.exitcode, 0)
+
+    def test_lightgbm_importance_matches_walk_forward_windows(self):
+        process = get_context("spawn").Process(
+            target=_run_lightgbm_importance_smoke
+        )
+        process.start()
+        process.join(timeout=60)
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            self.fail("lightgbm importance smoke test timed out")
         self.assertEqual(process.exitcode, 0)
 
     def test_elastic_net_predictions_are_strictly_walk_forward(self):

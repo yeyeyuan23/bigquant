@@ -10,8 +10,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v3-J"
+TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v4-factorwise-J"
 PREDICTION_COLUMNS = ("date", "instrument", "factor")
+LIGHTGBM_IMPORTANCE_COLUMNS = (
+    "train_start",
+    "train_end",
+    "test_start",
+    "test_end",
+    "feature",
+    "split_importance",
+    "gain_importance",
+)
 
 
 def _canonical_json(payload: Mapping[str, object]) -> str:
@@ -191,6 +200,65 @@ class TreePredictionCache:
         self.misses += 1
         return prediction, False, key
 
+    def get_or_compute_with_importance(
+        self,
+        feature_columns: Sequence[str],
+        *,
+        prediction_years: Sequence[int],
+        label_column: str,
+        train_window_days: int,
+        test_window_days: int,
+        force_refresh: bool = False,
+        compute: Callable[[], tuple[pd.DataFrame, pd.DataFrame]],
+    ) -> tuple[pd.DataFrame, pd.DataFrame, bool, str]:
+        """Load or materialize predictions plus LightGBM importance rows."""
+
+        payload = self.payload(
+            feature_columns,
+            prediction_years=prediction_years,
+            label_column=label_column,
+            train_window_days=train_window_days,
+            test_window_days=test_window_days,
+        )
+        key = content_digest(payload)
+        parquet_path = self.cache_dir / f"{key}.parquet"
+        importance_path = self.cache_dir / f"{key}.importance.parquet"
+        metadata_path = self.cache_dir / f"{key}.json"
+        if (
+            not self.refresh
+            and not force_refresh
+            and parquet_path.exists()
+            and importance_path.exists()
+            and metadata_path.exists()
+        ):
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if metadata == payload:
+                cached = pd.read_parquet(parquet_path)
+                importance = pd.read_parquet(importance_path)
+                self._validate_prediction(cached)
+                self._validate_importance(importance)
+                self.hits += 1
+                return cached, importance, True, key
+
+        prediction, importance = compute()
+        self._validate_prediction(prediction)
+        self._validate_importance(importance)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        parquet_partial = parquet_path.with_suffix(".parquet.partial")
+        importance_partial = importance_path.with_suffix(".parquet.partial")
+        metadata_partial = metadata_path.with_suffix(".json.partial")
+        prediction.to_parquet(parquet_partial, index=False)
+        importance.to_parquet(importance_partial, index=False)
+        metadata_partial.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        parquet_partial.replace(parquet_path)
+        importance_partial.replace(importance_path)
+        metadata_partial.replace(metadata_path)
+        self.misses += 1
+        return prediction, importance, False, key
+
     @staticmethod
     def _validate_prediction(frame: pd.DataFrame) -> None:
         if list(frame.columns) != list(PREDICTION_COLUMNS):
@@ -205,3 +273,15 @@ class TreePredictionCache:
         factor = pd.to_numeric(frame["factor"], errors="coerce")
         if factor.isna().any() or not np.isfinite(factor).all():
             raise ValueError("cached tree prediction contains invalid factor values")
+
+    @staticmethod
+    def _validate_importance(frame: pd.DataFrame) -> None:
+        missing = sorted(set(LIGHTGBM_IMPORTANCE_COLUMNS).difference(frame.columns))
+        if missing:
+            raise ValueError(f"cached tree importance columns missing: {missing}")
+        split = pd.to_numeric(frame["split_importance"], errors="coerce")
+        gain = pd.to_numeric(frame["gain_importance"], errors="coerce")
+        if split.isna().any() or gain.isna().any():
+            raise ValueError("cached tree importance contains invalid values")
+        if not np.isfinite(split).all() or not np.isfinite(gain).all():
+            raise ValueError("cached tree importance contains non-finite values")

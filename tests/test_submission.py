@@ -14,6 +14,10 @@ FINAL_SUBMISSIONS = (
         ROOT / "submissions" / "rule_v02.py",
         ROOT / "submissions" / "rule_v02.ipynb",
     ),
+    (
+        ROOT / "submissions" / "rule_v03.py",
+        ROOT / "submissions" / "rule_v03.ipynb",
+    ),
 )
 CURRENT_LEARNED_SUBMISSIONS = (
     (
@@ -24,6 +28,23 @@ CURRENT_LEARNED_SUBMISSIONS = (
     (
         ROOT / "submissions" / "lgbm_v01.py",
         ROOT / "submissions" / "lgbm_v01.ipynb",
+        (
+            "FR-002",
+            "FR-005",
+            "FR-015",
+            "HF-003",
+            "HF-004",
+            "OB-001",
+            "OB-003",
+            "PV-001",
+            "PV-009",
+            "PV-014",
+            "PV-020",
+        ),
+    ),
+    (
+        ROOT / "submissions" / "lgbm_v02.py",
+        ROOT / "submissions" / "lgbm_v02.ipynb",
         (
             "FR-002",
             "FR-005",
@@ -174,7 +195,7 @@ class SubmissionTest(unittest.TestCase):
         elastic_source = CURRENT_LEARNED_SUBMISSIONS[0][0].read_text(
             encoding="utf-8"
         )
-        lightgbm_source = CURRENT_LEARNED_SUBMISSIONS[1][0].read_text(
+        lightgbm_source = CURRENT_LEARNED_SUBMISSIONS[2][0].read_text(
             encoding="utf-8"
         )
         self.assertIn("positive=True", elastic_source)
@@ -198,17 +219,16 @@ class SubmissionTest(unittest.TestCase):
             lightgbm_source,
         )
         self.assertIn(
-            "intraday_end_ts = (",
+            "if cursor == final_period",
             lightgbm_source,
         )
         self.assertIn(
-            "month_end = min(intraday_end_ts, cursor.end_time)",
+            'end_ts.strftime("%Y-%m-%d 23:59:59")',
             lightgbm_source,
         )
-        self.assertNotIn(
-            "month_end = min(end_ts, cursor.end_time.normalize())",
-            lightgbm_source,
-        )
+        self.assertNotIn("intraday_end_ts", lightgbm_source)
+        self.assertNotIn("end_ts + pd.Timedelta(days=1)", lightgbm_source)
+        self.assertIn('filters={"date": [financial_start, end_date]}', lightgbm_source)
 
     def test_every_submission_uses_only_competition_tables(self):
         sources = sorted((ROOT / "submissions").glob("*.py"))

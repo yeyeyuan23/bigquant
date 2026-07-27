@@ -5,7 +5,8 @@
 1. `docs/team_workflow.md`：怎么协作和运行；
 2. `docs/factor_research_plan.md`：环境分工、研究流程、评价和晋级；
 3. `docs/candidate_registry.md`：哪些候选已经存在；
-4. `docs/data_contract.md`：允许使用哪些字段以及时间含义。
+4. `docs/data_contract.md`：允许使用哪些字段以及时间含义；
+5. `reports/README.md`：如何阅读稳定 CSV 和 JSON 报告。
 
 ## 发给队友 AI 的启动 Prompt
 
@@ -73,6 +74,16 @@ tests/                   # 单元测试
 reports/                 # 评价与冻结结果
 docs/                    # 合同、登记和协作规则
 ```
+
+核心入口和产物：
+
+| 阶段 | 入口 | 主要输出 |
+|---|---|---|
+| 候选长表与单因子诊断 | `scripts/run_first_round.py` | `data/factors/candidate_pool.parquet`、`reports/first_round/first_round_*` |
+| S 路线 | `single_factor_admission.py::run_single_factor_route_admission` | `reports/routes/single_factor_route_admission.csv`、`reports/routes/single_factor_route_promotion.csv` |
+| I 路线 | `incremental_admission.py::run_incremental_admission` | `incremental_factorwise_admission.csv`、`incremental_conditional_forward.csv` |
+| T 路线 | `tree_admission.py::run_tree_admission` | `reports/routes/tree_factorwise_admission.csv`、`reports/routes/tree_factorwise_importance.csv`、`reports/routes/tree_factorwise_promotion.csv` |
+| 三条最终组合 | `scripts/run_combinations.py` | `combination_summary.csv`、`factor_pool_decisions.json` |
 
 ## 2. 开始协作前
 
@@ -327,17 +338,57 @@ PYTHONPATH=src conda run --no-capture-output -n quant \
 主仓库负责人使用已核验快照正式运行 I、T 和三条组合管线：
 
 ```bash
-PYTHONPATH=src conda run --no-capture-output -n quant \
-  python scripts/run_combinations.py
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports
 ```
 
-I 与 T 的内容寻址缓存分别位于 `data/cache/incremental_v3/` 和
-`data/cache/tree_v3/`，正常运行会自动复用完全相同的输入。新增或修改候选只会
-生成包含该候选的新缓存键；只有完成候选级与联合池确认的成员才能写入冻结池。
-不得通过删除缓存、改报告或沿用原编号绕过冻结验证。需要排查尚未冻结候选时，
-使用 `--refresh-incremental-candidate CANDIDATE_ID` 或
-`--refresh-tree-candidate CANDIDATE_ID` 精确重算；冻结候选发生机制或取值变化
-必须登记为新版本并重新走完整准入。
+只检查真实快照和 manifest，不训练：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports \
+  --check-files
+```
+
+强制重算所有 I/T 因子：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports \
+  --refresh-incremental-cache \
+  --refresh-tree-cache
+```
+
+只重算一个候选：
+
+```bash
+cd /Users/yuanye/Projects/bigquant
+PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
+  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
+  --data-dir /Users/yuanye/Projects/bigquant/data \
+  --reports-dir /Users/yuanye/Projects/bigquant/reports \
+  --refresh-incremental-candidate CANDIDATE_ID \
+  --refresh-tree-candidate CANDIDATE_ID
+```
+
+I 与 T 的内容寻址缓存分别位于 `data/cache/incremental_v5_factorwise_J/` 和
+`data/cache/tree_v5_factorwise_J/`，正常运行会自动复用完全相同的输入。新增或
+修改候选只会生成包含该候选的新缓存键；只有完成个人增量、条件前向和整体确认的
+成员才能写入冻结池。不得通过删除缓存、改报告或沿用原编号绕过冻结验证。冻结候选
+发生机制或取值变化必须登记为新版本并重新走完整准入。
+
+`run_combinations.py` 每次都会先打印并保存真实快照检查结果；只有带
+`--check-files` 时才在打印后退出。不带该参数时，会继续运行 S/I/T、验证三条组合
+并更新报告。
 
 ## 8. 比赛提交与代码交付
 
