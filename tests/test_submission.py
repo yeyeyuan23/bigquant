@@ -234,6 +234,14 @@ class SubmissionTest(unittest.TestCase):
         )
         self.assertIn("positive=True", elastic_source)
         self.assertIn("monotone_constraints=[1] * len(feature_columns)", lightgbm_source)
+        for source in (elastic_source, lightgbm_source):
+            self.assertNotIn("cn_stock_bar1d", source)
+            self.assertNotIn("cn_stock_bar1m", source)
+
+        self.assertIn("bigalpha_2026_factorlib", elastic_source)
+        self.assertIn("bigalpha_2026_stock_bar1m", lightgbm_source)
+        self.assertIn("first(open) AS open", lightgbm_source)
+        self.assertIn("last(close) AS close", lightgbm_source)
 
 
 if __name__ == "__main__":

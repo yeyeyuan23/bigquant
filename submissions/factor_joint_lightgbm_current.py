@@ -81,22 +81,6 @@ def main(datasources, start_date, end_date):
         filters={"date": [history_start, end_ts]},
         compression=True,
     ).df()
-    raw_daily = dai.query(
-        """
-        SELECT
-            date,
-            instrument,
-            open,
-            high,
-            low,
-            close,
-            pre_close,
-            deal_number
-        FROM cn_stock_bar1d
-        """,
-        filters={"date": [history_start, end_ts]},
-        compression=True,
-    ).df()
     public_daily = dai.query(
         f"""
         SELECT
@@ -158,6 +142,11 @@ def main(datasources, start_date, end_date):
                          / ((bid_price1 + ask_price1) / 2.0)
                     ELSE NULL
                 END AS relative_spread,
+                open,
+                high,
+                low,
+                pre_close,
+                deal_number,
                 CASE WHEN bid_price1 > 0 AND bid_volume1 > 0
                     THEN bid_volume1 ELSE 0 END
                   + CASE WHEN bid_price2 > 0 AND bid_volume2 > 0
@@ -265,6 +254,12 @@ def main(datasources, start_date, end_date):
         SELECT
             CAST(trading_day AS DATETIME) AS date,
             instrument,
+            first(open) AS open,
+            max(high) AS high,
+            min(low) AS low,
+            last(close) AS close,
+            first(pre_close) AS pre_close,
+            sum(deal_number) AS deal_number,
             sqrt(sum(minute_log_return * minute_log_return))
                 AS realized_volatility,
             sqrt(sum(CASE WHEN minute_log_return < 0
@@ -337,6 +332,18 @@ def main(datasources, start_date, end_date):
         )
         cursor += 1
     hf_daily = pd.concat(hf_parts, ignore_index=True)
+    raw_daily = hf_daily[
+        [
+            "date",
+            "instrument",
+            "open",
+            "high",
+            "low",
+            "close",
+            "pre_close",
+            "deal_number",
+        ]
+    ].copy()
 
     for frame in (
         pool,
