@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "submissions" / "ba26_smoke_v01.py"
-TARGET = ROOT / "submissions" / "ba26_smoke_v01.ipynb"
+SOURCE = ROOT / "submissions" / "smoke_v01.py"
+TARGET = ROOT / "submissions" / "smoke_v01.ipynb"
 
 
 def rendered_notebook() -> str:

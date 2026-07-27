@@ -5,25 +5,25 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "submissions" / "ba26_smoke_v01.py"
-NOTEBOOK = ROOT / "submissions" / "ba26_smoke_v01.ipynb"
-SELF_PV_SOURCE = ROOT / "submissions" / "ba26_rule_v01.py"
-SELF_PV_NOTEBOOK = ROOT / "submissions" / "ba26_rule_v01.ipynb"
+SOURCE = ROOT / "submissions" / "smoke_v01.py"
+NOTEBOOK = ROOT / "submissions" / "smoke_v01.ipynb"
+SELF_PV_SOURCE = ROOT / "submissions" / "rule_v01.py"
+SELF_PV_NOTEBOOK = ROOT / "submissions" / "rule_v01.ipynb"
 FINAL_SUBMISSIONS = (
     (
-        ROOT / "submissions" / "ba26_rule_v02.py",
-        ROOT / "submissions" / "ba26_rule_v02.ipynb",
+        ROOT / "submissions" / "rule_v02.py",
+        ROOT / "submissions" / "rule_v02.ipynb",
     ),
 )
 CURRENT_LEARNED_SUBMISSIONS = (
     (
-        ROOT / "submissions" / "ba26_enet_v01.py",
-        ROOT / "submissions" / "ba26_enet_v01.ipynb",
+        ROOT / "submissions" / "enet_v01.py",
+        ROOT / "submissions" / "enet_v01.ipynb",
         ("PV-014", "FR-002"),
     ),
     (
-        ROOT / "submissions" / "ba26_lgbm_v01.py",
-        ROOT / "submissions" / "ba26_lgbm_v01.ipynb",
+        ROOT / "submissions" / "lgbm_v01.py",
+        ROOT / "submissions" / "lgbm_v01.ipynb",
         (
             "FR-002",
             "FR-005",
