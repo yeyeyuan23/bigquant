@@ -9,8 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SUBMISSIONS = (
     (
-        ROOT / "submissions" / "factor_joint_elastic_net_current.py",
-        ROOT / "submissions" / "factor_joint_elastic_net_current.ipynb",
+        ROOT / "submissions" / "ba26_enet_v01.py",
+        ROOT / "submissions" / "ba26_enet_v01.ipynb",
         "# BigAlpha 2026 current rolling Elastic Net\n",
         (
             "screened15 + I 冻结池（PV-014、FR-002）；正系数 Elastic Net；"
@@ -18,8 +18,8 @@ SUBMISSIONS = (
         ),
     ),
     (
-        ROOT / "submissions" / "factor_joint_lightgbm_current.py",
-        ROOT / "submissions" / "factor_joint_lightgbm_current.ipynb",
+        ROOT / "submissions" / "ba26_lgbm_v01.py",
+        ROOT / "submissions" / "ba26_lgbm_v01.ipynb",
         "# BigAlpha 2026 current rolling LightGBM\n",
         (
             "screened15 + T 冻结池；正单调 LightGBM；"

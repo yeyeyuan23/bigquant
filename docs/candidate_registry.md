@@ -311,10 +311,10 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 
 | pipeline / version | 冻结输入 | 2022 Rank IC | 2023 Rank IC | Notebook | 比赛状态 |
 | --- | --- | ---: | ---: | --- | --- |
-| `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/factor_self_family_rank.ipynb` | 2026-07-26 已提交，保留为历史对照 |
+| `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/ba26_rule_v02.ipynb` | 2026-07-26 已提交，保留为历史对照 |
 | `self_factor_composite / local-current` | `FR-002/004/005/006/014/015 + HF-001/003 + PV-003/009/010/011/014`，家族内等权后 FR/HF/PV 等权 | 0.05464 | 0.05178 | 尚未生成新提交 Notebook | 新 S 规则本地重跑通过，尚未提交 |
-| `joint_elastic_net / local-current` | 冻结 `screened15 + FR-002 + PV-014`；日度截面秩目标、非负系数 | 0.07334 | 0.07020 | `submissions/factor_joint_elastic_net_current.ipynb` | 新 I 合同完整重评并冻结 |
-| `joint_lightgbm / local-current` | 冻结 `screened15` 加 `FR-002/005/015, HF-003/004, OB-001/003, PV-001/009/014/020`；日度截面秩目标、正单调约束 | 0.07377 | 0.06965 | `submissions/factor_joint_lightgbm_current.ipynb` | 新 T 合同完整重评并冻结 |
+| `joint_elastic_net / local-current` | 冻结 `screened15 + FR-002 + PV-014`；日度截面秩目标、非负系数 | 0.07334 | 0.07020 | `submissions/ba26_enet_v01.ipynb` | 新 I 合同完整重评并冻结 |
+| `joint_lightgbm / local-current` | 冻结 `screened15` 加 `FR-002/005/015, HF-003/004, OB-001/003, PV-001/009/014/020`；日度截面秩目标、正单调约束 | 0.07377 | 0.06965 | `submissions/ba26_lgbm_v01.ipynb` | 新 T 合同完整重评并冻结 |
 
 已提交 Notebook 均仅保留比赛要求的
 `main(datasources, start_date, end_date)`，返回列固定为

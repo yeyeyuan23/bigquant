@@ -9,8 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SUBMISSIONS = (
     (
-        ROOT / "submissions" / "factor_self_family_rank.py",
-        ROOT / "submissions" / "factor_self_family_rank.ipynb",
+        ROOT / "submissions" / "ba26_rule_v02.py",
+        ROOT / "submissions" / "ba26_rule_v02.ipynb",
         "# BigAlpha 2026 family-balanced rank composite\n",
         "2019—2021 准入后冻结的 FR/PV 家族等权规则复合。",
     ),

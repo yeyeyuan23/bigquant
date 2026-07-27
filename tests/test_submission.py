@@ -5,25 +5,25 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "submissions" / "factor_int_001_equal_rank.py"
-NOTEBOOK = ROOT / "submissions" / "factor_int_001_equal_rank.ipynb"
-SELF_PV_SOURCE = ROOT / "submissions" / "factor_self_pv_rank.py"
-SELF_PV_NOTEBOOK = ROOT / "submissions" / "factor_self_pv_rank.ipynb"
+SOURCE = ROOT / "submissions" / "ba26_smoke_v01.py"
+NOTEBOOK = ROOT / "submissions" / "ba26_smoke_v01.ipynb"
+SELF_PV_SOURCE = ROOT / "submissions" / "ba26_rule_v01.py"
+SELF_PV_NOTEBOOK = ROOT / "submissions" / "ba26_rule_v01.ipynb"
 FINAL_SUBMISSIONS = (
     (
-        ROOT / "submissions" / "factor_self_family_rank.py",
-        ROOT / "submissions" / "factor_self_family_rank.ipynb",
+        ROOT / "submissions" / "ba26_rule_v02.py",
+        ROOT / "submissions" / "ba26_rule_v02.ipynb",
     ),
 )
 CURRENT_LEARNED_SUBMISSIONS = (
     (
-        ROOT / "submissions" / "factor_joint_elastic_net_current.py",
-        ROOT / "submissions" / "factor_joint_elastic_net_current.ipynb",
+        ROOT / "submissions" / "ba26_enet_v01.py",
+        ROOT / "submissions" / "ba26_enet_v01.ipynb",
         ("PV-014", "FR-002"),
     ),
     (
-        ROOT / "submissions" / "factor_joint_lightgbm_current.py",
-        ROOT / "submissions" / "factor_joint_lightgbm_current.ipynb",
+        ROOT / "submissions" / "ba26_lgbm_v01.py",
+        ROOT / "submissions" / "ba26_lgbm_v01.ipynb",
         (
             "FR-002",
             "FR-005",

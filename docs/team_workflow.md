@@ -176,7 +176,7 @@ conda run --no-capture-output -n quant python -m pytest -q
 
 ```bash
 python scripts/aistudio_submission_lookahead_probe.py \
-  submissions/factor_joint_lightgbm_current.py \
+  submissions/ba26_lgbm_v01.py \
   --start 2024-07-01 \
   --cutoff 2024-07-05 \
   --end 2024-07-10
