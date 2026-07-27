@@ -123,7 +123,7 @@ class SubmissionTest(unittest.TestCase):
                     source.read_text(encoding="utf-8"),
                 )
 
-    def test_lightgbm_submission_matches_frozen_tree_pool(self):
+    def test_lightgbm_submission_matches_submitted_artifact(self):
         source_path = ROOT / "submissions" / "factor_joint_lightgbm.py"
         tree = ast.parse(source_path.read_text(encoding="utf-8"))
         main = next(
@@ -143,20 +143,15 @@ class SubmissionTest(unittest.TestCase):
                 break
         self.assertIsNotNone(self_columns)
 
-        frozen_state = json.loads(
+        submitted_artifact = json.loads(
             (
                 ROOT
-                / "data"
-                / "cache"
-                / "tree_v2"
+                / "artifacts"
                 / "frozen"
-                / "frozen_state.json"
+                / "joint_lightgbm_submitted_v3.json"
             ).read_text(encoding="utf-8")
         )
-        expected = tuple(
-            candidate.removeprefix("self__")
-            for candidate in frozen_state["frozen_candidates"]
-        )
+        expected = tuple(submitted_artifact["members"])
         self.assertEqual(self_columns, expected)
 
         source = source_path.read_text(encoding="utf-8")

@@ -52,6 +52,7 @@ def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DatetimeIndex]:
         [(date, instrument) for date in pool_days for instrument in instruments],
         columns=["date", "instrument"],
     )
+    pool["date"] = pool["date"].astype("datetime64[us]")
     return pd.DataFrame(rows), pool, trading_days
 
 

@@ -1,0 +1,28 @@
+{
+  "protocol_version": "joint_lightgbm_submitted_v3",
+  "artifact_role": "submitted_competition_notebook",
+  "members": [
+    "FR-002",
+    "FR-004",
+    "FR-011",
+    "HF-002",
+    "PV-001",
+    "PV-002",
+    "PV-003",
+    "PV-006",
+    "PV-014",
+    "HF-003",
+    "OB-005"
+  ],
+  "model": "rolling_lightgbm_60_train_20_test",
+  "local_validation": {
+    "2022_rank_ic": 0.04409,
+    "2023_rank_ic": 0.03388
+  },
+  "source": "submissions/factor_joint_lightgbm.py",
+  "notebook": "submissions/factor_joint_lightgbm.ipynb",
+  "platform_submission": {
+    "submission_id": "a8170a82-afec-425a-b805-0065d9c4a4e2",
+    "status": "submitted_history"
+  }
+}

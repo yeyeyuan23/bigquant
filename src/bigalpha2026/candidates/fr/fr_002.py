@@ -37,10 +37,17 @@ def _group_asof(
     right_columns: list[str],
 ) -> pd.DataFrame:
     left_frame = left.copy()
+    left_frame[left_on] = pd.to_datetime(
+        left_frame[left_on], errors="coerce"
+    ).astype("datetime64[ns]")
+    right_frame = right.copy()
+    right_frame[right_on] = pd.to_datetime(
+        right_frame[right_on], errors="coerce"
+    ).astype("datetime64[ns]")
     left_frame["_row_order"] = np.arange(len(left_frame))
     right_groups = {
         instrument: block.sort_values(right_on)
-        for instrument, block in right.groupby("instrument", sort=False)
+        for instrument, block in right_frame.groupby("instrument", sort=False)
     }
     pieces: list[pd.DataFrame] = []
     for instrument, left_block in left_frame.groupby("instrument", sort=False):
