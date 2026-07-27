@@ -62,10 +62,6 @@ from bigalpha2026.candidates.pv.pv_020 import build_pv_020_factor
 from bigalpha2026.candidates.pv.pv_021 import build_pv_021_factor
 from bigalpha2026.candidates.pv.pv_022 import build_pv_022_factor
 from bigalpha2026.candidates.pv.pv_023 import build_pv_023_factor
-from bigalpha2026.evaluation import (
-    evaluate_single_factor,
-    rank_ic_series,
-)
 from bigalpha2026.factor_pool import (
     CANDIDATE_POOL_VERSION,
     write_candidate_pool_manifest,
@@ -76,8 +72,10 @@ from bigalpha2026.research_policy import (
     HF_OB_MANDATORY_MONTHS,
     HF_OB_MAX_OPTIONAL_MONTHS,
     HF_OB_OPTIONAL_MONTH_POOL,
-    TECHNICAL_GATE,
     candidate_ids,
+)
+from bigalpha2026.single_factor_admission import (
+    run_single_factor_admission,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -251,94 +249,6 @@ def freeze_market_state_check(
     }
 
 
-def eligible_factor(factor: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
-    frame = factor.copy()
-    unique = frame.groupby("date", sort=False)["factor"].nunique()
-    eligible_dates = unique.index[
-        unique >= TECHNICAL_GATE.minimum_daily_unique_values
-    ]
-    filtered = frame.loc[frame["date"].isin(eligible_dates)].copy()
-    return filtered, {
-        "factor_coverage": float(frame["factor"].notna().mean()),
-        "minimum_daily_unique_values": float(unique.min()),
-        "eligible_days": float(len(eligible_dates)),
-        "excluded_sparse_days": float(
-            (unique < TECHNICAL_GATE.minimum_daily_unique_values).sum()
-        ),
-    }
-
-
-def tradable_subset(exposures: pd.DataFrame) -> pd.DataFrame:
-    exp = exposures.copy()
-    size_rank = exp.groupby("date", sort=False)["float_market_cap"].rank(pct=True)
-    liquidity_rank = exp.groupby("date", sort=False)["LIQUIDTY"].rank(pct=True)
-    return exp.loc[(size_rank > 0.20) & (liquidity_rank > 0.20)].copy()
-
-
-def metric_rows(
-    candidate_id: str,
-    period: str,
-    factor: pd.DataFrame,
-    labels: pd.DataFrame,
-    exposures: pd.DataFrame,
-) -> list[dict[str, object]]:
-    output: list[dict[str, object]] = []
-    variants = {
-        "raw_full": (None, labels),
-        "neutral_full": (exposures, labels),
-        "raw_tradable": (
-            None,
-            labels.merge(
-                tradable_subset(exposures)[["date", "instrument"]],
-                on=["date", "instrument"],
-                how="inner",
-            ),
-        ),
-    }
-    for variant, (neutralization, variant_labels) in variants.items():
-        metrics = evaluate_single_factor(factor, variant_labels, neutralization)
-        for label, values in metrics.items():
-            output.append(
-                {
-                    "candidate_id": candidate_id,
-                    "period": period,
-                    "variant": variant,
-                    "label": label,
-                    **values,
-                }
-            )
-    return output
-
-
-def stability_rows(
-    candidate_id: str,
-    period: str,
-    factor: pd.DataFrame,
-    labels: pd.DataFrame,
-) -> list[dict[str, object]]:
-    merged = factor.merge(labels, on=["date", "instrument"], how="inner")
-    ic = rank_ic_series(merged).dropna()
-    rows: list[dict[str, object]] = []
-    for frequency, key in (
-        ("year", ic.index.year),
-        ("month", ic.index.strftime("%Y-%m")),
-    ):
-        grouped = ic.groupby(key)
-        for subperiod, values in grouped:
-            rows.append(
-                {
-                    "candidate_id": candidate_id,
-                    "period": period,
-                    "frequency": frequency,
-                    "subperiod": str(subperiod),
-                    "rank_ic_mean": float(values.mean()),
-                    "positive": bool(values.mean() > 0),
-                    "days": len(values),
-                }
-            )
-    return rows
-
-
 def candidate_pool_frame(
     factors: dict[str, pd.DataFrame],
     *,
@@ -372,119 +282,6 @@ def candidate_pool_frame(
     if pool.duplicated(keys).any():
         raise ValueError("candidate pool contains duplicate keys")
     return pool.sort_values(keys).reset_index(drop=True)
-
-
-def classify_candidates(
-    metrics: pd.DataFrame,
-    stability: pd.DataFrame,
-) -> list[dict[str, object]]:
-    decisions: list[dict[str, object]] = []
-
-    def value(
-        candidate_id: str,
-        period: str,
-        variant: str,
-        column: str,
-    ) -> float:
-        row = metrics.loc[
-            metrics["candidate_id"].eq(candidate_id)
-            & metrics["period"].eq(period)
-            & metrics["variant"].eq(variant)
-            & metrics["label"].eq("ret_close_to_close")
-        ]
-        return float(row.iloc[0][column])
-
-    def period_failures(
-        candidate_id: str,
-        period: str,
-        display_name: str,
-        *,
-        require_t_stat: bool,
-    ) -> list[str]:
-        period_rows = metrics.loc[
-            metrics["candidate_id"].eq(candidate_id)
-            & metrics["period"].eq(period)
-            & metrics["label"].eq("ret_close_to_close")
-        ]
-        if period_rows.empty:
-            return [f"{display_name} has no technically eligible observations"]
-        failures: list[str] = []
-        for variant in ("raw_full", "neutral_full", "raw_tradable"):
-            if value(candidate_id, period, variant, "rank_ic_mean") <= 0:
-                failures.append(f"{display_name} {variant} IC is not positive")
-        if require_t_stat and (
-            value(candidate_id, period, "raw_full", "rank_ic_t_stat")
-            < FORMAL_EVALUATION_POLICY.minimum_rank_ic_t_stat
-        ):
-            failures.append(
-                f"{display_name} IC t-stat is below "
-                f"{FORMAL_EVALUATION_POLICY.minimum_rank_ic_t_stat:g}"
-            )
-        if (
-            value(candidate_id, period, "raw_full", "group_monotonicity")
-            < FORMAL_EVALUATION_POLICY.minimum_group_monotonicity
-        ):
-            failures.append(f"{display_name} raw group monotonicity is below the gate")
-        return failures
-
-    for candidate_id in sorted(metrics["candidate_id"].unique()):
-        stable = stability.loc[
-            stability["candidate_id"].eq(candidate_id)
-            & stability["period"].eq("development")
-            & stability["frequency"].eq("month")
-        ]
-        stability_fraction = (
-            float(stable["positive"].mean()) if not stable.empty else 0.0
-        )
-        required_stability = (
-            FORMAL_EVALUATION_POLICY.minimum_positive_subperiod_fraction
-        )
-
-        development_failures = period_failures(
-            candidate_id,
-            "development",
-            "development",
-            require_t_stat=True,
-        )
-        if stability_fraction < required_stability:
-            development_failures.append(
-                "development monthly sign stability is below the gate"
-            )
-        validation_2022_observations = period_failures(
-            candidate_id,
-            "validation_2022",
-            "2022 validation",
-            require_t_stat=False,
-        )
-        validation_2023_observations = period_failures(
-            candidate_id,
-            "validation_2023",
-            "2023 validation",
-            require_t_stat=False,
-        )
-
-        # S is an admission decision, so validation-period outcomes must never
-        # change it.  Later periods remain diagnostic observations only.  The
-        # combination runner applies this historical gate causally before each
-        # 20-trading-day prediction block.
-        if not development_failures:
-            status = "provisional_survivor"
-        else:
-            status = "rejected"
-        decisions.append(
-            {
-                "candidate_id": candidate_id,
-                "status": status,
-                "technical_passed": True,
-                "single_factor_cross_regime_passed": not development_failures,
-                "development_stability_fraction": stability_fraction,
-                "development_failures": development_failures,
-                "validation_2022_observations": validation_2022_observations,
-                "validation_2023_observations": validation_2023_observations,
-                "upload_ready": False,
-            }
-        )
-    return decisions
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -583,11 +380,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     factors["OB-005"] = build_ob_005_factor_from_daily(micro, pool)
     factors["INT-003"] = build_int_003_factor(financial, micro, pool)
 
-    metric_output: list[dict[str, object]] = []
-    stability_output: list[dict[str, object]] = []
     cached_metrics = pd.DataFrame()
     cached_stability = pd.DataFrame()
-    cached_metric_ids: set[str] = set()
     if args.resume_metrics:
         metric_path = REPORTS / "first_round_metrics.csv"
         stability_path = REPORTS / "first_round_stability.csv"
@@ -612,72 +406,37 @@ def main(argv: Sequence[str] | None = None) -> None:
                 cached_stability = cached_stability.loc[
                     ~cached_stability["candidate_id"].astype(str).isin(refresh_ids)
                 ]
-            cached_metric_ids = set(cached_metrics["candidate_id"].astype(str))
-    technical_output: list[dict[str, object]] = []
-    clean_factors: dict[str, pd.DataFrame] = {}
-    for candidate_id, factor in factors.items():
-        clean, technical = eligible_factor(factor)
-        clean_factors[candidate_id] = clean
-        technical_output.append({"candidate_id": candidate_id, **technical})
-        if candidate_id not in cached_metric_ids:
-            periods = {
-                "development": clean.loc[
-                    clean["date"].dt.year.isin(DEVELOPMENT_YEARS)
-                ],
-                "validation_2022": clean.loc[
-                    clean["date"].dt.year.eq(VALIDATION_2022_YEAR)
-                ],
-                "validation_2023": clean.loc[
-                    clean["date"].dt.year.eq(VALIDATION_2023_YEAR)
-                ],
-            }
-            for period, block in periods.items():
-                if block.empty:
-                    continue
-                dates = block["date"].unique()
-                period_labels = labels.loc[labels["date"].isin(dates)]
-                period_exposures = exposures.loc[exposures["date"].isin(dates)]
-                metric_output.extend(
-                    metric_rows(
-                        candidate_id,
-                        period,
-                        block,
-                        period_labels,
-                        period_exposures,
-                    )
-                )
-                stability_output.extend(
-                    stability_rows(candidate_id, period, block, period_labels)
-                )
+
+    single_result = run_single_factor_admission(
+        factors,
+        labels,
+        exposures,
+        development_years=tuple(DEVELOPMENT_YEARS),
+        validation_2022_year=VALIDATION_2022_YEAR,
+        validation_2023_year=VALIDATION_2023_YEAR,
+        cached_metrics=cached_metrics,
+        cached_stability=cached_stability,
+    )
+    clean_factors = single_result.clean_factors
+    metrics_frame = single_result.metrics
+    stability_frame = single_result.stability
+    technical_frame = single_result.technical
     candidate_pool = candidate_pool_frame(clean_factors)
-    candidate_pool.to_parquet(DATA / "factors" / "candidate_pool.parquet", index=False)
+    candidate_pool.to_parquet(
+        DATA / "factors" / "candidate_pool.parquet",
+        index=False,
+    )
     refresh_candidate_pool_manifest(candidate_pool)
-    pd.DataFrame(technical_output).to_csv(
-        REPORTS / "first_round_technical.csv", index=False
+    technical_frame.to_csv(
+        REPORTS / "first_round_technical.csv",
+        index=False,
+    )
+    metrics_frame.to_csv(REPORTS / "first_round_metrics.csv", index=False)
+    stability_frame.to_csv(
+        REPORTS / "first_round_stability.csv",
+        index=False,
     )
 
-    metrics_frame = pd.concat(
-        [cached_metrics, pd.DataFrame(metric_output)],
-        ignore_index=True,
-    )
-    stability_frame = pd.concat(
-        [cached_stability, pd.DataFrame(stability_output)],
-        ignore_index=True,
-    )
-    expected_metric_ids = {
-        candidate_id
-        for candidate_id, factor in clean_factors.items()
-        if not factor.empty
-    }
-    actual_metric_ids = set(metrics_frame["candidate_id"].astype(str))
-    if actual_metric_ids != expected_metric_ids:
-        raise ValueError(
-            "metrics do not cover the current eligible pool; "
-            f"expected={sorted(expected_metric_ids)}, "
-            f"actual={sorted(actual_metric_ids)}"
-        )
-    metrics_frame.to_csv(REPORTS / "first_round_metrics.csv", index=False)
-    stability_frame.to_csv(REPORTS / "first_round_stability.csv", index=False)
 
     correlation_rows: list[dict[str, object]] = []
     if not args.skip_correlations:
@@ -713,35 +472,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     pd.DataFrame(correlation_rows).to_csv(
         REPORTS / "first_round_correlations.csv", index=False
     )
-    decisions = classify_candidates(metrics_frame, stability_frame)
-    decided_ids = {str(row["candidate_id"]) for row in decisions}
-    for row in technical_output:
-        candidate_id = str(row["candidate_id"])
-        if candidate_id in decided_ids:
-            continue
-        decisions.append(
-            {
-                "candidate_id": candidate_id,
-                "status": "technical_reject",
-                "technical_passed": False,
-                "single_factor_cross_regime_passed": False,
-                "development_stability_fraction": 0.0,
-                "development_failures": [
-                    "candidate has no technically eligible evaluation metrics"
-                ],
-                "validation_2022_observations": [],
-                "validation_2023_observations": [],
-                "upload_ready": False,
-            }
-        )
-    decisions.sort(key=lambda row: str(row["candidate_id"]))
+    decisions = single_result.decisions
     (REPORTS / "first_round_decisions.json").write_text(
         json.dumps(decisions, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
+
     print(json.dumps(state_check, ensure_ascii=False))
-    print(pd.DataFrame(technical_output).to_string(index=False))
+    print(technical_frame.to_string(index=False))
     primary = metrics_frame
     primary = primary.loc[
         primary["label"].eq("ret_close_to_close")

@@ -292,15 +292,18 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 
 ## 组合层
 
-### 当前冻结提交候选
+### 已提交版本与当前本地候选
 
-| pipeline | 冻结输入 | 2022 Rank IC | 2023 Rank IC | Notebook | 比赛状态 |
+| pipeline / version | 冻结输入 | 2022 Rank IC | 2023 Rank IC | Notebook | 比赛状态 |
 | --- | --- | ---: | ---: | --- | --- |
-| `self_factor_composite` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/factor_self_family_rank.ipynb` | 2026-07-26 已提交，公榜计算中 |
+| `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/factor_self_family_rank.ipynb` | 2026-07-26 已提交，保留为历史对照 |
+| `self_factor_composite / local-current` | `FR-002/004/005/006/014/015 + HF-001/003 + PV-003/009/010/011/014`，家族内等权后 FR/HF/PV 等权 | 0.05464 | 0.05178 | 尚未生成新提交 Notebook | 新 S 规则本地重跑通过，尚未提交 |
 | `joint_lightgbm` | 冻结 `screened15` 加 `FR-002/004/011, HF-002/003, OB-005, PV-001/002/003/006/014` | 0.04409 | 0.03388 | `submissions/factor_joint_lightgbm.ipynb` | v3 已提交，公榜计算中（`a8170a82-afec-425a-b805-0065d9c4a4e2`） |
 
-两份 Notebook 均仅保留比赛要求的 `main(datasources, start_date, end_date)`，
-返回列固定为 `date, instrument, factor`。
+已提交 Notebook 均仅保留比赛要求的
+`main(datasources, start_date, end_date)`，返回列固定为
+`date, instrument, factor`。`local-current` 只代表本地冻结评价结果，不表示已经
+通过 AIStudio 或比赛提交验收。
 
 ### INT-001
 

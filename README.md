@@ -43,7 +43,8 @@
 → 核验真实数据快照
 → 单因子评价（S）
 → 相对冻结公开因子库的增量评价（I）
-→ 按 S/I 结果路由到隔离的组合管线
+→ LightGBM 增量评价（T）
+→ 按 S/I/T 结果路由到隔离的组合管线
 → 冻结代码、数据合同、成员、参数和 Git 版本
 → AIStudio 短窗验收
 → 比赛提交
@@ -63,8 +64,11 @@
 ```text
 src/bigalpha2026/
 ├── candidates/           # 已登记的基础因子和跨类方案
-├── evaluation.py         # 单因子与增量评价
-├── combinations.py       # 组合与模型训练
+├── evaluation.py         # 评价指标与滚动验证原语
+├── single_factor_admission.py  # S 单因子准入
+├── incremental_admission.py    # I Elastic Net 增量准入
+├── tree_admission.py            # T LightGBM 增量准入
+├── combinations.py       # 准入后的最终组合与模型训练
 ├── factor_pool.py        # 公开库和自研因子的动态特征池
 ├── factorlib.py          # 公开因子库字段合同
 └── research_policy.py    # 可执行研究配置

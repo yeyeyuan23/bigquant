@@ -9,6 +9,17 @@ from bigalpha2026.factor_pool import (
     validate_candidate_pool_manifest,
     write_candidate_pool_manifest,
 )
+from bigalpha2026.incremental_admission import (
+    ordered_pending_candidates,
+    promote_frozen_incremental_pool,
+    sequential_forward_select,
+    validated_frozen_incremental_pool,
+)
+from bigalpha2026.single_factor_admission import classify_candidates
+from bigalpha2026.tree_admission import (
+    promote_frozen_tree_pool,
+    validated_frozen_tree_pool,
+)
 from scripts.run_combinations import (
     DEVELOPMENT_YEARS,
     FROZEN_TEST_YEAR,
@@ -18,17 +29,12 @@ from scripts.run_combinations import (
     contract_summary,
     enters_family_equal_rank,
     parse_args,
-    promote_frozen_incremental_pool,
-    promote_frozen_tree_pool,
     required_paths,
     synthetic_contract_summary,
-    validated_frozen_incremental_pool,
-    validated_frozen_tree_pool,
 )
 from scripts.run_first_round import (
     CANDIDATE_POOL_VERSION,
     candidate_pool_frame,
-    classify_candidates,
 )
 from scripts.run_first_round import (
     parse_args as parse_first_round_args,
@@ -36,6 +42,59 @@ from scripts.run_first_round import (
 
 
 class WorkflowScriptTest(unittest.TestCase):
+    def test_incremental_forward_order_uses_isolated_increment(self):
+        summary = pd.DataFrame(
+            {
+                "candidate": [
+                    "self__LOW",
+                    "self__FROZEN",
+                    "self__HIGH",
+                ],
+                "oos_rank_ic_increment": [0.001, 0.010, 0.003],
+            }
+        )
+        order = ordered_pending_candidates(
+            summary,
+            ("self__LOW", "self__FROZEN", "self__HIGH"),
+            ("self__FROZEN",),
+        )
+        self.assertEqual(order, ("self__HIGH", "self__LOW"))
+
+    def test_failed_forward_candidate_does_not_drag_later_candidates(self):
+        baselines = []
+
+        def evaluate(baseline, candidate):
+            baselines.append((baseline, candidate))
+            passed = candidate != "self__FAIL"
+            return (
+                {
+                    "oos_rank_ic_increment": 0.001 if passed else -0.001,
+                    "oos_days": 200,
+                    "positive_increment_day_ratio": 0.60,
+                    "positive_years": 2,
+                },
+                f"cache-{candidate}",
+            )
+
+        accepted, rows = sequential_forward_select(
+            ("self__FROZEN",),
+            ("self__FIRST", "self__FAIL", "self__LAST"),
+            evaluate,
+        )
+        self.assertEqual(accepted, ("self__FIRST", "self__LAST"))
+        self.assertEqual(
+            baselines,
+            [
+                (("self__FROZEN",), "self__FIRST"),
+                (("self__FROZEN", "self__FIRST"), "self__FAIL"),
+                (("self__FROZEN", "self__FIRST"), "self__LAST"),
+            ],
+        )
+        self.assertEqual(
+            [row["forward_passed"] for row in rows],
+            [True, False, True],
+        )
+
     def test_incremental_pool_changes_only_after_both_confirmation_gates(self):
         frozen = ("self__FR-002",)
         unchanged, promoted = promote_frozen_incremental_pool(
@@ -273,6 +332,7 @@ class WorkflowScriptTest(unittest.TestCase):
                         "rank_ic_mean": 0.02,
                         "rank_ic_t_stat": 3.0,
                         "group_monotonicity": 0.8,
+                        "long_short_mean": 0.001,
                     }
                 )
         metrics = pd.DataFrame(rows)
@@ -295,6 +355,52 @@ class WorkflowScriptTest(unittest.TestCase):
         failed = classify_candidates(metrics, stability)[0]
         self.assertTrue(failed["single_factor_cross_regime_passed"])
         self.assertTrue(failed["validation_2023_observations"])
+
+    def test_single_factor_shape_gate_accepts_positive_long_short(self):
+        rows = []
+        for period in ("development", "validation_2022", "validation_2023"):
+            for variant in ("raw_full", "neutral_full", "raw_tradable"):
+                rows.append(
+                    {
+                        "candidate_id": "HF-TEST",
+                        "period": period,
+                        "variant": variant,
+                        "label": "ret_close_to_close",
+                        "rank_ic_mean": 0.02,
+                        "rank_ic_t_stat": 3.0,
+                        "group_monotonicity": 0.2,
+                        "long_short_mean": (
+                            0.001 if variant == "neutral_full" else -0.001
+                        ),
+                    }
+                )
+        metrics = pd.DataFrame(rows)
+        stability = pd.DataFrame(
+            {
+                "candidate_id": ["HF-TEST"] * 10,
+                "period": ["development"] * 10,
+                "frequency": ["month"] * 10,
+                "positive": [True] * 6 + [False] * 4,
+            }
+        )
+        decision = classify_candidates(metrics, stability)[0]
+        self.assertTrue(decision["single_factor_cross_regime_passed"])
+        self.assertTrue(
+            decision["development_shape_evidence"][
+                "neutral_long_short_return"
+            ]
+        )
+
+        metrics.loc[
+            metrics["period"].eq("development"),
+            "long_short_mean",
+        ] = -0.001
+        decision = classify_candidates(metrics, stability)[0]
+        self.assertFalse(decision["single_factor_cross_regime_passed"])
+        self.assertIn(
+            "neither monotone groups nor positive raw/neutral long-short return",
+            decision["development_failures"][0],
+        )
 
 
 if __name__ == "__main__":

@@ -11,11 +11,11 @@ FR-010,self__FR-010,False,False,I_rejected,False,False,False,False,0,rejected
 FR-011,self__FR-011,False,False,I_rejected,False,False,True,True,1,admitted
 FR-012,self__FR-012,False,True,frozen_I,False,True,False,False,1,admitted
 FR-013,self__FR-013,False,False,I_rejected,False,False,False,False,0,rejected
-FR-014,self__FR-014,False,False,I_rejected,False,False,False,False,0,rejected
-FR-015,self__FR-015,False,True,pending_passed_not_frozen,False,False,False,False,0,rejected
-HF-001,self__HF-001,False,False,I_rejected,False,False,False,False,0,rejected
+FR-014,self__FR-014,True,False,I_rejected,True,False,False,False,1,admitted
+FR-015,self__FR-015,True,True,pending_passed_not_frozen,True,False,False,False,1,admitted
+HF-001,self__HF-001,True,False,I_rejected,True,False,False,False,1,admitted
 HF-002,self__HF-002,False,False,I_rejected,False,False,True,True,1,admitted
-HF-003,self__HF-003,False,True,pending_passed_not_frozen,False,False,True,True,1,admitted
+HF-003,self__HF-003,True,True,pending_passed_not_frozen,True,False,True,True,2,admitted
 HF-004,self__HF-004,False,False,I_rejected,False,False,False,False,0,rejected
 INT-002,self__INT-002,True,False,I_rejected,False,False,False,False,0,rejected
 INT-003,self__INT-003,False,False,I_rejected,False,False,False,False,0,rejected
@@ -32,7 +32,7 @@ PV-005,self__PV-005,False,False,I_rejected,False,False,False,False,0,rejected
 PV-006,self__PV-006,False,False,I_rejected,False,False,True,True,1,admitted
 PV-008,self__PV-008,False,True,frozen_I,False,True,False,False,1,admitted
 PV-009,self__PV-009,True,True,frozen_I,True,True,False,False,2,admitted
-PV-010,self__PV-010,False,False,I_rejected,False,False,False,False,0,rejected
+PV-010,self__PV-010,True,False,I_rejected,True,False,False,False,1,admitted
 PV-011,self__PV-011,True,True,frozen_I,True,True,False,False,2,admitted
 PV-013,self__PV-013,False,True,frozen_I,False,True,False,False,1,admitted
 PV-014,self__PV-014,True,True,frozen_I,True,True,True,True,3,admitted

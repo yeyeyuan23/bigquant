@@ -1,6 +1,6 @@
 {
   "schema_version": "candidate-pool-v2",
-  "generated_at": "2026-07-27T01:15:32+08:00",
+  "generated_at": "2026-07-27T14:40:29+08:00",
   "generation_entrypoint": "scripts/run_first_round.py",
   "relative_path": "factors/candidate_pool.parquet",
   "factor_version": "literature_round4_v1_2026-07-27",

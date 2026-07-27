@@ -141,8 +141,10 @@ HF/OB 首轮可以使用冻结的代表月份以控制计算成本；候选通�
 
 统一入口：
 
-- 核心函数：`src/bigalpha2026/evaluation.py`
-- 完整脚本：`scripts/run_first_round.py`
+- 准入模块：`src/bigalpha2026/single_factor_admission.py`
+- 核心入口：`run_single_factor_admission`
+- 指标原语：`src/bigalpha2026/evaluation.py`
+- 编排脚本：`scripts/run_first_round.py`
 
 AIStudio 只负责拉取和核验真实数据快照；单因子指标、I 增量和组合训练均在本地
 对已核验快照运行。
@@ -161,14 +163,21 @@ AIStudio 只负责拉取和核验真实数据快照；单因子指标、I 增量
 
 - 开发期 Rank IC 为正且 t 值不低于 2；
 - 所有数据族至少 60% 的开发月份 Rank IC 为正；
-- 五分组单调性不低于 0.50；
 - 中性化后和可交易子集方向仍为正；
+- 下列形态证据至少一项成立：原始五分组单调性不低于 0.50、中性化五分组
+  单调性不低于 0.50、原始头尾组合收益为正、中性化头尾组合收益为正；
 - S 只读取 2019—2021；2022、2023 只生成逐月样本外报告，不得反向改变 S。
+
+五分组单调性是形态证据，不再单独一票否决。这样可以保留 Rank IC、月份稳定性
+和可交易方向明确，但收益主要集中在截面尾部的因子；若单调性与头尾收益全部
+不支持，则仍不进入规则复合。
 
 单因子评价只产生明确路由：
 
-- 通过开发期总体门槛和月度稳定性：`S=通过`，进入
-  `self_factor_composite`；
+- 通过开发期总体门槛和月度稳定性的 FR/PV/HF/OB 原子候选：
+  `S=通过`，进入 `self_factor_composite`；
+- INT 等已经包含多个底层信号的复合候选不递归进入家族等权组合，避免同一信号
+  重复计权；它们保留独立候选身份并继续完成 I/T 评价；
 - 未通过：`S=未通过`，不进入规则组合，但仍必须继续完成 I 评价；
 - `S=未通过` 且 screened15 增量通过的候选，进入 Elastic Net；
 - 所有技术门槛通过的候选都进入 LightGBM 候选池，不能用线性 Elastic Net 的
@@ -195,6 +204,10 @@ factorlib_regularized_incremental_batch_validation
 
 位置：`src/bigalpha2026/evaluation.py`。
 
+I 的候选评价、联合池确认、冻结池晋级和缓存状态写入统一由
+`src/bigalpha2026/incremental_admission.py` 的
+`run_incremental_admission` 编排；上述 `evaluation.py` 函数只负责数值验证原语。
+
 流程：
 
 1. 复用所有候选共用的股票日、标签、冻结 screened15 和模型参数；I 评价只读取
@@ -210,12 +223,17 @@ factorlib_regularized_incremental_batch_validation
 6. 每个候选比较 OOS Rank IC，并记录候选权重、选择频率和与 screened15 的
    最大相关性。候选级 I 通过后只标记为 `pending_passed`，不得直接进入最终
    Elastic Net。
-7. 本批 `pending_passed` 必须再完成两项联合确认：
-   `screened15 + frozen_I + pending_passed` 相对 `screened15` 通过池级门槛；
+7. 候选级 I 通过且尚未冻结的候选，按其开发期单候选 OOS Rank IC 增量从高到低
+   排序；随后逐个比较
+   `screened15 + frozen_I + 本轮已接受候选 + x` 与
+   `screened15 + frozen_I + 本轮已接受候选`。单个候选未通过时只淘汰该候选，
+   后续候选继续相对当前已接受池评价，禁止把所有 pending 一次塞入而相互拖累。
+8. 前向通过的候选集合最后完成两项全池确认：
+   `screened15 + frozen_I + forward_passed` 相对 `screened15` 通过池级门槛；
    同一新联合模型相对旧 `screened15 + frozen_I` 也通过池级门槛。两项均通过
-   才原子更新 `frozen_I`；任一失败时保持 `evaluated_not_frozen`。池级确认只
-   评价完整联合模型的配对 OOS 增量，不重复套用“池内最弱候选权重比例”。
-8. 最终 Elastic Net 只读取 `screened15 + frozen_I`。2022、2023 的表现不得
+   才原子更新 `frozen_I`；任一失败时保持 `evaluated_not_frozen`。前向和全池
+   确认只评价完整模型的配对 OOS 增量，不重复套用候选权重方向门槛。
+9. 最终 Elastic Net 只读取 `screened15 + frozen_I`。2022、2023 的表现不得
    反向修改候选级 I、联合确认或冻结成员。
 
 当前内部增量门槛：
@@ -242,7 +260,8 @@ I 缓存分成两层：
 时间切分、60/20 窗口、预处理和 Elastic Net 参数。`factor_pool_incremental.csv`
 只是审计报告，禁止再用“候选名称 + 协议文字”充当缓存。已冻结因子的值、可用性
 或评价合同变化时必须直接停止，恢复冻结版本或把修改登记为新候选重新验证。
-统一入口仍为 `scripts/run_combinations.py`；精确缓存自动复用，
+命令入口仍为 `scripts/run_combinations.py`；它只准备共享输入并调用独立的
+`run_incremental_admission`，精确缓存自动复用，
 `--resume-incremental` 仅为向后兼容。
 
 S 和 I 只控制规则复合与 Elastic Net。LightGBM 使用第 7 节独立的树模型增量
@@ -255,6 +274,10 @@ S 和 I 只控制规则复合与 Elastic Net。LightGBM 使用第 7 节独立的
 这是官方评分的代理检查，不等于真实比赛分数。
 
 ## 7. LightGBM 增量评价（T）
+
+T 的独立准入模块为 `src/bigalpha2026/tree_admission.py`，核心入口为
+`run_tree_admission`。模块拥有候选级/条件增量、联合池确认、冻结池晋级及缓存
+状态；`scripts/run_combinations.py` 只负责准备共享输入并调用该入口。
 
 T 只使用 2019—2021 开发期。满足至少 240 个有效开发日的新候选先进入
 `pending`，不得直接改变冻结 T 池。按相同股票日、标签、60 日训练、20 日 OOS、
@@ -312,7 +335,8 @@ LightGBM 参数。新增或修改候选只使包含该候选的验证模型失�
 - `src/bigalpha2026/combinations.py`
 - `scripts/run_combinations.py`
 
-S/I/T 只负责候选路由，不直接定义最终组合。组合阶段固定为三条彼此隔离的
+`combinations.py` 只保留准入后的组合、Elastic Net 和 LightGBM 训练原语；
+S/I/T 的流程与状态分别归属三个 admission 模块。组合阶段固定为三条彼此隔离的
 管线：
 
 1. `self_factor_composite`：所有获准自研因子按数据族内等权、族间等权合成；
