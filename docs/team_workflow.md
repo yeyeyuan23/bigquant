@@ -180,15 +180,17 @@ mkdir -p data/transfers
 
 tar \
   --exclude='data/raw' \
+  --exclude='data/cache' \
   --exclude='data/transfers' \
   --exclude='*.tmp' \
   --exclude='*.partial' \
-  -czf data/transfers/bigalpha_research_data_20260726.tar.gz \
+  --exclude='.DS_Store' \
+  -czf data/transfers/bigalpha_research_data_20260727.tar.gz \
   data
 
 shasum -a 256 \
-  data/transfers/bigalpha_research_data_20260726.tar.gz \
-  > data/transfers/bigalpha_research_data_20260726.tar.gz.sha256
+  data/transfers/bigalpha_research_data_20260727.tar.gz \
+  > data/transfers/bigalpha_research_data_20260727.tar.gz.sha256
 ```
 
 发送压缩包和同名 `.sha256` 文件。接收方将二者放到仓库的
@@ -196,14 +198,14 @@ shasum -a 256 \
 
 ```bash
 shasum -a 256 -c \
-  data/transfers/bigalpha_research_data_20260726.tar.gz.sha256
+  data/transfers/bigalpha_research_data_20260727.tar.gz.sha256
 ```
 
 校验显示 `OK` 后解压：
 
 ```bash
 tar -xzf \
-  data/transfers/bigalpha_research_data_20260726.tar.gz \
+  data/transfers/bigalpha_research_data_20260727.tar.gz \
   -C .
 ```
 
@@ -223,14 +225,15 @@ manifests，不包含原始分钟成交或盘口快照。`data/transfers/` 已�
 当前团队基础数据包：
 
 ```text
-bigalpha_research_data_20260726.tar.gz
-bigalpha_research_data_20260726.tar.gz.sha256
+bigalpha_research_data_20260727.tar.gz
+bigalpha_research_data_20260727.tar.gz.sha256
 SHA-256:
-8ed3bc3c1de8ae13fd9253d992522bbfe1cf6caaf61dc4b4d8aebe7d03a6e46c
+459bb593a33d817dd850a2e8465db01523a229e6c9c56886ff4aeaf6c4bc48bd
 ```
 
-该快照已经包含标准化的 `data/factors/candidate_pool.parquet`，仍不包含公开
-36 因子训练矩阵。
+该快照已经包含最新的连续微观日级面板、冻结 screened15、标准化
+`data/factors/candidate_pool.parquet` 和全部 manifests；不包含原始分钟数据
+或可由当前代码重算的 `data/cache/`。
 
 如果候选引入当前包中没有的新日级组件，开发者必须同时交付：
 
