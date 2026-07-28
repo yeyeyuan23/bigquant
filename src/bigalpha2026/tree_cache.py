@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v5-entry-or-conditional-J"
+TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v6-orthogonal-entry"
 PREDICTION_COLUMNS = ("date", "instrument", "factor")
 LIGHTGBM_IMPORTANCE_COLUMNS = (
     "train_start",

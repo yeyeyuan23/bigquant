@@ -30,7 +30,7 @@ registered
 `admitted (T)` 或其组合；字母分别表示进入规则复合、Elastic Net 和
 LightGBM。唯一可执行路由以 `reports/latest/factor_pool_admission.csv` 为准。
 
-> 2026-07-28 已将 S/I/T 准入合同升级为 `all36 + self_library` 本地 J reference
+> 2026-07-28 已将 S/I/T 准入合同改为轻量筛选；本地 J 只用于冻结路线后的选择
 > 下的 A/B/J 路由增量；
 > 最终路线另做一次兄弟路线联合拥挤评分，该场景不是平台全局历史的替代品。
 > 下表和现有 `reports/` 仍是升级前的 Rank IC 合同历史结果；在
@@ -98,12 +98,12 @@ LightGBM。唯一可执行路由以 `reports/latest/factor_pool_admission.csv` �
 
 旧合同的 `frozen_I` 为 `FR-002、PV-014`；旧合同的 `frozen_T` 为
 `FR-002/005/015、HF-003/004、OB-001/003、PV-001/009/014/020`。
-这些成员必须在 J 合同下重新评价，不能自动迁移。两个旧冻结池相互独立；历史
+这些成员必须在当前轻量 I/T 合同下重新评价，不能自动迁移。两个旧冻结池相互独立；历史
 Git 证据为 `reports/latest/factor_pool_decisions.json`，旧本地运行状态另存于
 `data/cache/incremental_v3/frozen/frozen_state.json` 和
 `data/cache/tree_v3/frozen/frozen_state.json`。新合同使用独立
-`single_factor_v2_strict_trial_J、incremental_v6_residual_entry_J、
-tree_v5_entry_or_conditional_J` 缓存目录，缓存不进入 Git。
+`single_factor_v3_trial_only、incremental_v7_entry_only、
+tree_v6_orthogonal_entry` 缓存目录，缓存不进入 Git。
 
 ## 基础候选定义
 

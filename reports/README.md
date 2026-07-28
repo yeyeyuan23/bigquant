@@ -99,30 +99,26 @@ reports/
 
 ### S 路线
 
-- `single_factor_route_admission.csv`：S 路线的候选级路线审计。当前 S 使用
-  严格 trial gate 后逐候选加入 family-balanced 规则复合，并做 route-level J
-  增量确认。
+- `single_factor_route_admission.csv`：S 路线的候选级路线审计。当前 S 满足
+  质量、稳定性和低重复要求后直接进入 family-balanced 规则复合。
 - `single_factor_route_promotion.csv`
-  - `passed`：S 路线是否通过 J 确认。
+  - `passed`：S 路线是否通过质量、稳定性和低重复要求。
   - `reasons`：失败原因。
-  - `bootstrap_reference`：没有旧 frozen S 时使用的启动参考。
+  - `retained_pending_candidates`：本次满足 S 要求的候选。
 
-S 正式准入会读取 `s_*` trial 字段：覆盖率、活跃日、Rank IC、最差 fold、
+S 是否保留会读取 `s_*` 字段：覆盖率、活跃日、Rank IC、最差 fold、
 正向 fold 比例、方向一致性和相对当前 S baseline 的最大 Rank 相关性。通过 trial
-后才计算 `candidate_route_J_computed=True` 的 J 增量。t 统计、中性化、可交易和
+即进入 frozen S；准入阶段不计算 J。t 统计、中性化、可交易和
 分组诊断不再无条件增加主流程计算量；如果只是要审计单因子质量，用
 `scripts/run_first_round.py`，如果要给最终路线补审计字段，再给
 `scripts/run_combinations.py` 加 `--include-route-diagnostics`。
-没有旧 frozen S baseline 时，S 会用 trial-passed 候选 bootstrap 初始规则池；
-这类行的 `candidate_route_J_computed` 可以是 `False`，不是错误。
 
 ### I 路线
 
-- `factor_pool_incremental.csv`：I 路线候选增量审计。
-- `incremental_pool_promotion.csv`：I 条件通过池的最终整体确认。
-- `incremental_factorwise_admission.csv`：新 factorwise I 的逐候选训练和准入状态。
-- `incremental_conditional_forward.csv`：I 条件前向每一步的 baseline、candidate 和配对 J 增量。
-- `incremental_factorwise_promotion.csv`：factorwise I 的整体确认。
+- `factor_pool_incremental.csv`：I 路线候选 entry/诊断审计。
+- `incremental_pool_promotion.csv`：I entry 通过池的最终冻结记录。
+- `incremental_factorwise_admission.csv`：I 的逐候选 entry 诊断和准入状态。
+- `incremental_factorwise_promotion.csv`：I entry 通过池的整体记录。
 - `joint_elastic_net_weights.csv`：最终 Elastic Net 权重。
 - `joint_elastic_net_metrics.csv`：最终 Elastic Net 路线指标。
 
@@ -133,39 +129,32 @@ S 正式准入会读取 `s_*` trial 字段：覆盖率、活跃日、Rank IC、�
 - `i_rank_ic_mean`：候选原始日度 Rank IC 均值。
 - `i_residual_rank_ic`：候选对 `screened15 + frozen_I` 日内秩残差化后的 Rank IC。
 - `i_max_abs_rank_correlation`：候选相对 `screened15 + frozen_I` 的最大绝对秩相关。
-- `candidate_level_J_computed`：是否实际训练并计算个人 J 增量。
 - `active_days`：开发期内该候选有截面变化的交易日数量。
-- `baseline_score_proxy`、`augmented_score_proxy`、`delta_score_proxy`：配对 J。
-- `individual_passed`：个人 I 增量是否通过正式门槛。
-- `conditional_passed`：条件前向是否通过。
-- `frozen_after_validation`：完整确认后是否进入 frozen I。
+- `individual_passed`：I entry gate 是否通过。
+- `frozen_after_validation`：是否进入 frozen I。
 - `evaluation_status`：当前候选在 I 路线的最终状态。
-- `individual_cache_key`、`conditional_cache_key`：内容寻址缓存键。
 
 ### T 路线
 
 - `tree_factor_admission.csv`：T 路线候选准入状态，组合流程可用作旧状态输入。
-- `tree_factor_incremental.csv`：T 路线增量审计。
-- `tree_group_increment.csv`：T 路线整体增量确认。
-- `tree_factorwise_admission.csv`：新 factorwise T 的逐候选 LightGBM 训练和准入状态。
-- `tree_factorwise_importance.csv`：T 中每次 LightGBM 训练的 split/gain importance。
-- `tree_factorwise_promotion.csv`：factorwise T 的整体确认。
+- `tree_factor_incremental.csv`：T 路线正交 entry/诊断审计。
+- `tree_factorwise_admission.csv`：T 的逐候选正交 entry 诊断和准入状态。
+- `tree_factorwise_importance.csv`：最终联合 LightGBM 训练的 split/gain importance。
+- `tree_factorwise_promotion.csv`：T 正交通过池的整体记录。
 - `joint_lightgbm_metrics.csv`：最终 LightGBM 路线指标。
 
 常用字段：
 
 - `tree_data_eligible`：是否满足 T 的开发期有效日门槛。
-- `candidate_level_J_computed`：是否实际训练个人 LightGBM 并计算 J 增量。
-- `individual_passed`：个人 T 增量是否通过正式门槛。
-- `conditional_passed`：条件前向是否通过。
-- `tree_incremental_passed`：完整确认后是否进入 frozen T。
+- `individual_passed`：T 正交 entry gate 是否通过。
+- `tree_incremental_passed`：是否进入 frozen T。
 - `evaluation_status`：当前候选在 T 路线的最终状态。
 
 `tree_factorwise_importance.csv` 额外字段：
 
-- `candidate`：触发本次训练的候选。
-- `evaluation_stage`：`individual` 或 `conditional_forward`。
-- `baseline_candidates`：本次训练前已有的自研 T 候选。
+- `candidate`：触发本次训练的候选；轻量 T 的最终联合模型使用 `__joint_lightgbm__`。
+- `evaluation_stage`：轻量 T 下为 `final_joint`。
+- `baseline_candidates`：轻量 T 下为最终联合模型包含的自研 T 候选。
 - `train_start`、`train_end`：训练窗口。
 - `test_start`、`test_end`：样本外预测窗口。
 - `feature`：LightGBM 输入特征名。

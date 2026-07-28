@@ -13,10 +13,10 @@ from bigalpha2026.tree_cache import (
 
 
 class TreePredictionCacheTest(unittest.TestCase):
-    def test_official_J_contract_uses_v3_schema(self):
+    def test_orthogonal_entry_contract_uses_current_schema(self):
         self.assertEqual(
             TREE_CACHE_SCHEMA_VERSION,
-            "tree-prediction-cache-v5-entry-or-conditional-J",
+            "tree-prediction-cache-v6-orthogonal-entry",
         )
 
     def setUp(self):

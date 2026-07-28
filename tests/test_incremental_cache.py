@@ -9,10 +9,10 @@ from bigalpha2026.incremental_cache import (
 
 
 class IncrementalSummaryCacheTest(unittest.TestCase):
-    def test_official_J_contract_uses_factorwise_schema(self):
+    def test_entry_only_contract_uses_current_schema(self):
         self.assertEqual(
             INCREMENTAL_CACHE_SCHEMA_VERSION,
-            "elastic-net-incremental-cache-v5-residual-entry-J",
+            "elastic-net-incremental-cache-v7-entry-only",
         )
 
     def test_exact_inputs_reuse_summary(self):

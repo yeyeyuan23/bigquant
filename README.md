@@ -57,9 +57,9 @@
 登记候选
 → 实现并测试
 → 核验真实数据快照
-→ 单因子评价（S）
-→ 相对冻结公开因子库的增量评价（I）
-→ LightGBM 增量评价（T）
+→ 单因子轻量评价（S）
+→ 相对冻结公开因子库的轻量信息评价（I）
+→ LightGBM 正交准入评价（T）
 → 按 S/I/T 结果路由到隔离的组合管线
 → 冻结代码、数据合同、成员、参数和 Git 版本
 → AIStudio 短窗验收
@@ -106,7 +106,7 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
   --reports-dir /Users/yuanye/Projects/bigquant/reports
 ```
 
-强制重算所有 I/T 因子的训练增量：
+强制重算 I/T 缓存：
 
 ```bash
 cd /Users/yuanye/Projects/bigquant
@@ -118,7 +118,7 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
   --refresh-tree-cache
 ```
 
-只重算某个新增或修改因子的 I/T 增量：
+只重算某个新增或修改因子的 I/T 缓存：
 
 ```bash
 cd /Users/yuanye/Projects/bigquant
@@ -161,7 +161,7 @@ tar -xzf data/transfers/bigalpha_research_data_v3.tar.gz -C .
 src/bigalpha2026/
 ├── candidates/           # 已登记的基础因子和跨类方案
 ├── evaluation.py         # 评价指标与滚动验证原语
-├── competition_score_proxy.py # all36+self_library 本地 J 代理、方向选择与联合拥挤 J
+├── competition_score_proxy.py # 冻结路线后的本地 J 排序、方向选择与联合拥挤检查
 ├── single_factor_admission.py  # S 单因子准入
 ├── incremental_admission.py    # I Elastic Net 增量准入
 ├── tree_admission.py            # T LightGBM 增量准入
@@ -185,15 +185,13 @@ tests/                    # 单元、接口和防泄漏测试
 
 - `reports/latest/factor_pool_check.json`：真实快照合同检查结果。
 - `reports/first_round/first_round_*.csv/json`：候选单因子技术、指标和稳定性诊断。
-- `reports/routes/incremental_factorwise_admission.csv`：I 中每个因子的 Elastic Net 个人
-  增量、条件前向和冻结状态。
-- `reports/routes/incremental_conditional_forward.csv`：I 条件前向每一步的 baseline、
-  candidate 和配对 J 增量。
-- `reports/routes/tree_factorwise_admission.csv`：T 中每个因子的 LightGBM 个人增量、
-  条件前向和冻结状态。
-- `reports/routes/tree_factorwise_importance.csv`：T 中每次 LightGBM 训练的 split/gain
-  importance。
-- `reports/routes/tree_factorwise_promotion.csv`：T 条件通过池的整体确认结果。
+- `reports/routes/incremental_factorwise_admission.csv`：I 中每个因子的 entry 诊断和
+  冻结状态；准入阶段不跑本地 J。
+- `reports/routes/tree_factorwise_admission.csv`：T 中每个因子的正交 entry 诊断和
+  冻结状态。
+- `reports/routes/tree_factorwise_importance.csv`：最终 LightGBM 的 split/gain
+  importance；逐因子 LightGBM 不再作为 T 准入步骤。
+- `reports/routes/tree_factorwise_promotion.csv`：T 正交通过池的冻结记录。
 - `reports/latest/factor_pool_admission.csv`：每个候选最终进入 S/I/T 哪些路线。
 - `reports/latest/combination_summary.csv`：三条最终路线的验证期表现和排序。
 - `reports/latest/factor_pool_decisions.json`：机器可读的完整路由、模型和评分合同。

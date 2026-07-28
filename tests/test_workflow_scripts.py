@@ -13,9 +13,7 @@ from bigalpha2026.factor_pool import (
 )
 from bigalpha2026.incremental_admission import (
     candidate_incremental_entry_diagnostics,
-    ordered_pending_candidates,
     promote_frozen_incremental_pool,
-    sequential_forward_select,
     validated_frozen_incremental_pool,
 )
 from bigalpha2026.research_policy import competition_score_increment_gate
@@ -92,76 +90,11 @@ class WorkflowScriptTest(unittest.TestCase):
         )
         self.assertEqual(pending, ("self__A", "self__B"))
 
-    def test_incremental_order_uses_isolated_J_increment(self):
-        summary = pd.DataFrame(
-            {
-                "candidate": [
-                    "self__LOW",
-                    "self__FROZEN",
-                    "self__HIGH",
-                ],
-                "delta_score_proxy": [0.001, 0.010, 0.003],
-            }
-        )
-        order = ordered_pending_candidates(
-            summary,
-            ("self__LOW", "self__FROZEN", "self__HIGH"),
-            ("self__FROZEN",),
-        )
-        self.assertEqual(order, ("self__HIGH", "self__LOW"))
-
-    def test_failed_forward_candidate_does_not_drag_later_candidates(self):
-        baselines = []
-
-        def evaluate(baseline, candidate):
-            baselines.append((baseline, candidate))
-            passed = candidate != "self__FAIL"
-            return (
-                {
-                    "delta_score_proxy": 0.01 if passed else -0.01,
-                    "score_days": 200,
-                    "score_windows": 9,
-                    "positive_score_window_ratio": 0.60,
-                    "positive_score_years": 2,
-                },
-                f"cache-{candidate}",
-            )
-
-        accepted, rows = sequential_forward_select(
-            ("self__FROZEN",),
-            ("self__FIRST", "self__FAIL", "self__LAST"),
-            evaluate,
-        )
-        self.assertEqual(accepted, ("self__FIRST", "self__LAST"))
-        self.assertEqual(
-            baselines,
-            [
-                (("self__FROZEN",), "self__FIRST"),
-                (("self__FROZEN", "self__FIRST"), "self__FAIL"),
-                (("self__FROZEN", "self__FIRST"), "self__LAST"),
-            ],
-        )
-        self.assertEqual(
-            [row["forward_passed"] for row in rows],
-            [True, False, True],
-        )
-
-    def test_incremental_pool_changes_only_after_both_confirmation_gates(self):
+    def test_incremental_pool_promotes_entry_passed_candidates(self):
         frozen = ("self__FR-002",)
-        unchanged, promoted = promote_frozen_incremental_pool(
-            frozen,
-            ("self__PV-TEST",),
-            provisional_vs_screened_passed=True,
-            provisional_vs_frozen_passed=False,
-        )
-        self.assertFalse(promoted)
-        self.assertEqual(unchanged, frozen)
-
         updated, promoted = promote_frozen_incremental_pool(
             frozen,
             ("self__PV-TEST",),
-            provisional_vs_screened_passed=True,
-            provisional_vs_frozen_passed=True,
         )
         self.assertTrue(promoted)
         self.assertEqual(updated, ("self__FR-002", "self__PV-TEST"))
@@ -267,8 +200,8 @@ class WorkflowScriptTest(unittest.TestCase):
         )
 
         self.assertEqual(result.admitted_candidates, ("self__PV-TEST",))
-        self.assertFalse(result.evaluations[0]["candidate_route_J_computed"])
         self.assertTrue(result.evaluations[0]["s_route_passed"])
+        self.assertNotIn("candidate_route_J_computed", result.evaluations[0])
 
     def test_frozen_incremental_pool_rejects_implicit_content_change(self):
         state = {

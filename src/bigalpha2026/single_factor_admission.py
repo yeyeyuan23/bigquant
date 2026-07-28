@@ -16,11 +16,10 @@ from .research_policy import (
     FORMAL_EVALUATION_POLICY,
     SINGLE_FACTOR_ROUTE_GATE,
     TECHNICAL_GATE,
-    competition_score_increment_gate,
 )
 from .tree_cache import feature_fingerprints
 
-S_ROUTE_STATE_SCHEMA_VERSION = "single-factor-route-state-v2-strict-trial-J"
+S_ROUTE_STATE_SCHEMA_VERSION = "single-factor-route-state-v3-trial-only"
 
 
 @dataclass(frozen=True)
@@ -36,7 +35,7 @@ class SingleFactorAdmissionResult:
 
 @dataclass(frozen=True)
 class SingleFactorRouteAdmissionResult:
-    """J-based S routing result for the family-balanced submission."""
+    """Trial-gated S routing result for the family-balanced submission."""
 
     frozen_before: tuple[str, ...]
     pending_candidates: tuple[str, ...]
@@ -156,7 +155,7 @@ def candidate_s_trial_diagnostics(
     candidate: str,
     baseline_candidates: Sequence[str],
 ) -> dict[str, object]:
-    """Strict cheap S evidence before route-level J admission."""
+    """Strict cheap S evidence before route admission."""
 
     gate = SINGLE_FACTOR_ROUTE_GATE
     label_column = "ret_close_to_close"
@@ -247,7 +246,7 @@ def classify_candidates(
     metrics: pd.DataFrame,
     stability: pd.DataFrame,
 ) -> list[dict[str, object]]:
-    """Retain IC and sign evidence without pre-empting route-level J."""
+    """Retain IC and sign evidence without pre-empting route admission."""
 
     decisions: list[dict[str, object]] = []
 
@@ -286,10 +285,8 @@ def classify_candidates(
         for variant in ("raw_full", "neutral_full", "raw_tradable"):
             if value(candidate_id, period, variant, "rank_ic_mean") <= 0:
                 failures.append(f"{display_name} {variant} IC is not positive")
-        # t-statistics and shape remain useful diagnostics, but S now routes
-        # candidates by their contribution to the final family-balanced
-        # submission. They must not reject an otherwise positive-direction
-        # candidate before that route-level J test.
+        # t-statistics and shape remain useful diagnostics; the route decision
+        # itself is handled by the lightweight S checks.
         minimum_monotonicity = (
             FORMAL_EVALUATION_POLICY.minimum_group_monotonicity
         )
@@ -407,16 +404,14 @@ def run_single_factor_route_admission(
     frozen_candidates: Sequence[str] = (),
     frozen_state_path: Path | None = None,
 ) -> SingleFactorRouteAdmissionResult:
-    """Admit one family-balanced S pool without combinatorial subset search.
+    """Admit one family-balanced S pool from the cheap trial gate.
 
-    Candidate-level technical/J screening happens before this function.  The
-    route layer evaluates the complete pending pool once against the frozen
-    route, rather than repeating leave-one-out fits that duplicate the final
-    competition objective.
+    The local J proxy is not authoritative enough to veto S membership. Route
+    J can still be computed downstream as diagnostics, but S freezing is driven
+    only by quality, strength, stability, and redundancy trial evidence.
     """
 
     candidates = tuple(dict.fromkeys(map(str, candidate_columns)))
-    score_protocol = dict(score_reference.protocol())
     fingerprints = feature_fingerprints(
         oriented_panel,
         tuple(
@@ -437,8 +432,6 @@ def run_single_factor_route_admission(
             != S_ROUTE_STATE_SCHEMA_VERSION
         ):
             incompatibilities.append("schema_version")
-        if loaded_state.get("score_protocol") != score_protocol:
-            incompatibilities.append("score_protocol")
         state_fingerprints = loaded_state.get(
             "candidate_fingerprints",
             {},
@@ -464,7 +457,7 @@ def run_single_factor_route_admission(
             )
         if incompatibilities:
             raise RuntimeError(
-                "frozen S state is incompatible with the current J contract: "
+                "frozen S state is incompatible with the current S contract: "
                 f"{incompatibilities}. Run an explicit controlled "
                 "revalidation; automatic replacement is forbidden."
             )
@@ -509,64 +502,14 @@ def run_single_factor_route_admission(
                 "s_redundancy_passed": True,
                 "s_trial_reasons": "",
             }
+        route_passed = bool(trial["s_trial_passed"])
         row: dict[str, object] = {
             "candidate": candidate,
             "baseline_candidates": ",".join(baseline_candidates),
             **trial,
+            "s_route_passed": route_passed,
+            "s_route_reasons": "" if route_passed else str(trial["s_trial_reasons"]),
         }
-        if not bool(trial["s_trial_passed"]):
-            row.update(
-                {
-                    "candidate_route_J_computed": False,
-                    "route_increment_passed": False,
-                    "route_increment_reasons": str(trial["s_trial_reasons"]),
-                    "s_route_passed": False,
-                }
-            )
-            evaluations.append(row)
-            continue
-
-        augmented_candidates = tuple(
-            dict.fromkeys((*baseline_candidates, candidate))
-        )
-        if not baseline_candidates and not frozen:
-            route_passed = True
-            route_reasons = [
-                "bootstrap S from trial gate because no existing S baseline exists"
-            ]
-        elif baseline_candidates:
-            increment = score_reference.paired_increment(
-                route_factor(baseline_candidates),
-                route_factor(augmented_candidates),
-                include_stability=False,
-            )
-            route_passed, route_reasons = competition_score_increment_gate(
-                increment
-            )
-            row.update(increment)
-        else:
-            score = score_reference.score(route_factor(augmented_candidates))
-            route_passed = bool(float(score["score_proxy"]) > 0.5)
-            route_reasons = (
-                []
-                if route_passed
-                else ["bootstrap S route score does not exceed reference median"]
-            )
-            row.update(
-                {
-                    f"augmented_{key}": value
-                    for key, value in score.items()
-                    if key in {"a_proxy", "b_proxy", "score_proxy"}
-                }
-            )
-        row.update(
-            {
-                "candidate_route_J_computed": bool(baseline_candidates or frozen),
-                "route_increment_passed": route_passed,
-                "route_increment_reasons": "; ".join(route_reasons),
-                "s_route_passed": route_passed,
-            }
-        )
         evaluations.append(row)
         if route_passed:
             accepted.append(candidate)
@@ -576,40 +519,18 @@ def run_single_factor_route_admission(
     if not admitted:
         promotion_summary = {
             "passed": False,
-            "reasons": "no S candidate passed trial and route increment gates",
-            "selection": "strict_trial_then_sequential_route_J",
+            "reasons": "no S candidate passed trial gate",
+            "selection": "strict_trial_only",
         }
         promotion_passed = False
-    elif frozen and retained_pending:
-        promotion_summary = score_reference.paired_increment(
-            route_factor(frozen),
-            route_factor(admitted),
-            include_stability=False,
-        )
-        promotion_passed, promotion_reasons = competition_score_increment_gate(
-            promotion_summary
-        )
-        if not promotion_passed:
-            admitted = frozen
-        promotion_summary = {
-            **promotion_summary,
-            "passed": promotion_passed,
-            "reasons": "; ".join(promotion_reasons),
-            "selection": "strict_trial_then_sequential_route_J",
-        }
-    elif retained_pending:
-        promotion_passed = True
-        promotion_summary = {
-            "passed": promotion_passed,
-            "reasons": "bootstrap S from trial gate because no existing S baseline exists",
-            "selection": "strict_trial_then_sequential_route_J",
-        }
     else:
         promotion_passed = True
         promotion_summary = {
             "passed": True,
             "reasons": "",
-            "selection": "strict_trial_then_sequential_route_J",
+            "selection": "strict_trial_only",
+            "retained_pending_candidates": ",".join(retained_pending),
+            "frozen_candidates_after": ",".join(admitted),
         }
 
     result = SingleFactorRouteAdmissionResult(
@@ -630,8 +551,7 @@ def run_single_factor_route_admission(
             json.dumps(
                 {
                     "schema_version": S_ROUTE_STATE_SCHEMA_VERSION,
-                    "route_contract": "strict_trial_then_sequential_route_J_v1",
-                    "score_protocol": score_protocol,
+                    "route_contract": "strict_trial_only_v1",
                     "frozen_candidates": list(result.admitted_candidates),
                     "candidate_fingerprints": {
                         candidate: fingerprints[candidate]

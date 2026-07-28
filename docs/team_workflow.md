@@ -81,7 +81,7 @@ docs/                    # 合同、登记和协作规则
 |---|---|---|
 | 候选长表与单因子诊断 | `scripts/run_first_round.py` | `data/factors/candidate_pool.parquet`、`reports/first_round/first_round_*` |
 | S 路线 | `single_factor_admission.py::run_single_factor_route_admission` | `reports/routes/single_factor_route_admission.csv`、`reports/routes/single_factor_route_promotion.csv` |
-| I 路线 | `incremental_admission.py::run_incremental_admission` | `incremental_factorwise_admission.csv`、`incremental_conditional_forward.csv` |
+| I 路线 | `incremental_admission.py::run_incremental_admission` | `reports/routes/incremental_factorwise_admission.csv`、`reports/routes/incremental_factorwise_promotion.csv` |
 | T 路线 | `tree_admission.py::run_tree_admission` | `reports/routes/tree_factorwise_admission.csv`、`reports/routes/tree_factorwise_importance.csv`、`reports/routes/tree_factorwise_promotion.csv` |
 | 三条最终组合 | `scripts/run_combinations.py` | `reports/latest/combination_summary.csv`、`reports/latest/factor_pool_decisions.json` |
 
@@ -266,7 +266,7 @@ SHA-256: 4fd914654a38f11fc2f6b0bd1153d9db32c927e6a157ffaeb26a9b11c407e912
 该快照已经包含最新的连续微观日级面板、冻结 screened15、标准候选长表
 `data/factors/candidate_pool.parquet`、2019—2023 完整
 `FACTORLIB_ALL36` 和全部 manifests；不包含原始分钟数据或可由当前代码重算的
-`data/cache/`。当前本地 J reference 是 `all36 + self_library`：不能把 screened15
+`data/cache/`。本地 J 只用于冻结路线后的选择，reference 是 `all36 + self_library`：不能把 screened15
 复制后冒充完整参考池，也不能把我方当前或历史路线称为平台全局候选池。
 
 完整包作为私有仓库 Release 资产交付，不进入 Git 历史。仓库 collaborator
@@ -395,12 +395,12 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
 ```
 
 S、I、T 的内容寻址/冻结缓存分别位于
-`data/cache/single_factor_v2_strict_trial_J/`、
-`data/cache/incremental_v6_residual_entry_J/` 和
-`data/cache/tree_v5_entry_or_conditional_J/`，正常运行会自动复用完全相同的输入。新增或
-修改候选只会生成包含该候选的新缓存键；只有完成个人增量、条件前向和整体确认的
-成员才能写入冻结池。不得通过删除缓存、改报告或沿用原编号绕过冻结验证。冻结候选
-发生机制或取值变化必须登记为新版本并重新走完整准入。
+`data/cache/single_factor_v3_trial_only/`、
+`data/cache/incremental_v7_entry_only/` 和
+`data/cache/tree_v6_orthogonal_entry/`，正常运行会自动复用完全相同的输入。新增或
+修改候选只会生成包含该候选的新缓存键；S 满足质量/稳定/低重复要求、I 满足线性或残差信息要求、T 满足正交要求后
+才能写入冻结池。准入阶段不跑本地 J 或逐因子增量模型，不得通过删除缓存、改报告或
+沿用原编号绕过冻结验证。冻结候选发生机制或取值变化必须登记为新版本并重新走完整准入。
 
 `run_combinations.py` 每次都会先打印并保存真实快照检查结果；只有带
 `--check-files` 时才在打印后退出。不带该参数时，会继续运行 S/I/T、验证三条组合

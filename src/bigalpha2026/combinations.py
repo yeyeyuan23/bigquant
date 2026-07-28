@@ -6,6 +6,7 @@ AIStudio.  A frozen submission only uses recorded features and parameters.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Mapping
 
 import numpy as np
@@ -18,6 +19,7 @@ from .research_policy import fixed_weight_rank_combination
 def lightgbm_model_config() -> dict[str, object]:
     """Return the frozen, deliberately shallow LightGBM configuration."""
 
+    device_type = os.environ.get("BIGALPHA_LIGHTGBM_DEVICE_TYPE", "cpu").strip() or "cpu"
     return {
         "model": "LGBMRegressor",
         "learning_rate": 0.03,
@@ -30,6 +32,7 @@ def lightgbm_model_config() -> dict[str, object]:
         "subsample": 1.0,
         "colsample_bytree": 1.0,
         "reg_lambda": 1.0,
+        "device_type": device_type,
         "feature_transform": "daily_centered_percentile_rank",
         "target_transform": "daily_centered_percentile_rank",
         "monotone_constraints": "all_features_positive",
@@ -51,6 +54,7 @@ def _lightgbm_regressor(feature_count: int):
         colsample_bytree=float(config["colsample_bytree"]),
         reg_lambda=float(config["reg_lambda"]),
         random_state=int(config["random_state"]),
+        device_type=str(config["device_type"]),
         n_jobs=1,
         deterministic=True,
         force_col_wise=True,

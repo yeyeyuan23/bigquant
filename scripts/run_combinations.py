@@ -85,7 +85,6 @@ ROOT_GENERATED_REPORT_FILES = (
     "competition_J_reference_directions.csv",
     "factor_pool_incremental.csv",
     "factor_pool_screening.csv",
-    "incremental_conditional_forward.csv",
     "incremental_factorwise_admission.csv",
     "incremental_factorwise_promotion.csv",
     "incremental_pool_promotion.csv",
@@ -99,7 +98,6 @@ ROOT_GENERATED_REPORT_FILES = (
     "tree_factor_incremental.csv",
     "tree_factorwise_admission.csv",
     "tree_factorwise_promotion.csv",
-    "tree_group_increment.csv",
 )
 SCREENED_FACTORLIB_RAW_FEATURES = tuple(
     feature.removeprefix("factorlib__") for feature in FROZEN_FACTORLIB_SCREENED_FEATURES
@@ -168,13 +166,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--single-factor-cache-dir",
         type=Path,
         default=None,
-        help="frozen S state (default: DATA/cache/single_factor_v2_strict_trial_J)",
+        help="frozen S state (default: DATA/cache/single_factor_v3_trial_only)",
     )
     parser.add_argument(
         "--incremental-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed I cache (default: DATA/cache/incremental_v6_residual_entry_J)",
+        help="content-addressed I cache (default: DATA/cache/incremental_v7_entry_only)",
     )
     parser.add_argument(
         "--refresh-incremental-cache",
@@ -191,7 +189,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--tree-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed LightGBM cache (default: DATA/cache/tree_v5_entry_or_conditional_J)",
+        help="content-addressed LightGBM cache (default: DATA/cache/tree_v6_orthogonal_entry)",
     )
     parser.add_argument(
         "--refresh-tree-cache",
@@ -776,7 +774,6 @@ def build_admission_audit_rows(
     single_factor_set = set(single_factor_features)
     elastic_pool_inputs = set(incremental_result.individual_passed)
     admitted_incremental = set(incremental_result.frozen_after)
-    conditional_incremental = set(incremental_result.pending_passed)
     admitted_tree = set(tree_result.admitted_candidates)
     for self_column in self_columns:
         screened_row = (
@@ -798,27 +795,22 @@ def build_admission_audit_rows(
             {
                 **screened_row,
                 "feature": self_column,
-                "benchmark": "factorwise_elastic_net_J",
+                "benchmark": "incremental_entry",
                 "passed": screened_passed,
                 "reasons": screened_reasons,
             }
         )
         if enters_incremental_model:
             incremental_status = "frozen_I"
-        elif self_column in conditional_incremental:
-            incremental_status = "conditional_passed_not_promoted"
         elif screened_passed:
-            incremental_status = "individual_passed_conditional_failed"
+            incremental_status = "entry_passed_not_frozen"
         else:
-            incremental_status = "individual_failed"
+            incremental_status = "entry_failed"
         admission_rows.append(
             {
                 "candidate_id": self_column.removeprefix("self__"),
                 "feature": self_column,
                 "single_factor_passed": self_column in single_factor_set,
-                "candidate_level_incremental_J_computed": bool(
-                    screened_row.get("candidate_level_J_computed", False)
-                ),
                 "individual_I_passed": screened_passed,
                 # Backward-compatible alias. It means the candidate passed the
                 # individual I gate, not that it entered the frozen I model.
@@ -867,7 +859,7 @@ def run_route_admissions(
     single_factor_state = (
         Path(single_factor_cache_dir)
         if single_factor_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "single_factor_v2_strict_trial_J"
+        else reports_dir.parent / "data" / "cache" / "single_factor_v3_trial_only"
     ) / "frozen_state.json"
     single_factor = run_single_factor_route_admission(
         oriented.loc[oriented["date"].dt.year.isin(DEVELOPMENT_YEARS)],
@@ -879,7 +871,7 @@ def run_route_admissions(
     resolved_incremental_cache = (
         Path(incremental_cache_dir)
         if incremental_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "incremental_v6_residual_entry_J"
+        else reports_dir.parent / "data" / "cache" / "incremental_v7_entry_only"
     )
     incremental = run_incremental_admission(
         oriented,
@@ -896,7 +888,7 @@ def run_route_admissions(
     resolved_tree_cache = (
         Path(tree_cache_dir)
         if tree_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "tree_v5_entry_or_conditional_J"
+        else reports_dir.parent / "data" / "cache" / "tree_v6_orthogonal_entry"
     )
     tree = run_tree_admission(
         oriented,
@@ -1235,10 +1227,6 @@ def write_experiment_reports(
         incremental_promotion_path,
         index=False,
     )
-    pd.DataFrame(incremental_result.backward_evaluations).to_csv(
-        routes_dir / "incremental_conditional_forward.csv",
-        index=False,
-    )
     pd.DataFrame([incremental_result.promotion_row()]).to_csv(
         routes_dir / "incremental_factorwise_promotion.csv",
         index=False,
@@ -1261,43 +1249,16 @@ def write_experiment_reports(
         routes_dir / "tree_factor_admission.csv",
         index=False,
     )
-    pd.DataFrame(
-        [
-            {
-                **tree_result.group_increment,
-                "passed": tree_result.group_passed,
-                "reasons": "; ".join(tree_result.group_reasons),
-                "selected_candidate_count": len(tree_result.admitted_candidates),
-            }
-        ]
-    ).to_csv(
-        routes_dir / "tree_group_increment.csv",
-        index=False,
-    )
     if tree_result.pending_candidates:
         pd.DataFrame(
             [
                 {
                     "pending_candidates": ",".join(tree_result.pending_candidates),
-                    "selection": "entry_or_factorwise_then_conditional_forward",
-                    "conditional_passed_candidates": ",".join(
+                    "selection": "orthogonal_entry_only",
+                    "entry_passed_candidates": ",".join(
                         tree_result.pending_passed
                     ),
                     "provisional_pool_count": len(tree_result.provisional_pool),
-                    "provisional_vs_screened_increment": (
-                        tree_result.provisional_group_increment["delta_score_proxy"]
-                    ),
-                    "provisional_vs_screened_passed": (tree_result.provisional_group_passed),
-                    "provisional_vs_frozen_increment": (
-                        tree_result.promotion_increment["delta_score_proxy"]
-                    ),
-                    "provisional_vs_frozen_positive_window_ratio": (
-                        tree_result.promotion_increment["positive_score_window_ratio"]
-                    ),
-                    "provisional_vs_frozen_positive_years": (
-                        tree_result.promotion_increment["positive_score_years"]
-                    ),
-                    "provisional_vs_frozen_passed": (tree_result.promotion_passed),
                     "pool_promoted": tree_result.pool_promoted,
                     "frozen_candidates_after": ",".join(tree_result.admitted_candidates),
                 }
@@ -1370,7 +1331,7 @@ def build_experiment_result(
         "single_factor_route_admission": {
             "eligible_candidates": list(s_candidate_features),
             "admitted_candidates": list(single_factor_result.admitted_candidates),
-            "selection": "strict_trial_then_sequential_route_J",
+            "selection": "strict_trial_only",
             "promotion": single_factor_result.promotion_summary,
         },
         "learned_model_preprocessing": ("daily_centered_rank_features_and_target_neutral_fill"),
@@ -1390,8 +1351,6 @@ def build_experiment_result(
                 "method": "lightgbm",
                 "features": list(lightgbm_features),
                 "admission": "tree_incremental_T",
-                "development_group_increment": tree_result.group_increment,
-                "development_group_increment_passed": tree_result.group_passed,
             },
         },
         "factorlib_screened_reference": {
@@ -1579,19 +1538,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         single_factor_cache_dir=(
             args.single_factor_cache_dir
             if args.single_factor_cache_dir is not None
-            else args.data_dir / "cache" / "single_factor_v2_strict_trial_J"
+            else args.data_dir / "cache" / "single_factor_v3_trial_only"
         ),
         incremental_cache_dir=(
             args.incremental_cache_dir
             if args.incremental_cache_dir is not None
-            else args.data_dir / "cache" / "incremental_v6_residual_entry_J"
+            else args.data_dir / "cache" / "incremental_v7_entry_only"
         ),
         refresh_incremental_cache=args.refresh_incremental_cache,
         refresh_incremental_candidates=(args.refresh_incremental_candidate),
         tree_cache_dir=(
             args.tree_cache_dir
             if args.tree_cache_dir is not None
-            else args.data_dir / "cache" / "tree_v5_entry_or_conditional_J"
+            else args.data_dir / "cache" / "tree_v6_orthogonal_entry"
         ),
         refresh_tree_cache=args.refresh_tree_cache,
         refresh_tree_candidates=args.refresh_tree_candidate,
