@@ -314,8 +314,8 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 | --- | --- | ---: | ---: | --- | --- |
 | `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/rule_v02.ipynb` | 2026-07-26 已提交，保留为历史对照 |
 | `self_factor_composite / local-current` | `FR-002/005 + HF-001/003 + PV-010/011/014`，家族内等权后 FR/HF/PV 等权 | 0.929730 | — | `submissions/rule_v03.ipynb` | 最新 S winner 已生成，待 AIStudio/平台提交校验 |
-| `joint_elastic_net / local-current` | 冻结 `screened15 + FR-002 + PV-014`；日度截面秩目标、非负系数 | 0.07334 | 0.07020 | `submissions/enet_v01.ipynb` | 新 I 合同完整重评并冻结 |
-| `joint_lightgbm / local-current` | 冻结 `screened15` 加 `FR-002/005/015, HF-003/004, OB-001/003, PV-001/009/014/020`；日度截面秩目标、正单调约束 | 0.07377 | 0.06965 | `submissions/lgbm_v01.ipynb` | 新 T 合同完整重评并冻结 |
+| `joint_elastic_net / local-current` | 冻结 `screened15 + PV-008/PV-019/FR-006/HF-004/PV-011`；日度截面秩目标、正系数 | 0.581098 | — | `submissions/enet_v02.ipynb` | 当前 I winner 已生成，待 AIStudio/平台提交校验 |
+| `joint_lightgbm / local-current` | 冻结 `screened15 + PV-008/OB-003/PV-020/PV-013`；日度截面秩目标、正单调约束 | 0.852356 | — | `submissions/lgbm_v03.ipynb` | 当前 T winner 已生成，待 AIStudio/平台提交校验 |
 
 已提交 Notebook 均仅保留比赛要求的
 `main(datasources, start_date, end_date)`，返回列固定为

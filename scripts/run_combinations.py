@@ -1157,8 +1157,8 @@ def evaluate_validation_pipelines(
                 "validation_2023_tradable_rank_ic_mean": (validation_2023_tradable_ic),
                 "cross_regime_worst_year_rank_ic": cross_regime_worst_year_rank_ic,
                 "cross_regime_mean_rank_ic": cross_regime_mean_rank_ic,
-                "rank_ic_is_diagnostic_only": include_route_diagnostics,
-                "tradable_rank_ic_is_diagnostic_only": include_route_diagnostics,
+                "rank_ic_is_diagnostic_only": True,
+                "tradable_rank_ic_is_diagnostic_only": True,
                 "tree_group_gate_diagnostic": (
                     tree_group_passed if experiment == "joint_lightgbm" else None
                 ),

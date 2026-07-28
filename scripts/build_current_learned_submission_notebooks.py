@@ -13,8 +13,18 @@ SUBMISSIONS = (
         ROOT / "submissions" / "enet_v01.ipynb",
         "# BigAlpha 2026 current rolling Elastic Net\n",
         (
-            "screened15 + I 冻结池（PV-014、FR-002）；正系数 Elastic Net；"
-            "60 个交易日训练、20 个交易日预测。"
+            "screened15 + 旧 I 冻结池（PV-014、FR-002）；正系数 Elastic Net；"
+            "20 个交易日预测块；训练标签排除预测块前一交易日。"
+        ),
+    ),
+    (
+        ROOT / "submissions" / "enet_v02.py",
+        ROOT / "submissions" / "enet_v02.ipynb",
+        "# BigAlpha 2026 refreshed rolling Elastic Net v02\n",
+        (
+            "screened15 + 当前 I 冻结池 "
+            "PV-008/PV-019/FR-006/HF-004/PV-011；正系数 Elastic Net；"
+            "只用 start_date 前已完整观察到的历史标签训练。"
         ),
     ),
     (

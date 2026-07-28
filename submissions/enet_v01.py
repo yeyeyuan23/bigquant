@@ -380,9 +380,14 @@ def main(datasources, start_date, end_date):
         if test_dates.empty:
             continue
         first_test_position = all_dates.get_loc(test_dates[0])
-        if first_test_position < 60:
+        train_end_position = first_test_position - 1
+        train_start_position = train_end_position - 60
+        if train_start_position < 0:
             continue
-        train_dates = all_dates[first_test_position - 60 : first_test_position]
+        # The exposure immediately before a prediction block is labelled with
+        # the first prediction day's return.  Exclude it so every training
+        # label is already observable at the block start.
+        train_dates = all_dates[train_start_position:train_end_position]
         train = panel.loc[
             panel["date"].isin(train_dates) & panel["target"].notna()
         ]

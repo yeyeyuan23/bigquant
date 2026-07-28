@@ -1,0 +1,47 @@
+{
+  "protocol_version": "isolated_combination_pipelines_v11_score_first_J",
+  "artifact_role": "current_local_frozen_I_submission_candidate",
+  "route": "joint_elastic_net",
+  "selection_method": "factorwise_then_conditional_forward_with_pool_confirmations",
+  "members": [
+    "PV-008",
+    "PV-019",
+    "FR-006",
+    "HF-004",
+    "PV-011"
+  ],
+  "public_features": "screened15",
+  "model": {
+    "type": "ElasticNet",
+    "alpha": 0.001,
+    "l1_ratio": 0.5,
+    "positive": true,
+    "submission_training_boundary": "exclude labels not fully observed before start_date"
+  },
+  "local_proxy_scores": {
+    "validation_combined_base_score_proxy": 0.9182432432432432,
+    "validation_2022_score_proxy": 0.8993243243243243,
+    "validation_2023_score_proxy": 0.9148648648648648,
+    "validation_joint_crowding_score_proxy": 0.5810984060984061,
+    "robust_score_proxy": 0.5810984060984061
+  },
+  "data_snapshot": {
+    "candidate_factor_version": "literature_round4_v1_2026-07-27",
+    "candidate_pool_sha256": "cd5adb7ba98692a2c8bbfc64423bc7b3cae9665de4539b6414a7d85816ba828e",
+    "rows": 1214000,
+    "duplicate_keys": 0
+  },
+  "submission_files": {
+    "python": "submissions/enet_v02.py",
+    "notebook": "submissions/enet_v02.ipynb"
+  },
+  "platform_status": {
+    "aistudio_contract_check": "pending",
+    "aistudio_lookahead_probe": "pending",
+    "competition_submission": "not_submitted"
+  },
+  "limitations": [
+    "Scores are local proxy J values, not official platform scores.",
+    "The submission file must pass AIStudio output and prefix lookahead checks before competition submission."
+  ]
+}
