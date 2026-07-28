@@ -115,7 +115,7 @@ OAP 公式只作为文献机制来源。正式实现必须使用比赛指定数�
 | 8 | RevenueSurprise | FR | 现有 PIT 收入历史即可构造A股改写版 |
 
 精确结果见统一输出 `reports/routes/factor_pool_incremental.csv` 和
-`reports/factor_pool_admission.csv`。当前 `PV-003` 仅通过 S，进入规则复合；
+`reports/latest/factor_pool_admission.csv`。当前 `PV-003` 仅通过 S，进入规则复合；
 `FR-004、FR-005` 仅通过 I，进入两个联合模型。`PV-007/zerotrade1M` 因 21 日
 离散计数无法达到每日 50 个不同值的技术门槛而淘汰，其余本批候选未获准。
 

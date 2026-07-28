@@ -1,7 +1,7 @@
 # Reports 目录地图和字段字典
 
 `reports/` 是本地评价和提交路线审计目录。报告是审计产物，不是冻结状态；
-正式冻结成员优先看 `factor_pool_decisions.json` 和对应
+正式冻结成员优先看 `latest/factor_pool_decisions.json` 和对应
 `data/cache/*/frozen_state.json`。平台真实分数仍以提交结果为准。
 
 ## 目录层级
@@ -9,10 +9,11 @@
 ```text
 reports/
 ├── README.md
-├── factor_pool_check.json          # 当前真实快照合同
-├── combination_summary.csv         # 当前三条最终路线排序
-├── factor_pool_decisions.json      # 当前机器可读路线合同
-├── factor_pool_admission.csv       # 当前候选进入 S/I/T 的总表
+├── latest/                         # 当前组合运行摘要入口
+│   ├── factor_pool_check.json      # 当前真实快照合同
+│   ├── combination_summary.csv     # 当前三条最终路线排序
+│   ├── factor_pool_decisions.json  # 当前机器可读路线合同
+│   └── factor_pool_admission.csv   # 当前候选进入 S/I/T 的总表
 ├── first_round/                    # 候选第一轮单因子诊断
 ├── routes/                         # S/I/T 和最终路线细项
 ├── diagnostics/                    # 一次性研究、探针和覆盖率附件
@@ -21,15 +22,15 @@ reports/
 
 ## 推荐阅读顺序
 
-1. `factor_pool_check.json`：确认数据快照、候选版本、覆盖率和 join 规则。
-2. `combination_summary.csv`：看当前本地 J proxy 排序。
-3. `factor_pool_decisions.json`：看每条 pipeline 的正式成员和完整评分合同。
-4. `factor_pool_admission.csv`：看每个自研候选进入 S/I/T 哪些路线。
+1. `latest/factor_pool_check.json`：确认数据快照、候选版本、覆盖率和 join 规则。
+2. `latest/combination_summary.csv`：看当前本地 J proxy 排序。
+3. `latest/factor_pool_decisions.json`：看每条 pipeline 的正式成员和完整评分合同。
+4. `latest/factor_pool_admission.csv`：看每个自研候选进入 S/I/T 哪些路线。
 5. `routes/`：需要排查具体 S/I/T 准入时再看。
 6. `first_round/`：需要看候选单因子技术、IC、稳定性、相关性时再看。
 7. `diagnostics/` 和 `archive/`：只用于追溯。
 
-## 根目录当前入口
+## latest/ 当前入口
 
 ### factor_pool_check.json
 
@@ -104,6 +105,11 @@ reports/
   - `reasons`：失败原因。
   - `bootstrap_reference`：没有旧 frozen S 时使用的启动参考。
 
+S 的 Rank IC、t 统计、中性化、可交易和稳定性诊断不参与当前 S 路线准入。
+主组合流程默认跳过这些重诊断；如果只是要审计单因子质量，用
+`scripts/run_first_round.py`，如果要给最终路线补审计字段，再给
+`scripts/run_combinations.py` 加 `--include-route-diagnostics`。
+
 ### I 路线
 
 - `factor_pool_incremental.csv`：I 路线候选增量审计。
@@ -160,6 +166,12 @@ reports/
 - `factor_pool_screening.csv`：公开 screened15 和候选筛查结果。
 - `competition_J_reference_directions.csv`：本地 all36 J proxy 方向参考。
 - `self_factor_composite_metrics.csv`：S winner 路线指标。
+
+`self_factor_composite_metrics.csv`、`joint_elastic_net_metrics.csv` 和
+`joint_lightgbm_metrics.csv` 默认只保证包含路线级 J 排名需要的字段。
+`validation_*_rank_ic_*`、`*_tradable_*` 等字段只有在
+`--include-route-diagnostics` 下才会计算；默认可能是空值，不能拿来做
+准入判断。
 
 ## diagnostics/
 

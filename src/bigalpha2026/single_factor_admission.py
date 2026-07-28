@@ -374,7 +374,7 @@ def run_single_factor_route_admission(
                 "revalidation; automatic replacement is forbidden."
             )
         frozen = state_candidates
-    missing = sorted(set((*candidates, *frozen)).difference(oriented_panel))
+    missing = sorted({*candidates, *frozen}.difference(oriented_panel))
     if missing:
         raise ValueError(f"S route panel is missing candidates: {missing}")
     pending = tuple(candidate for candidate in candidates if candidate not in frozen)

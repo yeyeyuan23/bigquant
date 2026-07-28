@@ -11,9 +11,9 @@
 - 字段、主键和可用时点：[数据合同](docs/data_contract.md)
 - 报告目录地图和 CSV 字段读法：[Reports 说明](reports/README.md)
 - 候选定义、方向和当前状态：[候选登记表](docs/candidate_registry.md)
-- 当前可执行路由：`reports/factor_pool_admission.csv`
-- 当前三管线结果和成员：`reports/combination_summary.csv` 与
-  `reports/factor_pool_decisions.json`
+- 当前可执行路由：`reports/latest/factor_pool_admission.csv`
+- 当前三管线结果和成员：`reports/latest/combination_summary.csv` 与
+  `reports/latest/factor_pool_decisions.json`
 - 已提交版本的不可变配置：`artifacts/frozen/`
 
 文档职责保持分离：研究规则只在执行计划中定义，数据口径只在数据合同中定义，
@@ -161,7 +161,7 @@ tests/                    # 单元、接口和防泄漏测试
 
 ## 结果文件读法
 
-- `reports/factor_pool_check.json`：真实快照合同检查结果。
+- `reports/latest/factor_pool_check.json`：真实快照合同检查结果。
 - `reports/first_round/first_round_*.csv/json`：候选单因子技术、指标和稳定性诊断。
 - `reports/routes/incremental_factorwise_admission.csv`：I 中每个因子的 Elastic Net 个人
   增量、条件前向和冻结状态。
@@ -172,9 +172,9 @@ tests/                    # 单元、接口和防泄漏测试
 - `reports/routes/tree_factorwise_importance.csv`：T 中每次 LightGBM 训练的 split/gain
   importance。
 - `reports/routes/tree_factorwise_promotion.csv`：T 条件通过池的整体确认结果。
-- `reports/factor_pool_admission.csv`：每个候选最终进入 S/I/T 哪些路线。
-- `reports/combination_summary.csv`：三条最终路线的验证期表现和排序。
-- `reports/factor_pool_decisions.json`：机器可读的完整路由、模型和评分合同。
+- `reports/latest/factor_pool_admission.csv`：每个候选最终进入 S/I/T 哪些路线。
+- `reports/latest/combination_summary.csv`：三条最终路线的验证期表现和排序。
+- `reports/latest/factor_pool_decisions.json`：机器可读的完整路由、模型和评分合同。
 
 字段细节见 [Reports 说明](reports/README.md)。
 

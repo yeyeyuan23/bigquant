@@ -77,6 +77,30 @@ OBSOLETE_REPORT_FILES = (
     "incremental_backward_admission.csv",
     "tree_pool_promotion.csv",
 )
+ROOT_GENERATED_REPORT_FILES = (
+    "factor_pool_check.json",
+    "combination_summary.csv",
+    "factor_pool_decisions.json",
+    "factor_pool_admission.csv",
+    "competition_J_reference_directions.csv",
+    "factor_pool_incremental.csv",
+    "factor_pool_screening.csv",
+    "incremental_conditional_forward.csv",
+    "incremental_factorwise_admission.csv",
+    "incremental_factorwise_promotion.csv",
+    "incremental_pool_promotion.csv",
+    "joint_elastic_net_metrics.csv",
+    "joint_elastic_net_weights.csv",
+    "joint_lightgbm_metrics.csv",
+    "self_factor_composite_metrics.csv",
+    "single_factor_route_admission.csv",
+    "single_factor_route_promotion.csv",
+    "tree_factor_admission.csv",
+    "tree_factor_incremental.csv",
+    "tree_factorwise_admission.csv",
+    "tree_factorwise_promotion.csv",
+    "tree_group_increment.csv",
+)
 SCREENED_FACTORLIB_RAW_FEATURES = tuple(
     feature.removeprefix("factorlib__") for feature in FROZEN_FACTORLIB_SCREENED_FEATURES
 )
@@ -95,12 +119,16 @@ def enters_family_equal_rank(feature: str) -> bool:
 def cleanup_obsolete_reports(reports_dir: Path) -> None:
     """Remove report files whose names encode retired admission semantics."""
 
-    for filename in OBSOLETE_REPORT_FILES:
+    for filename in (*OBSOLETE_REPORT_FILES, *ROOT_GENERATED_REPORT_FILES):
         (reports_dir / filename).unlink(missing_ok=True)
 
 
 def first_round_reports_dir(reports_dir: Path) -> Path:
     return reports_dir / "first_round"
+
+
+def latest_reports_dir(reports_dir: Path) -> Path:
+    return reports_dir / "latest"
 
 
 def route_reports_dir(reports_dir: Path) -> Path:
@@ -175,6 +203,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="append",
         default=[],
         help="re-evaluate this candidate against frozen T without deleting cache",
+    )
+    parser.add_argument(
+        "--include-route-diagnostics",
+        action="store_true",
+        help=(
+            "also compute route IC/t/neutralized/tradable diagnostics; "
+            "these fields are report-only and are skipped by default"
+        ),
     )
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--reports-dir", type=Path, default=DEFAULT_REPORTS)
@@ -993,80 +1029,104 @@ def evaluate_validation_pipelines(
     exposures: pd.DataFrame,
     *,
     tree_group_passed: bool,
+    include_route_diagnostics: bool,
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
-    """Calculate diagnostics and competition-score ranking inputs."""
+    """Calculate competition-score ranking inputs and optional diagnostics."""
 
     metric_rows: list[dict[str, object]] = []
-    periods = {
-        "validation_2022": VALIDATION_2022_YEAR,
-        "validation_2023": VALIDATION_2023_YEAR,
-    }
-    for (experiment, method), factor in pipelines.items():
-        for period, year in periods.items():
-            block = factor.loc[factor["date"].dt.year.eq(year)]
-            dates = block["date"].unique()
-            metric_rows.extend(
-                period_metrics(
-                    experiment,
-                    method,
-                    period,
-                    block,
-                    labels.loc[labels["date"].isin(dates)],
-                    exposures.loc[exposures["date"].isin(dates)],
+    if include_route_diagnostics:
+        periods = {
+            "validation_2022": VALIDATION_2022_YEAR,
+            "validation_2023": VALIDATION_2023_YEAR,
+        }
+        for (experiment, method), factor in pipelines.items():
+            for period, year in periods.items():
+                block = factor.loc[factor["date"].dt.year.eq(year)]
+                dates = block["date"].unique()
+                metric_rows.extend(
+                    period_metrics(
+                        experiment,
+                        method,
+                        period,
+                        block,
+                        labels.loc[labels["date"].isin(dates)],
+                        exposures.loc[exposures["date"].isin(dates)],
+                    )
                 )
-            )
-    metrics = pd.DataFrame(metric_rows)
+    metrics = pd.DataFrame(
+        metric_rows,
+        columns=None
+        if metric_rows
+        else ["experiment", "method", "period", "variant"],
+    )
 
     decisions: list[dict[str, object]] = []
     for experiment, method in pipelines:
-        validation_2022_ic = metric_value(
-            metrics,
-            experiment,
-            method,
-            "validation_2022",
-            "raw_full",
-            "rank_ic_mean",
-        )
-        validation_2022_t = metric_value(
-            metrics,
-            experiment,
-            method,
-            "validation_2022",
-            "raw_full",
-            "rank_ic_t_stat",
-        )
-        validation_2022_tradable_ic = metric_value(
-            metrics,
-            experiment,
-            method,
-            "validation_2022",
-            "raw_tradable",
-            "rank_ic_mean",
-        )
-        validation_2023_ic = metric_value(
-            metrics,
-            experiment,
-            method,
-            "validation_2023",
-            "raw_full",
-            "rank_ic_mean",
-        )
-        validation_2023_t = metric_value(
-            metrics,
-            experiment,
-            method,
-            "validation_2023",
-            "raw_full",
-            "rank_ic_t_stat",
-        )
-        validation_2023_tradable_ic = metric_value(
-            metrics,
-            experiment,
-            method,
-            "validation_2023",
-            "raw_tradable",
-            "rank_ic_mean",
-        )
+        if include_route_diagnostics:
+            validation_2022_ic = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2022",
+                "raw_full",
+                "rank_ic_mean",
+            )
+            validation_2022_t = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2022",
+                "raw_full",
+                "rank_ic_t_stat",
+            )
+            validation_2022_tradable_ic = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2022",
+                "raw_tradable",
+                "rank_ic_mean",
+            )
+            validation_2023_ic = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2023",
+                "raw_full",
+                "rank_ic_mean",
+            )
+            validation_2023_t = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2023",
+                "raw_full",
+                "rank_ic_t_stat",
+            )
+            validation_2023_tradable_ic = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2023",
+                "raw_tradable",
+                "rank_ic_mean",
+            )
+            cross_regime_worst_year_rank_ic = min(
+                validation_2022_ic,
+                validation_2023_ic,
+            )
+            cross_regime_mean_rank_ic = (
+                validation_2022_ic + validation_2023_ic
+            ) / 2.0
+        else:
+            validation_2022_ic = float("nan")
+            validation_2022_t = float("nan")
+            validation_2022_tradable_ic = float("nan")
+            validation_2023_ic = float("nan")
+            validation_2023_t = float("nan")
+            validation_2023_tradable_ic = float("nan")
+            cross_regime_worst_year_rank_ic = float("nan")
+            cross_regime_mean_rank_ic = float("nan")
         score_summary = score_summaries[experiment]
         crowded_score = float(crowding_scores[experiment]["score_proxy"])
         score_values = (
@@ -1095,13 +1155,10 @@ def evaluate_validation_pipelines(
                 "validation_2023_rank_ic_mean": validation_2023_ic,
                 "validation_2023_rank_ic_t_stat": validation_2023_t,
                 "validation_2023_tradable_rank_ic_mean": (validation_2023_tradable_ic),
-                "cross_regime_worst_year_rank_ic": min(
-                    validation_2022_ic,
-                    validation_2023_ic,
-                ),
-                "cross_regime_mean_rank_ic": (validation_2022_ic + validation_2023_ic) / 2.0,
-                "rank_ic_is_diagnostic_only": True,
-                "tradable_rank_ic_is_diagnostic_only": True,
+                "cross_regime_worst_year_rank_ic": cross_regime_worst_year_rank_ic,
+                "cross_regime_mean_rank_ic": cross_regime_mean_rank_ic,
+                "rank_ic_is_diagnostic_only": include_route_diagnostics,
+                "tradable_rank_ic_is_diagnostic_only": include_route_diagnostics,
                 "tree_group_gate_diagnostic": (
                     tree_group_passed if experiment == "joint_lightgbm" else None
                 ),
@@ -1126,6 +1183,8 @@ def write_experiment_reports(
     """Write route audits and return the frozen submission ranking."""
 
     reports_dir.mkdir(exist_ok=True)
+    latest_dir = latest_reports_dir(reports_dir)
+    latest_dir.mkdir(exist_ok=True)
     routes_dir = route_reports_dir(reports_dir)
     routes_dir.mkdir(exist_ok=True)
     elastic_net_weights.to_csv(
@@ -1154,7 +1213,7 @@ def write_experiment_reports(
         index=False,
     )
     pd.DataFrame(admission_rows).to_csv(
-        reports_dir / "factor_pool_admission.csv",
+        latest_dir / "factor_pool_admission.csv",
         index=False,
     )
     incremental_promotion_path = routes_dir / "incremental_pool_promotion.csv"
@@ -1247,7 +1306,7 @@ def write_experiment_reports(
     }
     combination_summary["rank"] = combination_summary["pipeline"].map(rank_by_pipeline)
     combination_summary.to_csv(
-        reports_dir / "combination_summary.csv",
+        latest_dir / "combination_summary.csv",
         index=False,
     )
     tree_result.write_states()
@@ -1267,6 +1326,7 @@ def build_experiment_result(
     admission_rows: Sequence[dict[str, object]],
     pipeline_decisions: dict[str, dict[str, object]],
     frozen_submission_order: list[str],
+    include_route_diagnostics: bool,
 ) -> dict[str, object]:
     """Build the stable JSON contract consumed by downstream tools."""
 
@@ -1289,7 +1349,9 @@ def build_experiment_result(
             ],
             "direction": "best_of_z_and_negative_z_on_combined_validation_J",
             "crowding_scope": ("one_joint_fit_of_current_sibling_routes_not_global_history"),
-            "rank_ic_and_tradability": "diagnostic_only",
+            "rank_ic_and_tradability": (
+                "diagnostic_only" if include_route_diagnostics else "skipped_by_default"
+            ),
         },
         "single_factor_route_admission": {
             "eligible_candidates": list(s_candidate_features),
@@ -1352,6 +1414,7 @@ def run_experiments(
     tree_cache_dir: Path | None = None,
     refresh_tree_cache: bool = False,
     refresh_tree_candidates: Sequence[str] = (),
+    include_route_diagnostics: bool = False,
 ) -> dict[str, object]:
     del resume_incremental
     (
@@ -1419,6 +1482,7 @@ def run_experiments(
         labels,
         exposures,
         tree_group_passed=tree_result.group_passed,
+        include_route_diagnostics=include_route_diagnostics,
     )
 
     pipeline_decisions, frozen_submission_order = write_experiment_reports(
@@ -1447,8 +1511,10 @@ def run_experiments(
         admission_rows,
         pipeline_decisions,
         frozen_submission_order,
+        include_route_diagnostics,
     )
-    (reports_dir / "factor_pool_decisions.json").write_text(
+    latest_reports_dir(reports_dir).mkdir(exist_ok=True)
+    (latest_reports_dir(reports_dir) / "factor_pool_decisions.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -1465,7 +1531,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if summary["status"] != "ok":
         return 2
     args.reports_dir.mkdir(exist_ok=True)
-    (args.reports_dir / "factor_pool_check.json").write_text(
+    latest_reports_dir(args.reports_dir).mkdir(exist_ok=True)
+    (latest_reports_dir(args.reports_dir) / "factor_pool_check.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -1514,6 +1581,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
         refresh_tree_cache=args.refresh_tree_cache,
         refresh_tree_candidates=args.refresh_tree_candidate,
+        include_route_diagnostics=args.include_route_diagnostics,
     )
     print(json.dumps(result["pipeline_decisions"], ensure_ascii=False, indent=2))
     return 0

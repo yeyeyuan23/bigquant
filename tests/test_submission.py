@@ -59,6 +59,16 @@ CURRENT_LEARNED_SUBMISSIONS = (
             "PV-020",
         ),
     ),
+    (
+        ROOT / "submissions" / "lgbm_v03.py",
+        ROOT / "submissions" / "lgbm_v03.ipynb",
+        (
+            "PV-008",
+            "OB-003",
+            "PV-020",
+            "PV-013",
+        ),
+    ),
 )
 ALLOWED_COMPETITION_TABLES = {
     "bigalpha_2026_exposure",

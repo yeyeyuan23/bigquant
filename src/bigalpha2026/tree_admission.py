@@ -28,7 +28,6 @@ from .tree_cache import (
     frame_column_fingerprint,
 )
 
-
 TREE_SCORE_GATE = CompetitionScoreIncrementGate(
     minimum_score_increment=(
         COMPETITION_SCORE_INCREMENT_GATE.minimum_score_increment

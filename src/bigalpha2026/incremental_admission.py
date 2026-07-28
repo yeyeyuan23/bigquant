@@ -375,7 +375,6 @@ def run_incremental_admission(
     base_fingerprint_payload = {
         feature: fingerprints[feature] for feature in selected_public
     }
-    cache_keys: dict[str, str] = {}
     base_digest = content_digest(
         {
             "base_feature_fingerprints": base_fingerprint_payload,

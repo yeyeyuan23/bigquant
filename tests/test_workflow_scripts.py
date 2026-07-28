@@ -15,11 +15,11 @@ from bigalpha2026.incremental_admission import (
     sequential_forward_select,
     validated_frozen_incremental_pool,
 )
-from bigalpha2026.single_factor_admission import classify_candidates
+from bigalpha2026.research_policy import competition_score_increment_gate
 from bigalpha2026.single_factor_admission import (
+    classify_candidates,
     run_single_factor_route_admission,
 )
-from bigalpha2026.research_policy import competition_score_increment_gate
 from bigalpha2026.tree_admission import (
     promote_frozen_tree_pool,
     unresolved_tree_candidates,
@@ -59,13 +59,17 @@ class WorkflowScriptTest(unittest.TestCase):
             )
             for filename in retired_names:
                 (reports_dir / filename).write_text("stale\n", encoding="utf-8")
-            current_report = reports_dir / "tree_factorwise_admission.csv"
+            stale_root_report = reports_dir / "tree_factorwise_admission.csv"
+            stale_root_report.write_text("stale root\n", encoding="utf-8")
+            current_report = reports_dir / "routes" / "tree_factorwise_admission.csv"
+            current_report.parent.mkdir()
             current_report.write_text("current\n", encoding="utf-8")
 
             cleanup_obsolete_reports(reports_dir)
 
             for filename in retired_names:
                 self.assertFalse((reports_dir / filename).exists())
+            self.assertFalse(stale_root_report.exists())
             self.assertEqual(
                 current_report.read_text(encoding="utf-8"),
                 "current\n",

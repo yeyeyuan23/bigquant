@@ -472,10 +472,11 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
 
 ```text
 reports/
-├── factor_pool_check.json
-├── factor_pool_admission.csv
-├── combination_summary.csv
-├── factor_pool_decisions.json
+├── latest/
+│   ├── factor_pool_check.json
+│   ├── factor_pool_admission.csv
+│   ├── combination_summary.csv
+│   └── factor_pool_decisions.json
 ├── first_round/
 │   ├── first_round_technical.csv
 │   ├── first_round_metrics.csv

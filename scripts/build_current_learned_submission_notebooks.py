@@ -35,6 +35,16 @@ SUBMISSIONS = (
             "所有数据查询均不超过 end_date。"
         ),
     ),
+    (
+        ROOT / "submissions" / "lgbm_v03.py",
+        ROOT / "submissions" / "lgbm_v03.ipynb",
+        "# BigAlpha 2026 refreshed rolling LightGBM v03\n",
+        (
+            "screened15 + 昨日手工重跑确认的 T 池 "
+            "PV-008/OB-003/PV-020/PV-013；沿用 v02 的平台安全查询边界；"
+            "只用 start_date 前已完整观察到的历史标签训练。"
+        ),
+    ),
 )
 
 

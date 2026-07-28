@@ -83,7 +83,7 @@ docs/                    # 合同、登记和协作规则
 | S 路线 | `single_factor_admission.py::run_single_factor_route_admission` | `reports/routes/single_factor_route_admission.csv`、`reports/routes/single_factor_route_promotion.csv` |
 | I 路线 | `incremental_admission.py::run_incremental_admission` | `incremental_factorwise_admission.csv`、`incremental_conditional_forward.csv` |
 | T 路线 | `tree_admission.py::run_tree_admission` | `reports/routes/tree_factorwise_admission.csv`、`reports/routes/tree_factorwise_importance.csv`、`reports/routes/tree_factorwise_promotion.csv` |
-| 三条最终组合 | `scripts/run_combinations.py` | `combination_summary.csv`、`factor_pool_decisions.json` |
+| 三条最终组合 | `scripts/run_combinations.py` | `reports/latest/combination_summary.csv`、`reports/latest/factor_pool_decisions.json` |
 
 ## 2. 开始协作前
 
@@ -269,7 +269,20 @@ SHA-256: 4fd914654a38f11fc2f6b0bd1153d9db32c927e6a157ffaeb26a9b11c407e912
 复制后冒充完整参考池，也不能把我方当前或历史路线称为平台全局候选池。
 
 完整包作为私有仓库 Release 资产交付，不进入 Git 历史。仓库 collaborator
-完成 `gh auth login` 后可直接下载：
+完成 `gh auth login` 或 `gh auth refresh -h github.com` 后，上传方执行：
+
+```bash
+bash scripts/upload_transfer_release.sh data-transfer-20260728
+```
+
+接收方执行：
+
+```bash
+bash scripts/download_transfer_release.sh data-transfer-20260728
+```
+
+脚本会把资产下载到 `data/transfers/` 并按
+`artifacts/transfers/SHA256SUMS` 自动校验。也可以手动下载指定 asset：
 
 ```bash
 gh release download data-v3-2026-07-27 \
