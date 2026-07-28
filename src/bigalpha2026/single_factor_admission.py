@@ -10,16 +10,17 @@ from pathlib import Path
 import pandas as pd
 
 from .competition_score_proxy import CompetitionScoreReference
-from .evaluation import evaluate_single_factor, rank_ic_series
+from .evaluation import evaluate_single_factor, factor_rank_correlation, rank_ic_series
 from .factor_pool import family_balanced_factor
 from .research_policy import (
     FORMAL_EVALUATION_POLICY,
+    SINGLE_FACTOR_ROUTE_GATE,
     TECHNICAL_GATE,
     competition_score_increment_gate,
 )
 from .tree_cache import feature_fingerprints
 
-S_ROUTE_STATE_SCHEMA_VERSION = "single-factor-route-state-v1-J"
+S_ROUTE_STATE_SCHEMA_VERSION = "single-factor-route-state-v2-strict-trial-J"
 
 
 @dataclass(frozen=True)
@@ -146,6 +147,100 @@ def stability_rows(
                 }
             )
     return rows
+
+
+def candidate_s_trial_diagnostics(
+    oriented_panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    candidate: str,
+    baseline_candidates: Sequence[str],
+) -> dict[str, object]:
+    """Strict cheap S evidence before route-level J admission."""
+
+    gate = SINGLE_FACTOR_ROUTE_GATE
+    label_column = "ret_close_to_close"
+    frame = oriented_panel[["date", "instrument", candidate]].copy()
+    coverage = float(pd.to_numeric(frame[candidate], errors="coerce").notna().mean())
+    active_days = int(
+        frame.groupby("date", sort=True)[candidate].nunique().gt(1).sum()
+    )
+    merged = frame.merge(
+        labels[["date", "instrument", label_column]],
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    ic = rank_ic_series(
+        merged,
+        factor_column=candidate,
+        label_column=label_column,
+    ).dropna()
+    fold_ic = ic.groupby(ic.index.year).mean() if not ic.empty else pd.Series(dtype=float)
+    rank_ic_mean = float(ic.mean()) if not ic.empty else float("nan")
+    worst_fold_rank_ic = float(fold_ic.min()) if not fold_ic.empty else float("nan")
+    positive_fold_ratio = (
+        float((fold_ic > 0).mean()) if not fold_ic.empty else 0.0
+    )
+    sign_consistency = positive_fold_ratio
+    baseline = tuple(dict.fromkeys(map(str, baseline_candidates)))
+    if baseline:
+        columns = (*baseline, candidate)
+        correlations = factor_rank_correlation(
+            oriented_panel[["date", "instrument", *columns]],
+            columns,
+        )
+        max_abs_rank_correlation = float(
+            correlations.loc[candidate, list(baseline)].abs().max()
+        )
+    else:
+        max_abs_rank_correlation = 0.0
+
+    quality_pass = bool(
+        coverage >= gate.minimum_coverage
+        and active_days >= gate.minimum_active_days
+    )
+    strength_pass = bool(
+        pd.notna(rank_ic_mean)
+        and rank_ic_mean >= gate.minimum_rank_ic_mean
+        and pd.notna(worst_fold_rank_ic)
+        and worst_fold_rank_ic >= gate.minimum_worst_fold_rank_ic
+    )
+    stability_pass = bool(
+        positive_fold_ratio >= gate.minimum_positive_fold_ratio
+        and sign_consistency >= gate.minimum_sign_consistency
+    )
+    redundancy_pass = bool(
+        pd.notna(max_abs_rank_correlation)
+        and max_abs_rank_correlation <= gate.maximum_abs_rank_correlation
+    )
+    trial_passed = bool(
+        quality_pass and strength_pass and stability_pass and redundancy_pass
+    )
+    reasons = []
+    if not quality_pass:
+        reasons.append("S quality gate failed")
+    if not strength_pass:
+        reasons.append("S strength gate failed")
+    if not stability_pass:
+        reasons.append("S stability gate failed")
+    if not redundancy_pass:
+        reasons.append("S redundancy gate failed")
+    return {
+        "s_trial_passed": trial_passed,
+        "s_quality_passed": quality_pass,
+        "s_strength_passed": strength_pass,
+        "s_stability_passed": stability_pass,
+        "s_redundancy_passed": redundancy_pass,
+        "s_trial_reasons": "; ".join(reasons),
+        "s_coverage": coverage,
+        "s_active_days": active_days,
+        "s_rank_ic_mean": rank_ic_mean,
+        "s_worst_fold_rank_ic": worst_fold_rank_ic,
+        "s_positive_fold_ratio": positive_fold_ratio,
+        "s_sign_consistency": sign_consistency,
+        "s_max_abs_rank_correlation": max_abs_rank_correlation,
+    }
 
 
 def classify_candidates(
@@ -378,8 +473,7 @@ def run_single_factor_route_admission(
     if missing:
         raise ValueError(f"S route panel is missing candidates: {missing}")
     pending = tuple(candidate for candidate in candidates if candidate not in frozen)
-    current = list(dict.fromkeys((*frozen, *pending)))
-    if not current:
+    if not frozen and not pending:
         raise ValueError("S route requires at least one candidate")
 
     factor_cache: dict[tuple[str, ...], pd.DataFrame] = {}
@@ -396,52 +490,128 @@ def run_single_factor_route_admission(
         return factor_cache[key]
 
     evaluations: list[dict[str, object]] = []
-    retained_pending = pending
-    if frozen and retained_pending:
+    accepted: list[str] = []
+    for candidate in pending:
+        baseline_candidates = tuple(dict.fromkeys((*frozen, *accepted)))
+        if hasattr(score_reference, "labels"):
+            trial = candidate_s_trial_diagnostics(
+                oriented_panel,
+                score_reference.labels,
+                candidate=candidate,
+                baseline_candidates=baseline_candidates,
+            )
+        else:
+            trial = {
+                "s_trial_passed": True,
+                "s_quality_passed": True,
+                "s_strength_passed": True,
+                "s_stability_passed": True,
+                "s_redundancy_passed": True,
+                "s_trial_reasons": "",
+            }
+        row: dict[str, object] = {
+            "candidate": candidate,
+            "baseline_candidates": ",".join(baseline_candidates),
+            **trial,
+        }
+        if not bool(trial["s_trial_passed"]):
+            row.update(
+                {
+                    "candidate_route_J_computed": False,
+                    "route_increment_passed": False,
+                    "route_increment_reasons": str(trial["s_trial_reasons"]),
+                    "s_route_passed": False,
+                }
+            )
+            evaluations.append(row)
+            continue
+
+        augmented_candidates = tuple(
+            dict.fromkeys((*baseline_candidates, candidate))
+        )
+        if not baseline_candidates and not frozen:
+            route_passed = True
+            route_reasons = [
+                "bootstrap S from trial gate because no existing S baseline exists"
+            ]
+        elif baseline_candidates:
+            increment = score_reference.paired_increment(
+                route_factor(baseline_candidates),
+                route_factor(augmented_candidates),
+                include_stability=False,
+            )
+            route_passed, route_reasons = competition_score_increment_gate(
+                increment
+            )
+            row.update(increment)
+        else:
+            score = score_reference.score(route_factor(augmented_candidates))
+            route_passed = bool(float(score["score_proxy"]) > 0.5)
+            route_reasons = (
+                []
+                if route_passed
+                else ["bootstrap S route score does not exceed reference median"]
+            )
+            row.update(
+                {
+                    f"augmented_{key}": value
+                    for key, value in score.items()
+                    if key in {"a_proxy", "b_proxy", "score_proxy"}
+                }
+            )
+        row.update(
+            {
+                "candidate_route_J_computed": bool(baseline_candidates or frozen),
+                "route_increment_passed": route_passed,
+                "route_increment_reasons": "; ".join(route_reasons),
+                "s_route_passed": route_passed,
+            }
+        )
+        evaluations.append(row)
+        if route_passed:
+            accepted.append(candidate)
+
+    retained_pending = tuple(accepted)
+    admitted = tuple(dict.fromkeys((*frozen, *retained_pending)))
+    if not admitted:
+        promotion_summary = {
+            "passed": False,
+            "reasons": "no S candidate passed trial and route increment gates",
+            "selection": "strict_trial_then_sequential_route_J",
+        }
+        promotion_passed = False
+    elif frozen and retained_pending:
         promotion_summary = score_reference.paired_increment(
             route_factor(frozen),
-            route_factor(current),
+            route_factor(admitted),
             include_stability=False,
         )
-        promotion_passed, promotion_reasons = (
-            competition_score_increment_gate(promotion_summary)
+        promotion_passed, promotion_reasons = competition_score_increment_gate(
+            promotion_summary
         )
-    elif retained_pending:
-        final_score = score_reference.score(route_factor(current))
+        if not promotion_passed:
+            admitted = frozen
         promotion_summary = {
-            **{
-                f"augmented_{key}": value
-                for key, value in final_score.items()
-                if key in {"a_proxy", "b_proxy", "score_proxy"}
-            },
-            "bootstrap_reference": "factorlib_all36",
-            "bootstrap_score_above_reference_median": (
-                float(final_score["score_proxy"]) > 0.5
-            ),
+            **promotion_summary,
+            "passed": promotion_passed,
+            "reasons": "; ".join(promotion_reasons),
+            "selection": "strict_trial_then_sequential_route_J",
         }
-        promotion_passed = bool(
-            promotion_summary["bootstrap_score_above_reference_median"]
-        )
-        promotion_reasons = (
-            []
-            if promotion_passed
-            else ["bootstrap S route score does not exceed reference median"]
-        )
-    else:
-        promotion_summary = {}
+    elif retained_pending:
         promotion_passed = True
-        promotion_reasons = []
+        promotion_summary = {
+            "passed": promotion_passed,
+            "reasons": "bootstrap S from trial gate because no existing S baseline exists",
+            "selection": "strict_trial_then_sequential_route_J",
+        }
+    else:
+        promotion_passed = True
+        promotion_summary = {
+            "passed": True,
+            "reasons": "",
+            "selection": "strict_trial_then_sequential_route_J",
+        }
 
-    admitted = (
-        tuple(current)
-        if promotion_passed
-        else frozen
-    )
-    promotion_summary = {
-        **promotion_summary,
-        "passed": promotion_passed,
-        "reasons": "; ".join(promotion_reasons),
-    }
     result = SingleFactorRouteAdmissionResult(
         frozen_before=frozen,
         pending_candidates=pending,
@@ -460,7 +630,7 @@ def run_single_factor_route_admission(
             json.dumps(
                 {
                     "schema_version": S_ROUTE_STATE_SCHEMA_VERSION,
-                    "route_contract": "family_balanced_direct_pool_J_v2",
+                    "route_contract": "strict_trial_then_sequential_route_J_v1",
                     "score_protocol": score_protocol,
                     "frozen_candidates": list(result.admitted_candidates),
                     "candidate_fingerprints": {

@@ -90,7 +90,7 @@ def main(datasources, start_date, end_date):
             total_assets
         FROM {financial_source}
         """,
-        filters={"date": [financial_start, end_ts + pd.Timedelta(days=1)]},
+        filters={"date": [financial_start, end_date]},
         compression=True,
     ).df()
 

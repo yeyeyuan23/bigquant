@@ -69,6 +69,30 @@ CURRENT_LEARNED_SUBMISSIONS = (
             "PV-013",
         ),
     ),
+    (
+        ROOT / "submissions" / "lgbm_platform_top_v01.py",
+        ROOT / "submissions" / "lgbm_platform_top_v01.ipynb",
+        (
+            "FR-002",
+            "FR-004",
+            "FR-011",
+            "HF-002",
+            "PV-001",
+            "PV-002",
+            "PV-003",
+            "PV-006",
+            "PV-014",
+            "HF-003",
+            "OB-005",
+        ),
+    ),
+)
+PLATFORM_SAFE_SUBMISSIONS = (
+    ROOT / "submissions" / "rule_v03.py",
+    ROOT / "submissions" / "enet_v01.py",
+    ROOT / "submissions" / "enet_v02.py",
+    ROOT / "submissions" / "lgbm_v02.py",
+    ROOT / "submissions" / "lgbm_v03.py",
 )
 ALLOWED_COMPETITION_TABLES = {
     "bigalpha_2026_exposure",
@@ -89,6 +113,10 @@ SQL_TABLE_PATTERN = re.compile(
 SQL_CTE_PATTERN = re.compile(
     r"(?:\bwith\b|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s+as\s*\(",
     flags=re.IGNORECASE,
+)
+SQL_FIRST_LAST_PATTERN = re.compile(
+    r"\b(first|last)\s*\(([^)]*)\)",
+    flags=re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -239,6 +267,26 @@ class SubmissionTest(unittest.TestCase):
         self.assertNotIn("intraday_end_ts", lightgbm_source)
         self.assertNotIn("end_ts + pd.Timedelta(days=1)", lightgbm_source)
         self.assertIn('filters={"date": [financial_start, end_date]}', lightgbm_source)
+
+    def test_platform_safe_submissions_do_not_query_after_end_date(self):
+        for source_path in PLATFORM_SAFE_SUBMISSIONS:
+            with self.subTest(source=source_path.name):
+                source = source_path.read_text(encoding="utf-8")
+                self.assertNotRegex(source, r"\bend_ts\s*\+")
+                self.assertNotRegex(source, r"\bend_date\s*\+")
+                self.assertNotIn("pd.Timedelta(days=1)", source)
+
+    def test_platform_safe_first_last_aggregations_are_deterministic(self):
+        for source_path in PLATFORM_SAFE_SUBMISSIONS:
+            source = source_path.read_text(encoding="utf-8")
+            for match in SQL_FIRST_LAST_PATTERN.finditer(source):
+                function_name, arguments = match.groups()
+                with self.subTest(
+                    source=source_path.name,
+                    aggregation=function_name,
+                    arguments=arguments.strip(),
+                ):
+                    self.assertIn("ORDER BY", arguments.upper())
 
     def test_every_submission_uses_only_competition_tables(self):
         sources = sorted((ROOT / "submissions").glob("*.py"))

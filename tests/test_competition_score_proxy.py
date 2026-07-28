@@ -67,7 +67,7 @@ class CompetitionScoreProxyTest(unittest.TestCase):
         self.assertFalse(scorer.protocol()["b_positive_coefficients"])
         self.assertEqual(
             scorer.protocol()["reference"],
-            "competition_factorlib_all36_base_proxy",
+            "competition_reference_pool_base_proxy",
         )
         self.assertEqual(
             scorer.protocol()["undisclosed_parameter_status"],

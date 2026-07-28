@@ -30,11 +30,12 @@ registered
 `admitted (T)` 或其组合；字母分别表示进入规则复合、Elastic Net 和
 LightGBM。唯一可执行路由以 `reports/latest/factor_pool_admission.csv` 为准。
 
-> 2026-07-27 已将 S/I/T 准入合同升级为 all36 基础代理的 A/B/J 路由增量；
+> 2026-07-28 已将 S/I/T 准入合同升级为 `all36 + self_library` 本地 J reference
+> 下的 A/B/J 路由增量；
 > 最终路线另做一次兄弟路线联合拥挤评分，该场景不是平台全局历史的替代品。
 > 下表和现有 `reports/` 仍是升级前的 Rank IC 合同历史结果；在
-> `FACTORLIB_ALL36` 快照导出、manifest 核验和完整 J 重评完成前，不得把这些
-> 状态当作新合同下的当前路由，也不得据此改写冻结池。
+> `FACTORLIB_ALL36`、候选库快照、manifest 核验和完整 J 重评完成前，不得把这些
+> 历史状态当作新合同下的当前路由，也不得据此改写冻结池。
 
 ## 当前候选
 
@@ -101,8 +102,8 @@ LightGBM。唯一可执行路由以 `reports/latest/factor_pool_admission.csv` �
 Git 证据为 `reports/latest/factor_pool_decisions.json`，旧本地运行状态另存于
 `data/cache/incremental_v3/frozen/frozen_state.json` 和
 `data/cache/tree_v3/frozen/frozen_state.json`。新合同使用独立
-`single_factor_v1_J、incremental_v5_factorwise_J、tree_v5_factorwise_J`
-缓存目录，缓存不进入 Git。
+`single_factor_v2_strict_trial_J、incremental_v6_residual_entry_J、
+tree_v5_entry_or_conditional_J` 缓存目录，缓存不进入 Git。
 
 ## 基础候选定义
 

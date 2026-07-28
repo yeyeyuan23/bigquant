@@ -202,8 +202,9 @@ python scripts/aistudio_submission_lookahead_probe.py \
 
 ## 5. 可选本地数据包同步
 
-比赛数据不进入 Git。经过核验的日级面板、screened15、J-all36 参考和训练矩阵可在赛事规则允许
-的同队成员之间同步；原始分钟数据仅在开发新分钟逻辑时按最小月份同步。需要同步时，
+比赛数据不进入 Git。经过核验的日级面板、screened15、J 用 all36 参考、
+候选库快照和训练矩阵可在赛事规则允许的同队成员之间同步；原始分钟数据仅在开发
+新分钟逻辑时按最小月份同步。需要同步时，
 在仓库根目录执行：
 
 ```bash
@@ -265,7 +266,7 @@ SHA-256: 4fd914654a38f11fc2f6b0bd1153d9db32c927e6a157ffaeb26a9b11c407e912
 该快照已经包含最新的连续微观日级面板、冻结 screened15、标准候选长表
 `data/factors/candidate_pool.parquet`、2019—2023 完整
 `FACTORLIB_ALL36` 和全部 manifests；不包含原始分钟数据或可由当前代码重算的
-`data/cache/`。all36 只作为新 J 合同的基础代理参考池，不能把 screened15
+`data/cache/`。当前本地 J reference 是 `all36 + self_library`：不能把 screened15
 复制后冒充完整参考池，也不能把我方当前或历史路线称为平台全局候选池。
 
 完整包作为私有仓库 Release 资产交付，不进入 Git 历史。仓库 collaborator
@@ -393,8 +394,10 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
   --refresh-tree-candidate CANDIDATE_ID
 ```
 
-I 与 T 的内容寻址缓存分别位于 `data/cache/incremental_v5_factorwise_J/` 和
-`data/cache/tree_v5_factorwise_J/`，正常运行会自动复用完全相同的输入。新增或
+S、I、T 的内容寻址/冻结缓存分别位于
+`data/cache/single_factor_v2_strict_trial_J/`、
+`data/cache/incremental_v6_residual_entry_J/` 和
+`data/cache/tree_v5_entry_or_conditional_J/`，正常运行会自动复用完全相同的输入。新增或
 修改候选只会生成包含该候选的新缓存键；只有完成个人增量、条件前向和整体确认的
 成员才能写入冻结池。不得通过删除缓存、改报告或沿用原编号绕过冻结验证。冻结候选
 发生机制或取值变化必须登记为新版本并重新走完整准入。

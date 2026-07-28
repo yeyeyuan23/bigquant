@@ -16,7 +16,7 @@ class TreePredictionCacheTest(unittest.TestCase):
     def test_official_J_contract_uses_v3_schema(self):
         self.assertEqual(
             TREE_CACHE_SCHEMA_VERSION,
-            "tree-prediction-cache-v4-factorwise-J",
+            "tree-prediction-cache-v5-entry-or-conditional-J",
         )
 
     def setUp(self):

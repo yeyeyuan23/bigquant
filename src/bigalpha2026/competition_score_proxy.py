@@ -117,21 +117,104 @@ def _preprocess_wide_factors(
 ) -> pd.DataFrame:
     """Apply the disclosed factor preprocessing independently to every column."""
 
-    output = panel.loc[:, list(KEY_COLUMNS)].copy()
-    for column in factor_columns:
-        factor = panel.loc[:, [*KEY_COLUMNS, column]].rename(
-            columns={column: "factor"}
+    base_keys = panel.loc[:, list(KEY_COLUMNS)].copy().reset_index(drop=True)
+    if base_keys.duplicated(list(KEY_COLUMNS)).any():
+        raise ValueError("factor panel contains duplicate date-instrument keys")
+    columns = tuple(factor_columns)
+    values = (
+        panel.loc[:, list(columns)]
+        .reset_index(drop=True)
+        .apply(pd.to_numeric, errors="coerce")
+    )
+    raw = values.to_numpy(dtype=float, copy=True)
+    standardized_array = np.full_like(raw, np.nan, dtype=float)
+    for indices in base_keys.groupby("date", sort=False).groups.values():
+        block = raw[np.asarray(indices, dtype=int), :]
+        if block.size == 0:
+            continue
+        lower = np.nanquantile(block, 0.01, axis=0)
+        upper = np.nanquantile(block, 0.99, axis=0)
+        winsorized = np.clip(block, lower, upper)
+        mean = np.nanmean(winsorized, axis=0)
+        std = np.nanstd(winsorized, axis=0, ddof=1)
+        std[std == 0] = np.nan
+        standardized_array[np.asarray(indices, dtype=int), :] = (
+            winsorized - mean
+        ) / std
+    standardized = pd.DataFrame(
+        standardized_array,
+        columns=columns,
+        index=values.index,
+    )
+
+    if exposures is None or exposures.empty:
+        return pd.concat([base_keys, standardized], axis=1)
+
+    exp = exposures.copy()
+    exp["date"] = pd.to_datetime(exp["date"], errors="coerce").dt.normalize()
+    frame = pd.concat([base_keys, standardized], axis=1).merge(
+        exp,
+        on=list(KEY_COLUMNS),
+        how="left",
+    )
+    numeric_columns = [
+        column
+        for column in exp.columns
+        if column not in KEY_COLUMNS
+        and pd.api.types.is_numeric_dtype(exp[column])
+    ]
+    if "SIZE" in numeric_columns and "float_market_cap" in numeric_columns:
+        numeric_columns.remove("float_market_cap")
+    categorical_columns = [
+        column
+        for column in exp.columns
+        if column not in KEY_COLUMNS
+        and (
+            isinstance(exp[column].dtype, pd.CategoricalDtype)
+            or pd.api.types.is_object_dtype(exp[column])
+            or pd.api.types.is_string_dtype(exp[column])
         )
-        processed = preprocess_factor(factor, exposures).rename(
-            columns={"factor": column}
-        )
-        output = output.merge(
-            processed,
-            on=list(KEY_COLUMNS),
-            how="left",
-            validate="one_to_one",
-        )
-    return output
+    ]
+    if not numeric_columns and not categorical_columns:
+        return pd.concat([base_keys, standardized], axis=1)
+
+    residuals = standardized.copy()
+    for indices in frame.groupby("date", sort=False).groups.values():
+        block = frame.loc[indices]
+        exposure_valid = pd.Series(True, index=block.index)
+        if numeric_columns:
+            exposure_valid &= block[numeric_columns].notna().all(axis=1)
+        if categorical_columns:
+            exposure_valid &= block[categorical_columns].notna().all(axis=1)
+        for column in columns:
+            valid = exposure_valid & block[column].notna()
+            if not valid.any():
+                continue
+            design_parts: list[np.ndarray] = []
+            if numeric_columns:
+                design_parts.append(
+                    block.loc[valid, numeric_columns].to_numpy(dtype=float)
+                )
+            if categorical_columns:
+                dummies = pd.get_dummies(
+                    block.loc[valid, categorical_columns].astype("string"),
+                    drop_first=True,
+                    dtype=float,
+                )
+                if not dummies.empty:
+                    design_parts.append(dummies.to_numpy(dtype=float))
+            x = (
+                np.column_stack(design_parts)
+                if design_parts
+                else np.empty((int(valid.sum()), 0))
+            )
+            if valid.sum() <= x.shape[1] + 1:
+                continue
+            x = np.column_stack([np.ones(len(x)), x])
+            y = block.loc[valid, column].to_numpy(dtype=float)
+            beta, *_ = np.linalg.lstsq(x, y, rcond=None)
+            residuals.loc[block.index[valid], column] = y - x @ beta
+    return pd.concat([base_keys, residuals], axis=1)
 
 
 def _a_components(
@@ -150,6 +233,59 @@ def _a_components(
         how="inner",
         validate="one_to_one",
     )
+    ic = rank_ic_series(merged, label_column=label_column).dropna()
+    long_short = long_short_returns(
+        merged,
+        label_column=label_column,
+    ).dropna()
+    market_volatility = merged.groupby("date", sort=False)[label_column].std()
+    stress_cutoff = (
+        market_volatility.quantile(0.75)
+        if not market_volatility.empty
+        else np.nan
+    )
+    stress_dates = market_volatility.index[
+        market_volatility >= stress_cutoff
+    ]
+    stress_ic = ic.reindex(stress_dates).dropna()
+
+    def ratio(values: pd.Series) -> float:
+        if values.empty:
+            return np.nan
+        std = float(values.std())
+        return (
+            float(values.mean() / std)
+            if np.isfinite(std) and std > 1e-12
+            else np.nan
+        )
+
+    return {
+        "rank_ic_mean": float(ic.mean()) if not ic.empty else np.nan,
+        "rank_ic_ir": ratio(ic),
+        "long_short_sharpe": (
+            ratio(long_short) * np.sqrt(252)
+            if not long_short.empty
+            else np.nan
+        ),
+        "stress_ic_ir": ratio(stress_ic),
+    }
+
+
+def _a_components_from_processed(
+    processed_factor: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    factor_column: str,
+    label_column: str,
+) -> dict[str, float]:
+    """Compute A inputs for one already-preprocessed factor column."""
+
+    merged = processed_factor.merge(
+        labels[["date", "instrument", label_column]],
+        on=list(KEY_COLUMNS),
+        how="inner",
+        validate="one_to_one",
+    ).rename(columns={factor_column: "factor"})
     ic = rank_ic_series(merged, label_column=label_column).dropna()
     long_short = long_short_returns(
         merged,
@@ -233,6 +369,7 @@ def _model_scores(
             l1_ratio=config.l1_ratio,
             fit_intercept=True,
             max_iter=20_000,
+            precompute=True,
             random_state=0,
             positive=False,
         )
@@ -367,20 +504,14 @@ class CompetitionScoreReference:
         cache_key = tuple(pd.Timestamp(date) for date in dates)
         if cache_key in self._a_cache:
             return self._a_cache[cache_key].copy()
-        panel = self.reference_panel.loc[
-            self.reference_panel["date"].isin(dates)
-        ]
         labels = self.labels.loc[self.labels["date"].isin(dates)]
-        exposures = self._slice_exposures(dates)
+        processed = self._processed_reference(dates)
         rows: list[dict[str, object]] = []
         for column in self.reference_columns:
-            factor = panel[[*KEY_COLUMNS, column]].rename(
-                columns={column: "factor"}
-            )
-            metrics = _a_components(
-                factor,
+            metrics = _a_components_from_processed(
+                processed[[*KEY_COLUMNS, column]],
                 labels,
-                exposures,
+                factor_column=column,
                 label_column=self.config.primary_label,
             )
             rows.append(
@@ -924,9 +1055,9 @@ class CompetitionScoreReference:
         """Return a serializable description for cache and report manifests."""
 
         return {
-            "reference": "competition_factorlib_all36_base_proxy",
+            "reference": "competition_reference_pool_base_proxy",
             "reference_scope": (
-                "reproducible_base_not_platform_global_submission_history"
+                "fixed_reference_pool_not_platform_global_submission_history"
             ),
             "final_crowding_stress": (
                 "one_joint_fit_of_frozen_sibling_routes"

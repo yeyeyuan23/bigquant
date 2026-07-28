@@ -12,7 +12,7 @@ class IncrementalSummaryCacheTest(unittest.TestCase):
     def test_official_J_contract_uses_factorwise_schema(self):
         self.assertEqual(
             INCREMENTAL_CACHE_SCHEMA_VERSION,
-            "elastic-net-incremental-cache-v4-factorwise-J",
+            "elastic-net-incremental-cache-v5-residual-entry-J",
         )
 
     def test_exact_inputs_reuse_summary(self):

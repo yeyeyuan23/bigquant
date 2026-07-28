@@ -2,6 +2,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -10,6 +12,7 @@ from bigalpha2026.factor_pool import (
     write_candidate_pool_manifest,
 )
 from bigalpha2026.incremental_admission import (
+    candidate_incremental_entry_diagnostics,
     ordered_pending_candidates,
     promote_frozen_incremental_pool,
     sequential_forward_select,
@@ -17,14 +20,17 @@ from bigalpha2026.incremental_admission import (
 )
 from bigalpha2026.research_policy import competition_score_increment_gate
 from bigalpha2026.single_factor_admission import (
+    candidate_s_trial_diagnostics,
     classify_candidates,
     run_single_factor_route_admission,
 )
 from bigalpha2026.tree_admission import (
+    candidate_tree_entry_diagnostics,
     promote_frozen_tree_pool,
     unresolved_tree_candidates,
     validated_frozen_tree_pool,
 )
+from scripts import run_combinations
 from scripts.run_combinations import (
     DEVELOPMENT_YEARS,
     FROZEN_TEST_YEAR,
@@ -233,6 +239,37 @@ class WorkflowScriptTest(unittest.TestCase):
                     frozen_state_path=state_path,
                 )
 
+    def test_S_bootstrap_uses_trial_gate_without_existing_baseline(self):
+        class BootstrapScoreReference:
+            def protocol(self):
+                return {"reference": "all36-test"}
+
+            def score(self, _factor):
+                raise AssertionError("bootstrap S should not require absolute route J")
+
+            def paired_increment(self, _baseline, _augmented, *, include_stability):
+                raise AssertionError("bootstrap S has no baseline for paired J")
+
+        dates = pd.to_datetime(["2020-01-02", "2020-01-03"])
+        panel = pd.DataFrame(
+            {
+                "date": dates.repeat(3),
+                "instrument": ["A", "B", "C"] * 2,
+                "self__PV-TEST": [1.0, 2.0, 3.0, 3.0, 2.0, 1.0],
+            }
+        )
+
+        result = run_single_factor_route_admission(
+            panel,
+            BootstrapScoreReference(),
+            ("self__PV-TEST",),
+            frozen_state_path=None,
+        )
+
+        self.assertEqual(result.admitted_candidates, ("self__PV-TEST",))
+        self.assertFalse(result.evaluations[0]["candidate_route_J_computed"])
+        self.assertTrue(result.evaluations[0]["s_route_passed"])
+
     def test_frozen_incremental_pool_rejects_implicit_content_change(self):
         state = {
             "frozen_candidates": ["self__FR-002"],
@@ -267,6 +304,51 @@ class WorkflowScriptTest(unittest.TestCase):
         )
         self.assertTrue(promoted)
         self.assertEqual(updated, ("self__HF-002", "self__PV-TEST"))
+
+    def test_tree_entry_allows_orthogonal_candidate_without_positive_ic(self):
+        dates = pd.date_range("2021-01-01", periods=8, freq="D")
+        rows = []
+        labels = []
+        for date in dates:
+            rows.extend(
+                [
+                    {
+                        "date": date,
+                        "instrument": "A",
+                        "factorlib__base": 1.0,
+                        "self__orthogonal": 2.0,
+                    },
+                    {
+                        "date": date,
+                        "instrument": "B",
+                        "factorlib__base": 2.0,
+                        "self__orthogonal": 1.0,
+                    },
+                    {
+                        "date": date,
+                        "instrument": "C",
+                        "factorlib__base": 3.0,
+                        "self__orthogonal": 2.0,
+                    },
+                ]
+            )
+            labels.extend(
+                [
+                    {"date": date, "instrument": "A", "ret_close_to_close": 0.0},
+                    {"date": date, "instrument": "B", "ret_close_to_close": 0.0},
+                    {"date": date, "instrument": "C", "ret_close_to_close": 0.0},
+                ]
+            )
+        diagnostics = candidate_tree_entry_diagnostics(
+            pd.DataFrame(rows),
+            pd.DataFrame(labels),
+            candidate="self__orthogonal",
+            baseline_columns=("factorlib__base",),
+        )
+
+        self.assertFalse(diagnostics["single_effect_passed"])
+        self.assertTrue(diagnostics["orthogonal_passed"])
+        self.assertTrue(diagnostics["tree_entry_passed"])
 
     def test_frozen_tree_pool_rejects_implicit_content_change(self):
         state = {
@@ -344,8 +426,9 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(summary["factorlib_screened_features"], 15)
         self.assertEqual(
             summary["competition_J_reference"],
-            "factorlib_all36_base_proxy",
+            "factorlib_all36_plus_candidate_pool_proxy",
         )
+        self.assertEqual(summary["competition_J_reference_features"], 37)
         self.assertEqual(summary["self_features"], 1)
         self.assertEqual(
             {
@@ -403,6 +486,73 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(
             rank_submission_routes(decisions),
             ["joint_elastic_net", "self_factor_composite"],
+        )
+
+    def test_validation_pipelines_allow_empty_s_pool(self):
+        dates = pd.to_datetime(["2022-01-04", "2022-01-05"])
+        factor = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": ["A", "A"],
+                "factor": [0.1, 0.2],
+            }
+        )
+        oriented = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": ["A", "A"],
+                "factorlib__base": [0.0, 1.0],
+            }
+        )
+        labels = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": ["A", "A"],
+                "ret_close_to_close": [0.0, 0.1],
+            }
+        )
+        score_reference = SimpleNamespace(
+            score_best_direction=lambda _factor: {
+                "selected_direction": 1.0,
+                "positive_score_proxy": 0.6,
+                "negative_score_proxy": 0.4,
+            },
+            score=lambda _factor: {"score_proxy": 0.6},
+            score_joint_routes=lambda routes: {
+                route: {"score_proxy": 0.6} for route in routes
+            },
+        )
+        incremental_result = SimpleNamespace(frozen_after=())
+        tree_result = SimpleNamespace(
+            admitted_candidates=(),
+            predict_joint=lambda _years: factor.copy(),
+        )
+
+        with (
+            patch.object(
+                run_combinations,
+                "walk_forward_elastic_net_with_weights",
+                return_value=(factor.copy(), pd.DataFrame()),
+            ),
+            patch.object(
+                run_combinations,
+                "family_balanced_factor",
+                side_effect=AssertionError("S should be skipped when empty"),
+            ),
+        ):
+            pipelines, *_ = run_combinations.build_validation_pipelines(
+                oriented,
+                labels,
+                ("factorlib__base",),
+                score_reference,
+                (),
+                incremental_result,
+                tree_result,
+            )
+
+        self.assertEqual(
+            {experiment for experiment, _method in pipelines},
+            {"joint_elastic_net", "joint_lightgbm"},
         )
 
     def test_first_round_candidate_pool_has_stable_long_contract(self):
@@ -529,6 +679,85 @@ class WorkflowScriptTest(unittest.TestCase):
         failed = classify_candidates(metrics, stability)[0]
         self.assertTrue(failed["single_factor_cross_regime_passed"])
         self.assertTrue(failed["validation_2023_observations"])
+
+    def test_s_trial_gate_requires_strong_stable_candidate(self):
+        dates = pd.date_range("2021-01-01", periods=130, freq="D")
+        rows = []
+        labels = []
+        for date in dates:
+            for instrument, value in (
+                ("A", 1.0),
+                ("B", 2.0),
+                ("C", 3.0),
+                ("D", 4.0),
+                ("E", 5.0),
+            ):
+                rows.append(
+                    {
+                        "date": date,
+                        "instrument": instrument,
+                        "self__strong": value,
+                    }
+                )
+                labels.append(
+                    {
+                        "date": date,
+                        "instrument": instrument,
+                        "ret_close_to_close": value,
+                    }
+                )
+
+        diagnostics = candidate_s_trial_diagnostics(
+            pd.DataFrame(rows),
+            pd.DataFrame(labels),
+            candidate="self__strong",
+            baseline_candidates=(),
+        )
+
+        self.assertTrue(diagnostics["s_quality_passed"])
+        self.assertTrue(diagnostics["s_strength_passed"])
+        self.assertTrue(diagnostics["s_stability_passed"])
+        self.assertTrue(diagnostics["s_redundancy_passed"])
+        self.assertTrue(diagnostics["s_trial_passed"])
+
+    def test_i_entry_gate_accepts_residual_linear_signal(self):
+        dates = pd.date_range("2021-01-01", periods=130, freq="D")
+        rows = []
+        labels = []
+        values = {
+            "A": (1.0, 0.0, -2.0),
+            "B": (2.0, 5.0, 1.0),
+            "C": (3.0, 8.0, 2.0),
+            "D": (4.0, 9.0, 1.0),
+            "E": (5.0, 8.0, -2.0),
+        }
+        for date in dates:
+            for instrument, (base, candidate, label) in values.items():
+                rows.append(
+                    {
+                        "date": date,
+                        "instrument": instrument,
+                        "factorlib__base": base,
+                        "self__residual": candidate,
+                    }
+                )
+                labels.append(
+                    {
+                        "date": date,
+                        "instrument": instrument,
+                        "ret_close_to_close": label,
+                    }
+                )
+        diagnostics = candidate_incremental_entry_diagnostics(
+            pd.DataFrame(rows),
+            pd.DataFrame(labels),
+            candidate="self__residual",
+            baseline_columns=("factorlib__base",),
+        )
+
+        self.assertTrue(diagnostics["i_quality_passed"])
+        self.assertTrue(diagnostics["i_residual_signal_passed"])
+        self.assertTrue(diagnostics["i_trial_passed"])
 
     def test_single_factor_shape_is_diagnostic_not_a_gate(self):
         rows = []

@@ -15,6 +15,7 @@ from .combinations import (
     walk_forward_lightgbm_with_importance,
 )
 from .competition_score_proxy import CompetitionScoreReference
+from .evaluation import factor_rank_correlation, rank_ic_series
 from .research_policy import (
     COMPETITION_SCORE_INCREMENT_GATE,
     TREE_INCREMENTAL_GATE,
@@ -47,6 +48,71 @@ def tree_score_increment_gate(
     """Apply T sample sufficiency and positive full-period J."""
 
     return competition_score_increment_gate(summary, TREE_SCORE_GATE)
+
+
+def candidate_tree_entry_diagnostics(
+    development: pd.DataFrame,
+    development_labels: pd.DataFrame,
+    *,
+    candidate: str,
+    baseline_columns: Sequence[str],
+) -> dict[str, object]:
+    """Cheap T entry diagnostics before running LightGBM."""
+
+    label_column = "ret_close_to_close"
+    merged = development[["date", "instrument", candidate]].merge(
+        development_labels[["date", "instrument", label_column]],
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    ic = rank_ic_series(
+        merged,
+        factor_column=candidate,
+        label_column=label_column,
+    ).dropna()
+    rank_ic_mean = float(ic.mean()) if not ic.empty else float("nan")
+    rank_ic_t_stat = (
+        float(ic.mean() / (ic.std(ddof=1) / (len(ic) ** 0.5)))
+        if len(ic) > 1 and float(ic.std(ddof=1)) != 0.0
+        else float("nan")
+    )
+
+    columns = tuple(dict.fromkeys((*baseline_columns, candidate)))
+    correlations = factor_rank_correlation(
+        development[["date", "instrument", *columns]],
+        columns,
+    )
+    if baseline_columns:
+        candidate_max_abs_rank_correlation = float(
+            correlations.loc[candidate, list(baseline_columns)].abs().max()
+        )
+    else:
+        candidate_max_abs_rank_correlation = 0.0
+    single_effect_passed = bool(
+        pd.notna(rank_ic_mean)
+        and rank_ic_mean > TREE_INCREMENTAL_GATE.minimum_entry_rank_ic_mean
+    )
+    orthogonal_passed = bool(
+        pd.notna(candidate_max_abs_rank_correlation)
+        and candidate_max_abs_rank_correlation
+        <= TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
+    )
+    tree_entry_passed = single_effect_passed or orthogonal_passed
+    reasons = []
+    if not single_effect_passed:
+        reasons.append("entry Rank IC is not positive")
+    if not orthogonal_passed:
+        reasons.append("entry correlation is not low enough")
+    return {
+        "entry_rank_ic_mean": rank_ic_mean,
+        "entry_rank_ic_t_stat": rank_ic_t_stat,
+        "candidate_max_abs_rank_correlation": candidate_max_abs_rank_correlation,
+        "single_effect_passed": single_effect_passed,
+        "orthogonal_passed": orthogonal_passed,
+        "tree_entry_passed": tree_entry_passed,
+        "tree_entry_reasons": "" if tree_entry_passed else "; ".join(reasons),
+    }
 
 
 def promote_frozen_tree_pool(
@@ -215,6 +281,12 @@ class TreeAdmissionResult:
         )
 
     def promotion_row(self) -> dict[str, object]:
+        entry_passed = tuple(
+            str(row["candidate"])
+            for row in self.incremental_summary.to_dict(orient="records")
+            if bool(row.get("tree_entry_passed"))
+            and str(row["candidate"]) in self.pending_candidates
+        )
         individual_passed = tuple(
             str(row["candidate"])
             for row in self.incremental_summary.to_dict(orient="records")
@@ -223,7 +295,8 @@ class TreeAdmissionResult:
         )
         return {
             "pending_candidates": ",".join(self.pending_candidates),
-            "selection": "factorwise_then_conditional_forward",
+            "selection": "entry_or_factorwise_then_conditional_forward",
+            "entry_passed_candidates": ",".join(entry_passed),
             "individual_passed_candidates": ",".join(individual_passed),
             "conditional_passed_candidates": ",".join(self.pending_passed),
             "provisional_pool_count": len(self.provisional_pool),
@@ -248,13 +321,19 @@ class TreeAdmissionResult:
     def protocol_summary(self) -> dict[str, object]:
         return {
             "baseline": "lightgbm_screened15",
-            "candidate_filter": "technical_eligibility_only",
+            "candidate_filter": "basic_quality_and_single_effect_or_orthogonality",
             "admission_metric": "delta_official_score_proxy",
-            "selection": "factorwise_then_conditional_forward",
+            "selection": "entry_or_factorwise_then_conditional_forward",
             "evaluation_years": list(self.development_years),
             "train_days": 60,
             "test_days": 20,
             "minimum_active_days": TREE_INCREMENTAL_GATE.minimum_active_days,
+            "minimum_entry_rank_ic_mean": (
+                TREE_INCREMENTAL_GATE.minimum_entry_rank_ic_mean
+            ),
+            "maximum_entry_abs_rank_correlation": (
+                TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
+            ),
             "minimum_oos_days": TREE_INCREMENTAL_GATE.minimum_oos_days,
             "minimum_windows": TREE_INCREMENTAL_GATE.minimum_windows,
             "minimum_positive_window_ratio": (
@@ -310,7 +389,7 @@ class TreeAdmissionResult:
                     "score_protocol": dict(self.score_reference.protocol()),
                     "pending_candidates": list(self.pending_candidates),
                     "candidate_gate_passed": list(self.pending_passed),
-                    "selection": "factorwise_then_conditional_forward",
+                    "selection": "entry_or_factorwise_then_conditional_forward",
                     "promoted_candidates": [
                         candidate
                         for candidate in self.pending_passed
@@ -564,6 +643,15 @@ def run_tree_admission(
     admission: dict[str, dict[str, object]] = {}
     incremental_rows: list[dict[str, object]] = []
     importance_rows: list[pd.DataFrame] = []
+    entry_diagnostics = {
+        candidate: candidate_tree_entry_diagnostics(
+            development,
+            development_labels,
+            candidate=candidate,
+            baseline_columns=(*selected_public, *frozen_before),
+        )
+        for candidate in eligible
+    }
 
     def record_importance(
         importance: pd.DataFrame,
@@ -587,6 +675,9 @@ def run_tree_admission(
                 "candidate": self_column,
                 "active_days": active_days,
                 "tree_data_eligible": False,
+                "tree_entry_passed": False,
+                "single_effect_passed": False,
+                "orthogonal_passed": False,
                 "individual_passed": False,
                 "conditional_passed": False,
                 "tree_incremental_passed": False,
@@ -607,6 +698,7 @@ def run_tree_admission(
             )
             prior_row["active_days"] = active_days
             prior_row["tree_data_eligible"] = True
+            prior_row["tree_entry_passed"] = True
             prior_row["evaluation_status"] = "frozen_prior_evaluation"
             admission[self_column] = prior_row
             incremental_rows.append(
@@ -618,6 +710,28 @@ def run_tree_admission(
                 }
                 | {"evaluation_protocol": "frozen_prior_T"}
             )
+            continue
+
+        entry = entry_diagnostics[self_column]
+        if not bool(entry["tree_entry_passed"]):
+            row = {
+                "candidate": self_column,
+                "evaluation_protocol": "cheap_T_entry_v1",
+                "candidate_level_J_computed": False,
+                "individual_passed": False,
+                **entry,
+            }
+            incremental_rows.append(dict(row))
+            admission[self_column] = {
+                **row,
+                "active_days": active_days,
+                "tree_data_eligible": True,
+                "conditional_passed": False,
+                "tree_incremental_passed": False,
+                "evaluation_status": "entry_failed",
+                "marginal_reasons": str(entry["tree_entry_reasons"]),
+                "reasons": str(entry["tree_entry_reasons"]),
+            }
             continue
 
         individual_features = (*selected_public, *frozen_before, self_column)
@@ -645,6 +759,7 @@ def run_tree_admission(
             "evaluation_protocol": "factorwise_T_v5_official_J",
             "candidate_level_J_computed": True,
             "individual_baseline_candidates": ",".join(frozen_before),
+            **entry,
             **individual_increment,
             "individual_passed": individual_passed,
             "individual_reasons": "; ".join(individual_reasons),
@@ -659,16 +774,16 @@ def run_tree_admission(
             "evaluation_status": (
                 "individual_passed_pending_conditional"
                 if individual_passed
-                else "individual_failed"
+                else "entry_passed_pending_conditional"
             ),
             "marginal_reasons": "; ".join(individual_reasons),
             "reasons": "; ".join(individual_reasons),
         }
 
-    individual_passed_candidates = tuple(
+    entry_passed_candidates = tuple(
         row["candidate"]
         for row in incremental_rows
-        if bool(row.get("individual_passed"))
+        if bool(row.get("tree_entry_passed"))
         and row["candidate"] in pending
     )
     ordered_candidates = tuple(
@@ -677,10 +792,19 @@ def run_tree_admission(
             (
                 row
                 for row in incremental_rows
-                if row["candidate"] in individual_passed_candidates
+                if row["candidate"] in entry_passed_candidates
             ),
             key=lambda row: (
+                -int(bool(row.get("individual_passed"))),
+                -int(bool(row.get("single_effect_passed"))),
+                -int(bool(row.get("orthogonal_passed"))),
                 -float(row.get("delta_score_proxy", float("-inf"))),
+                float(
+                    row.get(
+                        "candidate_max_abs_rank_correlation",
+                        float("inf"),
+                    )
+                ),
                 str(row["candidate"]),
             ),
         )

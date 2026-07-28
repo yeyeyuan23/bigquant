@@ -139,7 +139,7 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
 src/bigalpha2026/
 ├── candidates/           # 已登记的基础因子和跨类方案
 ├── evaluation.py         # 评价指标与滚动验证原语
-├── competition_score_proxy.py # all36 基础代理、方向选择与联合拥挤 J
+├── competition_score_proxy.py # all36+self_library 本地 J 代理、方向选择与联合拥挤 J
 ├── single_factor_admission.py  # S 单因子准入
 ├── incremental_admission.py    # I Elastic Net 增量准入
 ├── tree_admission.py            # T LightGBM 增量准入

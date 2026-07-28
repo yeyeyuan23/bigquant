@@ -233,10 +233,36 @@ class FactorLibraryPoolGate:
 
 
 @dataclass(frozen=True)
+class SingleFactorRouteGate:
+    """Strict pre-route gate for rule-composite S candidates."""
+
+    minimum_coverage: float = 0.95
+    minimum_active_days: int = 120
+    minimum_rank_ic_mean: float = 0.01
+    minimum_worst_fold_rank_ic: float = -0.005
+    minimum_positive_fold_ratio: float = 0.60
+    minimum_sign_consistency: float = 0.60
+    maximum_abs_rank_correlation: float = 0.85
+
+
+@dataclass(frozen=True)
+class IncrementalEntryGate:
+    """Medium prefilter for Elastic Net linear-increment candidates."""
+
+    minimum_coverage: float = 0.90
+    minimum_active_days: int = 120
+    minimum_rank_ic_mean: float = 0.0
+    minimum_residual_rank_ic: float = 0.0
+    maximum_abs_rank_correlation: float = 0.85
+
+
+@dataclass(frozen=True)
 class TreeIncrementalGate:
     """LightGBM-specific admission, evaluated only on development data."""
 
-    minimum_active_days: int = 240
+    minimum_active_days: int = 120
+    minimum_entry_rank_ic_mean: float = 0.0
+    maximum_entry_abs_rank_correlation: float = 0.35
     minimum_oos_days: int = 180
     minimum_windows: int = 9
     minimum_positive_window_ratio: float = 0.55
@@ -259,6 +285,8 @@ TECHNICAL_GATE = TechnicalGate()
 COMBINATION_ADMISSION_GATE = CombinationAdmissionGate()
 FACTORLIB_INCREMENTAL_GATE = FactorLibraryIncrementalGate()
 FACTORLIB_POOL_GATE = FactorLibraryPoolGate()
+SINGLE_FACTOR_ROUTE_GATE = SingleFactorRouteGate()
+INCREMENTAL_ENTRY_GATE = IncrementalEntryGate()
 TREE_INCREMENTAL_GATE = TreeIncrementalGate()
 COMPETITION_SCORE_INCREMENT_GATE = CompetitionScoreIncrementGate()
 

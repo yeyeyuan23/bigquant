@@ -227,6 +227,41 @@ def cross_section_rank_scale(
     return result
 
 
+def _safe_pearson_correlation_values(
+    left_values: np.ndarray,
+    right_values: np.ndarray,
+) -> float:
+    """Pearson correlation on clean arrays without divide-by-zero warnings."""
+
+    if len(left_values) < 2:
+        return np.nan
+    left_centered = left_values - left_values.mean()
+    right_centered = right_values - right_values.mean()
+    denominator = np.sqrt(
+        np.dot(left_centered, left_centered)
+        * np.dot(right_centered, right_centered)
+    )
+    if not np.isfinite(denominator) or denominator <= 1e-12:
+        return np.nan
+    return float(np.dot(left_centered, right_centered) / denominator)
+
+
+def _safe_pearson_correlation(left: pd.Series, right: pd.Series) -> float:
+    """Pearson correlation without numpy divide-by-zero warnings."""
+
+    pair = pd.concat(
+        [
+            pd.to_numeric(left, errors="coerce").rename("left"),
+            pd.to_numeric(right, errors="coerce").rename("right"),
+        ],
+        axis=1,
+    ).dropna()
+    return _safe_pearson_correlation_values(
+        pair["left"].to_numpy(dtype=float),
+        pair["right"].to_numpy(dtype=float),
+    )
+
+
 def rank_ic_series(
     merged: pd.DataFrame,
     factor_column: str = "factor",
@@ -239,7 +274,10 @@ def rank_ic_series(
         valid = block[[factor_column, label_column]].dropna()
         if len(valid) < 5:
             return np.nan
-        return valid[factor_column].rank().corr(valid[label_column].rank())
+        return _safe_pearson_correlation_values(
+            valid[factor_column].rank().to_numpy(dtype=float),
+            valid[label_column].rank().to_numpy(dtype=float),
+        )
 
     result = merged.groupby("date", sort=False).apply(
         one_day,
@@ -974,4 +1012,11 @@ def factor_rank_correlation(
     columns = list(factor_columns)
     for column in columns:
         ranked[column] = ranked.groupby("date", sort=False)[column].rank(pct=True)
-    return ranked[columns].corr(method="pearson")
+    result = pd.DataFrame(np.nan, index=columns, columns=columns, dtype=float)
+    for left_index, left in enumerate(columns):
+        result.loc[left, left] = 1.0
+        for right in columns[left_index + 1 :]:
+            correlation = _safe_pearson_correlation(ranked[left], ranked[right])
+            result.loc[left, right] = correlation
+            result.loc[right, left] = correlation
+    return result

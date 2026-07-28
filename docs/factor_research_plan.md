@@ -159,19 +159,35 @@ AIStudio 只负责拉取和核验真实数据快照；单因子指标、I 增量
 - 行业、规模、流动性中性化后的结果；
 - 与同族候选和公开基础因子的 Rank 相关性。
 
-S 的候选方向与稳定性诊断：
+S 的正式准入由 `src/bigalpha2026/single_factor_admission.py` 的
+`run_single_factor_route_admission` 编排，只读取 2019—2021 开发期；
+2022、2023 只生成验证报告，不得反向改变 S。
 
-- 开发期原始、中性化和可交易子集 Rank IC 均为正；
-- 至少 60% 的开发月份方向为正；
-- 2019—2021 至少两个年份方向为正；
-- 上述方向、稳定性、t 值、五分组单调性和头尾收益全部继续报告，但不再预先
-  拒绝候选；
-- S 只读取 2019—2021；2022、2023 只生成报告，不得反向改变 S。
+S 是规则复合，没有模型自动压低坏因子权重，因此先做严格 trial gate：
 
-正式 S 使用 `run_single_factor_route_admission`：从通过前置检查的
-FR/PV/HF/OB 原子候选生成一次族内等权、族间等权组合，直接计算完整路线 J。
-已有冻结 S 时，只比较新完整路线与旧冻结路线的一次 `delta_J`，不做候选子集
-搜索。
+- `coverage >= 0.95`；
+- 至少 120 个有截面离散度的开发日；
+- 开发期日度 Rank IC 均值不低于 `0.01`；
+- 年度 fold 最差 Rank IC 不低于 `-0.005`；
+- 年度正向比例和方向一致性均不低于 `0.60`；
+- 与当前 S baseline 的最大绝对 Rank 相关性不高于 `0.85`。
+
+通过 trial gate 后，才把候选临时加入当前 S baseline，生成族内等权、族间等权的
+规则复合，并与旧 S baseline 做相同样本上的配对 J 增量。只有 `delta_J > 0`
+且满足统一 J 评分门槛，候选才进入最终 S。S 因此是：
+
+```text
+单因子强且稳定
+→ 与当前 S 不过度重复
+→ 加入规则复合后 J 有增量
+→ 冻结进 self_factor_composite
+```
+
+Rank IC、t 值、中性化、可交易、稳定性和分组结果仍可作为人工诊断报告输出；
+但在正式组合流程里，只有上述 trial gate 和 route-level J 会影响 S 冻结结果。
+如果没有任何旧 frozen S baseline，首轮 S 不存在可配对比较对象，因此用通过
+trial gate 的候选 bootstrap 初始规则池；后续新增候选再相对该 frozen S 做
+route-level J 增量确认。
 
 单因子评价只产生明确路由：
 
@@ -181,9 +197,10 @@ FR/PV/HF/OB 原子候选生成一次族内等权、族间等权组合，直接�
   重复计权；它们保留独立候选身份并继续完成 I/T 评价；
 - S 路线未通过时保持旧冻结 S；I/T 仍按各自完整池独立评价。
 
-S/I/T 使用同一个 `competition_score_proxy.py` 作为裁判。比赛公开因子库
-all36 是可复现的基础代理坐标，不代表平台随全体参赛者提交而变化的全局候选池。
-自研原子因子不得混写入 all36 目录。对任一路由输出 z：
+S/I/T 使用同一个 `competition_score_proxy.py` 作为裁判。J 的本地参考池是
+`all36 + 我方候选因子库`。all36 是公开基础坐标；我方候选因子库用于模拟本队
+已知拥挤环境，判断一条最终路线相对“公开库 + 自己库上已有信号”是否仍有线性
+贡献。自研原子因子不得混写入 all36 目录。对任一路由输出 z：
 
 ```text
 A(z) = 0.25 × [Pct(IC_mean) + Pct(IC_IR) + Pct(SR) + Pct(Stress)]
@@ -191,14 +208,15 @@ B(z) = Pct(mean(abs(w_z)) / (std(abs(w_z)) + epsilon))
 J(z) = 0.3 × A(z) + 0.7 × B(z)
 ```
 
-A 的四个百分位均把一个路由输出插入固定 all36 分布后按平均秩计算。S/I/T
-候选准入使用 `all36 + 一个 route_output`，使用截面 z-score 标签、60 日窗口、
-20 日步长和允许正负系数的评分 Elastic Net；baseline 与 augmented 必须分别
-替换同一个路由槽，禁止同时进入贡献模型。构造 I 路由的正系数 Elastic Net 与
-计算 B 的无符号限制 Elastic Net 是两个不同模型合同。
+A 的四个百分位均把一个路由输出插入固定 `all36 + self_library` 分布后按平均秩
+计算。S/I/T 候选准入使用 `all36 + self_library + 一个 route_output`，使用截面
+z-score 标签、60 日窗口、20 日步长和允许正负系数的评分 Elastic Net；baseline
+与 augmented 必须分别替换同一个路由槽，禁止同时进入贡献模型。构造 I 路由的
+正系数 Elastic Net 与计算 B 的无符号限制 Elastic Net 是两个不同模型合同。
 
-最终三条提交路线另做一次有界拥挤检查：各路线先单独相对 all36 计分，再把已经
-冻结方向的三条兄弟路线一次性放入同一个 `all36 + sibling_routes` Elastic Net。
+最终三条提交路线另做一次有界拥挤检查：各路线先单独相对
+`all36 + self_library` 计分，再把已经冻结方向的三条兄弟路线一次性放入同一个
+`all36 + self_library + sibling_routes` Elastic Net。
 这只用于检查我方路线之间可观察的相互替代，是未知全局拥挤程度的下界，不把我方
 历史或当前路线冒充全体参赛者历史，也不枚举三套完整压力网格。最终稳健 J 取
 2022、2023、两年合并基础场景与一次兄弟路线拥挤场景中的最低值。
@@ -237,29 +255,44 @@ I 的候选评价、联合池确认、冻结池晋级和缓存状态写入统一
 2. screened15 已经用 2019—2021 从公开 36 因子中筛选并冻结；不得重复筛选，
    也不得用 2022 或 2023 修改成员。
 3. 每个滚动窗口只使用过去 60 个交易日训练，随后 20 日 OOS 测试。
-4. 每个 pending 候选先单独训练 `screened15 + frozen_I + candidate`
-   Elastic Net，并和 `screened15 + frozen_I` 做同样股票日上的配对 J 增量。
+4. 每个 pending 候选先做 I entry gate：质量合格后，只要有弱线性信号或相对
+   `screened15 + frozen_I` 的残差信号，就进入训练 trial pool。
 5. 所有候选使用相同开发日历；特征与标签均按日转换为中心化截面百分位秩，
    缺失或无截面离散度的候选值按中性值 0 处理，禁止通过各自活跃日期改变
    baseline 样本。
 6. 所有公开因子和自研因子已按 2019—2021 冻结方向统一为
    “值越大越好”，因此 Elastic Net 固定使用非负系数，禁止短窗口噪声把已验证
    信号反向使用。
-7. 个人 `delta_J > 0` 的候选按个人增量从高到低进入条件前向确认；每一步都以
+7. 通过 entry gate 的候选再单独训练 `screened15 + frozen_I + candidate`
+   Elastic Net，并和 `screened15 + frozen_I` 做同样股票日上的配对 J 增量。
+8. 个人 `delta_J > 0` 的候选按个人增量从高到低进入条件前向确认；每一步都以
    当前 `screened15 + frozen_I + accepted` 为 baseline，只接收仍有正增量的候选。
-8. 条件通过的临时池还要完成两项确认：
+9. 条件通过的临时池还要完成两项确认：
    `screened15 + frozen_I + accepted` 相对 `screened15` 通过整体门槛；
    同一新联合模型相对旧 `screened15 + frozen_I` 也通过增量门槛。两项均通过
    才原子更新 `frozen_I`；任一失败时保持 `evaluated_not_frozen`。
-9. 最终 Elastic Net 只读取 `screened15 + frozen_I`。2022、2023 的表现不得
+10. 最终 Elastic Net 只读取 `screened15 + frozen_I`。2022、2023 的表现不得
    反向修改候选级 I、联合确认或冻结成员。
+
+I entry gate 当前口径：
+
+- `coverage >= 0.90`；
+- 至少 120 个有截面离散度的开发日；
+- 原始 Rank IC 均值不低于 `0.0`，或对 `screened15 + frozen_I` 做日内秩残差化
+  后的 residual Rank IC 不低于 `0.0`；
+- 与 `screened15 + frozen_I` 的最大绝对 Rank 相关性不高于 `0.85`，或 residual
+  Rank IC 通过。
+
+I 的定位是“线性增量”：它不要求候选单独足够强，但必须证明有可被 Elastic Net
+使用的线性或残差信息。
 
 I 的正式增量门槛：
 
 - 配对 `delta_J > 0`；
 - 至少 180 个共同评分日和 9 个可计算评分窗口。
 
-正 J 窗口比例、正 J 年份数、OOS Rank IC、权重和相关性只作路线诊断。
+正 J 窗口比例、正 J 年份数、OOS Rank IC、权重和相关性继续报告；其中 entry
+gate 字段会影响是否进入 I 训练，训练后的正式晋级仍以配对 J 增量和池级确认为准。
 
 I 缓存分成两层：
 
@@ -277,9 +310,10 @@ I 缓存分成两层：
 S 和 I 只控制规则复合与 Elastic Net。LightGBM 使用第 7 节独立的完整池增量
 确认 T，不能用 I 结果预筛树模型候选。
 
-技术门槛未通过时直接标记 `technical_reject`。逐候选相对 all36 的相关性或
-“正交性通过”不再是独立准入状态；all36 在正式流程中只作为统一 J 评分器的
-外生 A/B 参考。相关性仍可在出现本地与平台矛盾时单独诊断。
+技术门槛未通过时直接标记 `technical_reject`。S/I/T 的前置规则不同：S 看强度、
+稳定性和低冗余，I 看线性或残差信息，T 看最低质量、单因子弱效果或正交性。
+统一的是后置 J 评分器，不是统一前置门槛。`all36 + self_library` 在正式流程中
+作为统一 J 评分器的外生 A/B 参考。
 
 这是官方评分的代理检查，不等于真实比赛分数。
 
@@ -289,7 +323,8 @@ T 的独立准入模块为 `src/bigalpha2026/tree_admission.py`，核心入口�
 `run_tree_admission`。模块拥有完整池确认、冻结池晋级及缓存状态；
 `scripts/run_combinations.py` 只负责准备共享输入并调用该入口。
 
-T 只使用 2019—2021 开发期。满足至少 240 个截面可用开发日的候选先逐个训练
+T 只使用 2019—2021 开发期。满足最低质量门槛后，只要单因子有弱效果，或与
+`screened15 + frozen_T` 足够正交，就进入 LightGBM 训练 trial pool；随后逐个训练
 `screened15 + frozen_T + candidate` LightGBM，并和 `screened15 + frozen_T`
 做配对 J 增量；个人通过者按增量从高到低做条件前向确认。
 所有输入按相同股票日、标签、60 日训练、20 日 OOS 和中心化截面百分位秩处理，
@@ -331,7 +366,7 @@ LightGBM 参数。新增或修改候选只使包含该候选的验证模型失�
 - 三者互不替代，一个候选可以进入一条、两条或三条管线；
 - 三者均未通过：`rejected`。
 
-高频或盘口候选不足 240 个开发有效日时不运行 T，也不得据此声称树模型无增量；
+高频或盘口候选不足 120 个开发有效日时不运行 T，也不得据此声称树模型无增量；
 补齐连续日频聚合后再评价。
 
 ## 8. 组合与模型训练

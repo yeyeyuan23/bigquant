@@ -38,7 +38,8 @@ reports/
 - `rows`：组合主面板的股票日行数。
 - `duplicate_keys`：`date, instrument` 重复键数量，必须为 0。
 - `factorlib_reference.screened_features`：冻结 screened15。
-- `factorlib_reference.j_reference_columns_present`：本地 all36 参考列数量。
+- `factorlib_reference.j_reference_columns_present`：本地 J reference 可用列数量，
+  当前应等于 all36 公开列数加 self_library 候选列数。
 - `candidate_pool_reference.factor_version`：当前候选长表版本。
 - `candidate_pool_reference.sha256`：当前候选长表文件哈希。
 - `combination_inputs.all_candidate_count`：进入组合层的自研候选数量。
@@ -99,16 +100,21 @@ reports/
 ### S 路线
 
 - `single_factor_route_admission.csv`：S 路线的候选级路线审计。当前 S 使用
-  family-balanced route-level J，不做逐候选模型训练。
+  严格 trial gate 后逐候选加入 family-balanced 规则复合，并做 route-level J
+  增量确认。
 - `single_factor_route_promotion.csv`
   - `passed`：S 路线是否通过 J 确认。
   - `reasons`：失败原因。
   - `bootstrap_reference`：没有旧 frozen S 时使用的启动参考。
 
-S 的 Rank IC、t 统计、中性化、可交易和稳定性诊断不参与当前 S 路线准入。
-主组合流程默认跳过这些重诊断；如果只是要审计单因子质量，用
+S 正式准入会读取 `s_*` trial 字段：覆盖率、活跃日、Rank IC、最差 fold、
+正向 fold 比例、方向一致性和相对当前 S baseline 的最大 Rank 相关性。通过 trial
+后才计算 `candidate_route_J_computed=True` 的 J 增量。t 统计、中性化、可交易和
+分组诊断不再无条件增加主流程计算量；如果只是要审计单因子质量，用
 `scripts/run_first_round.py`，如果要给最终路线补审计字段，再给
 `scripts/run_combinations.py` 加 `--include-route-diagnostics`。
+没有旧 frozen S baseline 时，S 会用 trial-passed 候选 bootstrap 初始规则池；
+这类行的 `candidate_route_J_computed` 可以是 `False`，不是错误。
 
 ### I 路线
 
@@ -123,6 +129,10 @@ S 的 Rank IC、t 统计、中性化、可交易和稳定性诊断不参与当�
 常用字段：
 
 - `candidate`：带 `self__` 前缀的候选特征名。
+- `i_trial_passed`：是否通过 I entry gate。
+- `i_rank_ic_mean`：候选原始日度 Rank IC 均值。
+- `i_residual_rank_ic`：候选对 `screened15 + frozen_I` 日内秩残差化后的 Rank IC。
+- `i_max_abs_rank_correlation`：候选相对 `screened15 + frozen_I` 的最大绝对秩相关。
 - `candidate_level_J_computed`：是否实际训练并计算个人 J 增量。
 - `active_days`：开发期内该候选有截面变化的交易日数量。
 - `baseline_score_proxy`、`augmented_score_proxy`、`delta_score_proxy`：配对 J。

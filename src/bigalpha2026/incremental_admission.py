@@ -7,18 +7,22 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from .competition_score_proxy import CompetitionScoreReference
 from .evaluation import (
     FactorLibraryValidationConfig,
+    factor_rank_correlation,
     factorlib_regularized_incremental_validation,
+    rank_ic_series,
 )
 from .incremental_cache import (
     INCREMENTAL_CACHE_SCHEMA_VERSION,
     IncrementalSummaryCache,
 )
 from .research_policy import (
+    INCREMENTAL_ENTRY_GATE,
     competition_score_increment_gate,
 )
 from .tree_cache import (
@@ -86,6 +90,125 @@ def incremental_score_gate(
 
     score_passed, reasons = competition_score_increment_gate(summary)
     return score_passed, reasons
+
+
+def _daily_residual_signal(
+    frame: pd.DataFrame,
+    *,
+    candidate: str,
+    baseline_columns: Sequence[str],
+) -> pd.Series:
+    """Residualize a candidate against current linear baseline ranks by date."""
+
+    residuals = pd.Series(np.nan, index=frame.index, dtype=float)
+    for _, block in frame.groupby("date", sort=False):
+        y = block[candidate].rank(pct=True).to_numpy(dtype=float)
+        if not baseline_columns:
+            residuals.loc[block.index] = y - np.nanmean(y)
+            continue
+        x = block[list(baseline_columns)].rank(pct=True).to_numpy(dtype=float)
+        valid = np.isfinite(y) & np.isfinite(x).all(axis=1)
+        if valid.sum() < len(baseline_columns) + 2:
+            continue
+        design = np.column_stack([np.ones(valid.sum()), x[valid]])
+        beta, *_ = np.linalg.lstsq(design, y[valid], rcond=None)
+        residuals.loc[block.index[valid]] = y[valid] - design @ beta
+    return residuals
+
+
+def candidate_incremental_entry_diagnostics(
+    development: pd.DataFrame,
+    development_labels: pd.DataFrame,
+    *,
+    candidate: str,
+    baseline_columns: Sequence[str],
+) -> dict[str, object]:
+    """Cheap I prefilter for weak linear or residual signal."""
+
+    gate = INCREMENTAL_ENTRY_GATE
+    label_column = "ret_close_to_close"
+    columns = tuple(dict.fromkeys((*baseline_columns, candidate)))
+    frame = development[["date", "instrument", *columns]].copy()
+    coverage = float(pd.to_numeric(frame[candidate], errors="coerce").notna().mean())
+    active_days = int(
+        frame.groupby("date", sort=True)[candidate].nunique().gt(1).sum()
+    )
+    merged = frame.merge(
+        development_labels[["date", "instrument", label_column]],
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+    ic = rank_ic_series(
+        merged,
+        factor_column=candidate,
+        label_column=label_column,
+    ).dropna()
+    rank_ic_mean = float(ic.mean()) if not ic.empty else float("nan")
+    residual_frame = merged[["date", "instrument", label_column]].copy()
+    residual_frame["candidate_residual"] = _daily_residual_signal(
+        merged[["date", "instrument", *columns]],
+        candidate=candidate,
+        baseline_columns=tuple(baseline_columns),
+    )
+    residual_ic = rank_ic_series(
+        residual_frame.dropna(subset=["candidate_residual"]),
+        factor_column="candidate_residual",
+        label_column=label_column,
+    ).dropna()
+    residual_rank_ic = (
+        float(residual_ic.mean()) if not residual_ic.empty else float("nan")
+    )
+    if baseline_columns:
+        correlations = factor_rank_correlation(frame, columns)
+        max_abs_rank_correlation = float(
+            correlations.loc[candidate, list(baseline_columns)].abs().max()
+        )
+    else:
+        max_abs_rank_correlation = 0.0
+    quality_pass = bool(
+        coverage >= gate.minimum_coverage
+        and active_days >= gate.minimum_active_days
+    )
+    linear_signal_pass = bool(
+        (pd.notna(rank_ic_mean) and rank_ic_mean >= gate.minimum_rank_ic_mean)
+        or (
+            pd.notna(residual_rank_ic)
+            and residual_rank_ic >= gate.minimum_residual_rank_ic
+        )
+    )
+    residual_signal_pass = bool(
+        pd.notna(residual_rank_ic)
+        and residual_rank_ic >= gate.minimum_residual_rank_ic
+    )
+    redundancy_pass = bool(
+        (
+            pd.notna(max_abs_rank_correlation)
+            and max_abs_rank_correlation <= gate.maximum_abs_rank_correlation
+        )
+        or residual_signal_pass
+    )
+    trial_passed = bool(quality_pass and linear_signal_pass and redundancy_pass)
+    reasons = []
+    if not quality_pass:
+        reasons.append("I quality gate failed")
+    if not linear_signal_pass:
+        reasons.append("I linear/residual signal gate failed")
+    if not redundancy_pass:
+        reasons.append("I redundancy gate failed")
+    return {
+        "i_trial_passed": trial_passed,
+        "i_quality_passed": quality_pass,
+        "i_linear_signal_passed": linear_signal_pass,
+        "i_residual_signal_passed": residual_signal_pass,
+        "i_redundancy_passed": redundancy_pass,
+        "i_trial_reasons": "; ".join(reasons),
+        "i_coverage": coverage,
+        "i_active_days": active_days,
+        "i_rank_ic_mean": rank_ic_mean,
+        "i_residual_rank_ic": residual_rank_ic,
+        "i_max_abs_rank_correlation": max_abs_rank_correlation,
+    }
 
 
 def promote_frozen_incremental_pool(
@@ -255,7 +378,7 @@ class IncrementalAdmissionResult:
 
         return {
             "frozen_candidates_before": ",".join(self.frozen_before),
-            "selection": "factorwise_then_conditional_forward",
+            "selection": "residual_entry_then_factorwise_conditional_forward",
             "individual_passed_candidates": ",".join(self.individual_passed),
             "conditional_passed_candidates": ",".join(self.pending_passed),
             "provisional_pool_count": len(self.provisional_pool),
@@ -293,7 +416,7 @@ class IncrementalAdmissionResult:
             "preprocessing": self.model_config["preprocessing"],
             "cache_schema": INCREMENTAL_CACHE_SCHEMA_VERSION,
             "frozen_pool_state_digest": self.frozen_pool_state_digest,
-            "selection": "factorwise_then_conditional_forward",
+            "selection": "residual_entry_then_factorwise_conditional_forward",
             "individual_passed_candidates": list(self.individual_passed),
             "conditional_passed_candidates": list(self.pending_passed),
             "pool_promoted": self.pool_promoted,
@@ -319,7 +442,7 @@ def run_incremental_admission(
     config = FactorLibraryValidationConfig()
     model_protocol = "|".join(
         (
-            "screened15_factorwise_v8_official_J_frozen_I",
+            "screened15_residual_entry_v9_official_J_frozen_I",
             f"years={','.join(map(str, evaluation_years))}",
             f"train_days={config.train_window_days}",
             f"test_days={config.test_window_days}",
@@ -327,11 +450,11 @@ def run_incremental_admission(
             f"l1_ratio={config.l1_ratio}",
             "preprocessing=daily_centered_rank_features_and_target",
             "positive_coefficients=true",
-            "candidate_filter=factorwise_positive_J_then_conditional_forward",
+            "candidate_filter=linear_or_residual_signal_then_factorwise_J",
             "admission_metric=factorwise_delta_official_score_proxy",
         )
     )
-    protocol = f"{model_protocol}|admission=factorwise_positive_J_v1"
+    protocol = f"{model_protocol}|admission=residual_entry_then_factorwise_positive_J_v1"
     development = oriented.loc[
         oriented["date"].dt.year.isin(evaluation_years)
     ]
@@ -357,6 +480,17 @@ def run_incremental_admission(
         "preprocessing": "daily_centered_rank_features_and_target_neutral_fill",
         "evaluation_protocol": model_protocol,
         "score_protocol": dict(score_reference.protocol()),
+        "entry_gate": {
+            "minimum_coverage": INCREMENTAL_ENTRY_GATE.minimum_coverage,
+            "minimum_active_days": INCREMENTAL_ENTRY_GATE.minimum_active_days,
+            "minimum_rank_ic_mean": INCREMENTAL_ENTRY_GATE.minimum_rank_ic_mean,
+            "minimum_residual_rank_ic": (
+                INCREMENTAL_ENTRY_GATE.minimum_residual_rank_ic
+            ),
+            "maximum_abs_rank_correlation": (
+                INCREMENTAL_ENTRY_GATE.maximum_abs_rank_correlation
+            ),
+        },
     }
     cache = IncrementalSummaryCache(
         cache_dir / "validation",
@@ -482,11 +616,15 @@ def run_incremental_admission(
 
     screened_rows: list[dict[str, object]] = []
     for self_column in self_columns:
+        baseline_columns = (*selected_public, *frozen_before)
         base_row: dict[str, object] = {
             "candidate": self_column,
-            "candidate_level_J_computed": self_column in individual_pending,
-            "selection_role": "factorwise_elastic_net_candidate",
-            "selection_reason": "positive factorwise J increment against screened15+frozen_I",
+            "candidate_level_J_computed": False,
+            "selection_role": "residual_entry_elastic_net_candidate",
+            "selection_reason": (
+                "linear or residual signal, then positive factorwise J "
+                "increment against screened15+frozen_I"
+            ),
             "active_days": len(active_dates_by_candidate[self_column]),
             "evaluation_years": ",".join(map(str, evaluation_years)),
             "evaluation_protocol": protocol,
@@ -495,22 +633,43 @@ def run_incremental_admission(
             screened_rows.append(
                 {
                     **base_row,
+                    "i_trial_passed": True,
                     "individual_passed": True,
                     "individual_reasons": "",
                     "evaluation_status": "frozen_prior_I",
                 }
             )
             continue
+        entry = candidate_incremental_entry_diagnostics(
+            development,
+            development_labels,
+            candidate=self_column,
+            baseline_columns=baseline_columns,
+        )
+        if not bool(entry["i_trial_passed"]):
+            screened_rows.append(
+                {
+                    **base_row,
+                    **entry,
+                    "individual_passed": False,
+                    "individual_reasons": str(entry["i_trial_reasons"]),
+                    "force_refreshed": self_column in refresh_features,
+                    "evaluation_status": "i_entry_failed",
+                }
+            )
+            continue
         summary, cache_key = pool_summary(
             kind="factorwise_positive_J_vs_frozen_I",
-            base_columns=(*selected_public, *frozen_before),
+            base_columns=baseline_columns,
             candidate_columns=(self_column,),
         )
         passed, reasons = incremental_score_gate(summary)
         screened_rows.append(
             {
                 **base_row,
+                **entry,
                 **summary,
+                "candidate_level_J_computed": True,
                 "individual_passed": passed,
                 "individual_reasons": "; ".join(reasons),
                 "individual_cache_key": cache_key,
@@ -682,7 +841,7 @@ def run_incremental_admission(
         json.dumps(
             {
                 "schema_version": INCREMENTAL_CACHE_SCHEMA_VERSION,
-                "selection": "factorwise_then_conditional_forward",
+                "selection": "residual_entry_then_factorwise_conditional_forward",
                 "individual_passed_candidates": list(individual_passed),
                 "conditional_passed_candidates": list(pending_passed),
                 "conditional_evaluations": backward_evaluations,

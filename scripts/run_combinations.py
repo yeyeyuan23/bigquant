@@ -168,13 +168,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--single-factor-cache-dir",
         type=Path,
         default=None,
-        help="frozen S state (default: DATA/cache/single_factor_v1_J)",
+        help="frozen S state (default: DATA/cache/single_factor_v2_strict_trial_J)",
     )
     parser.add_argument(
         "--incremental-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed I cache (default: DATA/cache/incremental_v5_factorwise_J)",
+        help="content-addressed I cache (default: DATA/cache/incremental_v6_residual_entry_J)",
     )
     parser.add_argument(
         "--refresh-incremental-cache",
@@ -191,7 +191,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--tree-cache-dir",
         type=Path,
         default=None,
-        help="content-addressed LightGBM cache (default: DATA/cache/tree_v5_factorwise_J)",
+        help="content-addressed LightGBM cache (default: DATA/cache/tree_v5_entry_or_conditional_J)",
     )
     parser.add_argument(
         "--refresh-tree-cache",
@@ -473,11 +473,14 @@ def contract_summary(
         "factorlib_reference": {
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-            "j_reference": "factorlib_all36_base_proxy",
-            "j_reference_count": len(FACTORLIB_FEATURE_COLUMNS),
+            "j_reference": "factorlib_all36_plus_candidate_pool_proxy",
+            "j_public_reference_count": len(FACTORLIB_FEATURE_COLUMNS),
+            "j_self_reference_count": len(self_columns),
+            "j_reference_count": len(FACTORLIB_FEATURE_COLUMNS) + len(self_columns),
             "j_reference_columns_present": len(
                 [column for column in all36_reference if column.startswith("factorlib__")]
-            ),
+            )
+            + len(self_columns),
         },
         "candidate_pool_reference": {
             "factor_version": CANDIDATE_POOL_VERSION,
@@ -546,8 +549,8 @@ def synthetic_contract_summary() -> dict[str, object]:
         "rows": len(panel),
         "factorlib_features": len(public_columns),
         "factorlib_screened_features": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-        "competition_J_reference": "factorlib_all36_base_proxy",
-        "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS),
+        "competition_J_reference": "factorlib_all36_plus_candidate_pool_proxy",
+        "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS) + len(self_columns),
         "self_features": len(self_columns),
         "minimum_coverage": float(coverage["coverage"].min()),
         "self_factor_composite_contract": list(self_factor.columns),
@@ -707,7 +710,7 @@ def prepare_experiment_context(
     CompetitionScoreReference,
     tuple[str, ...],
 ]:
-    """Freeze feature directions and the all36 competition-score reference."""
+    """Freeze feature directions and the all36+self competition-score reference."""
 
     development_panel = panel.loc[panel["date"].dt.year.isin(DEVELOPMENT_YEARS)]
     development_labels = labels.loc[labels["date"].dt.year.isin(DEVELOPMENT_YEARS)]
@@ -723,9 +726,16 @@ def prepare_experiment_context(
     if selected_public != FROZEN_FACTORLIB_SCREENED_FEATURES:
         raise RuntimeError("local factorlib subset no longer matches the frozen 15 membership")
 
-    j_reference_columns = tuple(f"factorlib__{column}" for column in FACTORLIB_FEATURE_COLUMNS)
+    j_public_columns = tuple(f"factorlib__{column}" for column in FACTORLIB_FEATURE_COLUMNS)
+    j_reference_columns = (*j_public_columns, *self_columns)
+    j_reference_panel = all36_reference.merge(
+        oriented.loc[:, [*KEY_COLUMNS, *self_columns]],
+        on=list(KEY_COLUMNS),
+        how="left",
+        validate="one_to_one",
+    )
     oriented_j_reference, j_reference_directions = orient_j_reference(
-        all36_reference,
+        j_reference_panel,
         labels,
         j_reference_columns,
     )
@@ -857,7 +867,7 @@ def run_route_admissions(
     single_factor_state = (
         Path(single_factor_cache_dir)
         if single_factor_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "single_factor_v1_J"
+        else reports_dir.parent / "data" / "cache" / "single_factor_v2_strict_trial_J"
     ) / "frozen_state.json"
     single_factor = run_single_factor_route_admission(
         oriented.loc[oriented["date"].dt.year.isin(DEVELOPMENT_YEARS)],
@@ -865,13 +875,11 @@ def run_route_admissions(
         s_candidate_features,
         frozen_state_path=single_factor_state,
     )
-    if not single_factor.admitted_candidates:
-        raise RuntimeError("no candidate passed the J-based S route admission")
 
     resolved_incremental_cache = (
         Path(incremental_cache_dir)
         if incremental_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "incremental_v5_factorwise_J"
+        else reports_dir.parent / "data" / "cache" / "incremental_v6_residual_entry_J"
     )
     incremental = run_incremental_admission(
         oriented,
@@ -888,7 +896,7 @@ def run_route_admissions(
     resolved_tree_cache = (
         Path(tree_cache_dir)
         if tree_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "tree_v5_factorwise_J"
+        else reports_dir.parent / "data" / "cache" / "tree_v5_entry_or_conditional_J"
     )
     tree = run_tree_admission(
         oriented,
@@ -943,14 +951,19 @@ def build_validation_pipelines(
             VALIDATION_2023_YEAR,
         ),
     )
-    raw_pipelines: dict[tuple[str, str], pd.DataFrame] = {
-        (
-            "self_factor_composite",
-            "family_equal_rank",
-        ): family_balanced_factor(
+    raw_pipelines: dict[tuple[str, str], pd.DataFrame] = {}
+    if self_features:
+        raw_pipelines[
+            (
+                "self_factor_composite",
+                "family_equal_rank",
+            )
+        ] = family_balanced_factor(
             oriented,
             self_features,
-        ),
+        )
+    raw_pipelines.update(
+        {
         (
             "joint_elastic_net",
             "elastic_net",
@@ -959,7 +972,8 @@ def build_validation_pipelines(
             "joint_lightgbm",
             "lightgbm",
         ): tree_result.predict_joint((VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)),
-    }
+        }
+    )
     validation_years = (VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)
     factors: dict[tuple[str, str], pd.DataFrame] = {}
     score_summaries: dict[str, dict[str, float]] = {}
@@ -1265,7 +1279,7 @@ def write_experiment_reports(
             [
                 {
                     "pending_candidates": ",".join(tree_result.pending_candidates),
-                    "selection": "factorwise_then_conditional_forward",
+                    "selection": "entry_or_factorwise_then_conditional_forward",
                     "conditional_passed_candidates": ",".join(
                         tree_result.pending_passed
                     ),
@@ -1356,7 +1370,7 @@ def build_experiment_result(
         "single_factor_route_admission": {
             "eligible_candidates": list(s_candidate_features),
             "admitted_candidates": list(single_factor_result.admitted_candidates),
-            "selection": "family_balanced_direct_pool",
+            "selection": "strict_trial_then_sequential_route_J",
             "promotion": single_factor_result.promotion_summary,
         },
         "learned_model_preprocessing": ("daily_centered_rank_features_and_target_neutral_fill"),
@@ -1565,19 +1579,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         single_factor_cache_dir=(
             args.single_factor_cache_dir
             if args.single_factor_cache_dir is not None
-            else args.data_dir / "cache" / "single_factor_v1_J"
+            else args.data_dir / "cache" / "single_factor_v2_strict_trial_J"
         ),
         incremental_cache_dir=(
             args.incremental_cache_dir
             if args.incremental_cache_dir is not None
-            else args.data_dir / "cache" / "incremental_v5_factorwise_J"
+            else args.data_dir / "cache" / "incremental_v6_residual_entry_J"
         ),
         refresh_incremental_cache=args.refresh_incremental_cache,
         refresh_incremental_candidates=(args.refresh_incremental_candidate),
         tree_cache_dir=(
             args.tree_cache_dir
             if args.tree_cache_dir is not None
-            else args.data_dir / "cache" / "tree_v5_factorwise_J"
+            else args.data_dir / "cache" / "tree_v5_entry_or_conditional_J"
         ),
         refresh_tree_cache=args.refresh_tree_cache,
         refresh_tree_candidates=args.refresh_tree_candidate,

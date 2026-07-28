@@ -55,6 +55,17 @@ SUBMISSIONS = (
             "只用 start_date 前已完整观察到的历史标签训练。"
         ),
     ),
+    (
+        ROOT / "submissions" / "lgbm_platform_top_v01.py",
+        ROOT / "submissions" / "lgbm_platform_top_v01.ipynb",
+        "# BigAlpha 2026 platform-top historical LightGBM v01\n",
+        (
+            "历史平台最高分 LightGBM 提交复刻；screened15 + "
+            "FR-002/FR-004/FR-011/HF-002/HF-003/OB-005/"
+            "PV-001/PV-002/PV-003/PV-006/PV-014；"
+            "平台记录总分和 B 分最高，当前 J 口径待重算。"
+        ),
+    ),
 )
 
 
