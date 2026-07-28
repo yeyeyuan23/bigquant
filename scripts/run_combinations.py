@@ -1034,7 +1034,6 @@ def evaluate_validation_pipelines(
     labels: pd.DataFrame,
     exposures: pd.DataFrame,
     *,
-    tree_group_passed: bool,
     include_route_diagnostics: bool,
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
     """Calculate competition-score ranking inputs and optional diagnostics."""
@@ -1165,9 +1164,6 @@ def evaluate_validation_pipelines(
                 "cross_regime_mean_rank_ic": cross_regime_mean_rank_ic,
                 "rank_ic_is_diagnostic_only": True,
                 "tradable_rank_ic_is_diagnostic_only": True,
-                "tree_group_gate_diagnostic": (
-                    tree_group_passed if experiment == "joint_lightgbm" else None
-                ),
             }
         )
     return metrics, decisions
@@ -1454,7 +1450,6 @@ def run_experiments(
         crowding_scores,
         labels,
         exposures,
-        tree_group_passed=tree_result.group_passed,
         include_route_diagnostics=include_route_diagnostics,
     )
 
