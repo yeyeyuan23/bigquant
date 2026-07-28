@@ -133,6 +133,28 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
 其中 `--check-files` 打印真实快照合同后立即退出，不会训练；不带
 `--check-files` 时，打印同一份合同后会继续训练。
 
+## 训练数据包同步
+
+训练数据包不走 Git LFS，也不提交进 Git 历史；`data/transfers/` 和
+`data/**/*.tar.gz` 已被 `.gitignore` 排除。团队同步使用私有 GitHub Release
+资产：
+
+```text
+Release tag: data-transfer-20260728
+data/transfers/bigalpha_research_data_v3.tar.gz
+data/transfers/bigalpha_research_data_v3.tar.gz.sha256
+```
+
+接收方在仓库根目录下载、校验并解压：
+
+```bash
+bash scripts/download_transfer_release.sh data-transfer-20260728
+shasum -a 256 -c data/transfers/bigalpha_research_data_v3.tar.gz.sha256
+tar -xzf data/transfers/bigalpha_research_data_v3.tar.gz -C .
+```
+
+数据包内容、版本规则和增量包交付方式见 [协作手册](docs/team_workflow.md#5-可选本地数据包同步)。
+
 ## 工程结构
 
 ```text
