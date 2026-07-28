@@ -31,6 +31,7 @@ def candidate_tree_entry_diagnostics(
     *,
     candidate: str,
     baseline_columns: Sequence[str],
+    correlations: pd.DataFrame | None = None,
 ) -> dict[str, object]:
     """Cheap T entry diagnostics before running LightGBM."""
 
@@ -54,10 +55,11 @@ def candidate_tree_entry_diagnostics(
     )
 
     columns = tuple(dict.fromkeys((*baseline_columns, candidate)))
-    correlations = factor_rank_correlation(
-        development[["date", "instrument", *columns]],
-        columns,
-    )
+    if correlations is None:
+        correlations = factor_rank_correlation(
+            development[["date", "instrument", *columns]],
+            columns,
+        )
     if baseline_columns:
         candidate_max_abs_rank_correlation = float(
             correlations.loc[candidate, list(baseline_columns)].abs().max()
@@ -342,14 +344,6 @@ class TreeAdmissionResult:
                         for candidate in self.pending_passed
                         if candidate in self.admitted_candidates
                     ],
-                    "provisional_group_passed": (
-                        self.provisional_group_passed
-                    ),
-                    "provisional_group_reasons": (
-                        self.provisional_group_reasons
-                    ),
-                    "relative_to_frozen_passed": self.promotion_passed,
-                    "relative_to_frozen_reasons": self.promotion_reasons,
                     "pool_promoted": self.pool_promoted,
                     "cache_hits": self.cache_hits,
                     "cache_misses": self.cache_misses,
@@ -573,12 +567,23 @@ def run_tree_admission(
     admission: dict[str, dict[str, object]] = {}
     incremental_rows: list[dict[str, object]] = []
     importance_rows: list[pd.DataFrame] = []
+    entry_baseline_columns = tuple(
+        dict.fromkeys((*selected_public, *frozen_before))
+    )
+    entry_columns = tuple(
+        dict.fromkeys((*entry_baseline_columns, *eligible))
+    )
+    entry_correlations = factor_rank_correlation(
+        development[["date", "instrument", *entry_columns]],
+        entry_columns,
+    )
     entry_diagnostics = {
         candidate: candidate_tree_entry_diagnostics(
             development,
             development_labels,
             candidate=candidate,
-            baseline_columns=(*selected_public, *frozen_before),
+            baseline_columns=entry_baseline_columns,
+            correlations=entry_correlations,
         )
         for candidate in eligible
     }
@@ -738,13 +743,7 @@ def run_tree_admission(
         admission[candidate]["tree_incremental_passed"] = admitted_candidate
         admission[candidate]["reasons"] = (
             ""
-            if admitted_candidate
-            else "; ".join(
-                dict.fromkeys(
-                    (*provisional_group_reasons, *promotion_reasons)
-                )
-            )
-            if candidate in pending_passed
+            if admitted_candidate or candidate in pending_passed
             else str(admission[candidate].get("reasons", ""))
         )
         admission[candidate]["frozen_after_validation"] = (

@@ -1008,15 +1008,11 @@ def factor_rank_correlation(
     factor_panel: pd.DataFrame,
     factor_columns: Iterable[str],
 ) -> pd.DataFrame:
-    ranked = factor_panel.copy()
     columns = list(factor_columns)
+    if not columns:
+        return pd.DataFrame(dtype=float)
+    ranked = factor_panel.groupby("date", sort=False)[columns].rank(pct=True)
+    result = ranked.corr().reindex(index=columns, columns=columns).astype(float)
     for column in columns:
-        ranked[column] = ranked.groupby("date", sort=False)[column].rank(pct=True)
-    result = pd.DataFrame(np.nan, index=columns, columns=columns, dtype=float)
-    for left_index, left in enumerate(columns):
-        result.loc[left, left] = 1.0
-        for right in columns[left_index + 1 :]:
-            correlation = _safe_pearson_correlation(ranked[left], ranked[right])
-            result.loc[left, right] = correlation
-            result.loc[right, left] = correlation
+        result.loc[column, column] = 1.0
     return result
