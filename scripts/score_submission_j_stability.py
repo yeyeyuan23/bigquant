@@ -75,13 +75,27 @@ def normalized_route(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def daily_rank(values: pd.Series, dates: pd.Series) -> pd.Series:
-    return (
-        pd.to_numeric(values, errors="coerce")
-        .groupby(dates, sort=False)
-        .rank(pct=True, method="average")
-        .sub(0.5)
-        .mul(2.0)
+    import polars as pl
+
+    work = pd.DataFrame(
+        {
+            "date": pd.to_datetime(dates, errors="coerce").dt.normalize(),
+            "value": pd.to_numeric(values, errors="coerce"),
+        }
     )
+    ranked = (
+        pl.from_pandas(work)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col("value").cast(pl.Float64, strict=False),
+        )
+        .with_columns(
+            (((pl.col("value").rank("average").over("date") / pl.col("value").count().over("date")) - 0.5) * 2.0).alias("factor")
+        )
+        .get_column("factor")
+        .to_numpy()
+    )
+    return pd.Series(ranked, index=values.index, dtype=float)
 
 
 def build_rule_v03_route(data_dir: Path, years: Iterable[int]) -> pd.DataFrame:
@@ -103,11 +117,24 @@ def build_rule_v03_route(data_dir: Path, years: Iterable[int]) -> pd.DataFrame:
     candidate_pool = candidate_pool.loc[
         candidate_pool["date"].dt.year.isin(tuple(years))
     ].copy()
-    wide = candidate_pool.pivot(
-        index=["date", "instrument"],
-        columns="candidate_id",
-        values="factor",
-    ).reset_index()
+    import polars as pl
+
+    wide = (
+        pl.from_pandas(candidate_pool)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col("candidate_id").cast(pl.Utf8),
+            pl.col("factor").cast(pl.Float64, strict=False),
+        )
+        .pivot(
+            values="factor",
+            index=["date", "instrument"],
+            on="candidate_id",
+            aggregate_function="first",
+        )
+        .to_pandas()
+    )
     missing = sorted(set(members).difference(wide.columns))
     if missing:
         raise ValueError(f"candidate_pool is missing rule_v03 members: {missing}")

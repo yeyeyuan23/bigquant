@@ -11,6 +11,8 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
+from bigalpha2026.candidate_transforms import daily_median_centered_rank
+
 BAR_COLUMNS = ("date", "instrument", "close", "amount", "volume", "deal_number")
 POOL_COLUMNS = ("date", "instrument")
 OUTPUT_COLUMNS = ("date", "instrument", "factor")
@@ -128,14 +130,7 @@ def build_hf_001_factor(
         how="left",
         validate="one_to_one",
     )
-    daily_median = result.groupby("date", sort=False)["factor_raw"].transform("median")
-    result["factor_raw"] = result["factor_raw"].fillna(daily_median).fillna(0.0)
-    result["factor"] = (
-        result.groupby("date", sort=False)["factor_raw"]
-        .rank(pct=True, method="average")
-        .sub(0.5)
-        .mul(2.0)
-    )
+    result["factor"] = daily_median_centered_rank(result)
     result["factor"] = pd.to_numeric(result["factor"], errors="coerce").replace(
         [np.inf, -np.inf],
         np.nan,

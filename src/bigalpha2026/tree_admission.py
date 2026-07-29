@@ -379,15 +379,30 @@ def run_tree_admission(
     development_labels = labels.loc[
         labels["date"].dt.year.isin(development_years)
     ]
-    active_days_by_feature = {
-        self_column: int(
-            development.groupby("date", sort=True)[self_column]
-            .nunique()
-            .gt(1)
-            .sum()
+    import polars as pl
+
+    if self_columns:
+        active_stats = (
+            pl.from_pandas(development[["date", *self_columns]])
+            .with_columns(pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"))
+            .group_by("date")
+            .agg(
+                [
+                    (pl.col(self_column).cast(pl.Float64, strict=False).drop_nulls().n_unique() > 1)
+                    .cast(pl.Int64)
+                    .alias(self_column)
+                    for self_column in self_columns
+                ]
+            )
+            .select([pl.col(self_column).sum().alias(self_column) for self_column in self_columns])
+            .to_dicts()
         )
-        for self_column in self_columns
-    }
+        active_days_by_feature = {
+            self_column: int(active_stats[0].get(self_column, 0)) if active_stats else 0
+            for self_column in self_columns
+        }
+    else:
+        active_days_by_feature = {}
     eligible = tuple(
         self_column
         for self_column in self_columns

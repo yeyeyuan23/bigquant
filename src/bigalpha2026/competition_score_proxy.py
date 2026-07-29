@@ -10,6 +10,7 @@ are the global submission history.
 from __future__ import annotations
 
 import hashlib
+import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -70,26 +71,122 @@ def _normalize_keys(frame: pd.DataFrame, *, name: str) -> pd.DataFrame:
     missing = sorted(set(KEY_COLUMNS).difference(frame.columns))
     if missing:
         raise ValueError(f"{name} is missing key columns: {missing}")
-    result = frame.copy()
-    result["date"] = pd.to_datetime(
-        result["date"],
-        errors="coerce",
-    ).dt.normalize()
-    result["instrument"] = result["instrument"].astype(str)
-    if result.loc[:, list(KEY_COLUMNS)].isna().any().any():
+    import polars as pl
+
+    result_pl = (
+        pl.from_pandas(frame)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+        )
+    )
+    null_keys = result_pl.select(
+        pl.any_horizontal(pl.col("date").is_null(), pl.col("instrument").is_null()).any()
+    ).item()
+    if bool(null_keys):
         raise ValueError(f"{name} contains null keys")
-    if result.duplicated(list(KEY_COLUMNS)).any():
+    duplicate_count = result_pl.select(
+        pl.struct(list(KEY_COLUMNS)).is_duplicated().sum()
+    ).item()
+    if int(duplicate_count) > 0:
         raise ValueError(f"{name} contains duplicate date-instrument keys")
-    return result
+    return result_pl.to_pandas()
+
+
+FULL_SCORE_DIGEST = os.getenv("BIGALPHA_SCORE_FULL_DIGEST", "0") == "1"
 
 
 def _frame_digest(frame: pd.DataFrame, columns: Sequence[str]) -> str:
-    ordered = frame.loc[:, list(columns)].sort_values(
-        list(KEY_COLUMNS),
-        kind="stable",
+    import polars as pl
+
+    selected_columns = list(columns)
+    work = (
+        pl.from_pandas(frame.loc[:, selected_columns])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+        )
     )
-    hashed = pd.util.hash_pandas_object(ordered, index=False).to_numpy()
+    if not FULL_SCORE_DIGEST:
+        meta = work.select(
+            pl.len().alias("rows"),
+            pl.col("date").min().alias("min_date"),
+            pl.col("date").max().alias("max_date"),
+            pl.col("instrument").n_unique().alias("instrument_count"),
+        ).row(0, named=True)
+        payload = {
+            "columns": selected_columns,
+            "rows": int(meta["rows"]),
+            "min_date": str(meta["min_date"]),
+            "max_date": str(meta["max_date"]),
+            "instrument_count": int(meta["instrument_count"]),
+        }
+        return hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
+    ordered = work.sort(list(KEY_COLUMNS))
+    hashed = ordered.select(pl.struct(selected_columns).hash(seed=0).alias("hash")).to_series().to_numpy()
     return hashlib.sha256(hashed.tobytes()).hexdigest()
+
+
+def _daily_std(values: pd.DataFrame, column: str) -> pd.Series:
+    """Daily standard deviation using polars, returned as pandas Series."""
+
+    import polars as pl
+
+    stats = (
+        pl.from_pandas(values[["date", column]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col(column).cast(pl.Float64, strict=False),
+        )
+        .group_by("date")
+        .agg(pl.col(column).std().alias(column))
+        .sort("date")
+        .to_pandas()
+    )
+    return pd.Series(
+        stats[column].to_numpy(dtype=float),
+        index=pd.to_datetime(stats["date"]),
+        name=column,
+    )
+
+
+def _keyed_polars_frame(frame: pd.DataFrame):
+    """Normalize date/instrument keys and return a polars DataFrame."""
+
+    import polars as pl
+
+    data = frame.copy()
+    data["date"] = pd.to_datetime(data["date"], errors="coerce").dt.normalize()
+    data["instrument"] = data["instrument"].astype(str)
+    return pl.from_pandas(data).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col("instrument").cast(pl.Utf8),
+    )
+
+
+def _key_join(
+    left: pd.DataFrame,
+    right: pd.DataFrame,
+    *,
+    how: str,
+) -> pd.DataFrame:
+    """Join stock-day keyed frames with polars and preserve pandas API."""
+
+    joined = _keyed_polars_frame(left).join(
+        _keyed_polars_frame(right),
+        on=list(KEY_COLUMNS),
+        how=how,
+        validate="1:1",
+    )
+    return joined.to_pandas()
+
+
+def _drop_duplicate_keys_polars(frame: pd.DataFrame) -> pd.DataFrame:
+    return (
+        _keyed_polars_frame(frame)
+        .unique(subset=list(KEY_COLUMNS), keep="first", maintain_order=True)
+        .to_pandas()
+    )
 
 
 def inserted_percentile(value: float, reference: Sequence[float]) -> float:
@@ -121,31 +218,37 @@ def _preprocess_wide_factors(
     if base_keys.duplicated(list(KEY_COLUMNS)).any():
         raise ValueError("factor panel contains duplicate date-instrument keys")
     columns = tuple(factor_columns)
-    values = (
-        panel.loc[:, list(columns)]
-        .reset_index(drop=True)
-        .apply(pd.to_numeric, errors="coerce")
+    import polars as pl
+
+    work = pl.from_pandas(
+        pd.concat(
+            [
+                base_keys,
+                panel.loc[:, list(columns)].reset_index(drop=True),
+            ],
+            axis=1,
+        )
+    ).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+        pl.col("instrument").cast(pl.Utf8),
     )
-    raw = values.to_numpy(dtype=float, copy=True)
-    standardized_array = np.full_like(raw, np.nan, dtype=float)
-    for indices in base_keys.groupby("date", sort=False).groups.values():
-        block = raw[np.asarray(indices, dtype=int), :]
-        if block.size == 0:
-            continue
-        lower = np.nanquantile(block, 0.01, axis=0)
-        upper = np.nanquantile(block, 0.99, axis=0)
-        winsorized = np.clip(block, lower, upper)
-        mean = np.nanmean(winsorized, axis=0)
-        std = np.nanstd(winsorized, axis=0, ddof=1)
-        std[std == 0] = np.nan
-        standardized_array[np.asarray(indices, dtype=int), :] = (
-            winsorized - mean
-        ) / std
-    standardized = pd.DataFrame(
-        standardized_array,
-        columns=columns,
-        index=values.index,
-    )
+    exprs = []
+    for column in columns:
+        raw = pl.col(column).cast(pl.Float64, strict=False)
+        lower = raw.quantile(0.01).over("date")
+        upper = raw.quantile(0.99).over("date")
+        winsorized = raw.clip(lower, upper)
+        mean = winsorized.mean().over("date")
+        std = winsorized.std().over("date")
+        exprs.append(
+            pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+            .then((winsorized - mean) / std)
+            .otherwise(None)
+            .alias(column)
+        )
+    standardized_panel = work.with_columns(exprs).select([*KEY_COLUMNS, *columns]).to_pandas()
+    base_keys = standardized_panel.loc[:, list(KEY_COLUMNS)].copy()
+    standardized = standardized_panel.loc[:, list(columns)].copy()
 
     if exposures is None or exposures.empty:
         return pd.concat([base_keys, standardized], axis=1)
@@ -238,7 +341,7 @@ def _a_components(
         merged,
         label_column=label_column,
     ).dropna()
-    market_volatility = merged.groupby("date", sort=False)[label_column].std()
+    market_volatility = _daily_std(merged, label_column)
     stress_cutoff = (
         market_volatility.quantile(0.75)
         if not market_volatility.empty
@@ -291,7 +394,7 @@ def _a_components_from_processed(
         merged,
         label_column=label_column,
     ).dropna()
-    market_volatility = merged.groupby("date", sort=False)[label_column].std()
+    market_volatility = _daily_std(merged, label_column)
     stress_cutoff = (
         market_volatility.quantile(0.75)
         if not market_volatility.empty
@@ -339,20 +442,43 @@ def _model_scores(
             "scikit-learn is required for competition score evaluation"
         ) from exc
 
+    import polars as pl
+
     columns = tuple(factor_columns)
     target_column = config.primary_label
-    merged = processed_panel.merge(
-        labels[["date", "instrument", target_column]],
-        on=list(KEY_COLUMNS),
-        how="inner",
-        validate="one_to_one",
+    processed_pl = (
+        pl.from_pandas(processed_panel.loc[:, [*KEY_COLUMNS, *columns]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+        )
     )
-    # Factors have already been winsorized, standardized and residualized.
-    # Only the official contribution-model target is standardized here.
-    merged = cross_section_zscore(merged, [target_column])
-    merged.loc[:, list(columns)] = merged.loc[:, list(columns)].fillna(0.0)
-    merged = merged.dropna(subset=[target_column])
-    dates = np.array(sorted(pd.to_datetime(merged["date"].unique())))
+    labels_pl = (
+        pl.from_pandas(labels.loc[:, [*KEY_COLUMNS, target_column]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col(target_column).cast(pl.Float64, strict=False),
+        )
+    )
+    merged = processed_pl.join(labels_pl, on=list(KEY_COLUMNS), how="inner", validate="1:1")
+    target = pl.col(target_column).cast(pl.Float64, strict=False)
+    mean = target.mean().over("date")
+    std = target.std().over("date")
+    merged = (
+        merged.with_columns(
+            [pl.col(column).cast(pl.Float64, strict=False).fill_null(0.0).alias(column) for column in columns]
+            + [
+                pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+                .then((target - mean) / std)
+                .otherwise(None)
+                .alias(target_column)
+            ]
+        )
+        .filter(pl.col(target_column).is_not_null())
+        .sort(list(KEY_COLUMNS))
+    )
+    dates = pd.DatetimeIndex(merged.select(pl.col("date").unique().sort()).to_series().to_pandas())
 
     rows: list[dict[str, object]] = []
     for end in range(
@@ -361,8 +487,9 @@ def _model_scores(
         config.step_days,
     ):
         window = dates[end - config.train_window_days : end]
-        train = merged.loc[merged["date"].isin(window)]
-        if len(train) <= len(columns) + 2:
+        window_values = [pd.Timestamp(value).to_datetime64() for value in window]
+        train = merged.filter(pl.col("date").is_in(window_values))
+        if train.height <= len(columns) + 2:
             continue
         model = ElasticNet(
             alpha=config.alpha,
@@ -374,8 +501,8 @@ def _model_scores(
             positive=False,
         )
         model.fit(
-            train.loc[:, list(columns)].to_numpy(dtype=float),
-            train[target_column].to_numpy(dtype=float),
+            train.select(list(columns)).to_numpy(),
+            train.select(target_column).to_series().to_numpy(),
         )
         row: dict[str, object] = {
             "window_start": pd.Timestamp(window[0]),
@@ -404,11 +531,7 @@ def _model_scores(
                 "mean_abs_weight": mean_abs,
                 "std_abs_weight": std_abs,
                 "nonzero_window_ratio": (
-                    float(
-                        (
-                            coefficients > config.coefficient_epsilon
-                        ).mean()
-                    )
+                    float((coefficients > config.coefficient_epsilon).mean())
                     if not coefficients.empty
                     else 0.0
                 ),
@@ -554,29 +677,19 @@ class CompetitionScoreReference:
             raise ValueError("route_factor is missing factor column")
         route = route[[*KEY_COLUMNS, "factor"]].dropna(subset=["factor"])
         route_dates = pd.DatetimeIndex(sorted(route["date"].unique()))
-        scorable_keys = (
-            self.reference_panel.loc[
-                self.reference_panel["date"].isin(route_dates),
-                list(KEY_COLUMNS),
-            ]
-            .merge(
-                self.labels.loc[
-                    self.labels["date"].isin(route_dates)
-                    & self.labels[self.config.primary_label].notna(),
-                    list(KEY_COLUMNS),
-                ],
-                on=list(KEY_COLUMNS),
-                how="inner",
-                validate="one_to_one",
-            )
-            .drop_duplicates(list(KEY_COLUMNS))
+        reference_keys = self.reference_panel.loc[
+            self.reference_panel["date"].isin(route_dates),
+            list(KEY_COLUMNS),
+        ]
+        label_keys = self.labels.loc[
+            self.labels["date"].isin(route_dates)
+            & self.labels[self.config.primary_label].notna(),
+            list(KEY_COLUMNS),
+        ]
+        scorable_keys = _drop_duplicate_keys_polars(
+            _key_join(reference_keys, label_keys, how="inner")
         )
-        aligned_route = scorable_keys.merge(
-            route,
-            on=list(KEY_COLUMNS),
-            how="left",
-            validate="one_to_one",
-        )
+        aligned_route = _key_join(scorable_keys, route, how="left")
         missing_route_rows = int(aligned_route["factor"].isna().sum())
         if missing_route_rows:
             raise ValueError(
@@ -627,12 +740,7 @@ class CompetitionScoreReference:
             route,
             exposures,
         ).rename(columns={"factor": ROUTE_COLUMN})
-        processed = processed_reference.merge(
-            processed_route,
-            on=list(KEY_COLUMNS),
-            how="left",
-            validate="one_to_one",
-        )
+        processed = _key_join(processed_reference, processed_route, how="left")
         model_columns = (*self.reference_columns, ROUTE_COLUMN)
         scores, weights = _model_scores(
             processed,
@@ -675,15 +783,29 @@ class CompetitionScoreReference:
         """
 
         positive = self.score(factor)
-        negative_factor = _normalize_keys(
+        route = _normalize_keys(
             factor,
             name="route_factor",
-        )[[*KEY_COLUMNS, "factor"]]
-        negative_factor["factor"] = -pd.to_numeric(
-            negative_factor["factor"],
-            errors="coerce",
+        )[[*KEY_COLUMNS, "factor"]].dropna(subset=["factor"])
+        dates = pd.DatetimeIndex(sorted(route["date"].unique()))
+        reference_a = self._reference_a_components(dates)
+        negative = dict(positive)
+        negative_a_percentiles: list[float] = []
+        for component in A_COMPONENT_COLUMNS:
+            raw_value = -float(positive[f"a_{component}"])
+            percentile = inserted_percentile(
+                raw_value,
+                reference_a[component].to_numpy(dtype=float),
+            )
+            negative[f"a_{component}"] = raw_value
+            negative[f"a_{component}_percentile"] = percentile
+            negative_a_percentiles.append(percentile)
+        negative_a_proxy = float(np.mean(negative_a_percentiles))
+        negative["a_proxy"] = negative_a_proxy
+        negative["score_proxy"] = float(
+            self.config.a_weight * negative_a_proxy
+            + self.config.b_weight * float(positive["b_proxy"])
         )
-        negative = self.score(negative_factor)
         direction = (
             -1.0
             if float(negative["score_proxy"]) > float(positive["score_proxy"])
@@ -731,33 +853,24 @@ class CompetitionScoreReference:
             common_key_frame = (
                 keys
                 if common_key_frame is None
-                else common_key_frame.merge(
-                    keys,
-                    on=list(KEY_COLUMNS),
-                    how="inner",
-                    validate="one_to_one",
-                )
+                else _key_join(common_key_frame, keys, how="inner")
             )
             normalized[str(name)] = route
 
         assert common_key_frame is not None
-        common_key_frame = (
-            common_key_frame.merge(
-                self.reference_panel.loc[:, list(KEY_COLUMNS)],
-                on=list(KEY_COLUMNS),
-                how="inner",
-                validate="one_to_one",
-            )
-            .merge(
+        common_key_frame = _drop_duplicate_keys_polars(
+            _key_join(
+                _key_join(
+                    common_key_frame,
+                    self.reference_panel.loc[:, list(KEY_COLUMNS)],
+                    how="inner",
+                ),
                 self.labels.loc[
                     self.labels[self.config.primary_label].notna(),
                     list(KEY_COLUMNS),
                 ],
-                on=list(KEY_COLUMNS),
                 how="inner",
-                validate="one_to_one",
             )
-            .drop_duplicates(list(KEY_COLUMNS))
         )
         if common_key_frame.empty:
             raise ValueError("joint routes have no common scorable stock-days")
@@ -772,13 +885,10 @@ class CompetitionScoreReference:
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         exposures = self._slice_exposures(dates)
         scorable_keys = common_key_frame
-        common_reference = scorable_keys.merge(
-            self.reference_panel[
-                [*KEY_COLUMNS, *self.reference_columns]
-            ],
-            on=list(KEY_COLUMNS),
+        common_reference = _key_join(
+            scorable_keys,
+            self.reference_panel[[*KEY_COLUMNS, *self.reference_columns]],
             how="inner",
-            validate="one_to_one",
         )
         reference_a = pd.DataFrame(
             [
@@ -804,12 +914,7 @@ class CompetitionScoreReference:
         route_columns: dict[str, str] = {}
         route_metrics: dict[str, dict[str, float]] = {}
         for index, (name, route) in enumerate(normalized.items()):
-            aligned = scorable_keys.merge(
-                route,
-                on=list(KEY_COLUMNS),
-                how="left",
-                validate="one_to_one",
-            )
+            aligned = _key_join(scorable_keys, route, how="left")
             missing_rows = int(aligned["factor"].isna().sum())
             if missing_rows:
                 raise ValueError(
@@ -828,12 +933,7 @@ class CompetitionScoreReference:
                 aligned,
                 exposures,
             ).rename(columns={"factor": model_column})
-            processed = processed.merge(
-                processed_route,
-                on=list(KEY_COLUMNS),
-                how="left",
-                validate="one_to_one",
-            )
+            processed = _key_join(processed, processed_route, how="left")
 
         model_columns = (*self.reference_columns, *route_columns.values())
         scores, weights = _model_scores(

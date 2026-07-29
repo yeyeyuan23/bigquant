@@ -22,6 +22,8 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
+from bigalpha2026.candidate_transforms import daily_median_centered_rank
+
 CANDIDATE_ID = "HF-016"
 SEMANTIC_CLASS = "LATENT_COMPONENT"
 INCLUDE_IN_J_BASELINE = True
@@ -73,13 +75,10 @@ def build_hf_016_factor_from_daily(
 
     daily = compute_hf_016_daily(daily_features)
     result = panel.merge(daily, on=list(POOL_COLUMNS), how="left", validate="one_to_one")
-    raw = result["factor_raw"]
-    daily_median = raw.groupby(result["date"], sort=False).transform("median")
-    raw = raw.fillna(daily_median)
-    ranks = raw.groupby(result["date"], sort=False).rank(method="average")
-    counts = raw.groupby(result["date"], sort=False).transform("count")
-    centered = 2.0 * (ranks - (counts + 1.0) / 2.0) / counts.where(counts.gt(0))
-    result["factor"] = (ORIENTATION * centered).fillna(0.0)
+    result["factor"] = daily_median_centered_rank(
+        result,
+        orientation=ORIENTATION,
+    )
     result["factor"] = result["factor"].replace([np.inf, -np.inf], np.nan)
     if result["factor"].isna().any():
         raise ValueError(f"{CANDIDATE_ID} produced non-finite factor values")

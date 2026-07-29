@@ -31,6 +31,30 @@ PUBLIC_PREFIX = "factorlib__"
 SELF_PREFIX = "self__"
 
 
+def candidate_pool_group_stats(frame: pd.DataFrame) -> tuple[dict[str, int], dict[str, int]]:
+    """Return candidate row and active-date counts using polars."""
+
+    import polars as pl
+
+    stats = (
+        pl.from_pandas(frame[["candidate_id", "date"]])
+        .with_columns(
+            pl.col("candidate_id").cast(pl.Utf8),
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d").alias("_date"),
+        )
+        .group_by("candidate_id")
+        .agg(
+            pl.len().alias("rows"),
+            pl.col("_date").n_unique().alias("dates"),
+        )
+        .sort("candidate_id")
+        .to_dicts()
+    )
+    rows = {str(row["candidate_id"]): int(row["rows"]) for row in stats}
+    dates = {str(row["candidate_id"]): int(row["dates"]) for row in stats}
+    return rows, dates
+
+
 def file_sha256(path: Path) -> str:
     """Return the SHA-256 digest of a local snapshot file."""
 
@@ -72,9 +96,21 @@ def validate_candidate_pool(frame: pd.DataFrame) -> None:
         raise ValueError("candidate pool contains null keys")
     if frame.duplicated(keys).any():
         raise ValueError("candidate pool contains duplicate keys")
-    versions = frame.groupby("candidate_id", sort=False)["factor_version"].nunique()
-    if (versions != 1).any():
-        invalid = sorted(versions.index[versions != 1].astype(str))
+    import polars as pl
+
+    versions = (
+        pl.from_pandas(frame[["candidate_id", "factor_version"]])
+        .with_columns(
+            pl.col("candidate_id").cast(pl.Utf8),
+            pl.col("factor_version").cast(pl.Utf8),
+        )
+        .group_by("candidate_id")
+        .agg(pl.col("factor_version").n_unique().alias("versions"))
+        .filter(pl.col("versions") != 1)
+        .sort("candidate_id")
+    )
+    if versions.height:
+        invalid = versions.get_column("candidate_id").to_list()
         raise ValueError(f"candidate pool has multiple active versions: {invalid}")
 
 
@@ -98,19 +134,7 @@ def candidate_pool_manifest(
     dates = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
     if dates.isna().any():
         raise ValueError("candidate pool contains invalid dates")
-    candidate_rows = (
-        frame.groupby("candidate_id", sort=True)
-        .size()
-        .astype(int)
-        .to_dict()
-    )
-    candidate_dates = (
-        frame.assign(_date=dates)
-        .groupby("candidate_id", sort=True)["_date"]
-        .nunique()
-        .astype(int)
-        .to_dict()
-    )
+    candidate_rows, candidate_dates = candidate_pool_group_stats(frame)
     manifest_hashes = {
         str(path.relative_to(data_root.parent)): file_sha256(path)
         for path in sorted(input_manifest_paths)
@@ -200,23 +224,9 @@ def validate_candidate_pool_manifest(
         raise ValueError("candidate pool manifest columns do not match the contract")
     if int(manifest.get("rows", -1)) != len(frame):
         raise ValueError("candidate pool manifest row count does not match the data")
-    actual_rows = (
-        frame.groupby("candidate_id", sort=True)
-        .size()
-        .astype(int)
-        .to_dict()
-    )
+    actual_rows, actual_dates = candidate_pool_group_stats(frame)
     if manifest.get("candidate_rows") != actual_rows:
         raise ValueError("candidate pool manifest candidate rows do not match the data")
-    actual_dates = (
-        frame.assign(
-            _date=pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
-        )
-        .groupby("candidate_id", sort=True)["_date"]
-        .nunique()
-        .astype(int)
-        .to_dict()
-    )
     if manifest.get("candidate_dates") != actual_dates:
         raise ValueError("candidate pool manifest candidate dates do not match the data")
     if manifest.get("sha256") != file_sha256(parquet_path):
@@ -240,7 +250,14 @@ def build_feature_panel(
     admitted_candidates: Iterable[str] | None = None,
     public_feature_columns: Sequence[str] = FACTORLIB_FEATURE_COLUMNS,
 ) -> tuple[pd.DataFrame, tuple[str, ...], tuple[str, ...], pd.DataFrame]:
-    """Left-join all feature sources to the historical competition universe."""
+    """Left-join all feature sources to the historical competition universe.
+
+    Heavy date/instrument joins, candidate long-to-wide pivot, coverage, and
+    daily rank scaling are executed in polars. The function still returns
+    pandas frames to preserve the existing library contract for callers.
+    """
+
+    import polars as pl
 
     universe_keys = normalize_keys(
         universe.loc[:, list(KEY_COLUMNS)],
@@ -269,65 +286,78 @@ def build_feature_panel(
     )
     if duplicate_candidate_keys.any():
         raise ValueError("candidate pool has overlapping active candidate versions")
-    candidate_wide = candidates.pivot(
-        index=list(KEY_COLUMNS),
-        columns="candidate_id",
-        values="factor",
-    ).reset_index()
 
     public_rename = {
         column: f"{PUBLIC_PREFIX}{column}" for column in public_features
     }
+    public_columns = tuple(public_rename.values())
+
+    universe_pl = pl.from_pandas(universe_keys).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col("instrument").cast(pl.Utf8),
+    )
+    library_pl = (
+        pl.from_pandas(library.loc[:, [*KEY_COLUMNS, *public_features]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col("instrument").cast(pl.Utf8),
+        )
+        .rename(public_rename)
+    )
+    candidates_pl = pl.from_pandas(
+        candidates.loc[:, ["date", "instrument", "candidate_id", "factor"]]
+    ).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col("instrument").cast(pl.Utf8),
+        pl.col("candidate_id").cast(pl.Utf8),
+        pl.col("factor").cast(pl.Float64, strict=False),
+    )
+    candidate_wide = candidates_pl.pivot(
+        values="factor",
+        index=list(KEY_COLUMNS),
+        on="candidate_id",
+        aggregate_function="first",
+    )
     self_rename = {
         column: f"{SELF_PREFIX}{column}"
         for column in candidate_wide.columns
         if column not in KEY_COLUMNS
     }
-    public_columns = tuple(public_rename.values())
     self_columns = tuple(self_rename.values())
-    library = library.rename(columns=public_rename)
-    candidate_wide = candidate_wide.rename(columns=self_rename)
+    candidate_wide = candidate_wide.rename(self_rename)
 
-    panel = universe_keys.merge(
-        library,
+    panel_pl = universe_pl.join(
+        library_pl,
         on=list(KEY_COLUMNS),
         how="left",
-        validate="one_to_one",
-    ).merge(
+        validate="1:1",
+    ).join(
         candidate_wide,
         on=list(KEY_COLUMNS),
         how="left",
-        validate="one_to_one",
+        validate="1:1",
     )
     feature_columns = (*public_columns, *self_columns)
-    coverage = pd.DataFrame(
-        {
-            "feature": feature_columns,
-            "coverage": [
-                float(
-                    pd.to_numeric(panel[column], errors="coerce")
-                    .replace([np.inf, -np.inf], np.nan)
-                    .notna()
-                    .mean()
-                )
-                for column in feature_columns
-            ],
-        }
-    )
+    coverage_rows: list[dict[str, object]] = []
+    rank_exprs = []
     for column in feature_columns:
-        numeric = pd.to_numeric(panel[column], errors="coerce").replace(
-            [np.inf, -np.inf],
-            np.nan,
+        numeric = pl.col(column).cast(pl.Float64, strict=False)
+        valid = numeric.is_not_null() & numeric.is_finite()
+        coverage_rows.append(
+            {
+                "feature": column,
+                "coverage": float(panel_pl.select(valid.mean()).item()),
+            }
         )
-        panel[column] = (
-            numeric.groupby(panel["date"], sort=False)
-            .rank(pct=True, method="average")
-            .sub(0.5)
-            .mul(2.0)
-            .fillna(0.0)
-        )
+        ranks = numeric.rank("average").over("date")
+        counts = numeric.count().over("date")
+        scaled = (((ranks / counts) - 0.5) * 2.0).fill_null(0.0)
+        rank_exprs.append(pl.when(valid).then(scaled).otherwise(0.0).alias(column))
+    if rank_exprs:
+        panel_pl = panel_pl.with_columns(rank_exprs)
+    panel = panel_pl.to_pandas()
+    coverage = pd.DataFrame(coverage_rows, columns=["feature", "coverage"])
     return panel, public_columns, self_columns, coverage
-
 
 def screen_public_factors(
     panel: pd.DataFrame,
@@ -454,6 +484,8 @@ def family_balanced_factor(
 
     if not feature_columns:
         raise ValueError("feature_columns must not be empty")
+    import polars as pl
+
     families: dict[str, list[str]] = {}
     for column in feature_columns:
         if column.startswith(PUBLIC_PREFIX):
@@ -465,15 +497,23 @@ def family_balanced_factor(
             raise ValueError(f"unrecognized feature namespace: {column}")
         families.setdefault(family, []).append(column)
 
-    family_scores = pd.DataFrame(index=panel.index)
-    for family, columns in sorted(families.items()):
-        family_scores[family] = panel.loc[:, columns].mean(axis=1)
-    values = family_scores.mean(axis=1)
-    result = panel.loc[:, list(KEY_COLUMNS)].copy()
-    result["factor"] = (
-        values.groupby(panel["date"], sort=False)
-        .rank(pct=True, method="average")
-        .sub(0.5)
-        .mul(2.0)
+    work = pl.from_pandas(panel.loc[:, [*KEY_COLUMNS, *feature_columns]]).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col("instrument").cast(pl.Utf8),
     )
-    return result
+    family_exprs = []
+    family_names = []
+    for family, columns in sorted(families.items()):
+        family_name = f"_family_{family}"
+        family_names.append(family_name)
+        family_exprs.append(
+            pl.mean_horizontal([pl.col(c).cast(pl.Float64, strict=False) for c in columns]).alias(family_name)
+        )
+    work = work.with_columns(family_exprs)
+    values = pl.mean_horizontal([pl.col(c) for c in family_names])
+    ranks = values.rank("average").over("date")
+    counts = values.count().over("date")
+    result = work.with_columns(
+        (((ranks / counts) - 0.5) * 2.0).alias("factor")
+    ).select([*KEY_COLUMNS, "factor"])
+    return result.to_pandas()

@@ -22,6 +22,8 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
+from bigalpha2026.candidate_transforms import centered_daily_rank
+
 CANDIDATE_ID = "HF-036"
 SEMANTIC_CLASS = "LATENT_COMPONENT"
 INCLUDE_IN_J_BASELINE = True
@@ -40,12 +42,7 @@ def _require_columns(frame: pd.DataFrame, columns: Iterable[str], name: str) -> 
 
 
 def _centered_daily_rank(values: pd.Series, dates: pd.Series) -> pd.Series:
-    numeric = pd.to_numeric(values, errors="coerce")
-    daily_median = numeric.groupby(dates, sort=False).transform("median")
-    numeric = numeric.fillna(daily_median)
-    ranks = numeric.groupby(dates, sort=False).rank(method="average")
-    counts = numeric.groupby(dates, sort=False).transform("count")
-    return 2.0 * (ranks - (counts + 1.0) / 2.0) / counts.where(counts.gt(0))
+    return centered_daily_rank(values, dates)
 
 
 def compute_hf_036_daily(daily_features: pd.DataFrame) -> pd.DataFrame:

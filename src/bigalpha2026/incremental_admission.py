@@ -33,20 +33,36 @@ def _daily_residual_signal(
 ) -> pd.Series:
     """Residualize a candidate against current linear baseline ranks by date."""
 
-    residuals = pd.Series(np.nan, index=frame.index, dtype=float)
-    for _, block in frame.groupby("date", sort=False):
-        y = block[candidate].rank(pct=True).to_numpy(dtype=float)
+    import polars as pl
+
+    columns = [candidate, *baseline_columns]
+    work = frame[["date", *columns]].copy()
+    work["_pos"] = np.arange(len(work), dtype=np.int64)
+    ranked = pl.from_pandas(work).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+        pl.col("_pos").cast(pl.Int64),
+    )
+    rank_exprs = []
+    for column in columns:
+        numeric = pl.col(column).cast(pl.Float64, strict=False)
+        rank_exprs.append((numeric.rank("average").over("date") / numeric.count().over("date")).alias(column))
+    ranked = ranked.with_columns(rank_exprs).select(["date", "_pos", *columns])
+    residual_values = np.full(len(frame), np.nan, dtype=float)
+    for block in ranked.partition_by("date", maintain_order=False):
+        pdf = block.to_pandas()
+        pos = pdf["_pos"].to_numpy(dtype=np.int64)
+        y = pdf[candidate].to_numpy(dtype=float)
         if not baseline_columns:
-            residuals.loc[block.index] = y - np.nanmean(y)
+            residual_values[pos] = y - np.nanmean(y)
             continue
-        x = block[list(baseline_columns)].rank(pct=True).to_numpy(dtype=float)
+        x = pdf[list(baseline_columns)].to_numpy(dtype=float)
         valid = np.isfinite(y) & np.isfinite(x).all(axis=1)
         if valid.sum() < len(baseline_columns) + 2:
             continue
         design = np.column_stack([np.ones(valid.sum()), x[valid]])
         beta, *_ = np.linalg.lstsq(design, y[valid], rcond=None)
-        residuals.loc[block.index[valid]] = y[valid] - design @ beta
-    return residuals
+        residual_values[pos[valid]] = y[valid] - design @ beta
+    return pd.Series(residual_values, index=frame.index, dtype=float)
 
 
 def candidate_incremental_entry_diagnostics(
@@ -63,8 +79,18 @@ def candidate_incremental_entry_diagnostics(
     columns = tuple(dict.fromkeys((*baseline_columns, candidate)))
     frame = development[["date", "instrument", *columns]].copy()
     coverage = float(pd.to_numeric(frame[candidate], errors="coerce").notna().mean())
+    import polars as pl
+
     active_days = int(
-        frame.groupby("date", sort=True)[candidate].nunique().gt(1).sum()
+        pl.from_pandas(frame[["date", candidate]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col(candidate).cast(pl.Float64, strict=False),
+        )
+        .group_by("date")
+        .agg(pl.col(candidate).drop_nulls().n_unique().alias("unique"))
+        .filter(pl.col("unique") > 1)
+        .height
     )
     merged = frame.merge(
         development_labels[["date", "instrument", label_column]],
@@ -315,15 +341,30 @@ def run_incremental_admission(
             ),
         },
     }
-    active_dates_by_candidate: dict[str, tuple[pd.Timestamp, ...]] = {}
-    for self_column in self_columns:
-        active_dates_by_candidate[self_column] = tuple(
-            pd.Timestamp(date)
-            for date in development.groupby("date", sort=True)[self_column]
-            .nunique()
-            .loc[lambda values: values > 1]
-            .index
+    import polars as pl
+
+    if self_columns:
+        active_frame = (
+            pl.from_pandas(development[["date", *self_columns]])
+            .with_columns(pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"))
+            .group_by("date")
+            .agg(
+                [
+                    (pl.col(self_column).cast(pl.Float64, strict=False).drop_nulls().n_unique() > 1).alias(self_column)
+                    for self_column in self_columns
+                ]
+            )
+            .sort("date")
+            .to_pandas()
         )
+        active_dates_by_candidate = {
+            self_column: tuple(
+                pd.to_datetime(active_frame.loc[active_frame[self_column], "date"])
+            )
+            for self_column in self_columns
+        }
+    else:
+        active_dates_by_candidate = {}
 
     base_fingerprint_payload = {
         feature: fingerprints[feature] for feature in selected_public
@@ -448,12 +489,10 @@ def run_incremental_admission(
         and row["candidate"] in individual_pending
     )
     pending_passed = individual_passed
-    for index, row in screened_summary.iterrows():
-        candidate = str(row["candidate"])
-        if candidate in pending_passed:
-            screened_summary.at[index, "evaluation_status"] = (
-                "entry_passed_pending_freeze"
-            )
+    pending_mask = screened_summary["candidate"].astype(str).isin(pending_passed)
+    screened_summary.loc[pending_mask, "evaluation_status"] = (
+        "entry_passed_pending_freeze"
+    )
 
     provisional_pool = tuple(
         dict.fromkeys((*frozen_before, *pending_passed))
@@ -475,14 +514,11 @@ def run_incremental_admission(
         )
         for candidate in self_columns
     }
-    for index, row in screened_summary.iterrows():
-        candidate = str(row["candidate"])
-        status = final_status.get(candidate)
-        if status:
-            screened_summary.at[index, "evaluation_status"] = status
-        screened_summary.at[index, "frozen_after_validation"] = (
-            candidate in frozen_after
-        )
+    candidate_series = screened_summary["candidate"].astype(str)
+    status_series = candidate_series.map(final_status)
+    status_mask = status_series.notna()
+    screened_summary.loc[status_mask, "evaluation_status"] = status_series.loc[status_mask]
+    screened_summary["frozen_after_validation"] = candidate_series.isin(frozen_after)
     frozen_cache_state = {
         "schema_version": INCREMENTAL_CACHE_SCHEMA_VERSION,
         "base_state_digest": base_digest,

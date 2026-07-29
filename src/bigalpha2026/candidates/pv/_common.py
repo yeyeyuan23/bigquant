@@ -7,6 +7,8 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
+from bigalpha2026.candidate_transforms import daily_median_centered_rank
+
 POOL_COLUMNS = ("date", "instrument")
 OUTPUT_COLUMNS = ("date", "instrument", "factor")
 
@@ -102,14 +104,7 @@ def build_ranked_factor(
         result["factor_raw"],
         errors="coerce",
     ).replace([np.inf, -np.inf], np.nan)
-    daily_median = result.groupby("date", sort=False)["factor_raw"].transform("median")
-    result["factor_raw"] = result["factor_raw"].fillna(daily_median).fillna(0.0)
-    result["factor"] = (
-        result.groupby("date", sort=False)["factor_raw"]
-        .rank(pct=True, method="average")
-        .sub(0.5)
-        .mul(2.0)
-    )
+    result["factor"] = daily_median_centered_rank(result)
     if not np.isfinite(result["factor"]).all():
         raise ValueError(f"{candidate_id} produced non-finite factor values")
     return (

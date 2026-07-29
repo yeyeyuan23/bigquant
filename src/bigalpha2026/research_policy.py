@@ -252,9 +252,9 @@ class IncrementalEntryGate:
 
     minimum_coverage: float = 0.90
     minimum_active_days: int = 120
-    minimum_rank_ic_mean: float = 0.0
-    minimum_residual_rank_ic: float = 0.0
-    maximum_abs_rank_correlation: float = 0.85
+    minimum_rank_ic_mean: float = 0.005
+    minimum_residual_rank_ic: float = 0.005
+    maximum_abs_rank_correlation: float = 0.50
 
 
 @dataclass(frozen=True)
@@ -368,8 +368,10 @@ def fixed_weight_rank_combination(
     if denominator <= 0:
         raise ValueError("at least one weight must be non-zero")
 
-    panel: pd.DataFrame | None = None
-    ranked_columns: list[tuple[str, float]] = []
+    import polars as pl
+
+    panel: pl.DataFrame | None = None
+    score_terms = []
     for member, raw_weight in weights.items():
         if member not in factors:
             raise KeyError(f"missing factor for combination: {member}")
@@ -379,33 +381,27 @@ def fixed_weight_rank_combination(
         if frame.duplicated(["date", "instrument"]).any():
             raise ValueError(f"{member} contains duplicate date-instrument keys")
         column = f"factor_{member.lower().replace('-', '_')}"
-        frame[column] = frame.groupby("date", sort=False)["factor"].rank(
-            pct=True,
-            method="average",
-        )
-        frame = frame.drop(columns="factor")
-        ranked_columns.append((column, float(raw_weight) / denominator))
-        panel = frame if panel is None else panel.merge(
-            frame,
+        block = pl.from_pandas(frame).with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col("factor").cast(pl.Float64, strict=False),
+        ).with_columns(
+            (pl.col("factor").rank("average").over("date") / pl.col("factor").count().over("date")).alias(column)
+        ).select(["date", "instrument", column])
+        score_terms.append(pl.col(column) * (float(raw_weight) / denominator))
+        panel = block if panel is None else panel.join(
+            block,
             on=["date", "instrument"],
             how="inner",
-            validate="one_to_one",
+            validate="1:1",
         )
 
     assert panel is not None
-    panel["factor"] = sum(
-        panel[column] * weight for column, weight in ranked_columns
-    )
-    panel["factor"] = (
-        panel.groupby("date", sort=False)["factor"]
-        .rank(pct=True, method="average")
-        .sub(0.5)
-        .mul(2.0)
-    )
-    return panel[["date", "instrument", "factor"]].sort_values(
-        ["date", "instrument"]
-    ).reset_index(drop=True)
-
+    score = sum(score_terms)
+    result = panel.with_columns(score.alias("_score")).with_columns(
+        (((pl.col("_score").rank("average").over("date") / pl.col("_score").count().over("date")) - 0.5) * 2.0).alias("factor")
+    ).select(["date", "instrument", "factor"]).sort(["date", "instrument"])
+    return result.to_pandas().reset_index(drop=True)
 
 def technical_gate(
     coverage: float,

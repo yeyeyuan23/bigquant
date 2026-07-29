@@ -22,6 +22,8 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
+from bigalpha2026.candidate_transforms import daily_median_centered_rank
+
 CANDIDATE_ID = "OB-006"
 SEMANTIC_CLASS = "LATENT_COMPONENT"
 INCLUDE_IN_J_BASELINE = True
@@ -83,14 +85,10 @@ def build_ob_006_factor_from_daily(
         raise ValueError("pool contains duplicate date-instrument keys")
     daily = compute_ob_006_daily(daily_features)
     result = panel.merge(daily, on=list(POOL_COLUMNS), how="left", validate="one_to_one")
-    raw = result["factor_raw"]
-    daily_median = raw.groupby(result["date"], sort=False).transform("median")
-    raw = raw.fillna(daily_median)
-    ranks = raw.groupby(result["date"], sort=False).rank(method="average")
-    counts = raw.groupby(result["date"], sort=False).transform("count")
-    result["factor"] = (
-        -2.0 * (ranks - (counts + 1.0) / 2.0) / counts.where(counts.gt(0))
-    ).fillna(0.0)
+    result["factor"] = daily_median_centered_rank(
+        result,
+        orientation=-1.0,
+    )
     result["factor"] = result["factor"].replace([np.inf, -np.inf], np.nan)
     if result["factor"].isna().any():
         raise ValueError("OB-006 produced non-finite factor values")

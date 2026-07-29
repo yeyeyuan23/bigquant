@@ -117,15 +117,34 @@ def preprocess_factor(
 ) -> pd.DataFrame:
     """Daily winsorization, z-score and optional BARRA-style neutralization."""
 
-    frame = factor[["date", "instrument", "factor"]].copy()
-    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
-    frame["factor"] = pd.to_numeric(frame["factor"], errors="coerce")
-    frame["factor"] = frame.groupby("date", sort=False)["factor"].transform(
-        lambda values: _winsorize_series(values, lower_quantile, upper_quantile)
+    import polars as pl
+
+    base = factor[["date", "instrument", "factor"]].copy()
+    base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
+    base["instrument"] = base["instrument"].astype(str)
+    work = pl.from_pandas(base).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).alias("date"),
+        pl.col("instrument").cast(pl.Utf8),
+        pl.col("factor").cast(pl.Float64, strict=False),
     )
-    mean = frame.groupby("date", sort=False)["factor"].transform("mean")
-    std = frame.groupby("date", sort=False)["factor"].transform("std").replace(0, np.nan)
-    frame["factor"] = (frame["factor"] - mean) / std
+    value = pl.col("factor")
+    lower = value.quantile(lower_quantile).over("date")
+    upper = value.quantile(upper_quantile).over("date")
+    winsorized = (
+        pl.when(value < lower)
+        .then(lower)
+        .when(value > upper)
+        .then(upper)
+        .otherwise(value)
+    )
+    mean = winsorized.mean().over("date")
+    std = winsorized.std().over("date")
+    frame = work.with_columns(
+        pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+        .then((winsorized - mean) / std)
+        .otherwise(None)
+        .alias("factor")
+    ).to_pandas()
 
     if exposures is None or exposures.empty:
         return frame
@@ -195,13 +214,23 @@ def cross_section_zscore(
     frame: pd.DataFrame,
     columns: Sequence[str],
 ) -> pd.DataFrame:
-    result = frame.copy()
+    if not columns:
+        return frame.copy()
+    import polars as pl
+
+    work = pl.from_pandas(frame.copy()).with_columns(pl.col("date").cast(pl.Datetime("ns")))
+    exprs = []
     for column in columns:
-        values = pd.to_numeric(result[column], errors="coerce")
-        mean = values.groupby(result["date"], sort=False).transform("mean")
-        std = values.groupby(result["date"], sort=False).transform("std").replace(0, np.nan)
-        result[column] = (values - mean) / std
-    return result
+        values = pl.col(column).cast(pl.Float64, strict=False)
+        mean = values.mean().over("date")
+        std = values.std().over("date")
+        exprs.append(
+            pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+            .then((values - mean) / std)
+            .otherwise(None)
+            .alias(column)
+        )
+    return work.with_columns(exprs).to_pandas()
 
 
 def cross_section_rank_scale(
@@ -210,21 +239,25 @@ def cross_section_rank_scale(
 ) -> pd.DataFrame:
     """Map each daily cross-section to centered percentile ranks.
 
-    The transformation is monotone, has an exact zero daily mean (including
-    ties), and preserves missing values. It therefore aligns a regression
-    target with the Rank IC objective without leaking information across dates.
+    Uses polars for the date-partitioned rank transform; returns pandas to keep
+    the public contract unchanged for model code.
     """
 
+    if not columns:
+        return frame.copy()
+    import polars as pl
+
     result = frame.copy()
-    dates = result["date"]
+    work = pl.from_pandas(result).with_columns(pl.col("date").cast(pl.Datetime("ns")))
+    exprs = []
     for column in columns:
-        values = pd.to_numeric(result[column], errors="coerce")
-        grouped = values.groupby(dates, sort=False)
-        ranks = grouped.rank(method="average")
-        counts = grouped.transform("count")
+        numeric = pl.col(column).cast(pl.Float64, strict=False)
+        valid = numeric.is_not_null() & numeric.is_finite()
+        ranks = numeric.rank("average").over("date")
+        counts = numeric.count().over("date")
         scaled = 2.0 * (ranks - (counts + 1.0) / 2.0) / counts
-        result[column] = scaled.where(values.notna())
-    return result
+        exprs.append(pl.when(valid).then(scaled).otherwise(None).alias(column))
+    return work.with_columns(exprs).to_pandas()
 
 
 def _safe_pearson_correlation_values(
@@ -269,23 +302,34 @@ def rank_ic_series(
 ) -> pd.Series:
     if merged.empty:
         return pd.Series(dtype=float, name="rank_ic")
+    import polars as pl
 
-    def one_day(block: pd.DataFrame) -> float:
-        valid = block[[factor_column, label_column]].dropna()
-        if len(valid) < 5:
-            return np.nan
-        return _safe_pearson_correlation_values(
-            valid[factor_column].rank().to_numpy(dtype=float),
-            valid[label_column].rank().to_numpy(dtype=float),
-        )
-
-    result = merged.groupby("date", sort=False).apply(
-        one_day,
-        include_groups=False,
-    )
-    if isinstance(result, pd.DataFrame):
+    base = merged[["date", factor_column, label_column]].copy()
+    base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
+    work = pl.from_pandas(base).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
+        pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+    ).drop_nulls(["date", "_factor", "_label"])
+    if work.is_empty():
         return pd.Series(dtype=float, name="rank_ic")
-    return result
+    ranked = work.with_columns(
+        pl.len().over("date").alias("_n"),
+        pl.col("_factor").rank("average").over("date").alias("_factor_rank"),
+        pl.col("_label").rank("average").over("date").alias("_label_rank"),
+    )
+    result = (
+        ranked.group_by("date")
+        .agg(
+            pl.len().alias("_n"),
+            pl.corr("_factor_rank", "_label_rank").alias("rank_ic"),
+        )
+        .with_columns(pl.when(pl.col("_n") >= 5).then(pl.col("rank_ic")).otherwise(None).alias("rank_ic"))
+        .sort("date")
+        .to_pandas()
+    )
+    series = pd.Series(result["rank_ic"].to_numpy(dtype=float), index=pd.to_datetime(result["date"]), name="rank_ic")
+    return series
 
 
 def long_short_returns(
@@ -296,23 +340,39 @@ def long_short_returns(
 ) -> pd.Series:
     if merged.empty:
         return pd.Series(dtype=float, name="long_short_return")
+    import polars as pl
 
-    def one_day(block: pd.DataFrame) -> float:
-        valid = block[[factor_column, label_column]].dropna()
-        if len(valid) < quantiles * 2:
-            return np.nan
-        ranks = valid[factor_column].rank(pct=True, method="average")
-        top = valid.loc[ranks > 1.0 - 1.0 / quantiles, label_column].mean()
-        bottom = valid.loc[ranks <= 1.0 / quantiles, label_column].mean()
-        return float(top - bottom)
-
-    result = merged.groupby("date", sort=False).apply(
-        one_day,
-        include_groups=False,
-    )
-    if isinstance(result, pd.DataFrame):
+    base = merged[["date", factor_column, label_column]].copy()
+    base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
+    work = pl.from_pandas(base).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
+        pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+    ).drop_nulls(["date", "_factor", "_label"])
+    if work.is_empty():
         return pd.Series(dtype=float, name="long_short_return")
-    return result
+    threshold = 1.0 / float(quantiles)
+    ranked = work.with_columns(
+        pl.len().over("date").alias("_n"),
+        (pl.col("_factor").rank("average").over("date") / pl.len().over("date")).alias("_rank_pct"),
+    )
+    result = (
+        ranked.group_by("date")
+        .agg(
+            pl.first("_n").alias("_n"),
+            pl.when(pl.col("_rank_pct") > 1.0 - threshold).then(pl.col("_label")).otherwise(None).mean().alias("_top"),
+            pl.when(pl.col("_rank_pct") <= threshold).then(pl.col("_label")).otherwise(None).mean().alias("_bottom"),
+        )
+        .with_columns(
+            pl.when(pl.col("_n") >= quantiles * 2)
+            .then(pl.col("_top") - pl.col("_bottom"))
+            .otherwise(None)
+            .alias("long_short_return")
+        )
+        .sort("date")
+        .to_pandas()
+    )
+    return pd.Series(result["long_short_return"].to_numpy(dtype=float), index=pd.to_datetime(result["date"]), name="long_short_return")
 
 
 def quantile_group_returns(
@@ -326,29 +386,43 @@ def quantile_group_returns(
     columns = [f"group_{group}" for group in range(1, quantiles + 1)]
     if merged.empty:
         return pd.DataFrame(columns=columns, dtype=float)
+    import polars as pl
 
-    def one_day(block: pd.DataFrame) -> pd.Series:
-        valid = block[[factor_column, label_column]].dropna()
-        output = pd.Series(
-            np.nan,
-            index=range(1, quantiles + 1),
-            dtype=float,
-        )
-        if len(valid) < quantiles * 2:
-            return output
-        ranks = valid[factor_column].rank(pct=True, method="first")
-        groups = np.ceil(ranks * quantiles).clip(1, quantiles).astype(int)
-        means = valid[label_column].groupby(groups).mean()
-        output.loc[means.index] = means.to_numpy(dtype=float)
-        return output
-
-    result = merged.groupby("date", sort=False).apply(
-        one_day,
-        include_groups=False,
+    base = merged[["date", factor_column, label_column]].copy()
+    base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
+    work = pl.from_pandas(base).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
+        pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+    ).drop_nulls(["date", "_factor", "_label"])
+    if work.is_empty():
+        return pd.DataFrame(columns=columns, dtype=float)
+    ranked = work.with_columns(
+        pl.len().over("date").alias("_n"),
+        pl.col("_factor").rank("ordinal").over("date").alias("_rank"),
+    ).filter(pl.col("_n") >= quantiles * 2).with_columns(
+        (((pl.col("_rank") * quantiles - 1) // pl.col("_n")) + 1)
+        .clip(1, quantiles)
+        .cast(pl.Int64)
+        .alias("_group")
     )
-    result.columns = columns
-    return result
-
+    if ranked.is_empty():
+        return pd.DataFrame(columns=columns, dtype=float)
+    grouped = (
+        ranked.group_by(["date", "_group"])
+        .agg(pl.col("_label").mean().alias("value"))
+        .with_columns((pl.lit("group_") + pl.col("_group").cast(pl.Utf8)).alias("group"))
+        .select(["date", "group", "value"])
+        .pivot(values="value", index="date", on="group", aggregate_function="first")
+        .sort("date")
+        .to_pandas()
+    )
+    grouped["date"] = pd.to_datetime(grouped["date"])
+    result = grouped.set_index("date")
+    for column in columns:
+        if column not in result.columns:
+            result[column] = np.nan
+    return result.loc[:, columns]
 
 def _safe_ratio(mean: float, std: float) -> float:
     return float(mean / std) if np.isfinite(std) and std > 1e-12 else np.nan
@@ -377,8 +451,32 @@ def evaluate_single_factor(
             ),
             method="spearman",
         )
-        market = merged.groupby("date", sort=False)[label].mean()
-        market_vol = merged.groupby("date", sort=False)[label].std()
+        import polars as pl
+
+        market_stats = (
+            pl.from_pandas(merged[["date", label]])
+            .with_columns(
+                pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+                pl.col(label).cast(pl.Float64, strict=False),
+            )
+            .group_by("date")
+            .agg(
+                pl.col(label).mean().alias("market"),
+                pl.col(label).std().alias("market_vol"),
+            )
+            .sort("date")
+            .to_pandas()
+        )
+        market = pd.Series(
+            market_stats["market"].to_numpy(dtype=float),
+            index=pd.to_datetime(market_stats["date"]),
+            name=label,
+        )
+        market_vol = pd.Series(
+            market_stats["market_vol"].to_numpy(dtype=float),
+            index=pd.to_datetime(market_stats["date"]),
+            name=label,
+        )
         high_vol_cutoff = market_vol.quantile(0.75) if not market_vol.empty else np.nan
         stress_dates = market_vol.index[market_vol >= high_vol_cutoff]
         stress_ic = ic.reindex(stress_dates).dropna()
@@ -1011,7 +1109,25 @@ def factor_rank_correlation(
     columns = list(factor_columns)
     if not columns:
         return pd.DataFrame(dtype=float)
-    ranked = factor_panel.groupby("date", sort=False)[columns].rank(pct=True)
+    import polars as pl
+
+    ranked = (
+        pl.from_pandas(factor_panel.loc[:, ["date", *columns]])
+        .with_columns(pl.col("date").cast(pl.Datetime("ns")))
+        .with_columns(
+            [
+                pl.col(column)
+                .cast(pl.Float64, strict=False)
+                .rank("average")
+                .over("date")
+                .truediv(pl.col(column).cast(pl.Float64, strict=False).count().over("date"))
+                .alias(column)
+                for column in columns
+            ]
+        )
+        .select(columns)
+        .to_pandas()
+    )
     result = ranked.corr().reindex(index=columns, columns=columns).astype(float)
     for column in columns:
         result.loc[column, column] = 1.0

@@ -51,29 +51,54 @@ def eligible_factor(
 ) -> tuple[pd.DataFrame, dict[str, float]]:
     """Remove dates without enough cross-sectional factor dispersion."""
 
+    import polars as pl
+
     frame = factor.copy()
-    unique = frame.groupby("date", sort=False)["factor"].nunique()
-    eligible_dates = unique.index[
-        unique >= TECHNICAL_GATE.minimum_daily_unique_values
-    ]
+    stats = (
+        pl.from_pandas(frame[["date", "factor"]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col("factor").cast(pl.Float64, strict=False),
+        )
+        .group_by("date")
+        .agg(pl.col("factor").drop_nulls().n_unique().alias("unique"))
+        .to_pandas()
+    )
+    eligible_dates = set(
+        pd.to_datetime(stats.loc[stats["unique"] >= TECHNICAL_GATE.minimum_daily_unique_values, "date"]).dt.normalize()
+    )
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
     filtered = frame.loc[frame["date"].isin(eligible_dates)].copy()
+    minimum_unique = float(stats["unique"].min()) if not stats.empty else 0.0
+    excluded_sparse_days = int((stats["unique"] < TECHNICAL_GATE.minimum_daily_unique_values).sum()) if not stats.empty else 0
     return filtered, {
         "factor_coverage": float(frame["factor"].notna().mean()),
-        "minimum_daily_unique_values": float(unique.min()),
+        "minimum_daily_unique_values": minimum_unique,
         "eligible_days": float(len(eligible_dates)),
-        "excluded_sparse_days": float(
-            (unique < TECHNICAL_GATE.minimum_daily_unique_values).sum()
-        ),
+        "excluded_sparse_days": float(excluded_sparse_days),
     }
 
 
 def tradable_subset(exposures: pd.DataFrame) -> pd.DataFrame:
     """Apply the frozen size and liquidity tradability screen."""
 
+    import polars as pl
+
     exp = exposures.copy()
-    size_rank = exp.groupby("date", sort=False)["float_market_cap"].rank(pct=True)
-    liquidity_rank = exp.groupby("date", sort=False)["LIQUIDTY"].rank(pct=True)
-    return exp.loc[(size_rank > 0.20) & (liquidity_rank > 0.20)].copy()
+    work = pl.from_pandas(exp).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+        pl.col("float_market_cap").cast(pl.Float64, strict=False),
+        pl.col("LIQUIDTY").cast(pl.Float64, strict=False),
+    )
+    size = pl.col("float_market_cap")
+    liq = pl.col("LIQUIDTY")
+    screened = work.with_columns(
+        (size.rank("average").over("date") / size.count().over("date")).alias("_size_rank"),
+        (liq.rank("average").over("date") / liq.count().over("date")).alias("_liquidity_rank"),
+    ).filter(
+        (pl.col("_size_rank") > 0.20) & (pl.col("_liquidity_rank") > 0.20)
+    ).drop(["_size_rank", "_liquidity_rank"])
+    return screened.to_pandas()
 
 
 def metric_rows(
@@ -161,8 +186,18 @@ def candidate_s_trial_diagnostics(
     label_column = "ret_close_to_close"
     frame = oriented_panel[["date", "instrument", candidate]].copy()
     coverage = float(pd.to_numeric(frame[candidate], errors="coerce").notna().mean())
+    import polars as pl
+
     active_days = int(
-        frame.groupby("date", sort=True)[candidate].nunique().gt(1).sum()
+        pl.from_pandas(frame[["date", candidate]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col(candidate).cast(pl.Float64, strict=False),
+        )
+        .group_by("date")
+        .agg(pl.col(candidate).drop_nulls().n_unique().alias("unique"))
+        .filter(pl.col("unique") > 1)
+        .height
     )
     merged = frame.merge(
         labels[["date", "instrument", label_column]],
