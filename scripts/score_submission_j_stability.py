@@ -25,6 +25,7 @@ from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from scripts.run_combinations import (
     VALIDATION_2022_YEAR,
     VALIDATION_2023_YEAR,
+    j_baseline_columns_from_self_columns,
     load_dynamic_inputs,
     prepare_experiment_context,
 )
@@ -145,6 +146,7 @@ def load_score_reference(data_dir: Path, reports_dir: Path) -> CompetitionScoreR
     ) = load_dynamic_inputs(data_dir, reports_dir)
     public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
     self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
+    j_baseline_columns = j_baseline_columns_from_self_columns(self_columns)
     return prepare_experiment_context(
         panel,
         labels,
@@ -152,6 +154,7 @@ def load_score_reference(data_dir: Path, reports_dir: Path) -> CompetitionScoreR
         all36_reference,
         public_columns,
         self_columns,
+        j_baseline_columns,
         single_factor_admitted,
     )[4]
 

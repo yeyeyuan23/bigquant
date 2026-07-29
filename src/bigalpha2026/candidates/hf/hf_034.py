@@ -1,7 +1,7 @@
 """HF-034: competition-adapted CICC high-frequency candidate.
 
 Source: CICC, High-Frequency Factor Handbook (2024-01-15), CICC-SYN-003.
-Semantic class: LATENT_COMPONENT; include in self_library: true.
+Semantic class: LATENT_COMPONENT; include in J baseline: true.
 Data families: HF.
 Frozen formula: equal weight of daily centered percentile ranks: shape_skew(-1), shape_kurt(-1), shape_skewVol(-1).
 Economic logic: Combines return asymmetry, return tails, and volume-concentration shape.
@@ -24,7 +24,7 @@ import pandas as pd
 
 CANDIDATE_ID = "HF-034"
 SEMANTIC_CLASS = "LATENT_COMPONENT"
-INCLUDE_IN_SELF_LIBRARY = True
+INCLUDE_IN_J_BASELINE = True
 DATA_FAMILIES = ("HF",)
 SOURCE_RESEARCH_ID = "CICC-SYN-003"
 SOURCE_FIDELITY = "adapted"

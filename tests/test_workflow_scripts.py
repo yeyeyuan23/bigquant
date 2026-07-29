@@ -359,10 +359,11 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(summary["factorlib_screened_features"], 15)
         self.assertEqual(
             summary["competition_J_reference"],
-            "factorlib_all36_plus_candidate_pool_proxy",
+            "factorlib_all36_plus_j_baseline_candidates",
         )
         self.assertEqual(summary["competition_J_reference_features"], 37)
         self.assertEqual(summary["self_features"], 1)
+        self.assertEqual(summary["j_baseline_features"], 1)
         self.assertEqual(
             {
                 key
@@ -370,6 +371,18 @@ class WorkflowScriptTest(unittest.TestCase):
                 if key.endswith("_contract")
             },
             {f"{pipeline}_contract" for pipeline in PIPELINE_NAMES},
+        )
+
+    def test_j_baseline_columns_follow_candidate_metadata(self):
+        columns = (
+            "self__HF-001",
+            "self__HF-039",
+            "self__HF-043",
+        )
+
+        self.assertEqual(
+            run_combinations.j_baseline_columns_from_self_columns(columns),
+            ("self__HF-001", "self__HF-043"),
         )
 
     def test_check_mode_reports_missing_inputs_without_training(self):

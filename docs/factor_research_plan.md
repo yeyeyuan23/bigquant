@@ -192,7 +192,7 @@ Rank IC、t 值、中性化、可交易、稳定性和分组结果仍可作为�
 - S 路线未通过时保持旧冻结 S；I/T 仍按各自完整池独立评价。
 
 候选池冻结之后，最终路线选择使用 `competition_score_proxy.py` 计算本地 J。J 的本地参考池是
-`all36 + 我方候选因子库`。all36 是公开基础坐标；我方候选因子库用于模拟本队
+`all36 + J baseline candidates`。all36 是公开基础坐标；J baseline candidates 是候选模块显式标记 `INCLUDE_IN_J_BASELINE = True` 的我方候选，用于模拟本队
 已知拥挤环境，判断一条最终路线相对“公开库 + 自己库上已有信号”是否仍有线性
 贡献。自研原子因子不得混写入 all36 目录。对任一路由输出 z：
 
@@ -202,15 +202,15 @@ B(z) = Pct(mean(abs(w_z)) / (std(abs(w_z)) + epsilon))
 J(z) = 0.3 × A(z) + 0.7 × B(z)
 ```
 
-A 的四个百分位均把一个路由输出插入固定 `all36 + self_library` 分布后按平均秩
-计算。最终路线选择使用 `all36 + self_library + 一个 route_output`，使用截面
+A 的四个百分位均把一个路由输出插入固定 `all36 + J baseline candidates` 分布后按平均秩
+计算。最终路线选择使用 `all36 + J baseline candidates + 一个 route_output`，使用截面
 z-score 标签、60 日窗口、20 日步长和允许正负系数的评分 Elastic Net；baseline
 与 augmented 必须分别替换同一个路由槽，禁止同时进入贡献模型。构造 I 路由的
 正系数 Elastic Net 与计算 B 的无符号限制 Elastic Net 是两个不同模型合同。
 
 最终三条提交路线另做一次有界拥挤检查：各路线先单独相对
-`all36 + self_library` 计分，再把已经冻结方向的三条兄弟路线一次性放入同一个
-`all36 + self_library + sibling_routes` Elastic Net。
+`all36 + J baseline candidates` 计分，再把已经冻结方向的三条兄弟路线一次性放入同一个
+`all36 + J baseline candidates + sibling_routes` Elastic Net。
 这只用于检查我方路线之间可观察的相互替代，是未知全局拥挤程度的下界，不把我方
 历史或当前路线冒充全体参赛者历史，也不枚举三套完整压力网格。最终稳健 J 取
 2022、2023、两年合并基础场景与一次兄弟路线拥挤场景中的最低值。
@@ -295,7 +295,7 @@ I 缓存分成两层：
 S 和 I 只控制规则复合与 Elastic Net。LightGBM 使用第 7 节独立的正交准入
 确认 T，不能用 I 结果预筛树模型候选。
 
-技术门槛未通过时直接标记 `technical_reject`。S/I/T 的前置规则不同：S 看质量、强度、稳定性和低冗余，I 看线性或残差信息，T 看最低质量和正交性。`all36 + self_library`
+技术门槛未通过时直接标记 `technical_reject`。S/I/T 的前置规则不同：S 看质量、强度、稳定性和低冗余，I 看线性或残差信息，T 看最低质量和正交性。`all36 + J baseline candidates`
 只在候选池冻结后的最终路线选择中使用。
 
 这是官方评分的代理检查，不等于真实比赛分数。

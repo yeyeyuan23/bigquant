@@ -1,7 +1,7 @@
 """OB-006: competition-adapted CICC high-frequency candidate.
 
 Source: CICC, High-Frequency Factor Handbook (2024-01-15), CICC-038.
-Semantic class: LATENT_COMPONENT; include in self_library: true.
+Semantic class: LATENT_COMPONENT; include in J baseline: true.
 Data families: OB.
 Frozen formula: negative daily cross-sectional rank of full-day median relative best-quote spread.
 Economic logic: Narrower quoted spread represents lower immediate trading friction.
@@ -24,7 +24,7 @@ import pandas as pd
 
 CANDIDATE_ID = "OB-006"
 SEMANTIC_CLASS = "LATENT_COMPONENT"
-INCLUDE_IN_SELF_LIBRARY = True
+INCLUDE_IN_J_BASELINE = True
 DATA_FAMILIES = ("OB",)
 SOURCE_RESEARCH_ID = "CICC-038"
 SOURCE_FIDELITY = "exact"

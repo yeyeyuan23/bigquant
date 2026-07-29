@@ -160,12 +160,13 @@ disclosure_date, instrument, report_date, category, shift
 - 固定目录为 `data/features/FACTORLIB/year=YYYY/part-YYYY.parquet`。
 - J 评分另外读取完整 all36，固定目录为
   `data/features/FACTORLIB_ALL36/year=YYYY/part-YYYY.parquet`，并使用独立
-  manifest。当前本地 J reference 是 `all36 + self_library`：all36 定义公开基础
-  坐标，我方候选库模拟本队已知拥挤环境。它不代表平台动态全局候选池，也不改变
-  screened15 的 I/T 训练成员。S/I/T 开发期准入必须具备 2019—2021；最终路线按 J
-  选优还必须具备 2022、2023。自研原子因子不得写入 all36 目录；它们只在评分
-  DataFrame 中临时并入 `self_library`。最终三条兄弟路线只在一次独立的联合拥挤
-  评分中临时加入评分模型。
+  manifest。当前本地 J reference 是 `all36 + J baseline candidates`：all36
+  定义公开基础坐标，J baseline candidates 是候选模块显式标记
+  `INCLUDE_IN_J_BASELINE = True` 的我方候选。它不代表平台动态全局候选池，也不
+  改变 screened15 的 I/T 训练成员。S/I/T 开发期准入必须具备 2019—2021；最终
+  路线按 J 选优还必须具备 2022、2023。自研原子因子不得写入 all36 目录；J
+  baseline candidates 只在评分 DataFrame 中临时并入本地 J reference。最终三条
+  兄弟路线只在一次独立的联合拥挤评分中临时加入评分模型。
 - manifest 必须区分可直接观测的数值尺度与平台生成来源；本地发现每日均值约为
   0、标准差约为 1 时只能记录为 `observed_value_scale`，在 AIStudio 取数代码
   未留档前不得声称标准化由官方表或某一段导出代码完成。

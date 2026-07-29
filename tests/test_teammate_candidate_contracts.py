@@ -67,7 +67,8 @@ def test_teammate_candidate_daily_builder_contract(module_name: str) -> None:
     candidate_id = module_name.rsplit(".", maxsplit=1)[-1].upper().replace("_", "-")
     assert module.CANDIDATE_ID == candidate_id
     assert tuple(module.OUTPUT_COLUMNS) == ("date", "instrument", "factor")
-    assert isinstance(module.INCLUDE_IN_SELF_LIBRARY, bool)
+    assert isinstance(module.INCLUDE_IN_J_BASELINE, bool)
+    assert not hasattr(module, "INCLUDE_IN_SELF_LIBRARY")
     assert module.SEMANTIC_CLASS in {"LATENT_COMPONENT", "ANCHOR_COMPONENT"}
 
     required_columns = _required_feature_columns(module)

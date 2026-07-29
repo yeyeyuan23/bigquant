@@ -44,6 +44,7 @@ from bigalpha2026.incremental_admission import (
 from bigalpha2026.research_policy import (
     FORMAL_EVALUATION_POLICY,
     FROZEN_FACTORLIB_SCREENED_FEATURES,
+    include_in_j_baseline,
 )
 from bigalpha2026.single_factor_admission import (
     SingleFactorRouteAdmissionResult,
@@ -112,6 +113,18 @@ def enters_family_equal_rank(feature: str) -> bool:
         return False
     candidate_id = feature.removeprefix("self__")
     return candidate_id.split("-", maxsplit=1)[0] in BASE_SELF_FAMILIES
+
+
+def j_baseline_columns_from_self_columns(
+    self_columns: Sequence[str],
+) -> tuple[str, ...]:
+    """Filter self__ candidate columns to those marked for the J baseline."""
+
+    return tuple(
+        column
+        for column in self_columns
+        if include_in_j_baseline(column.removeprefix("self__"))
+    )
 
 
 def cleanup_obsolete_reports(reports_dir: Path) -> None:
@@ -451,6 +464,7 @@ def contract_summary(
     )
     public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
     self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
+    j_baseline_columns = j_baseline_columns_from_self_columns(self_columns)
     public_coverage = coverage.loc[
         coverage["feature"].isin(public_columns),
         "coverage",
@@ -471,14 +485,22 @@ def contract_summary(
         "factorlib_reference": {
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-            "j_reference": "factorlib_all36_plus_candidate_pool_proxy",
+            "j_reference": "factorlib_all36_plus_j_baseline_candidates",
             "j_public_reference_count": len(FACTORLIB_FEATURE_COLUMNS),
-            "j_self_reference_count": len(self_columns),
-            "j_reference_count": len(FACTORLIB_FEATURE_COLUMNS) + len(self_columns),
+            "j_self_reference_count": len(j_baseline_columns),
+            "j_reference_count": len(FACTORLIB_FEATURE_COLUMNS) + len(j_baseline_columns),
             "j_reference_columns_present": len(
                 [column for column in all36_reference if column.startswith("factorlib__")]
             )
-            + len(self_columns),
+            + len(j_baseline_columns),
+            "j_baseline_candidates": [
+                column.removeprefix("self__") for column in j_baseline_columns
+            ],
+            "j_baseline_excluded_candidates": [
+                column.removeprefix("self__")
+                for column in self_columns
+                if column not in set(j_baseline_columns)
+            ],
         },
         "candidate_pool_reference": {
             "factor_version": CANDIDATE_POOL_VERSION,
@@ -488,6 +510,7 @@ def contract_summary(
             "all_candidate_count": int(candidate_pool["candidate_id"].nunique()),
             "single_factor_candidates": list(single_factor_admitted),
             "self_feature_count": len(self_columns),
+            "j_baseline_feature_count": len(j_baseline_columns),
         },
         "minimum_public_coverage": minimum_public_coverage,
         "minimum_self_coverage": (
@@ -536,6 +559,7 @@ def synthetic_contract_summary() -> dict[str, object]:
         admitted_candidates=("HF-TEST",),
         public_feature_columns=SCREENED_FACTORLIB_RAW_FEATURES,
     )
+    j_baseline_columns = self_columns
     self_factor = family_balanced_factor(panel, self_columns)
     joint_factor = family_balanced_factor(
         panel,
@@ -547,9 +571,11 @@ def synthetic_contract_summary() -> dict[str, object]:
         "rows": len(panel),
         "factorlib_features": len(public_columns),
         "factorlib_screened_features": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-        "competition_J_reference": "factorlib_all36_plus_candidate_pool_proxy",
-        "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS) + len(self_columns),
+        "competition_J_reference": "factorlib_all36_plus_j_baseline_candidates",
+        "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS)
+        + len(j_baseline_columns),
         "self_features": len(self_columns),
+        "j_baseline_features": len(j_baseline_columns),
         "minimum_coverage": float(coverage["coverage"].min()),
         "self_factor_composite_contract": list(self_factor.columns),
         "joint_elastic_net_contract": list(joint_factor.columns),
@@ -699,6 +725,7 @@ def prepare_experiment_context(
     all36_reference: pd.DataFrame,
     public_columns: tuple[str, ...],
     self_columns: tuple[str, ...],
+    j_baseline_columns: tuple[str, ...],
     single_factor_candidates: tuple[str, ...],
 ) -> tuple[
     pd.DataFrame,
@@ -708,7 +735,7 @@ def prepare_experiment_context(
     CompetitionScoreReference,
     tuple[str, ...],
 ]:
-    """Freeze feature directions and the all36+self competition-score reference."""
+    """Freeze directions and the all36+J-baseline score reference."""
 
     development_panel = panel.loc[panel["date"].dt.year.isin(DEVELOPMENT_YEARS)]
     development_labels = labels.loc[labels["date"].dt.year.isin(DEVELOPMENT_YEARS)]
@@ -725,9 +752,9 @@ def prepare_experiment_context(
         raise RuntimeError("local factorlib subset no longer matches the frozen 15 membership")
 
     j_public_columns = tuple(f"factorlib__{column}" for column in FACTORLIB_FEATURE_COLUMNS)
-    j_reference_columns = (*j_public_columns, *self_columns)
+    j_reference_columns = (*j_public_columns, *j_baseline_columns)
     j_reference_panel = all36_reference.merge(
-        oriented.loc[:, [*KEY_COLUMNS, *self_columns]],
+        oriented.loc[:, [*KEY_COLUMNS, *j_baseline_columns]],
         on=list(KEY_COLUMNS),
         how="left",
         validate="one_to_one",
@@ -1372,6 +1399,7 @@ def run_experiments(
     all36_reference: pd.DataFrame,
     public_columns: tuple[str, ...],
     self_columns: tuple[str, ...],
+    j_baseline_columns: tuple[str, ...],
     single_factor_candidates: tuple[str, ...],
     reports_dir: Path,
     *,
@@ -1400,6 +1428,7 @@ def run_experiments(
         all36_reference,
         public_columns,
         self_columns,
+        j_baseline_columns,
         single_factor_candidates,
     )
     (
@@ -1520,6 +1549,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ) = loaded
     public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
     self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
+    j_baseline_columns = j_baseline_columns_from_self_columns(self_columns)
     result = run_experiments(
         panel,
         labels,
@@ -1527,6 +1557,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         all36_reference,
         public_columns,
         self_columns,
+        j_baseline_columns,
         single_factor_candidates,
         args.reports_dir,
         resume_incremental=args.resume_incremental,

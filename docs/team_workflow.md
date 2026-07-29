@@ -257,7 +257,7 @@ SHA-256: 4fd914654a38f11fc2f6b0bd1153d9db32c927e6a157ffaeb26a9b11c407e912
 该快照已经包含最新的连续微观日级面板、冻结 screened15、标准候选长表
 `data/factors/candidate_pool.parquet`、2019—2023 完整
 `FACTORLIB_ALL36` 和全部 manifests；不包含原始分钟数据或可由当前代码重算的
-`data/cache/`。本地 J 只用于冻结路线后的选择，reference 是 `all36 + self_library`：不能把 screened15
+`data/cache/`。本地 J 只用于冻结路线后的选择，reference 是 `all36 + J baseline candidates`：不能把 screened15
 复制后冒充完整参考池，也不能把我方当前或历史路线称为平台全局候选池。
 
 完整包作为私有仓库 Release 资产交付，不进入 Git 历史。仓库 collaborator

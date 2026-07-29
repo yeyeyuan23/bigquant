@@ -1,7 +1,7 @@
 """INT-004: competition-adapted CICC high-frequency candidate.
 
 Source: CICC, High-Frequency Factor Handbook (2024-01-15), CICC-SYN-005.
-Semantic class: LATENT_COMPONENT; include in self_library: true.
+Semantic class: LATENT_COMPONENT; include in J baseline: true.
 Data families: HF + OB.
 Frozen formula: equal weight of daily centered percentile ranks: liq_amihud_1min(+1), liq_closevol(+1), liq_spread(-1).
 Economic logic: Combines price impact, closing demand, and immediate quoted trading cost.
@@ -24,7 +24,7 @@ import pandas as pd
 
 CANDIDATE_ID = "INT-004"
 SEMANTIC_CLASS = "LATENT_COMPONENT"
-INCLUDE_IN_SELF_LIBRARY = True
+INCLUDE_IN_J_BASELINE = True
 DATA_FAMILIES = ("HF", "OB")
 SOURCE_RESEARCH_ID = "CICC-SYN-005"
 SOURCE_FIDELITY = "adapted"

@@ -81,7 +81,6 @@ def _load_candidate_map(package_dir: Path) -> pd.DataFrame:
             "target_directory",
             "module_name",
             "semantic_class",
-            "include_in_self_library",
             "release_tag",
         ),
         "CANDIDATE_DATA_MAP.csv",

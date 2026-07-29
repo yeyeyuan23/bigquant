@@ -6,7 +6,8 @@ candidate membership, evaluation gates, or combination weights in a notebook.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import importlib
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -317,6 +318,40 @@ def candidate_ids(stage: str | None = None) -> tuple[str, ...]:
     if stage is not None:
         selected = tuple(item for item in selected if item.stage == stage)
     return tuple(item.candidate_id for item in selected)
+
+
+def candidate_module_name(candidate_id: str) -> str:
+    """Return the canonical candidate module path for a candidate ID."""
+
+    family = candidate_id.split("-", maxsplit=1)[0]
+    family_path = "composite" if family == "INT" else family.lower()
+    module_stem = candidate_id.lower().replace("-", "_")
+    return f"bigalpha2026.candidates.{family_path}.{module_stem}"
+
+
+def include_in_j_baseline(candidate_id: str) -> bool:
+    """Return whether a candidate belongs to the local J baseline.
+
+    Older candidates predate the explicit metadata field and default to True:
+    historically every candidate in candidate_pool.parquet was part of the
+    local all36+self J reference. New teammate candidates declare
+    INCLUDE_IN_J_BASELINE explicitly.
+    """
+
+    module = importlib.import_module(candidate_module_name(candidate_id))
+    if hasattr(module, "INCLUDE_IN_J_BASELINE"):
+        return bool(module.INCLUDE_IN_J_BASELINE)
+    return True
+
+
+def j_baseline_candidate_ids(candidate_ids_: Iterable[str]) -> tuple[str, ...]:
+    """Filter candidate IDs to the metadata-declared J baseline members."""
+
+    return tuple(
+        candidate_id
+        for candidate_id in candidate_ids_
+        if include_in_j_baseline(str(candidate_id))
+    )
 
 
 def fixed_weight_rank_combination(
