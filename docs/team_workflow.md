@@ -95,8 +95,8 @@ docs/                    # 合同、登记和协作规则
 我认领 HF-003：尾盘成交集中后的价格恢复。
 ```
 
-不要两个人同时使用同一个编号。认领后先在
-`docs/candidate_registry.md` 按模板登记，再写代码。
+不要两个人同时使用同一个编号。认领后直接在独立分支实现对应候选文件；
+registry 和公共入口由主仓库负责人统一补齐。
 
 ### Git 协作
 
@@ -115,28 +115,22 @@ git switch -c factor/hf-003
 - 密钥、Cookie 或账号信息；
 - 与本候选无关的格式化修改。
 
-### 修改权限
+### 提交 PR 规则
 
-队友的候选分支只允许修改：
+队友的候选 PR 默认只提交自己认领的候选文件，例如
+`src/bigalpha2026/candidates/hf/hf_003.py`。跨类组合候选可以放在
+`src/bigalpha2026/candidates/composite/`，但不要在同一个 PR 里修改公共流程。
 
-- 自己认领的 `src/bigalpha2026/candidates/<类别>/` 候选文件；
-- 对应类别的 `__init__.py` 导出；
-- `docs/candidate_registry.md` 中该候选的登记；
-- 该候选对应的测试和小型评价报告；
-- 新数据确有必要时，对应的取数 Notebook、`docs/data_contract.md`、manifest
-  和增量包说明。
+以下内容由主仓库负责人统一接入，队友 PR 不需要改：
 
-以下内容只读，不得在候选 MR/PR 中修改：
+- `docs/candidate_registry.md`；
+- 各目录的 `__init__.py`；
+- `scripts/run_first_round.py`、`scripts/run_combinations.py`；
+- `src/bigalpha2026/evaluation.py`、`combinations.py`、`research_policy.py`。
 
-- `src/bigalpha2026/evaluation.py` 和通用评价标准；
-- `src/bigalpha2026/combinations.py`、`scripts/run_combinations.py` 和组合训练逻辑；
-- `src/bigalpha2026/research_policy.py` 中的时间切分与准入门槛；
-- `src/bigalpha2026/candidates/composite/` 和 `artifacts/frozen/` 中的冻结版本；
-- `main` 分支。
-
-公共代码和研究规则的调整使用独立 MR/PR，由主仓库负责人统一处理；候选 MR/PR
-只包含 `candidate` 范围内的实现、测试和登记信息。队友可以运行公共评价和组合
-代码，但不能修改它们。
+如果候选依赖当前数据包没有的新字段，PR 说明里必须写清字段来源，并把实际使用的
+Feather/Parquet 数据、SHA-256、字段清单和生成 Notebook/脚本作为 GitHub Release
+asset 交付。数据文件不要 commit 进仓库。
 
 ## 3. 新增一个基础因子
 
@@ -144,20 +138,17 @@ git switch -c factor/hf-003
 `docs/factor_research_plan.md` 第 4—7 节；字段与时点只能引用
 `docs/data_contract.md`，不要在本文件复制一套规则。
 
-队友的操作顺序只有：
+队友的操作顺序：
 
 1. 在群里认领编号；
-2. 在 `docs/candidate_registry.md` 登记；
-3. 在自己的候选分支实现同编号模块和测试；
-4. 本地完整测试通过；
-5. 按第 4 节交给 AIStudio 做真实数据核验；
-6. 有效结果可以上传比赛，随后提交 MR/PR。
+2. 在自己的候选分支实现同编号模块；
+3. 如果使用新数据字段，同时交付 Release asset 和字段说明；
+4. 提交 PR，PR 中不要混入公共流程修改。
 
 文件名和编号必须一致，例如：
 
 ```text
 src/bigalpha2026/candidates/hf/hf_003.py
-tests/test_hf_003.py
 ```
 
 运行：
@@ -294,11 +285,12 @@ gh release download data-v3-2026-07-27 \
 
 如果候选引入当前包中没有的新日级组件，开发者必须同时交付：
 
-1. 生成组件的 AIStudio 查询或 Notebook；
-2. 更新后的 `docs/data_contract.md`；
-3. 新增日级 Parquet；
-4. 对应 manifest；
-5. 增量压缩包和 SHA-256。
+1. 生成组件的 AIStudio 查询、Notebook 或脚本说明；
+2. 实际使用的 Feather/Parquet 数据包；
+3. 字段清单、覆盖年份、`date/instrument` key 说明；
+4. 增量压缩包和 SHA-256。
+
+`docs/data_contract.md`、manifest 和正式 Parquet 接入由主仓库负责人统一整理。
 
 增量包示例：
 
@@ -454,9 +446,7 @@ MR/PR 简单说明：
 ## 9. 合并前检查
 
 - 候选编号没有冲突；
-- 只修改本候选及“修改权限”允许的配套文件；
-- 完整测试通过；
+- PR 默认只新增或修改对应候选文件；
 - 没有数据文件、密钥或 Notebook 输出；
-- plan 规定的评价和冻结证据已经提供；
-- 新数据依赖已按第 5 节交付；
+- 新数据依赖已按第 5 节通过 Release asset 交付；
 - 最终代码已创建 MR/PR。
