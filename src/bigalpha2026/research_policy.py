@@ -332,16 +332,13 @@ def candidate_module_name(candidate_id: str) -> str:
 def include_in_j_baseline(candidate_id: str) -> bool:
     """Return whether a candidate belongs to the local J baseline.
 
-    Older candidates predate the explicit metadata field and default to True:
-    historically every candidate in candidate_pool.parquet was part of the
-    local all36+self J reference. New teammate candidates declare
-    INCLUDE_IN_J_BASELINE explicitly.
+    The local J baseline mirrors the competition factor-library reference only:
+    self-developed candidates are evaluated against the all36 library and are
+    not injected into the baseline reference.
     """
 
-    module = importlib.import_module(candidate_module_name(candidate_id))
-    if hasattr(module, "INCLUDE_IN_J_BASELINE"):
-        return bool(module.INCLUDE_IN_J_BASELINE)
-    return True
+    del candidate_id
+    return False
 
 
 def j_baseline_candidate_ids(candidate_ids_: Iterable[str]) -> tuple[str, ...]:
