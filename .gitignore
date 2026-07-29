@@ -46,3 +46,5 @@ data/**/*.tar.zst
 data/**/*.tmp
 data/**/*.partial
 data/screened15.part.*
+data/manifest_candidate_pool_fz76_delta.json
+reports/fz76_delta/development_daily_rank_ic.csv
