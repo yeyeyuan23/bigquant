@@ -415,6 +415,191 @@ def _a_components_from_processed(
     }
 
 
+def _ratio_array(values: np.ndarray) -> float:
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return np.nan
+    std = float(np.std(values, ddof=1)) if values.size > 1 else np.nan
+    return (
+        float(np.mean(values) / std)
+        if np.isfinite(std) and std > 1e-12
+        else np.nan
+    )
+
+
+def _a_components_from_processed_wide(
+    processed_panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    factor_columns: Sequence[str],
+    label_column: str,
+) -> pd.DataFrame:
+    """Compute A inputs for many already-preprocessed factor columns.
+
+    This is the batched equivalent of calling
+    ``_a_components_from_processed`` for each column.  It keeps the same
+    daily rank-IC and long-short definitions, but avoids rebuilding and
+    collecting one Polars frame per factor.
+    """
+
+    columns = tuple(factor_columns)
+    if not columns:
+        return pd.DataFrame(columns=("factor", *A_COMPONENT_COLUMNS))
+
+    import polars as pl
+
+    merged = processed_panel.loc[:, [*KEY_COLUMNS, *columns]].merge(
+        labels.loc[:, [*KEY_COLUMNS, label_column]],
+        on=list(KEY_COLUMNS),
+        how="inner",
+        validate="one_to_one",
+    )
+    work = (
+        pl.from_pandas(merged)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+        )
+        .drop_nulls(["date"])
+    )
+    if work.is_empty():
+        return pd.DataFrame(
+            [
+                {
+                    "factor": column,
+                    "rank_ic_mean": np.nan,
+                    "rank_ic_ir": np.nan,
+                    "long_short_sharpe": np.nan,
+                    "stress_ic_ir": np.nan,
+                }
+                for column in columns
+            ]
+        )
+
+    market_volatility = work.group_by("date").agg(
+        pl.col("_label").std().alias("_label_std")
+    )
+    volatility_frame = market_volatility.sort("date").to_pandas()
+    volatility_values = volatility_frame["_label_std"].to_numpy(dtype=float)
+    stress_cutoff = (
+        float(np.nanquantile(volatility_values, 0.75))
+        if np.isfinite(volatility_values).any()
+        else np.nan
+    )
+    stress_dates = set(
+        pd.to_datetime(
+            volatility_frame.loc[
+                volatility_frame["_label_std"] >= stress_cutoff,
+                "date",
+            ],
+        )
+    )
+
+    clean_exprs = []
+    rank_exprs = []
+    rank_pct_exprs = []
+    agg_exprs = []
+    column_temp_names: dict[str, tuple[str, str, str, str]] = {}
+    for index, column in enumerate(columns):
+        factor_name = f"__factor_{index}"
+        label_name = f"__label_{index}"
+        factor_rank_name = f"__factor_rank_{index}"
+        label_rank_name = f"__label_rank_{index}"
+        count_name = f"__count_{index}"
+        rank_pct_name = f"__rank_pct_{index}"
+        ic_name = f"__rank_ic_{index}"
+        ls_name = f"__long_short_{index}"
+        value = pl.col(column).cast(pl.Float64, strict=False)
+        label = pl.col("_label")
+        valid = (
+            value.is_not_null()
+            & value.is_finite()
+            & label.is_not_null()
+            & label.is_finite()
+        )
+        clean_exprs.extend(
+            [
+                pl.when(valid).then(value).otherwise(None).alias(factor_name),
+                pl.when(valid).then(label).otherwise(None).alias(label_name),
+            ]
+        )
+        column_temp_names[column] = (ic_name, ls_name, count_name, rank_pct_name)
+        rank_exprs.extend(
+            [
+                pl.col(factor_name)
+                .rank("average")
+                .over("date")
+                .alias(factor_rank_name),
+                pl.col(label_name)
+                .rank("average")
+                .over("date")
+                .alias(label_rank_name),
+                pl.col(factor_name).count().over("date").alias(count_name),
+            ]
+        )
+        rank_pct_exprs.append(
+            (pl.col(factor_rank_name) / pl.col(count_name)).alias(rank_pct_name)
+        )
+        agg_exprs.extend(
+            [
+                pl.first(count_name).alias(count_name),
+                pl.corr(factor_rank_name, label_rank_name).alias(ic_name),
+                (
+                    pl.when(pl.col(rank_pct_name) > 0.8)
+                    .then(pl.col(label_name))
+                    .otherwise(None)
+                    .mean()
+                    - pl.when(pl.col(rank_pct_name) <= 0.2)
+                    .then(pl.col(label_name))
+                    .otherwise(None)
+                    .mean()
+                ).alias(ls_name),
+            ]
+        )
+
+    daily = (
+        work.with_columns(clean_exprs)
+        .with_columns(rank_exprs)
+        .with_columns(rank_pct_exprs)
+        .group_by("date")
+        .agg(agg_exprs)
+        .sort("date")
+        .to_pandas()
+    )
+    daily_dates = pd.to_datetime(daily["date"])
+    stress_mask = daily_dates.isin(stress_dates).to_numpy()
+
+    rows: list[dict[str, object]] = []
+    for column in columns:
+        ic_name, ls_name, count_name, _rank_pct_name = column_temp_names[column]
+        counts = daily[count_name].to_numpy(dtype=float)
+        ic_values = daily[ic_name].to_numpy(dtype=float)
+        ic_values = np.where(counts >= 5, ic_values, np.nan)
+        long_short_values = daily[ls_name].to_numpy(dtype=float)
+        long_short_values = np.where(counts >= 10, long_short_values, np.nan)
+        stress_ic_values = ic_values[stress_mask]
+        rows.append(
+            {
+                "factor": column,
+                "rank_ic_mean": (
+                    float(np.nanmean(ic_values))
+                    if np.isfinite(ic_values).any()
+                    else np.nan
+                ),
+                "rank_ic_ir": _ratio_array(ic_values),
+                "long_short_sharpe": (
+                    _ratio_array(long_short_values) * np.sqrt(252)
+                    if np.isfinite(long_short_values).any()
+                    else np.nan
+                ),
+                "stress_ic_ir": _ratio_array(stress_ic_values),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _model_scores(
     processed_panel: pd.DataFrame,
     labels: pd.DataFrame,
@@ -680,42 +865,25 @@ class CompetitionScoreReference:
                 ),
                 flush=True,
             )
-        rows: list[dict[str, object]] = []
-        last_column = time.perf_counter()
-        for index, column in enumerate(self.reference_columns, start=1):
-            metrics = _a_components_from_processed(
-                processed[[*KEY_COLUMNS, column]],
-                labels,
-                factor_column=column,
-                label_column=self.config.primary_label,
-            )
-            if profile_stages:
-                now = time.perf_counter()
-                print(
-                    json.dumps(
-                        {
-                            "status": "j_reference_a_stage",
-                            "stage": "reference_a_column",
-                            "column": column,
-                            "index": index,
-                            "seconds": round(now - last_column, 3),
-                            "total_seconds": round(now - profile_start, 3),
-                        },
-                        ensure_ascii=False,
-                    ),
-                    flush=True,
-                )
-                last_column = now
-            rows.append(
-                {
-                    "factor": column,
-                    **{
-                        component: float(metrics[component])
-                        for component in A_COMPONENT_COLUMNS
+        result = _a_components_from_processed_wide(
+            processed,
+            labels,
+            factor_columns=self.reference_columns,
+            label_column=self.config.primary_label,
+        )
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_reference_a_stage",
+                        "stage": "reference_a_wide",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "reference_count": len(self.reference_columns),
                     },
-                }
+                    ensure_ascii=False,
+                ),
+                flush=True,
             )
-        result = pd.DataFrame(rows)
         self._a_cache[cache_key] = result.copy()
         return result
 
@@ -1053,22 +1221,13 @@ class CompetitionScoreReference:
             self.reference_columns,
             exposures,
         )
-        reference_a = pd.DataFrame(
-            [
-                {
-                    "factor": column,
-                    **_a_components_from_processed(
-                        processed[[*KEY_COLUMNS, column]],
-                        labels,
-                        factor_column=column,
-                        label_column=self.config.primary_label,
-                    ),
-                }
-                for column in self.reference_columns
-            ]
+        reference_a = _a_components_from_processed_wide(
+            processed,
+            labels,
+            factor_columns=self.reference_columns,
+            label_column=self.config.primary_label,
         )
         route_columns: dict[str, str] = {}
-        route_metrics: dict[str, dict[str, float]] = {}
         for index, (name, route) in enumerate(normalized.items()):
             aligned = _key_join(scorable_keys, route, how="left")
             missing_rows = int(aligned["factor"].isna().sum())
@@ -1083,13 +1242,21 @@ class CompetitionScoreReference:
                 aligned,
                 exposures,
             ).rename(columns={"factor": model_column})
-            route_metrics[name] = _a_components_from_processed(
-                processed_route[[*KEY_COLUMNS, model_column]],
-                labels,
-                factor_column=model_column,
-                label_column=self.config.primary_label,
-            )
             processed = _key_join(processed, processed_route, how="left")
+
+        route_a = _a_components_from_processed_wide(
+            processed.loc[:, [*KEY_COLUMNS, *route_columns.values()]],
+            labels,
+            factor_columns=tuple(route_columns.values()),
+            label_column=self.config.primary_label,
+        ).set_index("factor")
+        route_metrics: dict[str, dict[str, float]] = {
+            name: {
+                component: float(route_a.loc[model_column, component])
+                for component in A_COMPONENT_COLUMNS
+            }
+            for name, model_column in route_columns.items()
+        }
 
         model_columns = (*self.reference_columns, *route_columns.values())
         scores, weights = _model_scores(
