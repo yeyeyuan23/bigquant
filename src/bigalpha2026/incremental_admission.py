@@ -170,6 +170,307 @@ def candidate_incremental_entry_diagnostics(
     }
 
 
+def candidate_incremental_entry_diagnostics_batch(
+    development: pd.DataFrame,
+    development_labels: pd.DataFrame,
+    *,
+    candidates: Sequence[str],
+    baseline_columns: Sequence[str],
+) -> dict[str, dict[str, object]]:
+    # Batch I-entry diagnostics for many candidates against one baseline.
+    gate = INCREMENTAL_ENTRY_GATE
+    label_column = "ret_close_to_close"
+    candidates = tuple(dict.fromkeys(map(str, candidates)))
+    baseline_columns = tuple(dict.fromkeys(map(str, baseline_columns)))
+    if not candidates:
+        return {}
+    columns = tuple(dict.fromkeys((*baseline_columns, *candidates)))
+
+    frame = development.loc[:, ["date", "instrument", *columns]].copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+    frame["instrument"] = frame["instrument"].astype(str)
+    target = development_labels.loc[:, ["date", "instrument", label_column]].copy()
+    target["date"] = pd.to_datetime(target["date"], errors="coerce").dt.normalize()
+    target["instrument"] = target["instrument"].astype(str)
+    merged = frame.merge(
+        target,
+        on=["date", "instrument"],
+        how="inner",
+        validate="one_to_one",
+    )
+
+    import polars as pl
+
+    candidate_frame = pl.from_pandas(frame.loc[:, ["date", *candidates]]).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d")
+    )
+    coverage_row = candidate_frame.select(
+        [
+            pl.col(candidate)
+            .cast(pl.Float64, strict=False)
+            .is_finite()
+            .fill_null(False)
+            .mean()
+            .alias(candidate)
+            for candidate in candidates
+        ]
+    ).to_dicts()[0]
+    active_row = (
+        candidate_frame.group_by("date")
+        .agg(
+            [
+                (
+                    pl.when(
+                        pl.col(candidate)
+                        .cast(pl.Float64, strict=False)
+                        .is_finite()
+                        .fill_null(False)
+                    )
+                    .then(pl.col(candidate).cast(pl.Float64, strict=False))
+                    .otherwise(None)
+                    .drop_nulls()
+                    .n_unique()
+                    > 1
+                ).alias(candidate)
+                for candidate in candidates
+            ]
+        )
+        .select([pl.col(candidate).sum().alias(candidate) for candidate in candidates])
+        .to_dicts()[0]
+    )
+
+    if merged.empty:
+        rows: dict[str, dict[str, object]] = {}
+        for candidate in candidates:
+            rows[candidate] = {
+                "i_trial_passed": False,
+                "i_quality_passed": False,
+                "i_linear_signal_passed": False,
+                "i_residual_signal_passed": False,
+                "i_redundancy_passed": False,
+                "i_trial_reasons": "I linear/residual signal gate failed",
+                "i_coverage": float(coverage_row.get(candidate) or 0.0),
+                "i_active_days": int(active_row.get(candidate) or 0),
+                "i_rank_ic_mean": float("nan"),
+                "i_residual_rank_ic": float("nan"),
+                "i_max_abs_rank_correlation": 0.0,
+                "i_residual_evaluated": False,
+            }
+        return rows
+
+    work = pl.from_pandas(merged.loc[:, ["date", *columns, label_column]]).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d")
+    )
+    rank_exprs = []
+    for column in (*columns, label_column):
+        numeric = pl.col(column).cast(pl.Float64, strict=False)
+        clean = pl.when(numeric.is_finite().fill_null(False)).then(numeric).otherwise(None)
+        alias = "__label_rank" if column == label_column else column
+        rank_exprs.append(clean.rank("average").over("date").alias(alias))
+    ranked = work.with_columns(rank_exprs).select(["date", *columns, "__label_rank"])
+
+    daily_ic = (
+        ranked.group_by("date")
+        .agg(
+            [
+                expr
+                for candidate in candidates
+                for expr in (
+                    (
+                        pl.col(candidate).is_not_null()
+                        & pl.col("__label_rank").is_not_null()
+                    )
+                    .sum()
+                    .alias(f"__n__{candidate}"),
+                    pl.corr(candidate, "__label_rank").alias(candidate),
+                )
+            ]
+        )
+        .sort("date")
+        .to_pandas()
+    )
+    rank_ic_mean: dict[str, float] = {}
+    for candidate in candidates:
+        n_col = f"__n__{candidate}"
+        values = pd.to_numeric(
+            daily_ic.loc[daily_ic[n_col] >= 5, candidate],
+            errors="coerce",
+        ).dropna()
+        rank_ic_mean[candidate] = float(values.mean()) if not values.empty else float("nan")
+
+    if baseline_columns:
+        ranked_wide = ranked.select([*baseline_columns, *candidates]).to_pandas()
+        corr = ranked_wide.corr().reindex(index=candidates, columns=baseline_columns)
+        max_corr = corr.abs().max(axis=1).astype(float).to_dict()
+    else:
+        max_corr = {candidate: 0.0 for candidate in candidates}
+
+    rows: dict[str, dict[str, object]] = {}
+    residual_candidates: list[str] = []
+    for candidate in candidates:
+        coverage = float(coverage_row.get(candidate) or 0.0)
+        active_days = int(active_row.get(candidate) or 0)
+        rank_ic = rank_ic_mean.get(candidate, float("nan"))
+        corr_value = float(max_corr.get(candidate, 0.0))
+        quality_pass = bool(
+            coverage >= gate.minimum_coverage
+            and active_days >= gate.minimum_active_days
+        )
+        rank_signal_pass = bool(
+            pd.notna(rank_ic) and rank_ic >= gate.minimum_rank_ic_mean
+        )
+        corr_pass = bool(
+            pd.notna(corr_value)
+            and corr_value <= gate.maximum_abs_rank_correlation
+        )
+        if quality_pass and (not rank_signal_pass or not corr_pass):
+            residual_candidates.append(candidate)
+        rows[candidate] = {
+            "i_coverage": coverage,
+            "i_active_days": active_days,
+            "i_rank_ic_mean": rank_ic,
+            "i_residual_rank_ic": float("nan"),
+            "i_max_abs_rank_correlation": corr_value,
+            "i_residual_evaluated": False,
+        }
+
+    print(
+        json.dumps(
+            {
+                "status": "i_batch_prefilter_done",
+                "candidates": len(candidates),
+                "residual_candidates": len(residual_candidates),
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+
+    if not baseline_columns:
+        for candidate in candidates:
+            rows[candidate]["i_residual_rank_ic"] = rows[candidate]["i_rank_ic_mean"]
+    elif residual_candidates:
+        residual_candidates = tuple(residual_candidates)
+        residual_values: dict[str, list[float]] = {
+            candidate: [] for candidate in residual_candidates
+        }
+        residual_input = ranked.select(
+            ["date", *baseline_columns, *residual_candidates, "__label_rank"]
+        )
+        blocks = residual_input.partition_by("date", maintain_order=False)
+        baseline_width = len(baseline_columns)
+        progress_step = max(25, len(blocks) // 10)
+        for block_index, block in enumerate(blocks, start=1):
+            baseline_matrix = block.select(baseline_columns).to_numpy()
+            label_rank = block.select("__label_rank").to_numpy().reshape(-1)
+            candidate_matrix = block.select(residual_candidates).to_numpy()
+            base_valid = np.isfinite(label_rank) & np.isfinite(baseline_matrix).all(axis=1)
+            if int(base_valid.sum()) < baseline_width + 2:
+                continue
+            design_all = np.column_stack(
+                [np.ones(int(base_valid.sum())), baseline_matrix[base_valid]]
+            )
+            label_all = label_rank[base_valid]
+            candidates_all = candidate_matrix[base_valid, :]
+            for candidate_index, candidate in enumerate(residual_candidates):
+                y_all = candidates_all[:, candidate_index]
+                valid = np.isfinite(y_all)
+                if int(valid.sum()) < baseline_width + 2:
+                    continue
+                design = design_all[valid]
+                y = y_all[valid]
+                beta, *_ = np.linalg.lstsq(design, y, rcond=None)
+                residual = y - design @ beta
+                label_subset = label_all[valid]
+                if len(residual) < 5:
+                    continue
+                residual_rank = pd.Series(residual).rank(method="average").to_numpy(dtype=float)
+                label_subset_rank = pd.Series(label_subset).rank(method="average").to_numpy(dtype=float)
+                corr_value = np.corrcoef(residual_rank, label_subset_rank)[0, 1]
+                if np.isfinite(corr_value):
+                    residual_values[candidate].append(float(corr_value))
+            if block_index % progress_step == 0 or block_index == len(blocks):
+                print(
+                    json.dumps(
+                        {
+                            "status": "i_residual_batch_progress",
+                            "dates_done": block_index,
+                            "dates_total": len(blocks),
+                            "candidates": len(residual_candidates),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+        for candidate in residual_candidates:
+            values = residual_values[candidate]
+            rows[candidate]["i_residual_rank_ic"] = (
+                float(np.mean(values)) if values else float("nan")
+            )
+            rows[candidate]["i_residual_evaluated"] = True
+        print(
+            json.dumps(
+                {
+                    "status": "i_residual_batch_done",
+                    "candidates": len(residual_candidates),
+                    "dates": len(blocks),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+
+
+    for candidate in candidates:
+        row = rows[candidate]
+        coverage = float(row["i_coverage"])
+        active_days = int(row["i_active_days"])
+        rank_ic = float(row["i_rank_ic_mean"])
+        residual_rank_ic = float(row["i_residual_rank_ic"])
+        corr_value = float(row["i_max_abs_rank_correlation"])
+        quality_pass = bool(
+            coverage >= gate.minimum_coverage
+            and active_days >= gate.minimum_active_days
+        )
+        linear_signal_pass = bool(
+            (pd.notna(rank_ic) and rank_ic >= gate.minimum_rank_ic_mean)
+            or (
+                pd.notna(residual_rank_ic)
+                and residual_rank_ic >= gate.minimum_residual_rank_ic
+            )
+        )
+        residual_signal_pass = bool(
+            pd.notna(residual_rank_ic)
+            and residual_rank_ic >= gate.minimum_residual_rank_ic
+        )
+        redundancy_pass = bool(
+            (
+                pd.notna(corr_value)
+                and corr_value <= gate.maximum_abs_rank_correlation
+            )
+            or residual_signal_pass
+        )
+        trial_passed = bool(quality_pass and linear_signal_pass and redundancy_pass)
+        reasons = []
+        if not quality_pass:
+            reasons.append("I quality gate failed")
+        if not linear_signal_pass:
+            reasons.append("I linear/residual signal gate failed")
+        if not redundancy_pass:
+            reasons.append("I redundancy gate failed")
+        row.update(
+            {
+                "i_trial_passed": trial_passed,
+                "i_quality_passed": quality_pass,
+                "i_linear_signal_passed": linear_signal_pass,
+                "i_residual_signal_passed": residual_signal_pass,
+                "i_redundancy_passed": redundancy_pass,
+                "i_trial_reasons": "; ".join(reasons),
+            }
+        )
+    return rows
+
+
 def promote_frozen_incremental_pool(
     frozen_pool: Sequence[str],
     pending_passed: Sequence[str],
@@ -344,27 +645,33 @@ def run_incremental_admission(
     import polars as pl
 
     if self_columns:
-        active_frame = (
+        active_days_by_candidate = (
             pl.from_pandas(development[["date", *self_columns]])
             .with_columns(pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"))
             .group_by("date")
             .agg(
                 [
-                    (pl.col(self_column).cast(pl.Float64, strict=False).drop_nulls().n_unique() > 1).alias(self_column)
+                    (
+                        pl.when(
+                            pl.col(self_column)
+                            .cast(pl.Float64, strict=False)
+                            .is_finite()
+                            .fill_null(False)
+                        )
+                        .then(pl.col(self_column).cast(pl.Float64, strict=False))
+                        .otherwise(None)
+                        .drop_nulls()
+                        .n_unique()
+                        > 1
+                    ).alias(self_column)
                     for self_column in self_columns
                 ]
             )
-            .sort("date")
-            .to_pandas()
+            .select([pl.col(self_column).sum().alias(self_column) for self_column in self_columns])
+            .to_dicts()[0]
         )
-        active_dates_by_candidate = {
-            self_column: tuple(
-                pd.to_datetime(active_frame.loc[active_frame[self_column], "date"])
-            )
-            for self_column in self_columns
-        }
     else:
-        active_dates_by_candidate = {}
+        active_days_by_candidate = {}
 
     base_fingerprint_payload = {
         feature: fingerprints[feature] for feature in selected_public
@@ -378,7 +685,7 @@ def run_incremental_admission(
     )
     frozen_state_path = cache_dir / "frozen" / "frozen_state.json"
     frozen_state: dict[str, object] = {}
-    if frozen_state_path.exists():
+    if frozen_state_path.exists() and not refresh_cache:
         loaded_state = json.loads(
             frozen_state_path.read_text(encoding="utf-8")
         )
@@ -413,7 +720,7 @@ def run_incremental_admission(
         candidate for candidate in self_columns
         if candidate not in frozen_before
     )
-    del score_reference, refresh_cache
+    del score_reference
     refresh_features = {
         candidate
         if str(candidate).startswith("self__")
@@ -421,16 +728,44 @@ def run_incremental_admission(
         for candidate in refresh_candidates
     }
 
+    baseline_columns = (*selected_public, *frozen_before)
+    print(
+        json.dumps(
+            {
+                "status": "i_candidate_batch_start",
+                "pending": len(individual_pending),
+                "baseline_columns": len(baseline_columns),
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+    pending_entries = candidate_incremental_entry_diagnostics_batch(
+        development,
+        development_labels,
+        candidates=individual_pending,
+        baseline_columns=baseline_columns,
+    )
+    print(
+        json.dumps(
+            {
+                "status": "i_candidate_batch_done",
+                "pending": len(individual_pending),
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+
     screened_rows: list[dict[str, object]] = []
     for self_column in self_columns:
-        baseline_columns = (*selected_public, *frozen_before)
         base_row: dict[str, object] = {
             "candidate": self_column,
             "selection_role": "residual_entry_elastic_net_candidate",
             "selection_reason": (
                 "quality plus linear/residual signal and non-redundancy"
             ),
-            "active_days": len(active_dates_by_candidate[self_column]),
+            "active_days": int(active_days_by_candidate.get(self_column, 0)),
             "evaluation_years": ",".join(map(str, evaluation_years)),
             "evaluation_protocol": protocol,
         }
@@ -445,12 +780,7 @@ def run_incremental_admission(
                 }
             )
             continue
-        entry = candidate_incremental_entry_diagnostics(
-            development,
-            development_labels,
-            candidate=self_column,
-            baseline_columns=baseline_columns,
-        )
+        entry = pending_entries[self_column]
         if not bool(entry["i_trial_passed"]):
             screened_rows.append(
                 {
@@ -538,7 +868,7 @@ def run_incremental_admission(
         },
         "model_config": model_config,
     }
-    if pool_promoted or not frozen_state_path.exists():
+    if pool_promoted or refresh_cache or not frozen_state_path.exists():
         frozen_state_path.parent.mkdir(parents=True, exist_ok=True)
         frozen_state_path.write_text(
             json.dumps(

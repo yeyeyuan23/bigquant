@@ -2077,7 +2077,12 @@ def run_t_importance_stage(
     payload = {
         "stage": "t",
         "mode": "lightgbm_importance_top_self_features",
-        "source_pool": "all_self_candidates",
+        "source_pool": (
+            "all_self_candidates"
+            if os.getenv("BIGALPHA_T_SOURCE_POOL", "i").strip().lower()
+            in {"all", "all_self", "all_self_candidates"}
+            else "frozen_I_candidates"
+        ),
         "candidate_count": len(self_feature_columns),
         "top_n": top_n,
         "selected_self_count": len(selected_self),
@@ -2513,14 +2518,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.tree_cache_dir is not None
         else args.data_dir / "cache" / "tree_v6_orthogonal_entry"
     )
+    t_source_pool = os.getenv("BIGALPHA_T_SOURCE_POOL", "i").strip().lower()
     if args.admission_routes == "t":
-        candidate_manifest = json.loads(
-            (args.data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
-        )
-        candidate_filter = tuple(
-            f"self__{candidate_id}"
-            for candidate_id in sorted(candidate_manifest.get("candidate_rows", {}))
-        )
+        if t_source_pool in {"all", "all_self", "all_self_candidates"}:
+            candidate_manifest = json.loads(
+                (args.data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
+            )
+            candidate_filter = tuple(
+                f"self__{candidate_id}"
+                for candidate_id in sorted(candidate_manifest.get("candidate_rows", {}))
+            )
+        else:
+            candidate_filter = frozen_i_candidates_from_state(incremental_cache_dir)
     elif args.admission_routes == "t-orthogonal":
         candidate_filter = frozen_i_candidates_from_state(incremental_cache_dir)
     else:
