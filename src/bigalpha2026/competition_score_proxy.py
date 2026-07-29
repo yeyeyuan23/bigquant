@@ -909,6 +909,30 @@ class CompetitionScoreReference:
                     flush=True,
                 )
             return self._processed_reference_cache[cache_key].copy()
+        requested_dates = set(cache_key)
+        for cached_key, cached_frame in self._processed_reference_cache.items():
+            if not requested_dates.issubset(set(cached_key)):
+                continue
+            result = cached_frame.loc[
+                cached_frame["date"].isin(requested_dates)
+            ].copy()
+            self._processed_reference_cache[cache_key] = result.copy()
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_processed_reference_stage",
+                            "stage": "superset_cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                            "source_date_count": len(cached_key),
+                            "rows": int(len(result)),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+            return result
         reference = self.reference_panel.loc[
             self.reference_panel["date"].isin(dates),
             [*KEY_COLUMNS, *self.reference_columns],
