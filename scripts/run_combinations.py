@@ -29,6 +29,7 @@ from bigalpha2026.evaluation import (
     rank_ic_series,
 )
 from bigalpha2026.factor_pool import (
+    CANDIDATE_POOL_COLUMNS,
     CANDIDATE_POOL_VERSION,
     KEY_COLUMNS,
     apply_feature_directions,
@@ -309,7 +310,10 @@ def write_parquet_polars(frame: pd.DataFrame, path: Path) -> None:
 
     import polars as pl
 
-    pl.from_pandas(frame).write_parquet(path)
+    if isinstance(frame, pl.DataFrame):
+        frame.write_parquet(path)
+    else:
+        pl.from_pandas(frame).write_parquet(path)
 
 
 def required_paths(
@@ -485,6 +489,14 @@ def write_panel_column_cache(
     panel: pd.DataFrame,
     column_paths: dict[str, Path],
 ) -> None:
+    import polars as pl
+
+    if isinstance(panel, pl.DataFrame):
+        ordered_pl = panel.sort(list(KEY_COLUMNS))
+        for feature, path in column_paths.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            ordered_pl.select([*KEY_COLUMNS, feature]).write_parquet(path)
+        return
     ordered = panel.sort_values(list(KEY_COLUMNS)).reset_index(drop=True)
     for feature, path in column_paths.items():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -540,10 +552,11 @@ def load_all36_reference_cached(
 def build_feature_panel_polars(
     universe: pd.DataFrame,
     factorlib: pd.DataFrame,
-    candidate_pool: pd.DataFrame,
+    candidate_pool,
     *,
     admitted_candidates: Sequence[str],
     public_feature_columns: Sequence[str],
+    panel_as_polars: bool = False,
 ) -> tuple[pd.DataFrame, tuple[str, ...], tuple[str, ...], pd.DataFrame]:
     """Build the wide rank-normalized panel with polars for faster pivot/rank."""
 
@@ -551,14 +564,35 @@ def build_feature_panel_polars(
 
     public_features = tuple(public_feature_columns)
     validate_factorlib_subset_frame(factorlib, public_features)
-    from bigalpha2026.factor_pool import validate_candidate_pool
 
-    validate_candidate_pool(candidate_pool)
     admitted = set(admitted_candidates)
-    candidates_pd = candidate_pool.loc[candidate_pool["candidate_id"].isin(admitted)].copy()
-    if candidates_pd.empty:
+    if isinstance(candidate_pool, pl.DataFrame):
+        candidates_pl = candidate_pool.select(
+            ["date", "instrument", "candidate_id", "factor"]
+        )
+    else:
+        candidates_pl = pl.from_pandas(
+            candidate_pool.loc[:, ["date", "instrument", "candidate_id", "factor"]]
+        )
+    candidates_pl = (
+        candidates_pl.with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col("candidate_id").cast(pl.Utf8),
+            pl.col("factor").cast(pl.Float64, strict=False),
+        )
+        .filter(pl.col("candidate_id").is_in(list(admitted)))
+        .select(["date", "instrument", "candidate_id", "factor"])
+    )
+    if candidates_pl.is_empty():
         raise ValueError("candidate pool contains no admitted candidate rows")
-    if candidates_pd.duplicated(["date", "instrument", "candidate_id"]).any():
+    duplicate_rows = (
+        candidates_pl.group_by(["date", "instrument", "candidate_id"])
+        .len()
+        .filter(pl.col("len") > 1)
+        .height
+    )
+    if duplicate_rows:
         raise ValueError("candidate pool has overlapping active candidate versions")
 
     universe_pd = universe.loc[:, list(KEY_COLUMNS)].copy()
@@ -567,8 +601,6 @@ def build_feature_panel_polars(
     library_pd = factorlib.copy()
     library_pd["date"] = pd.to_datetime(library_pd["date"], errors="coerce").dt.normalize()
     library_pd["instrument"] = library_pd["instrument"].astype(str)
-    candidates_pd["date"] = pd.to_datetime(candidates_pd["date"], errors="coerce").dt.normalize()
-    candidates_pd["instrument"] = candidates_pd["instrument"].astype(str)
 
     public_rename = {column: f"factorlib__{column}" for column in public_features}
     public_columns = tuple(public_rename.values())
@@ -576,9 +608,6 @@ def build_feature_panel_polars(
     library_pl = pl.from_pandas(library_pd.loc[:, [*KEY_COLUMNS, *public_features]]).with_columns(
         pl.col("date").cast(pl.Datetime("ns"))
     ).rename(public_rename)
-    candidates_pl = pl.from_pandas(
-        candidates_pd.loc[:, ["date", "instrument", "candidate_id", "factor"]]
-    ).with_columns(pl.col("date").cast(pl.Datetime("ns")))
     candidate_wide = candidates_pl.pivot(
         values="factor",
         index=list(KEY_COLUMNS),
@@ -598,16 +627,27 @@ def build_feature_panel_polars(
         how="left",
     )
     feature_columns = (*public_columns, *self_columns)
-    coverage_rows = []
+    coverage_pl = panel_pl.select(
+        [
+            (
+                pl.col(feature)
+                .cast(pl.Float64, strict=False)
+                .is_finite()
+                .fill_null(False)
+                .sum()
+                / pl.len()
+            ).alias(feature)
+            for feature in feature_columns
+        ]
+    )
+    coverage_row = coverage_pl.to_dicts()[0] if feature_columns else {}
+    coverage_rows = [
+        {"feature": feature, "coverage": float(coverage_row.get(feature, 0.0))}
+        for feature in feature_columns
+    ]
     rank_exprs = []
     for feature in feature_columns:
         valid = pl.col(feature).cast(pl.Float64).is_finite()
-        coverage_rows.append(
-            {
-                "feature": feature,
-                "coverage": float(panel_pl.select(valid.sum() / pl.len()).item()),
-            }
-        )
         numeric = pl.when(valid).then(pl.col(feature).cast(pl.Float64)).otherwise(None)
         rank_exprs.append(
             (((numeric.rank("average").over("date") / numeric.count().over("date")) - 0.5) * 2.0)
@@ -615,7 +655,8 @@ def build_feature_panel_polars(
             .alias(feature)
         )
     panel_pl = panel_pl.with_columns(rank_exprs).sort(list(KEY_COLUMNS))
-    return panel_pl.to_pandas(), public_columns, self_columns, pd.DataFrame(coverage_rows)
+    panel_out = panel_pl if panel_as_polars else panel_pl.to_pandas()
+    return panel_out, public_columns, self_columns, pd.DataFrame(coverage_rows)
 
 
 def load_dynamic_inputs(
@@ -757,9 +798,10 @@ def load_dynamic_inputs(
                 candidate_scan = candidate_scan.filter(
                     (pl.col("date") >= start_date) & (pl.col("date") <= end_date)
                 )
-            candidate_pool = candidate_scan.collect().to_pandas()
+            candidate_pool = candidate_scan.collect()
             filtered_candidate_snapshot = bool(parquet_filters)
             if not filtered_candidate_snapshot:
+                candidate_pool = candidate_pool.to_pandas()
                 validate_candidate_pool_manifest(
                     candidate_pool,
                     parquet_path=candidate_path,
@@ -767,16 +809,57 @@ def load_dynamic_inputs(
                     data_root=data_dir,
                 )
             else:
-                from bigalpha2026.factor_pool import validate_candidate_pool
-
-                validate_candidate_pool(candidate_pool)
+                missing_columns = sorted(
+                    set(CANDIDATE_POOL_COLUMNS).difference(candidate_pool.columns)
+                )
+                extra_columns = sorted(
+                    set(candidate_pool.columns).difference(CANDIDATE_POOL_COLUMNS)
+                )
+                if missing_columns or extra_columns:
+                    raise ValueError(
+                        "filtered candidate pool columns do not match contract; "
+                        f"missing={missing_columns}, extra={extra_columns}"
+                    )
+                null_keys = candidate_pool.select(
+                    pl.any_horizontal(
+                        [
+                            pl.col(column).is_null()
+                            for column in (
+                                "date",
+                                "instrument",
+                                "candidate_id",
+                                "factor_version",
+                            )
+                        ]
+                    )
+                    .sum()
+                    .alias("null_keys")
+                ).item()
+                if int(null_keys) != 0:
+                    raise ValueError("filtered candidate pool contains null keys")
+                duplicate_keys = (
+                    candidate_pool.group_by(
+                        ["date", "instrument", "candidate_id", "factor_version"]
+                    )
+                    .len()
+                    .filter(pl.col("len") > 1)
+                    .height
+                )
+                if duplicate_keys:
+                    raise ValueError("filtered candidate pool contains duplicate keys")
+                multi_versions = (
+                    candidate_pool.group_by("candidate_id")
+                    .agg(pl.col("factor_version").n_unique().alias("versions"))
+                    .filter(pl.col("versions") != 1)
+                    .height
+                )
+                if multi_versions:
+                    raise ValueError("filtered candidate pool has multiple active versions")
                 if selected_years == YEARS:
-                    import polars as pl
-
                     expected_rows = candidate_manifest.get("candidate_rows", {})
                     expected_dates = candidate_manifest.get("candidate_dates", {})
                     candidate_stats = (
-                        pl.from_pandas(candidate_pool[["candidate_id", "date"]])
+                        candidate_pool.select(["candidate_id", "date"])
                         .with_columns(
                             pl.col("candidate_id").cast(pl.Utf8),
                             pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d").alias("_date"),
@@ -806,17 +889,27 @@ def load_dynamic_inputs(
                 pd.to_datetime(universe["date"], errors="coerce").dropna().unique()
             )
             if candidate_filter is None or "OB-001" in set(requested_candidate_ids):
-                ob_dates = pd.DatetimeIndex(
-                    pd.to_datetime(
-                        candidate_pool.loc[
-                            candidate_pool["candidate_id"].eq("OB-001"),
-                            "date",
-                        ],
-                        errors="coerce",
+                if hasattr(candidate_pool, "select"):
+                    ob_date_values = (
+                        candidate_pool.filter(pl.col("candidate_id") == "OB-001")
+                        .select(pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"))
+                        .unique()
+                        .to_series()
+                        .to_list()
                     )
-                    .dropna()
-                    .unique()
-                )
+                else:
+                    ob_date_values = (
+                        pd.to_datetime(
+                            candidate_pool.loc[
+                                candidate_pool["candidate_id"].eq("OB-001"),
+                                "date",
+                            ],
+                            errors="coerce",
+                        )
+                        .dropna()
+                        .unique()
+                    )
+                ob_dates = pd.DatetimeIndex(pd.to_datetime(ob_date_values, errors="coerce"))
                 if not ob_dates.sort_values().equals(universe_dates.sort_values()):
                     raise ValueError("OB-001 does not cover the full historical universe calendar")
     decisions = load_decisions(
@@ -825,7 +918,18 @@ def load_dynamic_inputs(
             "first_round/first_round_decisions.json",
         )
     )
-    candidate_ids = tuple(sorted(candidate_pool["candidate_id"].astype(str).unique()))
+    if hasattr(candidate_pool, "select"):
+        candidate_ids = tuple(
+            sorted(
+                str(value)
+                for value in candidate_pool.select("candidate_id")
+                .unique()
+                .to_series()
+                .to_list()
+            )
+        )
+    else:
+        candidate_ids = tuple(sorted(candidate_pool["candidate_id"].astype(str).unique()))
     if candidate_filter is not None and not panel_cache_hit:
         missing_filtered = sorted(set(requested_candidate_ids).difference(candidate_ids))
         if missing_filtered:
@@ -858,6 +962,7 @@ def load_dynamic_inputs(
             candidate_pool,
             admitted_candidates=candidate_ids,
             public_feature_columns=SCREENED_FACTORLIB_RAW_FEATURES,
+            panel_as_polars=panel_as_polars,
         )
         if panel_cache_enabled:
             panel_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -875,7 +980,7 @@ def load_dynamic_inputs(
         labels,
         exposures,
         coverage,
-        candidate_pool,
+        pd.DataFrame({"candidate_id": candidate_ids}),
         all36_reference,
         single_factor_admitted,
     )
