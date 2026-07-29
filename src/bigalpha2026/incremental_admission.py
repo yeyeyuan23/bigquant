@@ -33,18 +33,9 @@ def _average_rank_numpy(values: np.ndarray) -> np.ndarray:
         raise ValueError("average rank expects a 1-D array")
     if len(values) == 0:
         return np.asarray([], dtype=float)
-    order = np.argsort(values, kind="mergesort")
-    sorted_values = values[order]
-    ranks = np.empty(len(values), dtype=float)
-    start = 0
-    while start < len(values):
-        end = start + 1
-        while end < len(values) and sorted_values[end] == sorted_values[start]:
-            end += 1
-        average_rank = (start + 1 + end) / 2.0
-        ranks[order[start:end]] = average_rank
-        start = end
-    return ranks
+    from scipy.stats import rankdata
+
+    return rankdata(values, method="average").astype(float, copy=False)
 
 
 def _safe_corr_numpy(left: np.ndarray, right: np.ndarray) -> float:
