@@ -261,7 +261,7 @@ class TreeAdmissionResult:
         return {
             "pending_candidates": ",".join(self.pending_candidates),
             "selection": "orthogonal_entry_only",
-            "entry_passed_candidates": ",".join(entry_passed),
+            "tree_entry_passed_candidates": ",".join(entry_passed),
             "individual_passed_candidates": ",".join(individual_passed),
             "entry_passed_candidates": ",".join(self.pending_passed),
             "provisional_pool_count": len(self.provisional_pool),

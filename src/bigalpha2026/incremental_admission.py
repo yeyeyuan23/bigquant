@@ -25,7 +25,6 @@ from .tree_cache import (
 )
 
 
-
 def _daily_residual_signal(
     frame: pd.DataFrame,
     *,
