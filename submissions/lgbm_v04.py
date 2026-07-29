@@ -209,7 +209,7 @@ def _query_micro_daily(dai, pd, source, history_start, end_ts):
 
 def _load_common_inputs(datasources, start_date, end_date, pd, np):
     start_ts = pd.Timestamp(start_date).normalize(); end_ts = pd.Timestamp(end_date).normalize()
-    history_start = start_ts - pd.Timedelta(days=1500); financial_start = start_ts - pd.Timedelta(days=2200)
+    history_start = start_ts - pd.Timedelta(days=500); financial_start = start_ts - pd.Timedelta(days=2200)
     financial_source = datasources.get('financial', 'bigalpha_2026_financial'); bar1m_source = datasources.get('bar1m', 'bigalpha_2026_stock_bar1m')
     import dai
     public_columns = ('amount', 'atr_14', 'bias_20', 'cci_14', 'float_market_cap', 'kdj_d_9_3_3', 'macd_diff_12_26_9', 'macd_hist_12_26_9', 'momentum_5', 'net_profit_rate_ttm', 'netflow_amount_rate_main', 'total_market_cap', 'turn', 'volatility_5', 'volume')
