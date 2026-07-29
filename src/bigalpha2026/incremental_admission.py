@@ -25,6 +25,74 @@ from .tree_cache import (
 )
 
 
+def _average_rank_numpy(values: np.ndarray) -> np.ndarray:
+    """Average ranks for a finite 1-D array without pandas."""
+
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 1:
+        raise ValueError("average rank expects a 1-D array")
+    if len(values) == 0:
+        return np.asarray([], dtype=float)
+    order = np.argsort(values, kind="mergesort")
+    sorted_values = values[order]
+    ranks = np.empty(len(values), dtype=float)
+    start = 0
+    while start < len(values):
+        end = start + 1
+        while end < len(values) and sorted_values[end] == sorted_values[start]:
+            end += 1
+        average_rank = (start + 1 + end) / 2.0
+        ranks[order[start:end]] = average_rank
+        start = end
+    return ranks
+
+
+def _safe_corr_numpy(left: np.ndarray, right: np.ndarray) -> float:
+    """Pearson correlation for finite pairs without pandas."""
+
+    left = np.asarray(left, dtype=float)
+    right = np.asarray(right, dtype=float)
+    mask = np.isfinite(left) & np.isfinite(right)
+    if int(mask.sum()) < 2:
+        return float("nan")
+    x = left[mask]
+    y = right[mask]
+    x = x - x.mean()
+    y = y - y.mean()
+    denom = float(np.sqrt(np.dot(x, x) * np.dot(y, y)))
+    if not np.isfinite(denom) or denom <= 1e-12:
+        return float("nan")
+    return float(np.dot(x, y) / denom)
+
+
+def _max_abs_corr_against_baseline_numpy(
+    ranked,
+    *,
+    candidates: Sequence[str],
+    baseline_columns: Sequence[str],
+) -> dict[str, float]:
+    """Max absolute candidate-vs-baseline correlation from a Polars rank frame."""
+
+    candidates = tuple(candidates)
+    baseline_columns = tuple(baseline_columns)
+    if not candidates:
+        return {}
+    if not baseline_columns:
+        return {candidate: 0.0 for candidate in candidates}
+    candidate_matrix = ranked.select(candidates).to_numpy()
+    baseline_matrix = ranked.select(baseline_columns).to_numpy()
+    result: dict[str, float] = {}
+    for candidate_index, candidate in enumerate(candidates):
+        candidate_values = candidate_matrix[:, candidate_index]
+        max_abs = 0.0
+        for baseline_index in range(len(baseline_columns)):
+            corr = _safe_corr_numpy(candidate_values, baseline_matrix[:, baseline_index])
+            if np.isfinite(corr):
+                max_abs = max(max_abs, abs(float(corr)))
+        result[candidate] = max_abs
+    return result
+
+
 def _daily_residual_signal(
     frame: pd.DataFrame,
     *,
@@ -298,12 +366,11 @@ def candidate_incremental_entry_diagnostics_batch(
         ).dropna()
         rank_ic_mean[candidate] = float(values.mean()) if not values.empty else float("nan")
 
-    if baseline_columns:
-        ranked_wide = ranked.select([*baseline_columns, *candidates]).to_pandas()
-        corr = ranked_wide.corr().reindex(index=candidates, columns=baseline_columns)
-        max_corr = corr.abs().max(axis=1).astype(float).to_dict()
-    else:
-        max_corr = {candidate: 0.0 for candidate in candidates}
+    max_corr = _max_abs_corr_against_baseline_numpy(
+        ranked,
+        candidates=candidates,
+        baseline_columns=baseline_columns,
+    )
 
     rows: dict[str, dict[str, object]] = {}
     residual_candidates: list[str] = []
@@ -384,9 +451,9 @@ def candidate_incremental_entry_diagnostics_batch(
                 label_subset = label_all[valid]
                 if len(residual) < 5:
                     continue
-                residual_rank = pd.Series(residual).rank(method="average").to_numpy(dtype=float)
-                label_subset_rank = pd.Series(label_subset).rank(method="average").to_numpy(dtype=float)
-                corr_value = np.corrcoef(residual_rank, label_subset_rank)[0, 1]
+                residual_rank = _average_rank_numpy(residual)
+                label_subset_rank = _average_rank_numpy(label_subset)
+                corr_value = _safe_corr_numpy(residual_rank, label_subset_rank)
                 if np.isfinite(corr_value):
                     residual_values[candidate].append(float(corr_value))
             if block_index % progress_step == 0 or block_index == len(blocks):

@@ -31,6 +31,24 @@ PUBLIC_PREFIX = "factorlib__"
 SELF_PREFIX = "self__"
 
 
+def _safe_corr_numpy(left: np.ndarray, right: np.ndarray) -> float:
+    """Pearson correlation on finite pairs without pandas."""
+
+    left = np.asarray(left, dtype=float)
+    right = np.asarray(right, dtype=float)
+    mask = np.isfinite(left) & np.isfinite(right)
+    if int(mask.sum()) < 2:
+        return float("nan")
+    x = left[mask]
+    y = right[mask]
+    x = x - x.mean()
+    y = y - y.mean()
+    denom = float(np.sqrt(np.dot(x, x) * np.dot(y, y)))
+    if not np.isfinite(denom) or denom <= 1e-12:
+        return float("nan")
+    return float(np.dot(x, y) / denom)
+
+
 def candidate_pool_group_stats(frame: pd.DataFrame) -> tuple[dict[str, int], dict[str, int]]:
     """Return candidate row and active-date counts using polars."""
 
@@ -447,16 +465,47 @@ def screen_public_factors(
         ["oriented_rank_ic_mean", "feature"],
         ascending=[False, True],
     )
+    import polars as pl
+
+    ranked_for_corr = (
+        pl.from_pandas(merged.loc[:, list(columns)])
+        .with_columns(
+            [
+                pl.when(
+                    pl.col(column)
+                    .cast(pl.Float64, strict=False)
+                    .is_finite()
+                    .fill_null(False)
+                )
+                .then(pl.col(column).cast(pl.Float64, strict=False))
+                .otherwise(None)
+                .rank("average")
+                .alias(column)
+                for column in columns
+            ]
+        )
+        .select(list(columns))
+    )
+    corr_values = ranked_for_corr.to_numpy()
+    corr_column_index = {column: index for index, column in enumerate(columns)}
+
     selected: list[str] = []
     for feature in eligible["feature"]:
+        feature = str(feature)
         if not selected:
-            selected.append(str(feature))
+            selected.append(feature)
             continue
-        correlations = merged[[feature, *selected]].corr(
-            method="spearman"
-        ).loc[feature, selected]
-        if correlations.abs().max() <= maximum_abs_rank_correlation:
-            selected.append(str(feature))
+        feature_values = corr_values[:, corr_column_index[feature]]
+        max_abs_corr = 0.0
+        for selected_feature in selected:
+            corr = _safe_corr_numpy(
+                feature_values,
+                corr_values[:, corr_column_index[selected_feature]],
+            )
+            if np.isfinite(corr):
+                max_abs_corr = max(max_abs_corr, abs(float(corr)))
+        if max_abs_corr <= maximum_abs_rank_correlation:
+            selected.append(feature)
     screening["selected"] = screening["feature"].isin(selected)
     return screening.sort_values("feature").reset_index(drop=True)
 
