@@ -223,11 +223,13 @@ class TreeAdmissionResult:
             label_column="ret_close_to_close",
             train_window_days=60,
             test_window_days=20,
+            residual_baseline_columns=self.selected_public,
             compute=lambda: walk_forward_lightgbm(
                 self.oriented,
                 self.labels,
                 feature_columns=feature_columns,
                 prediction_years=prediction_years,
+                residual_baseline_columns=self.selected_public,
             ),
         )
         self.cache_keys.add(cache_key)
@@ -274,6 +276,7 @@ class TreeAdmissionResult:
             "baseline": "lightgbm_screened15",
             "candidate_filter": "basic_quality_and_orthogonality",
             "admission_metric": "orthogonal_entry_only",
+            "target_transform": "daily_rank_residual_to_screened15",
             "selection": "orthogonal_entry_only",
             "evaluation_years": list(self.development_years),
             "train_days": 60,
@@ -462,6 +465,7 @@ def run_tree_admission(
             label_column="ret_close_to_close",
             train_window_days=60,
             test_window_days=20,
+            residual_baseline_columns=selected_public,
             force_refresh=bool(
                 set(feature_columns).intersection(refresh_features)
             ),
@@ -470,6 +474,7 @@ def run_tree_admission(
                 labels,
                 feature_columns=feature_columns,
                 prediction_years=prediction_years,
+                residual_baseline_columns=selected_public,
             ),
         )
         cache_keys.add(cache_key)
@@ -487,6 +492,7 @@ def run_tree_admission(
                 label_column="ret_close_to_close",
                 train_window_days=60,
                 test_window_days=20,
+                residual_baseline_columns=selected_public,
                 force_refresh=bool(
                     set(feature_columns).intersection(refresh_features)
                 ),
@@ -495,6 +501,7 @@ def run_tree_admission(
                     labels,
                     feature_columns=feature_columns,
                     prediction_years=prediction_years,
+                    residual_baseline_columns=selected_public,
                 ),
             )
         )

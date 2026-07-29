@@ -1,6 +1,8 @@
 import unittest
 from multiprocessing import get_context
+from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 
 from bigalpha2026.combinations import (
@@ -14,6 +16,22 @@ from bigalpha2026.combinations import (
     walk_forward_lightgbm_with_importance,
 )
 from bigalpha2026.research_policy import fixed_weight_rank_combination
+
+
+class _ZeroLightGBM:
+    def __init__(self, fitted_targets: list[np.ndarray]):
+        self.fitted_targets = fitted_targets
+        self.booster_ = self
+
+    def fit(self, _x, y):
+        self.fitted_targets.append(np.asarray(y, dtype=float))
+        return self
+
+    def predict(self, x):
+        return np.zeros(len(x), dtype=float)
+
+    def feature_importance(self, importance_type="split"):
+        return np.zeros(2, dtype=float)
 
 
 def _run_lightgbm_smoke() -> None:
@@ -292,12 +310,58 @@ class CombinationTest(unittest.TestCase):
         )
         self.assertEqual(
             config["target_transform"],
-            "daily_centered_percentile_rank",
+            "daily_centered_percentile_rank_residual_to_baseline",
         )
         self.assertEqual(
             config["monotone_constraints"],
             "all_features_positive",
         )
+
+    def test_lightgbm_residual_baseline_changes_training_target_and_output(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 10 + ["2020-01-02"] * 10
+        )
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(10)] * 2,
+                "public": list(range(10)) * 2,
+                "candidate": [0.0] * 20,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["public"]
+        fitted_targets: list[np.ndarray] = []
+
+        with patch(
+            "bigalpha2026.combinations._lightgbm_regressor",
+            return_value=_ZeroLightGBM(fitted_targets),
+        ):
+            result = walk_forward_lightgbm(
+                panel,
+                labels,
+                feature_columns=("public", "candidate"),
+                prediction_years=(2020,),
+                train_window_days=1,
+                test_window_days=1,
+                residual_baseline_columns=("public",),
+            )
+
+        self.assertEqual(len(fitted_targets), 1)
+        self.assertTrue(np.allclose(fitted_targets[0], 0.0))
+        expected = panel.loc[
+            panel["date"].dt.year.eq(2020),
+            ["date", "instrument", "public"],
+        ].rename(columns={"public": "factor"})
+        expected["date"] = expected["date"].astype("datetime64[ns]")
+        expected["factor"] = (
+            expected.groupby("date", sort=False)["factor"]
+            .rank(pct=True, method="average")
+            .sub(0.5)
+            .mul(2.0)
+        )
+        expected = expected.sort_values(["date", "instrument"]).reset_index(drop=True)
+        pd.testing.assert_frame_equal(result, expected)
 
     def test_paired_tree_increment_uses_daily_oos_rank_ic(self):
         dates = pd.bdate_range("2021-01-04", periods=40)

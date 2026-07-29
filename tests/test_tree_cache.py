@@ -195,6 +195,30 @@ class TreePredictionCacheTest(unittest.TestCase):
             )
             self.assertEqual(old_baseline, new_baseline)
 
+    def test_residual_baseline_columns_are_part_of_prediction_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = self.cache(
+                Path(directory),
+                ("base", "candidate_a"),
+            )
+            plain = cache.payload(
+                ("base", "candidate_a"),
+                prediction_years=(2021,),
+                label_column="ret_close_to_close",
+                train_window_days=60,
+                test_window_days=20,
+            )
+            residual = cache.payload(
+                ("base", "candidate_a"),
+                prediction_years=(2021,),
+                label_column="ret_close_to_close",
+                train_window_days=60,
+                test_window_days=20,
+                residual_baseline_columns=("base",),
+            )
+            self.assertNotEqual(plain, residual)
+            self.assertEqual(residual["residual_baseline_columns"], ["base"])
+
     def test_force_refresh_bypasses_an_exact_cache_hit(self):
         with tempfile.TemporaryDirectory() as directory:
             cache = self.cache(Path(directory), ("base",))

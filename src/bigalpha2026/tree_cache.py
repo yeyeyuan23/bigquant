@@ -137,12 +137,22 @@ class TreePredictionCache:
         label_column: str,
         train_window_days: int,
         test_window_days: int,
+        residual_baseline_columns: Sequence[str] = (),
     ) -> dict[str, object]:
+        residual_baseline_columns = tuple(dict.fromkeys(residual_baseline_columns))
         missing = sorted(
-            set(feature_columns).difference(self.feature_fingerprints)
+            {*feature_columns, *residual_baseline_columns}.difference(
+                self.feature_fingerprints
+            )
         )
         if missing:
             raise ValueError(f"tree cache lacks feature fingerprints: {missing}")
+        invalid_baseline = sorted(set(residual_baseline_columns).difference(feature_columns))
+        if invalid_baseline:
+            raise ValueError(
+                "tree cache residual baseline columns must be a subset of "
+                f"feature_columns: {invalid_baseline}"
+            )
         return {
             "schema_version": TREE_CACHE_SCHEMA_VERSION,
             "feature_columns": list(feature_columns),
@@ -152,6 +162,7 @@ class TreePredictionCache:
             },
             "label_column": label_column,
             "label_fingerprint": self.label_fingerprint,
+            "residual_baseline_columns": list(residual_baseline_columns),
             "prediction_years": [int(year) for year in prediction_years],
             "train_window_days": int(train_window_days),
             "test_window_days": int(test_window_days),
@@ -187,6 +198,7 @@ class TreePredictionCache:
         label_column: str,
         train_window_days: int,
         test_window_days: int,
+        residual_baseline_columns: Sequence[str] = (),
         force_refresh: bool = False,
         compute: Callable[[], pd.DataFrame],
     ) -> tuple[pd.DataFrame, bool, str]:
@@ -198,6 +210,7 @@ class TreePredictionCache:
             label_column=label_column,
             train_window_days=train_window_days,
             test_window_days=test_window_days,
+            residual_baseline_columns=residual_baseline_columns,
         )
         key = content_digest(payload)
         parquet_path = self.cache_dir / f"{key}.parquet"
@@ -238,6 +251,7 @@ class TreePredictionCache:
         label_column: str,
         train_window_days: int,
         test_window_days: int,
+        residual_baseline_columns: Sequence[str] = (),
         force_refresh: bool = False,
         compute: Callable[[], tuple[pd.DataFrame, pd.DataFrame]],
     ) -> tuple[pd.DataFrame, pd.DataFrame, bool, str]:
@@ -249,6 +263,7 @@ class TreePredictionCache:
             label_column=label_column,
             train_window_days=train_window_days,
             test_window_days=test_window_days,
+            residual_baseline_columns=residual_baseline_columns,
         )
         key = content_digest(payload)
         parquet_path = self.cache_dir / f"{key}.parquet"
