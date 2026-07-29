@@ -865,10 +865,14 @@ class CompetitionScoreReference:
             )
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         exposures = self._slice_exposures(dates)
-        route_metrics = _a_components(
+        processed_route = preprocess_factor(
             route,
-            labels,
             exposures,
+        )
+        route_metrics = _a_components_from_processed(
+            processed_route,
+            labels,
+            factor_column="factor",
             label_column=self.config.primary_label,
         )
         profile_stage("route_a_components")
@@ -890,10 +894,7 @@ class CompetitionScoreReference:
 
         processed_reference = self._processed_reference(dates)
         profile_stage("processed_reference", rows=int(len(processed_reference)))
-        processed_route = preprocess_factor(
-            route,
-            exposures,
-        ).rename(columns={"factor": ROUTE_COLUMN})
+        processed_route = processed_route.rename(columns={"factor": ROUTE_COLUMN})
         profile_stage("processed_route", rows=int(len(processed_route)))
         processed = _key_join(processed_reference, processed_route, how="left")
         profile_stage("joined_processed", rows=int(len(processed)))
@@ -1047,26 +1048,24 @@ class CompetitionScoreReference:
             self.reference_panel[[*KEY_COLUMNS, *self.reference_columns]],
             how="inner",
         )
+        processed = _preprocess_wide_factors(
+            common_reference,
+            self.reference_columns,
+            exposures,
+        )
         reference_a = pd.DataFrame(
             [
                 {
                     "factor": column,
-                    **_a_components(
-                        common_reference[
-                            [*KEY_COLUMNS, column]
-                        ].rename(columns={column: "factor"}),
+                    **_a_components_from_processed(
+                        processed[[*KEY_COLUMNS, column]],
                         labels,
-                        exposures,
+                        factor_column=column,
                         label_column=self.config.primary_label,
                     ),
                 }
                 for column in self.reference_columns
             ]
-        )
-        processed = _preprocess_wide_factors(
-            common_reference,
-            self.reference_columns,
-            exposures,
         )
         route_columns: dict[str, str] = {}
         route_metrics: dict[str, dict[str, float]] = {}
@@ -1080,16 +1079,16 @@ class CompetitionScoreReference:
                 )
             model_column = f"{ROUTE_COLUMN}_{index}"
             route_columns[name] = model_column
-            route_metrics[name] = _a_components(
-                aligned,
-                labels,
-                exposures,
-                label_column=self.config.primary_label,
-            )
             processed_route = preprocess_factor(
                 aligned,
                 exposures,
             ).rename(columns={"factor": model_column})
+            route_metrics[name] = _a_components_from_processed(
+                processed_route[[*KEY_COLUMNS, model_column]],
+                labels,
+                factor_column=model_column,
+                label_column=self.config.primary_label,
+            )
             processed = _key_join(processed, processed_route, how="left")
 
         model_columns = (*self.reference_columns, *route_columns.values())
