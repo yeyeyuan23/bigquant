@@ -10,7 +10,9 @@ are the global submission history.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -93,9 +95,6 @@ def _normalize_keys(frame: pd.DataFrame, *, name: str) -> pd.DataFrame:
     return result_pl.to_pandas()
 
 
-FULL_SCORE_DIGEST = os.getenv("BIGALPHA_SCORE_FULL_DIGEST", "0") == "1"
-
-
 def _frame_digest(frame: pd.DataFrame, columns: Sequence[str]) -> str:
     import polars as pl
 
@@ -107,21 +106,6 @@ def _frame_digest(frame: pd.DataFrame, columns: Sequence[str]) -> str:
             pl.col("instrument").cast(pl.Utf8),
         )
     )
-    if not FULL_SCORE_DIGEST:
-        meta = work.select(
-            pl.len().alias("rows"),
-            pl.col("date").min().alias("min_date"),
-            pl.col("date").max().alias("max_date"),
-            pl.col("instrument").n_unique().alias("instrument_count"),
-        ).row(0, named=True)
-        payload = {
-            "columns": selected_columns,
-            "rows": int(meta["rows"]),
-            "min_date": str(meta["min_date"]),
-            "max_date": str(meta["max_date"]),
-            "instrument_count": int(meta["instrument_count"]),
-        }
-        return hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
     ordered = work.sort(list(KEY_COLUMNS))
     hashed = ordered.select(pl.struct(selected_columns).hash(seed=0).alias("hash")).to_series().to_numpy()
     return hashlib.sha256(hashed.tobytes()).hexdigest()
@@ -289,18 +273,22 @@ def _preprocess_wide_factors(
             exposure_valid &= block[numeric_columns].notna().all(axis=1)
         if categorical_columns:
             exposure_valid &= block[categorical_columns].notna().all(axis=1)
+        valid_groups: dict[tuple[int, ...], list[str]] = {}
         for column in columns:
             valid = exposure_valid & block[column].notna()
             if not valid.any():
                 continue
+            valid_groups.setdefault(tuple(block.index[valid]), []).append(column)
+        for valid_index_tuple, grouped_columns in valid_groups.items():
+            valid_index = pd.Index(valid_index_tuple)
             design_parts: list[np.ndarray] = []
             if numeric_columns:
                 design_parts.append(
-                    block.loc[valid, numeric_columns].to_numpy(dtype=float)
+                    block.loc[valid_index, numeric_columns].to_numpy(dtype=float)
                 )
             if categorical_columns:
                 dummies = pd.get_dummies(
-                    block.loc[valid, categorical_columns].astype("string"),
+                    block.loc[valid_index, categorical_columns].astype("string"),
                     drop_first=True,
                     dtype=float,
                 )
@@ -309,14 +297,14 @@ def _preprocess_wide_factors(
             x = (
                 np.column_stack(design_parts)
                 if design_parts
-                else np.empty((int(valid.sum()), 0))
+                else np.empty((len(valid_index), 0))
             )
-            if valid.sum() <= x.shape[1] + 1:
+            if len(valid_index) <= x.shape[1] + 1:
                 continue
             x = np.column_stack([np.ones(len(x)), x])
-            y = block.loc[valid, column].to_numpy(dtype=float)
+            y = block.loc[valid_index, grouped_columns].to_numpy(dtype=float)
             beta, *_ = np.linalg.lstsq(x, y, rcond=None)
-            residuals.loc[block.index[valid], column] = y - x @ beta
+            residuals.loc[valid_index, grouped_columns] = y - x @ beta
     return pd.concat([base_keys, residuals], axis=1)
 
 
@@ -494,6 +482,7 @@ def _model_scores(
     date_stop = date_start + date_counts
     feature_matrix = merged.select(list(columns)).to_numpy()
     target_array = merged.select(target_column).to_series().to_numpy()
+    profile_windows = os.getenv("BIGALPHA_J_PROFILE_WINDOWS", "0") == "1"
 
     rows: list[dict[str, object]] = []
     for end in range(
@@ -515,10 +504,27 @@ def _model_scores(
             random_state=0,
             positive=False,
         )
+        fit_start = time.perf_counter()
         model.fit(
             feature_matrix[row_start:row_stop],
             target_array[row_start:row_stop],
         )
+        if profile_windows:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_model_score_window",
+                        "columns": len(columns),
+                        "rows": row_stop - row_start,
+                        "window_start": str(pd.Timestamp(dates[window_start_index]).date()),
+                        "window_end": str(pd.Timestamp(dates[end - 1]).date()),
+                        "seconds": round(time.perf_counter() - fit_start, 3),
+                        "n_iter": int(getattr(model, "n_iter_", -1)),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         row: dict[str, object] = {
             "window_start": pd.Timestamp(dates[window_start_index]),
             "window_end": pd.Timestamp(dates[end - 1]),
@@ -639,19 +645,67 @@ class CompetitionScoreReference:
         self,
         dates: pd.DatetimeIndex,
     ) -> pd.DataFrame:
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        profile_start = time.perf_counter()
         cache_key = tuple(pd.Timestamp(date) for date in dates)
         if cache_key in self._a_cache:
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_reference_a_stage",
+                            "stage": "a_cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
             return self._a_cache[cache_key].copy()
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         processed = self._processed_reference(dates)
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_reference_a_stage",
+                        "stage": "processed_reference_ready",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "date_count": len(dates),
+                        "rows": int(len(processed)),
+                        "reference_count": len(self.reference_columns),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         rows: list[dict[str, object]] = []
-        for column in self.reference_columns:
+        last_column = time.perf_counter()
+        for index, column in enumerate(self.reference_columns, start=1):
             metrics = _a_components_from_processed(
                 processed[[*KEY_COLUMNS, column]],
                 labels,
                 factor_column=column,
                 label_column=self.config.primary_label,
             )
+            if profile_stages:
+                now = time.perf_counter()
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_reference_a_stage",
+                            "stage": "reference_a_column",
+                            "column": column,
+                            "index": index,
+                            "seconds": round(now - last_column, 3),
+                            "total_seconds": round(now - profile_start, 3),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+                last_column = now
             rows.append(
                 {
                     "factor": column,
@@ -669,29 +723,109 @@ class CompetitionScoreReference:
         self,
         dates: pd.DatetimeIndex,
     ) -> pd.DataFrame:
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        profile_start = time.perf_counter()
         cache_key = tuple(pd.Timestamp(date) for date in dates)
         if cache_key in self._processed_reference_cache:
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_processed_reference_stage",
+                            "stage": "cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
             return self._processed_reference_cache[cache_key].copy()
         reference = self.reference_panel.loc[
             self.reference_panel["date"].isin(dates),
             [*KEY_COLUMNS, *self.reference_columns],
         ]
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_reference_stage",
+                        "stage": "sliced_reference",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "rows": int(len(reference)),
+                        "date_count": len(dates),
+                        "reference_count": len(self.reference_columns),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         result = _preprocess_wide_factors(
             reference,
             self.reference_columns,
             self._slice_exposures(dates),
         )
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_reference_stage",
+                        "stage": "preprocessed_reference",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "rows": int(len(result)),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         self._processed_reference_cache[cache_key] = result.copy()
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_reference_stage",
+                        "stage": "stored_cache",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         return result
 
     def score(self, factor: pd.DataFrame) -> dict[str, float]:
         """Score one submission-shaped route output against the all36 base."""
+
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        stage_start = time.perf_counter()
+        last_stage = stage_start
+
+        def profile_stage(stage: str, **extra: object) -> None:
+            nonlocal last_stage
+            if not profile_stages:
+                return
+            now = time.perf_counter()
+            print(
+                json.dumps(
+                    {
+                        "status": "j_score_stage",
+                        "stage": stage,
+                        "step_seconds": round(now - last_stage, 3),
+                        "total_seconds": round(now - stage_start, 3),
+                        **extra,
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+            last_stage = now
 
         route = _normalize_keys(factor, name="route_factor")
         if "factor" not in route:
             raise ValueError("route_factor is missing factor column")
         route = route[[*KEY_COLUMNS, "factor"]].dropna(subset=["factor"])
         route_dates = pd.DatetimeIndex(sorted(route["date"].unique()))
+        profile_stage("normalized_route", route_rows=int(len(route)), date_count=len(route_dates))
         reference_keys = self.reference_panel.loc[
             self.reference_panel["date"].isin(route_dates),
             list(KEY_COLUMNS),
@@ -705,6 +839,7 @@ class CompetitionScoreReference:
             _key_join(reference_keys, label_keys, how="inner")
         )
         aligned_route = _key_join(scorable_keys, route, how="left")
+        profile_stage("aligned_route", scorable_rows=int(len(aligned_route)))
         missing_route_rows = int(aligned_route["factor"].isna().sum())
         if missing_route_rows:
             raise ValueError(
@@ -720,6 +855,7 @@ class CompetitionScoreReference:
             ).encode("utf-8")
         ).hexdigest()
         if score_cache_key in self._score_cache:
+            profile_stage("score_cache_hit")
             return dict(self._score_cache[score_cache_key])
         dates = pd.DatetimeIndex(sorted(route["date"].unique()))
         if len(dates) < self.config.minimum_score_days:
@@ -735,7 +871,9 @@ class CompetitionScoreReference:
             exposures,
             label_column=self.config.primary_label,
         )
+        profile_stage("route_a_components")
         reference_a = self._reference_a_components(dates)
+        profile_stage("reference_a_components", reference_count=len(reference_a))
 
         output: dict[str, float] = {}
         a_percentiles: list[float] = []
@@ -751,11 +889,14 @@ class CompetitionScoreReference:
         a_proxy = float(np.mean(a_percentiles))
 
         processed_reference = self._processed_reference(dates)
+        profile_stage("processed_reference", rows=int(len(processed_reference)))
         processed_route = preprocess_factor(
             route,
             exposures,
         ).rename(columns={"factor": ROUTE_COLUMN})
+        profile_stage("processed_route", rows=int(len(processed_route)))
         processed = _key_join(processed_reference, processed_route, how="left")
+        profile_stage("joined_processed", rows=int(len(processed)))
         model_columns = (*self.reference_columns, ROUTE_COLUMN)
         scores, weights = _model_scores(
             processed,
@@ -763,6 +904,7 @@ class CompetitionScoreReference:
             model_columns,
             self.config,
         )
+        profile_stage("model_scores", score_rows=int(len(scores)), weight_windows=int(len(weights)))
         route_score = scores.loc[scores["factor"].eq(ROUTE_COLUMN)]
         if len(route_score) != 1:
             raise RuntimeError("competition scorer did not produce one route score")
