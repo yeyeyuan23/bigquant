@@ -23,6 +23,12 @@ SUBMISSIONS = (
             "PV-010、PV-011、PV-014；族内等权、FR/HF/PV 族间等权。"
         ),
     ),
+    (
+        ROOT / "submissions" / "rule_v04.py",
+        ROOT / "submissions" / "rule_v04.ipynb",
+        "# BigAlpha 2026 S-route family-balanced rank composite v04\n",
+        "当前 S 路线冻结因子；族内等权后家族等权，平台安全查询边界。",
+    ),
 )
 
 

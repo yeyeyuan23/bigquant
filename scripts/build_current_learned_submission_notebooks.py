@@ -56,6 +56,24 @@ SUBMISSIONS = (
         ),
     ),
     (
+        ROOT / "submissions" / "enet_v03.py",
+        ROOT / "submissions" / "enet_v03.ipynb",
+        "# BigAlpha 2026 current Elastic Net v03\n",
+        (
+            "当前 I 路线冻结池；正系数 Elastic Net；"
+            "平台安全查询边界，训练标签只使用 start_date 前已完整观察数据。"
+        ),
+    ),
+    (
+        ROOT / "submissions" / "lgbm_v04.py",
+        ROOT / "submissions" / "lgbm_v04.ipynb",
+        "# BigAlpha 2026 current LightGBM v04\n",
+        (
+            "当前 T 路线正交准入冻结池；正单调 LightGBM；"
+            "平台安全查询边界，训练标签只使用 start_date 前已完整观察数据。"
+        ),
+    ),
+    (
         ROOT / "submissions" / "lgbm_platform_top_v01.py",
         ROOT / "submissions" / "lgbm_platform_top_v01.ipynb",
         "# BigAlpha 2026 platform-top historical LightGBM v01\n",

@@ -48,7 +48,7 @@ def build_monthly_state_factor(
     )
     require_columns(pool, ("date", "instrument"), "pool")
     panel = pool[["date", "instrument"]].copy()
-    panel["date"] = pd.to_datetime(panel["date"], errors="coerce").dt.normalize()
+    panel["date"] = pd.to_datetime(panel["date"], errors="coerce").dt.normalize().astype("datetime64[ns]")
     panel["instrument"] = panel["instrument"].astype(str)
     events = monthly[
         ["effective_date", "instrument", "factor_raw"]
@@ -56,7 +56,7 @@ def build_monthly_state_factor(
     events["effective_date"] = pd.to_datetime(
         events["effective_date"],
         errors="coerce",
-    ).dt.normalize()
+    ).dt.normalize().astype("datetime64[ns]")
     events["instrument"] = events["instrument"].astype(str)
     event_groups = {
         instrument: block.sort_values("effective_date")

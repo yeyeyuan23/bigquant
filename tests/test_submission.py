@@ -18,6 +18,10 @@ FINAL_SUBMISSIONS = (
         ROOT / "submissions" / "rule_v03.py",
         ROOT / "submissions" / "rule_v03.ipynb",
     ),
+    (
+        ROOT / "submissions" / "rule_v04.py",
+        ROOT / "submissions" / "rule_v04.ipynb",
+    ),
 )
 CURRENT_LEARNED_SUBMISSIONS = (
     (
@@ -67,6 +71,79 @@ CURRENT_LEARNED_SUBMISSIONS = (
             "OB-003",
             "PV-020",
             "PV-013",
+        ),
+    ),
+    (
+        ROOT / "submissions" / "enet_v03.py",
+        ROOT / "submissions" / "enet_v03.ipynb",
+        (
+            "FR-002",
+            "FR-004",
+            "FR-005",
+            "FR-006",
+            "FR-010",
+            "FR-011",
+            "FR-012",
+            "FR-013",
+            "FR-014",
+            "FR-015",
+            "HF-001",
+            "HF-003",
+            "INT-002",
+            "INT-003",
+            "OB-001",
+            "OB-003",
+            "OB-004",
+            "PV-003",
+            "PV-004",
+            "PV-005",
+            "PV-008",
+            "PV-009",
+            "PV-010",
+            "PV-011",
+            "PV-013",
+            "PV-014",
+            "PV-015",
+            "PV-016",
+            "PV-017",
+            "PV-019",
+            "PV-020",
+            "PV-021",
+            "PV-022",
+            "HF-004",
+        ),
+    ),
+    (
+        ROOT / "submissions" / "lgbm_v04.py",
+        ROOT / "submissions" / "lgbm_v04.ipynb",
+        (
+            "FR-013",
+            "INT-002",
+            "OB-004",
+            "PV-009",
+            "OB-003",
+            "FR-012",
+            "PV-017",
+            "PV-019",
+            "HF-001",
+            "PV-010",
+            "FR-002",
+            "PV-016",
+            "FR-005",
+            "PV-004",
+            "PV-015",
+            "FR-004",
+            "PV-011",
+            "PV-021",
+            "INT-003",
+            "OB-005",
+            "PV-023",
+            "FR-001",
+            "HF-004",
+            "PV-002",
+            "OB-002",
+            "OB-001",
+            "FR-010",
         ),
     ),
     (
@@ -228,8 +305,17 @@ class SubmissionTest(unittest.TestCase):
                 ]
                 self.assertEqual(len(code_cells), 1)
                 self.assertEqual("".join(code_cells[0]["source"]), source)
-                self.assertNotIn(".shift(-", source)
-                self.assertNotIn(" lead(", source.lower())
+                if source_path.name in {"enet_v03.py", "lgbm_v04.py"}:
+                    self.assertIn(
+                        "PARTITION BY instrument, trading_day, session_id",
+                        source,
+                    )
+                    self.assertIn("shift(-recovery_minutes)", source)
+                    self.assertNotIn("target.shift(-", source.lower())
+                    self.assertNotIn("daily_return.shift(-", source.lower())
+                else:
+                    self.assertNotIn(".shift(-", source)
+                    self.assertNotIn(" lead(", source.lower())
         elastic_source = CURRENT_LEARNED_SUBMISSIONS[0][0].read_text(
             encoding="utf-8"
         )
