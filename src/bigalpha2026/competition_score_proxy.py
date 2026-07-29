@@ -478,7 +478,22 @@ def _model_scores(
         .filter(pl.col(target_column).is_not_null())
         .sort(list(KEY_COLUMNS))
     )
-    dates = pd.DatetimeIndex(merged.select(pl.col("date").unique().sort()).to_series().to_pandas())
+    date_np = (
+        merged.select("date")
+        .to_series()
+        .cast(pl.Datetime("ns"))
+        .to_numpy()
+        .astype("datetime64[ns]")
+    )
+    dates_np, date_start, date_counts = np.unique(
+        date_np,
+        return_index=True,
+        return_counts=True,
+    )
+    dates = pd.DatetimeIndex(dates_np)
+    date_stop = date_start + date_counts
+    feature_matrix = merged.select(list(columns)).to_numpy()
+    target_array = merged.select(target_column).to_series().to_numpy()
 
     rows: list[dict[str, object]] = []
     for end in range(
@@ -486,10 +501,10 @@ def _model_scores(
         len(dates) + 1,
         config.step_days,
     ):
-        window = dates[end - config.train_window_days : end]
-        window_values = [pd.Timestamp(value).to_datetime64() for value in window]
-        train = merged.filter(pl.col("date").is_in(window_values))
-        if train.height <= len(columns) + 2:
+        window_start_index = end - config.train_window_days
+        row_start = int(date_start[window_start_index])
+        row_stop = int(date_stop[end - 1])
+        if row_stop - row_start <= len(columns) + 2:
             continue
         model = ElasticNet(
             alpha=config.alpha,
@@ -501,12 +516,12 @@ def _model_scores(
             positive=False,
         )
         model.fit(
-            train.select(list(columns)).to_numpy(),
-            train.select(target_column).to_series().to_numpy(),
+            feature_matrix[row_start:row_stop],
+            target_array[row_start:row_stop],
         )
         row: dict[str, object] = {
-            "window_start": pd.Timestamp(window[0]),
-            "window_end": pd.Timestamp(window[-1]),
+            "window_start": pd.Timestamp(dates[window_start_index]),
+            "window_end": pd.Timestamp(dates[end - 1]),
         }
         row.update(dict(zip(columns, model.coef_, strict=True)))
         rows.append(row)
