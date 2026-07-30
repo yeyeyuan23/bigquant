@@ -22,6 +22,10 @@ FINAL_SUBMISSIONS = (
         ROOT / "submissions" / "rule_v04.py",
         ROOT / "submissions" / "rule_v04.ipynb",
     ),
+    (
+        ROOT / "submissions" / "rule_v05.py",
+        ROOT / "submissions" / "rule_v05.ipynb",
+    ),
 )
 CURRENT_LEARNED_SUBMISSIONS = (
     (
@@ -114,8 +118,81 @@ CURRENT_LEARNED_SUBMISSIONS = (
         ),
     ),
     (
+        ROOT / "submissions" / "enet_v04.py",
+        ROOT / "submissions" / "enet_v04.ipynb",
+        (
+            "FR-002",
+            "FR-004",
+            "FR-005",
+            "FR-006",
+            "FR-010",
+            "FR-011",
+            "FR-012",
+            "FR-013",
+            "FR-014",
+            "FR-015",
+            "HF-001",
+            "HF-003",
+            "INT-002",
+            "INT-003",
+            "OB-001",
+            "OB-003",
+            "OB-004",
+            "PV-003",
+            "PV-004",
+            "PV-005",
+            "PV-008",
+            "PV-009",
+            "PV-010",
+            "PV-011",
+            "PV-013",
+            "PV-014",
+            "PV-015",
+            "PV-016",
+            "PV-017",
+            "PV-019",
+            "PV-020",
+            "PV-021",
+            "PV-022",
+            "HF-004",
+        ),
+    ),
+    (
         ROOT / "submissions" / "lgbm_v04.py",
         ROOT / "submissions" / "lgbm_v04.ipynb",
+        (
+            "FR-013",
+            "INT-002",
+            "OB-004",
+            "PV-009",
+            "OB-003",
+            "FR-012",
+            "PV-017",
+            "PV-019",
+            "HF-001",
+            "PV-010",
+            "FR-002",
+            "PV-016",
+            "FR-005",
+            "PV-004",
+            "PV-015",
+            "FR-004",
+            "PV-011",
+            "PV-021",
+            "INT-003",
+            "OB-005",
+            "PV-023",
+            "FR-001",
+            "HF-004",
+            "PV-002",
+            "OB-002",
+            "OB-001",
+            "FR-010",
+        ),
+    ),
+    (
+        ROOT / "submissions" / "lgbm_v05.py",
+        ROOT / "submissions" / "lgbm_v05.ipynb",
         (
             "FR-013",
             "INT-002",
@@ -166,10 +243,13 @@ CURRENT_LEARNED_SUBMISSIONS = (
 )
 PLATFORM_SAFE_SUBMISSIONS = (
     ROOT / "submissions" / "rule_v03.py",
+    ROOT / "submissions" / "rule_v05.py",
     ROOT / "submissions" / "enet_v01.py",
     ROOT / "submissions" / "enet_v02.py",
+    ROOT / "submissions" / "enet_v04.py",
     ROOT / "submissions" / "lgbm_v02.py",
     ROOT / "submissions" / "lgbm_v03.py",
+    ROOT / "submissions" / "lgbm_v05.py",
 )
 ALLOWED_COMPETITION_TABLES = {
     "bigalpha_2026_exposure",
@@ -177,6 +257,7 @@ ALLOWED_COMPETITION_TABLES = {
     "bigalpha_2026_financial",
     "bigalpha_2026_instruments",
     "bigalpha_2026_stock_bar1m",
+    "bigalpha_2026_stock_bar5m",
 }
 FORBIDDEN_PLATFORM_TABLES = {
     "all_trading_days",
@@ -305,7 +386,12 @@ class SubmissionTest(unittest.TestCase):
                 ]
                 self.assertEqual(len(code_cells), 1)
                 self.assertEqual("".join(code_cells[0]["source"]), source)
-                if source_path.name in {"enet_v03.py", "lgbm_v04.py"}:
+                if source_path.name in {
+                    "enet_v03.py",
+                    "enet_v04.py",
+                    "lgbm_v04.py",
+                    "lgbm_v05.py",
+                }:
                     self.assertIn(
                         "PARTITION BY instrument, trading_day, session_id",
                         source,

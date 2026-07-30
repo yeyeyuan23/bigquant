@@ -33,11 +33,14 @@ J_stable = J_mean - 0.5 * J_std
 | `rule_v01` | PV-003/009/014 截面秩等权 | — | — | 第一版纯 PV 规则组合 |
 | `rule_v02` | FR 4个、PV 4个，族内及族间等权 | 0.700658 | — | 从单族扩展为 FR/PV 家族平衡 |
 | `rule_v03` | S 路线冻结 FR-002/005、HF-001/003、PV-010/011/014，族内及族间等权 | J_mean 0.955405 / J_stable 0.942568 | — | 2022/2023 年度 J：0.929730/0.981081；平台公榜 0.60478，非冠军 |
+| `rule_v05` | 当前 S 冻结池家族平衡 rank composite | local J proxy robust 0.767568 | — | 新正式版本名；J baseline 统一为 factorlib all36；对应 `self_factor_composite` |
 | `enet_v01` | screened15 + FR-002/PV-014 Elastic Net | 0.522973 | — | 第一版冻结准入线性组合；已修正训练标签边界 |
 | `enet_v02` | screened15 + PV-008/PV-019/FR-006/HF-004/PV-011 Elastic Net | 0.581098 | +0.058125 | 当前 I 冻结池；提交版改为 start_date 前固定训练以规避未来函数 |
+| `enet_v04` | 当前 I 冻结池 Elastic Net | local J proxy robust 0.599047 | — | 新正式版本名；J baseline 统一为 factorlib all36；对应 `joint_elastic_net` |
 | `lgbm_v01` | screened15 + 11个自研因子 LightGBM | 0.856410 | — | 平台判定疑似未来函数，不再提交 |
 | `lgbm_v02` | 与 v01 相同 | 0.856410 | 0.000000 | 查询不再超过 `end_date`；待平台校验 |
 | `lgbm_v03` | screened15 + PV-008/OB-003/PV-020/PV-013 LightGBM | 0.852356 | -0.004054 | 昨日手工重跑 T 池；提交版改为 start_date 前固定训练以规避未来函数 |
+| `lgbm_v05` | 当前 T 冻结池 LightGBM | local J proxy robust 1.000000 | — | 新正式版本名；J baseline 统一为 factorlib all36；对应 `joint_lightgbm` |
 | `lgbm_platform_top_v01` | screened15 + FR-002/FR-004/FR-011/HF-002/HF-003/OB-005/PV-001/PV-002/PV-003/PV-006/PV-014 LightGBM | J_mean 0.858784 / J_stable 0.811149 | — | 历史平台最高总分/B分机制复刻；2022/2023 年度 J：0.954054/0.763514；旧 Rank IC 0.04409/0.03388 |
 
 生成下一版时必须先把同口径的基准 J、本版 J 和 ΔJ 写入本表，并说明规则改动。

@@ -29,6 +29,12 @@ SUBMISSIONS = (
         "# BigAlpha 2026 S-route family-balanced rank composite v04\n",
         "当前 S 路线冻结因子；族内等权后家族等权，平台安全查询边界。",
     ),
+    (
+        ROOT / "submissions" / "rule_v05.py",
+        ROOT / "submissions" / "rule_v05.ipynb",
+        "# BigAlpha 2026 S-route family-balanced rank composite v05\n",
+        "当前 S 路线冻结因子；族内等权后家族等权，J baseline 统一为 factorlib all36。",
+    ),
 )
 
 
