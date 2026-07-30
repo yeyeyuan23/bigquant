@@ -1036,7 +1036,7 @@ def contract_summary(
         "factorlib_reference": {
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-            "j_reference": "factorlib_all36_plus_j_baseline_candidates",
+            "j_reference": "factorlib_all36",
             "j_public_reference_count": len(FACTORLIB_FEATURE_COLUMNS),
             "j_self_reference_count": len(j_baseline_columns),
             "j_reference_count": len(FACTORLIB_FEATURE_COLUMNS) + len(j_baseline_columns),
@@ -1110,7 +1110,7 @@ def synthetic_contract_summary() -> dict[str, object]:
         admitted_candidates=("HF-TEST",),
         public_feature_columns=SCREENED_FACTORLIB_RAW_FEATURES,
     )
-    j_baseline_columns = self_columns
+    j_baseline_columns: tuple[str, ...] = ()
     self_factor = family_balanced_factor(panel, self_columns)
     joint_factor = family_balanced_factor(
         panel,
@@ -1122,9 +1122,8 @@ def synthetic_contract_summary() -> dict[str, object]:
         "rows": len(panel),
         "factorlib_features": len(public_columns),
         "factorlib_screened_features": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-        "competition_J_reference": "factorlib_all36_plus_j_baseline_candidates",
-        "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS)
-        + len(j_baseline_columns),
+        "competition_J_reference": "factorlib_all36",
+        "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS),
         "self_features": len(self_columns),
         "j_baseline_features": len(j_baseline_columns),
         "minimum_coverage": float(coverage["coverage"].min()),
@@ -1740,7 +1739,8 @@ def evaluate_validation_pipelines(
             cross_regime_worst_year_rank_ic = float("nan")
             cross_regime_mean_rank_ic = float("nan")
         score_summary = score_summaries[experiment]
-        crowded_score = float(crowding_scores[experiment]["score_proxy"])
+        crowding_summary = crowding_scores[experiment]
+        crowded_score = float(crowding_summary["score_proxy"])
         score_values = (
             float(score_summary["validation_combined_base_score_proxy"]),
             float(score_summary["validation_2022_score_proxy"]),
@@ -1760,6 +1760,24 @@ def evaluate_validation_pipelines(
                 ],
                 **score_summary,
                 "validation_joint_crowding_score_proxy": crowded_score,
+                "validation_joint_crowding_a_proxy": float(
+                    crowding_summary["a_proxy"]
+                ),
+                "validation_joint_crowding_b_proxy": float(
+                    crowding_summary["b_proxy"]
+                ),
+                "validation_joint_crowding_b_model_score": float(
+                    crowding_summary["b_model_score"]
+                ),
+                "validation_joint_crowding_b_nonzero_window_ratio": float(
+                    crowding_summary["b_nonzero_window_ratio"]
+                ),
+                "validation_joint_crowding_route_count": float(
+                    crowding_summary["joint_route_count"]
+                ),
+                "validation_joint_crowding_common_rows": float(
+                    crowding_summary["joint_common_rows"]
+                ),
                 "robust_score_proxy": min(score_values),
                 "validation_2022_rank_ic_mean": validation_2022_ic,
                 "validation_2022_rank_ic_t_stat": validation_2022_t,

@@ -816,6 +816,13 @@ class CompetitionScoreReference:
             tuple[pd.Timestamp, ...],
             pd.DataFrame,
         ] = {}
+        self._processed_route_cache: list[
+            tuple[
+                tuple[pd.Timestamp, ...],
+                pd.DataFrame,
+                pd.DataFrame,
+            ]
+        ] = []
         self._score_cache: dict[str, dict[str, float]] = {}
 
     def _slice_exposures(
@@ -985,6 +992,85 @@ class CompetitionScoreReference:
             )
         return result
 
+    def _processed_route(
+        self,
+        route: pd.DataFrame,
+        dates: pd.DatetimeIndex,
+        exposures: pd.DataFrame | None,
+    ) -> pd.DataFrame:
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        profile_start = time.perf_counter()
+        cache_key = tuple(pd.Timestamp(date) for date in dates)
+        requested_dates = set(cache_key)
+        route_compare = (
+            route.loc[:, [*KEY_COLUMNS, "factor"]]
+            .sort_values(list(KEY_COLUMNS))
+            .reset_index(drop=True)
+        )
+        for cached_key, cached_route, cached_processed in self._processed_route_cache:
+            if not requested_dates.issubset(set(cached_key)):
+                continue
+            cached_compare = (
+                cached_route.loc[cached_route["date"].isin(requested_dates)]
+                .sort_values(list(KEY_COLUMNS))
+                .reset_index(drop=True)
+            )
+            if len(cached_compare) != len(route_compare):
+                continue
+            if not cached_compare.loc[:, list(KEY_COLUMNS)].equals(
+                route_compare.loc[:, list(KEY_COLUMNS)]
+            ):
+                continue
+            if not np.array_equal(
+                cached_compare["factor"].to_numpy(dtype=float),
+                route_compare["factor"].to_numpy(dtype=float),
+                equal_nan=True,
+            ):
+                continue
+            result = cached_processed.loc[
+                cached_processed["date"].isin(requested_dates)
+            ].copy()
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_processed_route_stage",
+                            "stage": "superset_cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                            "source_date_count": len(cached_key),
+                            "rows": int(len(result)),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+            return result
+
+        result = preprocess_factor(route, exposures)
+        self._processed_route_cache.append(
+            (
+                cache_key,
+                route.loc[:, [*KEY_COLUMNS, "factor"]].copy(),
+                result.copy(),
+            )
+        )
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_route_stage",
+                        "stage": "preprocessed_route",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "date_count": len(dates),
+                        "rows": int(len(result)),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+        return result
+
     def score(self, factor: pd.DataFrame) -> dict[str, float]:
         """Score one submission-shaped route output against the all36 base."""
 
@@ -1057,8 +1143,9 @@ class CompetitionScoreReference:
             )
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         exposures = self._slice_exposures(dates)
-        processed_route = preprocess_factor(
+        processed_route = self._processed_route(
             route,
+            dates,
             exposures,
         )
         route_metrics = _a_components_from_processed(
@@ -1262,8 +1349,9 @@ class CompetitionScoreReference:
                 )
             model_column = f"{ROUTE_COLUMN}_{index}"
             route_columns[name] = model_column
-            processed_route = preprocess_factor(
+            processed_route = self._processed_route(
                 aligned,
+                dates,
                 exposures,
             ).rename(columns={"factor": model_column})
             processed = _key_join(processed, processed_route, how="left")
