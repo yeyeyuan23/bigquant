@@ -397,6 +397,40 @@ def _build_top50_daily_components(raw5, pool, factorlib, exposure, pd, np):
 def _candidate_factors(selected, financial, factorlib, exposure, daily_features, pool):
     _install_bigalpha_candidate_modules()
     import importlib
+    import inspect
+
+    available_inputs = {{
+        "financial": financial,
+        "financial_panel": financial,
+        "factorlib": factorlib,
+        "exposure": exposure,
+        "exposures": exposure,
+        "daily_features": daily_features,
+        "daily_bars": daily_features,
+        "bars": daily_features,
+        "pv": daily_features,
+        "micro": daily_features,
+        "micro_daily": daily_features,
+        "pool": pool,
+    }}
+
+    def invoke(builder, candidate_id):
+        arguments = []
+        for parameter in inspect.signature(builder).parameters.values():
+            if parameter.kind not in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            ):
+                continue
+            if parameter.default is not inspect.Parameter.empty:
+                continue
+            if parameter.name not in available_inputs:
+                raise ValueError(
+                    f"unsupported required parameter {{parameter.name!r}} "
+                    f"for {{candidate_id}}"
+                )
+            arguments.append(available_inputs[parameter.name])
+        return builder(*arguments)
 
     results = {{}}
     for candidate_id in selected:
@@ -404,24 +438,14 @@ def _candidate_factors(selected, financial, factorlib, exposure, daily_features,
         module_name = "bigalpha2026.candidates." + {{"FR": "fr", "HF": "hf", "PV": "pv", "OB": "ob", "INT": "composite"}}[family] + "." + family.lower() + "_" + number
         module = importlib.import_module(module_name)
         stem = candidate_id.lower().replace("-", "_")
-        builder = getattr(module, f"build_{{stem}}_factor_from_daily", None)
-        if builder is not None:
-            results[candidate_id] = builder(daily_features, pool)
-            continue
-        if family == "FR" and candidate_id == "FR-002":
-            results[candidate_id] = module.build_fr_002_factor_from_panel(financial, pool)
-            continue
-        if family == "FR" and candidate_id == "FR-005":
-            results[candidate_id] = module.build_fr_005_factor(
-                financial,
-                exposure,
-                pool,
-            )
-            continue
-        builder = getattr(module, f"build_{{stem}}_factor", None)
+        builder = None
+        for suffix in ("factor_from_daily", "factor_from_panel", "factor"):
+            builder = getattr(module, f"build_{{stem}}_{{suffix}}", None)
+            if builder is not None:
+                break
         if builder is None:
             raise ValueError(f"no builder found for {{candidate_id}}")
-        results[candidate_id] = builder(daily_features, pool)
+        results[candidate_id] = invoke(builder, candidate_id)
     return results
 
 
