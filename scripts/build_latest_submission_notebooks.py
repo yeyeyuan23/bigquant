@@ -1,4 +1,4 @@
-"""Build and validate the latest I and T submission notebooks."""
+"""Build and validate the latest S, I and T submission notebooks."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ def discover_reports_dir() -> Path:
         path
         for path in candidates
         if path.is_dir()
+        and (path / "latest/s_only_result.json").is_file()
         and (path / "latest/i_only_result.json").is_file()
         and (path / "latest/t_orthogonal_only_result.json").is_file()
     ]
@@ -30,6 +31,7 @@ def discover_reports_dir() -> Path:
     return max(
         complete,
         key=lambda path: max(
+            (path / "latest/s_only_result.json").stat().st_mtime_ns,
             (path / "latest/i_only_result.json").stat().st_mtime_ns,
             (path / "latest/t_orthogonal_only_result.json").stat().st_mtime_ns,
         ),
@@ -84,6 +86,10 @@ def main() -> int:
         reports_dir = ROOT / reports_dir
 
     builds = [
+        run_builder(
+            "build_s_family_submission.py",
+            reports_dir / "latest/s_only_result.json",
+        ),
         run_builder(
             "build_i_elasticnet_submission.py",
             reports_dir / "latest/i_only_result.json",

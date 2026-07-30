@@ -50,9 +50,10 @@ def render_notebook(source: str, candidate_count: int) -> str:
                 "source": [
                     f"# BigAlpha 2026 I-pool Elastic Net ({candidate_count} factors)\n",
                     (
-                        "Frozen I pool; positive Elastic Net; causal rolling "
-                        "60-day training and 20-day prediction blocks with a "
-                        "one-day label embargo."
+                        "Frozen I pool; screened15 residual target; self-only "
+                        "positive Elastic Net output; causal rolling 60-day "
+                        "training and 20-day prediction blocks with a one-day "
+                        "label embargo."
                     ),
                 ],
             },
@@ -110,7 +111,7 @@ def main() -> int:
     output_nb = output_stem.with_suffix(".ipynb")
 
     source = (
-        f'"""I-route rolling Elastic Net with {len(candidate_ids)} factors."""\n\n'
+        f'"""I-route pure-increment Elastic Net with {len(candidate_ids)} factors."""\n\n'
         "# Auto-generated from the frozen I artifact. Do not edit by hand.\n"
         + installer_source(discover_candidate_modules(candidate_ids))
         + external_helpers_source()

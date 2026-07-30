@@ -209,7 +209,9 @@ class TreeAdmissionResult:
 
     @property
     def joint_features(self) -> tuple[str, ...]:
-        return (*self.selected_public, *self.admitted_candidates)
+        """Return only proprietary features entering the final T model."""
+
+        return self.admitted_candidates
 
     def _cached_prediction(
         self,
@@ -273,10 +275,12 @@ class TreeAdmissionResult:
 
     def protocol_summary(self) -> dict[str, object]:
         return {
-            "baseline": "lightgbm_screened15",
+            "baseline": "screened15_residual_target_only",
             "candidate_filter": "basic_quality_and_orthogonality",
             "admission_metric": "orthogonal_entry_only",
             "target_transform": "daily_rank_residual_to_screened15",
+            "model_features": "admitted_self_candidates_only",
+            "prediction_output": "pure_increment_without_screened15_addback",
             "selection": "orthogonal_entry_only",
             "evaluation_years": list(self.development_years),
             "train_days": 60,
@@ -745,7 +749,7 @@ def run_tree_admission(
     if pending_passed:
         _, provisional_importance = cached_prediction_with_importance(
             validation_cache,
-            (*selected_public, *provisional_pool),
+            provisional_pool,
             development_years,
         )
         record_importance(

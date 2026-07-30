@@ -1,6 +1,6 @@
 {
   "dataset": "MICRO_DAILY_FULL",
-  "created_at": "2026-07-27T01:10:40.270889+08:00",
+  "created_at": "2026-07-30T18:01:28.289450+08:00",
   "source_table": "bigalpha_2026_stock_bar1m",
   "aggregation_script": "scripts/aistudio_build_micro_daily.py",
   "preparation_script": "scripts/prepare_micro_daily_full.py",
@@ -10,7 +10,8 @@
     2020,
     2021,
     2022,
-    2023
+    2023,
+    2024
   ],
   "key_columns": [
     "date",
@@ -129,6 +130,20 @@
       "missing_keys": 369,
       "source_sha256": "f100f7aa0e1b918485a49f570b07ef65f96b1b4111042063cce321f769c2c949",
       "output_sha256": "76d9d267bafa04d94201d9cc8ea70c25c35d57341e5f645f288f5dde6feabcdc"
+    },
+    {
+      "year": 2024,
+      "source": "data/raw/MICRO_DAILY_FULL/micro_daily_2024.parquet",
+      "output": "data/features/MICRO_DAILY_FULL/year=2024/part-2024.parquet",
+      "source_rows": 241770,
+      "output_rows": 242000,
+      "dates": 242,
+      "instruments": 1206,
+      "missing_keys": 230,
+      "source_sha256": "846c987499d735ff354f3a30e7ac9fc8525bbe91793ecee28280360e422098d9",
+      "output_sha256": "3e30d69765418bc8add186da70d8cfd5bcdf225b92ba3db097677b170d80d2bc",
+      "order_book_levels": 3
     }
-  ]
+  ],
+  "source_note_2024": "official E2E Feather archive converted losslessly to Parquet; three order-book levels available"
 }

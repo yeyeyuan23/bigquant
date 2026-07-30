@@ -33,8 +33,9 @@ def render_notebook(source: str, candidate_count: int) -> str:
                 "source": [
                     f"# BigAlpha 2026 orthogonal T LightGBM ({candidate_count} factors)\n",
                     (
-                        "Frozen orthogonal T pool; causal rolling 60-day training and "
-                        "20-day prediction blocks with a one-day label embargo."
+                        "Frozen orthogonal T pool; screened15 residual target; "
+                        "self-only LightGBM output; causal rolling 60-day training "
+                        "and 20-day prediction blocks with a one-day label embargo."
                     ),
                 ],
             },
@@ -94,7 +95,7 @@ def main() -> int:
     output_nb = output_stem.with_suffix(".ipynb")
 
     source = (
-        f'"""Orthogonal T-route rolling LightGBM with {len(candidate_ids)} factors."""\n\n'
+        f'"""Orthogonal T pure-increment LightGBM with {len(candidate_ids)} factors."""\n\n'
         "# Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.\n"
         + installer_source(discover_candidate_modules(candidate_ids))
         + external_helpers_source()

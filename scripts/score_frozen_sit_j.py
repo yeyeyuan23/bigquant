@@ -196,13 +196,14 @@ def main() -> int:
     i_factor, i_weights = walk_forward_elastic_net_with_weights(
         oriented,
         labels,
-        feature_columns=(*selected_public, *routes["I"]),
+        feature_columns=routes["I"],
         prediction_years=model_prediction_years,
+        residual_baseline_columns=selected_public,
     )
     t_factor = walk_forward_lightgbm(
         oriented,
         labels,
-        feature_columns=(*selected_public, *routes["T"]),
+        feature_columns=routes["T"],
         prediction_years=model_prediction_years,
         residual_baseline_columns=selected_public,
     )
@@ -309,6 +310,11 @@ def main() -> int:
         "required_exposure_columns": sorted(REQUIRED_J_EXPOSURE_COLUMNS),
         "j_baseline_self_columns": list(j_baseline_columns),
         "j_baseline_self_count": len(j_baseline_columns),
+        "screened15_role": (
+            "residual_target_control_only_not_model_feature_or_prediction_addback"
+        ),
+        "I_model_features": list(routes["I"]),
+        "T_model_features": list(routes["T"]),
         "competition_score_protocol": dict(score_reference.protocol()),
         "membership_digest": _membership_digest(routes),
         "members": {route: list(members) for route, members in routes.items()},

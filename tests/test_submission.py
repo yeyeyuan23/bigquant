@@ -82,6 +82,16 @@ class SubmissionTest(unittest.TestCase):
                 "for offset in range(0, len(prediction_dates), 20)",
                 source,
             )
+            self.assertIn("feature_columns = tuple(self_columns)", source)
+            self.assertIn(
+                "residual_baseline_columns = tuple(public_columns)",
+                source,
+            )
+            self.assertIn('train["target_residual"]', source)
+            self.assertNotIn(
+                "feature_columns = (*public_columns, *self_columns)",
+                source,
+            )
 
 
 if __name__ == "__main__":

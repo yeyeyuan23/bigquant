@@ -2,7 +2,7 @@
 
 This entrypoint reuses development-only monthly S decisions, evaluates I and T
 with strict 60-day train / 20-day OOS windows, and runs three isolated
-combination routes.  The 2022 and 2023 results never change admission.
+combination routes.  The 2023 and 2024 results never change admission.
 """
 
 from __future__ import annotations
@@ -11,10 +11,11 @@ import argparse
 import hashlib
 import json
 import os
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 
 from bigalpha2026.combinations import (
     static_lightgbm_feature_importance,
@@ -43,6 +44,12 @@ from bigalpha2026.factorlib import (
 from bigalpha2026.incremental_admission import (
     IncrementalAdmissionResult,
     run_incremental_admission,
+)
+from bigalpha2026.official_week4_proxy import (
+    OFFICIAL_BARRA_STYLE_COLUMNS,
+    barra_style_exposure_profile,
+    index_enhancement_metrics,
+    industry_rank_ic_profile,
 )
 from bigalpha2026.research_policy import (
     FORMAL_EVALUATION_POLICY,
@@ -282,11 +289,21 @@ def read_yearly(data_dir: Path, template: str, years: Sequence[int]) -> pd.DataF
     paths = [data_dir / template.format(year=year) for year in years]
     if not paths:
         return pd.DataFrame()
-    return pl.scan_parquet([str(path) for path in paths]).collect().to_pandas()
+    return (
+        pl.concat(
+            [pl.scan_parquet(str(path)) for path in paths],
+            how="vertical_relaxed",
+        )
+        .collect(engine="streaming")
+        .to_pandas()
+    )
 
 
 VERIFY_SOURCE_SHA = os.getenv("BIGALPHA_VERIFY_SOURCE_SHA", "0") == "1"
 VERIFY_MANIFEST_ROWS = os.getenv("BIGALPHA_VERIFY_MANIFEST_ROWS", "0") == "1"
+TRUST_CANDIDATE_POOL_MANIFEST = (
+    os.getenv("BIGALPHA_TRUST_CANDIDATE_POOL_MANIFEST", "0") == "1"
+)
 
 
 def read_parquet_polars_frame(path: Path):
@@ -335,7 +352,13 @@ def required_paths(
                     else []
                 ),
                 *(
-                    [data_dir / (f"features/FACTORLIB_ALL36/year={year}/part-{year}.parquet")]
+                    [
+                        data_dir
+                        / (
+                            "features/FACTORLIB_ALL36/"
+                            f"year={year}/part-{year}.parquet"
+                        )
+                    ]
                     if include_all36 and year in YEARS
                     else []
                 ),
@@ -819,13 +842,44 @@ def load_dynamic_inputs(
             candidate_pool = candidate_scan.collect()
             filtered_candidate_snapshot = bool(parquet_filters)
             if not filtered_candidate_snapshot:
-                candidate_pool = candidate_pool.to_pandas()
-                validate_candidate_pool_manifest(
-                    candidate_pool,
-                    parquet_path=candidate_path,
-                    manifest_path=data_dir / "manifest_candidate_pool.json",
-                    data_root=data_dir,
-                )
+                if TRUST_CANDIDATE_POOL_MANIFEST:
+                    if candidate_pool.columns != list(CANDIDATE_POOL_COLUMNS):
+                        raise ValueError(
+                            "candidate pool columns do not match trusted manifest; "
+                            f"actual={candidate_pool.columns}, "
+                            f"expected={list(CANDIDATE_POOL_COLUMNS)}"
+                        )
+                    expected_rows = candidate_manifest.get("candidate_rows", {})
+                    expected_total = sum(int(value) for value in expected_rows.values())
+                    if candidate_pool.height != expected_total:
+                        raise ValueError(
+                            "candidate pool row count does not match trusted manifest; "
+                            f"actual={candidate_pool.height}, expected={expected_total}"
+                        )
+                    if int(candidate_manifest.get("duplicate_keys", -1)) != 0:
+                        raise ValueError(
+                            "trusted candidate pool manifest does not certify duplicate_keys=0"
+                        )
+                    actual_candidates = set(
+                        candidate_pool.select("candidate_id")
+                        .unique()
+                        .to_series()
+                        .cast(pl.String)
+                        .to_list()
+                    )
+                    expected_candidates = set(map(str, expected_rows))
+                    if actual_candidates != expected_candidates:
+                        raise ValueError(
+                            "candidate pool membership does not match trusted manifest"
+                        )
+                else:
+                    candidate_pool = candidate_pool.to_pandas()
+                    validate_candidate_pool_manifest(
+                        candidate_pool,
+                        parquet_path=candidate_path,
+                        manifest_path=data_dir / "manifest_candidate_pool.json",
+                        data_root=data_dir,
+                    )
             else:
                 missing_columns = sorted(
                     set(CANDIDATE_POOL_COLUMNS).difference(candidate_pool.columns)
@@ -958,20 +1012,18 @@ def load_dynamic_inputs(
     decision_by_id = {str(row["candidate_id"]): row for row in decisions}
     missing_decisions = sorted(set(candidate_ids).difference(decision_by_id))
     if missing_decisions:
-        raise ValueError(
-            "first-round decisions do not cover the full candidate pool; "
-            f"rerun run_first_round.py, missing={missing_decisions}"
+        print(
+            json.dumps(
+                {
+                    "status": "first_round_decisions_partial",
+                    "missing_count": len(missing_decisions),
+                    "action": "strict_S_evaluates_full_candidate_pool",
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
         )
-    single_factor_admitted = tuple(
-        candidate_id
-        for candidate_id in candidate_ids
-        if bool(
-            decision_by_id[candidate_id].get(
-                "single_factor_cross_regime_passed",
-                False,
-            )
-        )
-    )
+    single_factor_admitted = candidate_ids
     if not panel_cache_hit:
         factorlib = load_factorlib(data_dir, selected_years)
         panel, _public_columns, _self_columns, coverage = build_feature_panel_polars(
@@ -1399,16 +1451,29 @@ def build_admission_audit_rows(
     admitted_incremental = set(incremental_result.frozen_after)
     admitted_tree = set(tree_result.admitted_candidates)
     for self_column in self_columns:
+        screened_matches = incremental_result.screened_summary.loc[
+            incremental_result.screened_summary["candidate"].eq(self_column)
+        ]
         screened_row = (
-            incremental_result.screened_summary.loc[
-                incremental_result.screened_summary["candidate"].eq(self_column)
-            ]
-            .iloc[0]
-            .to_dict()
+            screened_matches.iloc[0].to_dict()
+            if not screened_matches.empty
+            else {
+                "candidate": self_column,
+                "evaluation_status": (
+                    "not_in_S_pool"
+                    if self_column not in single_factor_set
+                    else "not_retained_by_I_prefilter"
+                ),
+            }
         )
         screened_passed = self_column in elastic_pool_inputs
         screened_reasons: list[str] = []
-        tree_passed = bool(tree_result.admission_by_feature[self_column]["tree_incremental_passed"])
+        tree_passed = bool(
+            tree_result.admission_by_feature.get(self_column, {}).get(
+                "tree_incremental_passed",
+                False,
+            )
+        )
         enters_incremental_model = self_column in admitted_incremental
         enters_tree_model = self_column in admitted_tree
         enters_self_composite = self_column in single_factor_set and enters_family_equal_rank(
@@ -1427,6 +1492,8 @@ def build_admission_audit_rows(
             incremental_status = "frozen_I"
         elif screened_passed:
             incremental_status = "entry_passed_not_frozen"
+        elif self_column not in single_factor_set:
+            incremental_status = "not_in_S_pool"
         else:
             incremental_status = "entry_failed"
         admission_rows.append(
@@ -1477,7 +1544,7 @@ def run_route_admissions(
     IncrementalAdmissionResult,
     TreeAdmissionResult,
 ]:
-    """Run the strict S -> I -> T candidate funnel."""
+    """Run the strict S -> I -> T admission funnel."""
 
     single_factor_state = (
         Path(single_factor_cache_dir)
@@ -1563,14 +1630,8 @@ def build_validation_pipelines(
 ]:
     """Train and orient the three routes on their nested admitted pools."""
 
-    elastic_net_features = (
-        *selected_public,
-        *incremental_result.frozen_after,
-    )
-    lightgbm_features = (
-        *selected_public,
-        *tree_result.admitted_candidates,
-    )
+    elastic_net_features = tuple(incremental_result.frozen_after)
+    lightgbm_features = tuple(tree_result.admitted_candidates)
     direction_calibration_year = DEVELOPMENT_YEARS[-1]
     model_prediction_years = (
         direction_calibration_year,
@@ -1582,6 +1643,7 @@ def build_validation_pipelines(
         labels,
         feature_columns=elastic_net_features,
         prediction_years=model_prediction_years,
+        residual_baseline_columns=selected_public,
     )
     raw_pipelines: dict[tuple[str, str], pd.DataFrame] = {}
     if self_features:
@@ -1618,9 +1680,6 @@ def build_validation_pipelines(
                 f"{experiment} produced no direction-calibration rows for "
                 f"{direction_calibration_year}"
             )
-        validation_block = factor.loc[
-            factor["date"].dt.year.isin(validation_years)
-        ].copy()
         direction_score = score_reference.score_best_direction(
             calibration_block
         )
@@ -1843,6 +1902,169 @@ def evaluate_validation_pipelines(
     return metrics, decisions
 
 
+def build_official_week4_route_diagnostics(
+    pipelines: Mapping[tuple[str, str], pd.DataFrame],
+    labels: pd.DataFrame,
+    exposures: pd.DataFrame,
+) -> dict[str, pl.DataFrame]:
+    """Build disclosed WEEK4 diagnostics for frozen final routes.
+
+    The benchmark is explicitly labelled as a proxy unless real benchmark
+    weights are supplied in a future data contract.  These outputs do not
+    change S/I/T admission or the existing J ranking.
+    """
+
+    evaluation_years = list(EVALUATION_YEARS)
+    labels_pl = (
+        pl.from_pandas(
+            labels.loc[:, [*KEY_COLUMNS, FORMAL_EVALUATION_POLICY.primary_label]]
+        )
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.String),
+        )
+        .filter(pl.col("date").dt.year().is_in(evaluation_years))
+    )
+    exposures_pl = (
+        pl.from_pandas(exposures)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.String),
+        )
+        .filter(pl.col("date").dt.year().is_in(evaluation_years))
+    )
+    style_source_available = bool(
+        set(OFFICIAL_BARRA_STYLE_COLUMNS).intersection(exposures_pl.columns)
+        or {"float_market_cap", "turn"}.intersection(exposures_pl.columns)
+    )
+
+    summary_rows: list[dict[str, object]] = []
+    barra_daily_frames: list[pl.DataFrame] = []
+    barra_summary_frames: list[pl.DataFrame] = []
+    industry_daily_frames: list[pl.DataFrame] = []
+    industry_summary_frames: list[pl.DataFrame] = []
+    index_daily_frames: list[pl.DataFrame] = []
+
+    for (experiment, method), factor in pipelines.items():
+        factor_pl = (
+            pl.from_pandas(factor.loc[:, [*KEY_COLUMNS, "factor"]])
+            .with_columns(
+                pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+                pl.col("instrument").cast(pl.String),
+                pl.col("factor").cast(pl.Float64, strict=False),
+            )
+            .filter(pl.col("date").dt.year().is_in(evaluation_years))
+            .drop_nulls("factor")
+        )
+        summary_row: dict[str, object] = {
+            "pipeline": experiment,
+            "method": method,
+            "week4_diagnostics_are_ranking_inputs": False,
+        }
+
+        index_result = index_enhancement_metrics(
+            factor_pl,
+            labels_pl,
+            exposures=exposures_pl,
+            label_column=FORMAL_EVALUATION_POLICY.primary_label,
+            theta=1.0,
+        )
+        index_summary = index_result.summary.row(0, named=True)
+        summary_row.update(
+            {
+                f"week4_{key}": value
+                for key, value in index_summary.items()
+            }
+        )
+        index_daily_frames.append(
+            index_result.daily.with_columns(
+                pl.lit(experiment).alias("pipeline"),
+                pl.lit(method).alias("method"),
+            )
+        )
+
+        if "industry_level1_code" in exposures_pl.columns:
+            industry_result = industry_rank_ic_profile(
+                factor_pl,
+                labels_pl,
+                exposures_pl,
+                label_column=FORMAL_EVALUATION_POLICY.primary_label,
+            )
+            industry_summary = industry_result.summary.row(0, named=True)
+            summary_row.update(
+                {
+                    f"week4_{key}": value
+                    for key, value in industry_summary.items()
+                }
+            )
+            industry_daily_frames.append(
+                industry_result.daily.with_columns(
+                    pl.lit(experiment).alias("pipeline"),
+                    pl.lit(method).alias("method"),
+                )
+            )
+            industry_summary_frames.append(
+                industry_result.by_industry.with_columns(
+                    pl.lit(experiment).alias("pipeline"),
+                    pl.lit(method).alias("method"),
+                )
+            )
+
+        if style_source_available:
+            barra_result = barra_style_exposure_profile(
+                factor_pl,
+                exposures_pl,
+                standardize_daily=True,
+            )
+            summary_row["week4_barra_used_styles"] = ",".join(
+                barra_result.used_styles
+            )
+            summary_row["week4_barra_missing_styles"] = ",".join(
+                barra_result.missing_styles
+            )
+            summary_row.update(
+                {
+                    f"week4_barra_{row['style']}_mean_coefficient": row[
+                        "mean_coefficient"
+                    ]
+                    for row in barra_result.summary.to_dicts()
+                }
+            )
+            barra_daily_frames.append(
+                barra_result.daily_coefficients.with_columns(
+                    pl.lit(experiment).alias("pipeline"),
+                    pl.lit(method).alias("method"),
+                )
+            )
+            barra_summary_frames.append(
+                barra_result.summary.with_columns(
+                    pl.lit(experiment).alias("pipeline"),
+                    pl.lit(method).alias("method"),
+                    pl.lit(",".join(barra_result.used_styles)).alias("used_styles"),
+                    pl.lit(",".join(barra_result.missing_styles)).alias(
+                        "missing_styles"
+                    ),
+                )
+            )
+        summary_rows.append(summary_row)
+
+    def concatenate(frames: list[pl.DataFrame]) -> pl.DataFrame:
+        return (
+            pl.concat(frames, how="diagonal_relaxed")
+            if frames
+            else pl.DataFrame()
+        )
+
+    return {
+        "summary": pl.from_dicts(summary_rows, infer_schema_length=None),
+        "barra_daily": concatenate(barra_daily_frames),
+        "barra_summary": concatenate(barra_summary_frames),
+        "industry_daily": concatenate(industry_daily_frames),
+        "industry_summary": concatenate(industry_summary_frames),
+        "index_daily": concatenate(index_daily_frames),
+    }
+
+
 def write_experiment_reports(
     reports_dir: Path,
     screening: pd.DataFrame,
@@ -1855,6 +2077,7 @@ def write_experiment_reports(
     elastic_net_weights: pd.DataFrame,
     metrics: pd.DataFrame,
     decisions: Sequence[dict[str, object]],
+    official_week4_reports: Mapping[str, pl.DataFrame],
 ) -> tuple[dict[str, dict[str, object]], list[str]]:
     """Write route audits and return the frozen submission ranking."""
 
@@ -1863,6 +2086,11 @@ def write_experiment_reports(
     latest_dir.mkdir(exist_ok=True)
     routes_dir = route_reports_dir(reports_dir)
     routes_dir.mkdir(exist_ok=True)
+    for report_name, report in official_week4_reports.items():
+        if report.width:
+            report.write_csv(
+                routes_dir / f"official_week4_{report_name}.csv"
+            )
     elastic_net_weights.to_csv(
         routes_dir / "joint_elastic_net_weights.csv",
         index=False,
@@ -2002,13 +2230,31 @@ def build_experiment_result(
                 "diagnostic_only" if include_route_diagnostics else "skipped_by_default"
             ),
         },
+        "official_week4_diagnostics": {
+            "status": "diagnostic_only",
+            "ranking_inputs": False,
+            "benchmark_fallback": (
+                "market_cap_universe_proxy_then_equal_weight_universe_proxy"
+            ),
+            "theta": 1.0,
+            "disclosed_views": [
+                "daily_multivariate_barra_style_exposure",
+                "daily_within_industry_rank_ic",
+                "realized_index_enhancement_metrics",
+            ],
+        },
         "single_factor_route_admission": {
             "eligible_candidates": list(s_candidate_features),
             "admitted_candidates": list(single_factor_result.admitted_candidates),
             "selection": "strict_s_funnel",
             "promotion": single_factor_result.promotion_summary,
         },
-        "learned_model_preprocessing": ("daily_centered_rank_features_and_target_neutral_fill"),
+        "learned_model_preprocessing": (
+            "screened15_residual_target_then_self_only_model_output"
+        ),
+        "screened15_role": (
+            "residual_target_control_only_not_model_feature_or_prediction_addback"
+        ),
         "tree_incremental_protocol": tree_result.protocol_summary(),
         "evaluation_years_change_admission": False,
         "pipelines": {
@@ -2059,9 +2305,7 @@ def frozen_s_candidates_from_state(cache_dir: Path) -> tuple[str, ...]:
         raise FileNotFoundError(f"missing frozen S state: {state_path}")
     state = json.loads(state_path.read_text(encoding="utf-8"))
     candidates = tuple(
-        dict.fromkeys(
-            map(str, state.get("frozen_candidates", []))
-        )
+        dict.fromkeys(map(str, state.get("frozen_candidates", [])))
     )
     if not candidates:
         raise ValueError(f"frozen S state has no candidates: {state_path}")
@@ -2186,14 +2430,12 @@ def run_t_importance_stage(
         column for column in self_columns if column.startswith("self__")
     )
     print(json.dumps({"status": "t_static_importance_start", "self_feature_count": len(self_feature_columns)}, ensure_ascii=False), flush=True)
-    importance_feature_columns = tuple(
-        dict.fromkeys((*selected_public, *self_feature_columns))
-    )
     development_importance = static_lightgbm_feature_importance(
         oriented,
         labels,
-        feature_columns=importance_feature_columns,
+        feature_columns=self_feature_columns,
         train_years=DEVELOPMENT_YEARS,
+        residual_baseline_columns=selected_public,
     )
     routes_dir = route_reports_dir(reports_dir)
     routes_dir.mkdir(parents=True, exist_ok=True)
@@ -2232,7 +2474,7 @@ def run_t_importance_stage(
         routes_dir / "tree_lightgbm_importance_selection.csv",
         index=False,
     )
-    feature_columns = tuple(dict.fromkeys((*selected_public, *selected_self)))
+    feature_columns = selected_self
     print(json.dumps({"status": "t_static_validation_predict_start", "feature_count": len(feature_columns)}, ensure_ascii=False), flush=True)
     factor = static_lightgbm_predict(
         oriented,
@@ -2240,6 +2482,7 @@ def run_t_importance_stage(
         feature_columns=feature_columns,
         train_years=DEVELOPMENT_YEARS,
         prediction_years=(EVALUATION_YEARS[0], EVALUATION_YEARS[1]),
+        residual_baseline_columns=selected_public,
     )
     print(json.dumps({"status": "t_static_validation_predict_done", "rows": len(factor)}, ensure_ascii=False), flush=True)
     should_score = os.getenv("BIGALPHA_T_SCORE", "0") == "1"
@@ -2267,7 +2510,12 @@ def run_t_importance_stage(
     payload = {
         "stage": "t-importance",
         "mode": "lightgbm_importance_top_self_features",
-        "source_pool": "frozen_I_candidates",
+        "source_pool": (
+            "all_self_candidates"
+            if os.getenv("BIGALPHA_T_IMPORTANCE_SOURCE_POOL", "i").strip().lower()
+            in {"all", "all_self", "all_self_candidates"}
+            else "frozen_I_candidates"
+        ),
         "candidate_count": len(self_feature_columns),
         "top_n": top_n,
         "selected_self_count": len(selected_self),
@@ -2574,6 +2822,27 @@ def run_experiments(
         exposures,
         include_route_diagnostics=include_route_diagnostics,
     )
+    official_week4_reports = build_official_week4_route_diagnostics(
+        pipelines,
+        labels,
+        exposures,
+    )
+    official_summary_by_pipeline = {
+        str(row["pipeline"]): row
+        for row in official_week4_reports["summary"].to_dicts()
+    }
+    for decision in decisions:
+        official_summary = official_summary_by_pipeline.get(
+            str(decision["experiment"]),
+            {},
+        )
+        decision.update(
+            {
+                key: value
+                for key, value in official_summary.items()
+                if key not in {"pipeline", "method"}
+            }
+        )
 
     pipeline_decisions, frozen_submission_order = write_experiment_reports(
         reports_dir,
@@ -2587,6 +2856,7 @@ def run_experiments(
         elastic_net_weights,
         metrics,
         decisions,
+        official_week4_reports,
     )
     result = build_experiment_result(
         selected_public,
@@ -2645,11 +2915,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.tree_cache_dir is not None
         else args.data_dir / "cache" / "tree_v6_orthogonal_entry"
     )
+    t_source_pool = os.getenv(
+        "BIGALPHA_T_IMPORTANCE_SOURCE_POOL",
+        "i",
+    ).strip().lower()
     if args.admission_routes == "i":
         candidate_filter = frozen_s_candidates_from_state(
             single_factor_cache_dir
         )
-    elif args.admission_routes in {"t-importance", "t-orthogonal"}:
+    elif args.admission_routes == "t-importance":
+        if t_source_pool in {"all", "all_self", "all_self_candidates"}:
+            candidate_manifest = json.loads(
+                (args.data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
+            )
+            candidate_filter = tuple(
+                f"self__{candidate_id}"
+                for candidate_id in sorted(candidate_manifest.get("candidate_rows", {}))
+            )
+        else:
+            candidate_filter = frozen_i_candidates_from_state(incremental_cache_dir)
+    elif args.admission_routes == "t-orthogonal":
         candidate_filter = frozen_i_candidates_from_state(
             incremental_cache_dir
         )

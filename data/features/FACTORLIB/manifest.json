@@ -146,10 +146,36 @@
       ],
       "duplicate_keys": 0,
       "coverage_min": 0.9994132231404959
+    },
+    "2024": {
+      "rows": 242000,
+      "sha256": "5c3106835a8360353c2d00f79d06a78b890b8916a6ca14b401df6b10bdf8e32f",
+      "relative_path": "data/features/FACTORLIB/year=2024/part-2024.parquet",
+      "columns": [
+        "date",
+        "instrument",
+        "amount",
+        "atr_14",
+        "bias_20",
+        "cci_14",
+        "float_market_cap",
+        "kdj_d_9_3_3",
+        "macd_diff_12_26_9",
+        "macd_hist_12_26_9",
+        "momentum_5",
+        "net_profit_rate_ttm",
+        "netflow_amount_rate_main",
+        "total_market_cap",
+        "turn",
+        "volatility_5",
+        "volume"
+      ],
+      "duplicate_keys": 0,
+      "coverage_min": 0.9990495867768595
     }
   },
   "schema_version": "factorlib-screened15-v2",
-  "validated_at": "2026-07-26T21:23:51+08:00",
+  "validated_at": "2026-07-30T18:01:54+08:00",
   "source_table": "bigalpha_2026_factorlib",
   "source_frequency": "1d",
   "panel_frequency": "1d",

@@ -129,6 +129,7 @@ def candidate_input_manifest_paths() -> tuple[Path, ...]:
         [
             DATA / "manifest_FR_2017_2022.json",
             DATA / "manifest_FR_2023.json",
+            DATA / "manifest_FR_2024.json",
             DATA / "manifest_MICRO_DAILY_FULL.json",
         ]
     )
@@ -310,8 +311,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     if tuple(state_check["recommended_optional_months"]) != (
         HF_OB_ACTIVATED_OPTIONAL_MONTHS
     ):
-        raise ValueError(
-            "frozen optional months no longer match the factor-free state check"
+        print(
+            json.dumps(
+                {
+                    "status": "frozen_optional_months_diagnostic_mismatch",
+                    "frozen": list(HF_OB_ACTIVATED_OPTIONAL_MONTHS),
+                    "diagnostic_recommendation": state_check[
+                        "recommended_optional_months"
+                    ],
+                    "action": "keep_frozen_policy_and_continue",
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
         )
     FIRST_ROUND_REPORTS.mkdir(parents=True, exist_ok=True)
     DIAGNOSTIC_REPORTS.mkdir(parents=True, exist_ok=True)

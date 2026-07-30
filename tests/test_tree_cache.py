@@ -16,7 +16,7 @@ class TreePredictionCacheTest(unittest.TestCase):
     def test_orthogonal_entry_contract_uses_current_schema(self):
         self.assertEqual(
             TREE_CACHE_SCHEMA_VERSION,
-            "tree-prediction-cache-v6-orthogonal-entry",
+            "tree-prediction-cache-v7-screened15-residual-output",
         )
 
     def setUp(self):
@@ -202,14 +202,14 @@ class TreePredictionCacheTest(unittest.TestCase):
                 ("base", "candidate_a"),
             )
             plain = cache.payload(
-                ("base", "candidate_a"),
+                ("candidate_a",),
                 prediction_years=(2021,),
                 label_column="ret_close_to_close",
                 train_window_days=60,
                 test_window_days=20,
             )
             residual = cache.payload(
-                ("base", "candidate_a"),
+                ("candidate_a",),
                 prediction_years=(2021,),
                 label_column="ret_close_to_close",
                 train_window_days=60,
@@ -218,6 +218,14 @@ class TreePredictionCacheTest(unittest.TestCase):
             )
             self.assertNotEqual(plain, residual)
             self.assertEqual(residual["residual_baseline_columns"], ["base"])
+            self.assertEqual(
+                set(residual["feature_fingerprints"]),
+                {"candidate_a"},
+            )
+            self.assertEqual(
+                set(residual["residual_baseline_fingerprints"]),
+                {"base"},
+            )
 
     def test_force_refresh_bypasses_an_exact_cache_hit(self):
         with tempfile.TemporaryDirectory() as directory:

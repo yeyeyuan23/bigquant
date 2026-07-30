@@ -39,7 +39,7 @@ reports/
 - `duplicate_keys`：`date, instrument` 重复键数量，必须为 0。
 - `factorlib_reference.screened_features`：冻结 screened15。
 - `factorlib_reference.j_reference_columns_present`：本地 J reference 可用列数量，
-  当前应等于 all36 公开列数加 self_library 候选列数。
+  当前应等于 all36 公开列数加 `INCLUDE_IN_J_BASELINE = True` 的候选列数。
 - `candidate_pool_reference.factor_version`：当前候选长表版本。
 - `candidate_pool_reference.sha256`：当前候选长表文件哈希。
 - `combination_inputs.all_candidate_count`：进入组合层的自研候选数量。
@@ -75,10 +75,10 @@ reports/
 - `candidate_id`：无 `self__` 前缀的候选编号。
 - `feature`：带 `self__` 前缀的候选特征名。
 - `single_factor_passed`：是否进入 S 路线。
-- `candidate_level_incremental_J_computed`：I 是否实际计算个人 J 增量。
-- `individual_I_passed`：I 个人增量是否通过。
+- `individual_I_passed`：是否在通过 S 后继续通过 I entry gate。
 - `elastic_net_pool_input`：兼容旧报告的别名，等同于 `individual_I_passed`。
 - `incremental_evaluation_status`：I 路线最终状态。
+- `enters_self_factor_composite`：是否进入最终规则复合。
 - `enters_joint_elastic_net`：是否进入最终 Elastic Net。
 - `tree_incremental_passed`：是否进入最终 LightGBM。
 - `enters_joint_lightgbm`：是否进入最终 LightGBM。
@@ -93,7 +93,8 @@ reports/
 - `first_round_metrics.csv`：单因子的 Rank IC、t 统计和分期诊断。
 - `first_round_stability.csv`：跨期稳定性。
 - `first_round_correlations.csv`：候选之间的相关性。
-- `first_round_decisions.json`：第一轮机器可读候选决策，组合流程会读取它。
+- `first_round_decisions.json`：第一轮机器可读诊断结果。严格漏斗正式运行会重新对
+  全候选执行 S；该文件不能预先否决候选，也不能替代 frozen S。
 
 ## routes/
 
@@ -106,10 +107,10 @@ reports/
   - `reasons`：失败原因。
   - `retained_pending_candidates`：本次满足 S 要求的候选。
 
-S 是否保留会读取 `s_*` 字段：覆盖率、活跃日、Rank IC、最差 fold、
-正向 fold 比例、方向一致性和相对当前 S baseline 的最大 Rank 相关性。通过 trial
-即进入 frozen S；准入阶段不计算 J。t 统计、中性化、可交易和
-分组诊断不再无条件增加主流程计算量；如果只是要审计单因子质量，用
+S 是否保留会读取 `s_*` 字段：覆盖率、活跃日、行业与 Barra 中性化后的 Rank IC、
+最差 fold、正向 fold 比例、方向一致性、行业内有效性和相对当前 S baseline 的
+最大 Rank 相关性。通过 trial 即进入 frozen S；准入阶段不计算 J。其他可交易和
+分组诊断不再无条件增加主流程计算量；如果只是要审计更多单因子质量，用
 `scripts/run_first_round.py`，如果要给最终路线补审计字段，再给
 `scripts/run_combinations.py` 加 `--include-route-diagnostics`。
 

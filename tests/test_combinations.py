@@ -10,8 +10,8 @@ from bigalpha2026.combinations import (
     _eligible_prediction_dates,
     _prepare_joint_model_frame,
     fixed_rank_blend,
-    lightgbm_model_config,
     learned_model_training_config,
+    lightgbm_model_config,
     paired_factor_rank_ic_increment,
     walk_forward_elastic_net,
     walk_forward_elastic_net_with_weights,
@@ -25,8 +25,10 @@ class _ZeroLightGBM:
     def __init__(self, fitted_targets: list[np.ndarray]):
         self.fitted_targets = fitted_targets
         self.booster_ = self
+        self.feature_count = 0
 
-    def fit(self, _x, y):
+    def fit(self, x, y):
+        self.feature_count = x.shape[1]
         self.fitted_targets.append(np.asarray(y, dtype=float))
         return self
 
@@ -34,7 +36,7 @@ class _ZeroLightGBM:
         return np.zeros(len(x), dtype=float)
 
     def feature_importance(self, importance_type="split"):
-        return np.zeros(2, dtype=float)
+        return np.zeros(self.feature_count, dtype=float)
 
 
 def _run_lightgbm_smoke() -> None:
@@ -329,7 +331,16 @@ class CombinationTest(unittest.TestCase):
         )
         self.assertEqual(
             config["monotone_constraints"],
-            "all_features_positive",
+            "all_self_features_positive",
+        )
+        self.assertEqual(
+            config["residual_baseline_role"],
+            "target_control_only",
+        )
+        self.assertEqual(config["model_features"], "self_candidates_only")
+        self.assertEqual(
+            config["prediction_output"],
+            "pure_increment_without_baseline_addback",
         )
 
     def test_shared_training_contract_rolls_and_embargoes_last_label(self):
@@ -357,7 +368,7 @@ class CombinationTest(unittest.TestCase):
         )
         self.assertEqual(prediction_dates[0], all_dates[61])
 
-    def test_lightgbm_residual_baseline_changes_training_target_and_output(self):
+    def test_lightgbm_screened_baseline_only_residualizes_target(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 10
             + ["2019-01-03"] * 10
@@ -382,7 +393,7 @@ class CombinationTest(unittest.TestCase):
             result = walk_forward_lightgbm(
                 panel,
                 labels,
-                feature_columns=("public", "candidate"),
+                feature_columns=("candidate",),
                 prediction_years=(2020,),
                 train_window_days=1,
                 test_window_days=1,
@@ -393,15 +404,10 @@ class CombinationTest(unittest.TestCase):
         self.assertTrue(np.allclose(fitted_targets[0], 0.0))
         expected = panel.loc[
             panel["date"].dt.year.eq(2020),
-            ["date", "instrument", "public"],
-        ].rename(columns={"public": "factor"})
+            ["date", "instrument"],
+        ].copy()
         expected["date"] = expected["date"].astype("datetime64[ns]")
-        expected["factor"] = (
-            expected.groupby("date", sort=False)["factor"]
-            .rank(pct=True, method="average")
-            .sub(0.5)
-            .mul(2.0)
-        )
+        expected["factor"] = 0.1
         expected = expected.sort_values(["date", "instrument"]).reset_index(drop=True)
         pd.testing.assert_frame_equal(result, expected)
 

@@ -54,7 +54,10 @@ def lightgbm_model_config() -> dict[str, object]:
         "num_threads": num_threads,
         "feature_transform": "daily_centered_percentile_rank",
         "target_transform": "daily_centered_percentile_rank_residual_to_baseline",
-        "monotone_constraints": "all_features_positive",
+        "residual_baseline_role": "target_control_only",
+        "model_features": "self_candidates_only",
+        "prediction_output": "pure_increment_without_baseline_addback",
+        "monotone_constraints": "all_self_features_positive",
     }
 
 
@@ -155,14 +158,26 @@ def _validate_residual_baseline_columns(
     feature_columns: tuple[str, ...],
     residual_baseline_columns: tuple[str, ...],
 ) -> tuple[str, ...]:
+    """Validate controls used only to residualize the training target."""
+
     residual_baseline_columns = tuple(dict.fromkeys(residual_baseline_columns))
-    missing = sorted(set(residual_baseline_columns).difference(feature_columns))
-    if missing:
+    overlap = sorted(set(residual_baseline_columns).intersection(feature_columns))
+    if overlap:
         raise ValueError(
-            "residual_baseline_columns must be a subset of feature_columns: "
-            f"{missing}"
+            "residual baseline controls must not enter model features: "
+            f"{overlap}"
         )
     return residual_baseline_columns
+
+
+def _joint_model_input_columns(
+    feature_columns: tuple[str, ...],
+    residual_baseline_columns: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys((*feature_columns, *residual_baseline_columns))
+    )
+
 
 def fixed_rank_blend(
     factors: Mapping[str, pd.DataFrame],
@@ -266,18 +281,27 @@ def _walk_forward_elastic_net(
     test_window_days: int = 20,
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
+    residual_baseline_columns: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Generate causal rolling 60/20 predictions and coefficients."""
+    """Generate pure-increment rolling 60/20 predictions and coefficients."""
 
     from sklearn.linear_model import ElasticNet
 
     # Keep this identical to factorlib_regularized_incremental_batch_validation.
     # A fixed Elastic Net alpha is meaningful only when both X and y use the
     # same scale in screening and final training.
+    residual_baseline_columns = _validate_residual_baseline_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
+    prepared_columns = _joint_model_input_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
     merged = _prepare_joint_model_frame(
         panel,
         labels,
-        feature_columns=feature_columns,
+        feature_columns=prepared_columns,
         label_column=label_column,
     )
     outputs: list[pd.DataFrame] = []
@@ -312,9 +336,17 @@ def _walk_forward_elastic_net(
             random_state=0,
             positive=True,
         )
+        y_train = train[label_column].to_numpy(dtype=float)
+        if residual_baseline_columns:
+            y_train = (
+                y_train
+                - train.loc[:, list(residual_baseline_columns)]
+                .mean(axis=1)
+                .to_numpy(dtype=float)
+            )
         model.fit(
             train.loc[:, list(feature_columns)].to_numpy(dtype=float),
-            train[label_column].to_numpy(dtype=float),
+            y_train,
         )
         weight_row: dict[str, object] = {
             "train_start": pd.Timestamp(train_dates[0]),
@@ -351,8 +383,9 @@ def walk_forward_elastic_net(
     test_window_days: int = 20,
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
+    residual_baseline_columns: tuple[str, ...] = (),
 ) -> pd.DataFrame:
-    """Generate causal rolling, scale-consistent Elastic Net predictions."""
+    """Generate causal pure-increment Elastic Net predictions."""
 
     predictions, _ = _walk_forward_elastic_net(
         panel,
@@ -364,6 +397,7 @@ def walk_forward_elastic_net(
         test_window_days=test_window_days,
         alpha=alpha,
         l1_ratio=l1_ratio,
+        residual_baseline_columns=residual_baseline_columns,
     )
     return predictions
 
@@ -379,8 +413,9 @@ def walk_forward_elastic_net_with_weights(
     test_window_days: int = 20,
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
+    residual_baseline_columns: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return scale-consistent predictions plus per-window coefficients."""
+    """Return pure-increment predictions plus per-window coefficients."""
 
     return _walk_forward_elastic_net(
         panel,
@@ -392,6 +427,7 @@ def walk_forward_elastic_net_with_weights(
         test_window_days=test_window_days,
         alpha=alpha,
         l1_ratio=l1_ratio,
+        residual_baseline_columns=residual_baseline_columns,
     )
 
 
@@ -408,10 +444,18 @@ def static_lightgbm_feature_importance(
 
     import polars as pl
 
+    residual_baseline_columns = _validate_residual_baseline_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
+    prepared_columns = _joint_model_input_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
     prepared = _prepare_joint_model_frame_polars(
         panel,
         labels,
-        feature_columns=feature_columns,
+        feature_columns=prepared_columns,
         label_column=label_column,
     )
     train = prepared.filter(pl.col("date").dt.year().is_in(list(train_years)))
@@ -419,10 +463,6 @@ def static_lightgbm_feature_importance(
         raise ValueError("static LightGBM training sample is too small")
     model = _lightgbm_regressor(len(feature_columns))
     feature_list = list(feature_columns)
-    residual_baseline_columns = _validate_residual_baseline_columns(
-        feature_columns,
-        residual_baseline_columns,
-    )
     y_train = train.select(label_column).to_series().to_numpy()
     if residual_baseline_columns:
         y_train = (
@@ -475,10 +515,18 @@ def static_lightgbm_predict(
 
     import polars as pl
 
+    residual_baseline_columns = _validate_residual_baseline_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
+    prepared_columns = _joint_model_input_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
     prepared = _prepare_joint_model_frame_polars(
         panel,
         labels,
-        feature_columns=feature_columns,
+        feature_columns=prepared_columns,
         label_column=label_column,
     )
     train = prepared.filter(pl.col("date").dt.year().is_in(list(train_years)))
@@ -489,10 +537,6 @@ def static_lightgbm_predict(
         raise ValueError("static LightGBM prediction sample is empty")
     model = _lightgbm_regressor(len(feature_columns))
     feature_list = list(feature_columns)
-    residual_baseline_columns = _validate_residual_baseline_columns(
-        feature_columns,
-        residual_baseline_columns,
-    )
     y_train = train.select(label_column).to_series().to_numpy()
     if residual_baseline_columns:
         y_train = (
@@ -506,13 +550,6 @@ def static_lightgbm_predict(
         y_train,
     )
     prediction = model.predict(test.select(feature_list).to_numpy())
-    if residual_baseline_columns:
-        prediction = (
-            prediction
-            + test.select(list(residual_baseline_columns))
-            .mean_horizontal()
-            .to_numpy()
-        )
     ranked = (
         test.select(["date", "instrument"])
         .with_columns(pl.Series("factor", prediction).cast(pl.Float64))
@@ -538,10 +575,18 @@ def walk_forward_lightgbm(
 ) -> pd.DataFrame:
     """Generate causal rolling 60-day train / 20-day OOS predictions."""
 
+    residual_baseline_columns = _validate_residual_baseline_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
+    prepared_columns = _joint_model_input_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
     merged = _prepare_joint_model_frame_polars(
         panel,
         labels,
-        feature_columns=feature_columns,
+        feature_columns=prepared_columns,
         label_column=label_column,
     )
     predictions, _ = _walk_forward_lightgbm_prepared_polars(
@@ -569,10 +614,18 @@ def walk_forward_lightgbm_with_importance(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Generate LightGBM predictions plus per-window feature importance."""
 
+    residual_baseline_columns = _validate_residual_baseline_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
+    prepared_columns = _joint_model_input_columns(
+        feature_columns,
+        residual_baseline_columns,
+    )
     merged = _prepare_joint_model_frame_polars(
         panel,
         labels,
-        feature_columns=feature_columns,
+        feature_columns=prepared_columns,
         label_column=label_column,
     )
     return _walk_forward_lightgbm_prepared_polars(
@@ -599,7 +652,13 @@ def _walk_forward_lightgbm_prepared(
     """Fit LightGBM on a pre-standardized common sample."""
 
     missing = sorted(
-        {"date", "instrument", label_column, *feature_columns}.difference(
+        {
+            "date",
+            "instrument",
+            label_column,
+            *feature_columns,
+            *residual_baseline_columns,
+        }.difference(
             prepared.columns
         )
     )
@@ -670,13 +729,6 @@ def _walk_forward_lightgbm_prepared(
         prediction = model.predict(
             test.loc[:, list(feature_columns)].to_numpy(dtype=float)
         )
-        if residual_baseline_columns:
-            prediction = (
-                prediction
-                + test.loc[:, list(residual_baseline_columns)]
-                .mean(axis=1)
-                .to_numpy(dtype=float)
-            )
         block["factor"] = prediction
         outputs.append(_daily_rank_factor_polars(block))
     if not outputs:
@@ -703,7 +755,13 @@ def _walk_forward_lightgbm_prepared_polars(
     import polars as pl
 
     missing = sorted(
-        {"date", "instrument", label_column, *feature_columns}.difference(
+        {
+            "date",
+            "instrument",
+            label_column,
+            *feature_columns,
+            *residual_baseline_columns,
+        }.difference(
             prepared.columns
         )
     )
@@ -773,11 +831,6 @@ def _walk_forward_lightgbm_prepared_polars(
                 }
             )
         prediction = model.predict(test.select(feature_list).to_numpy())
-        if residual_baseline_columns:
-            prediction = (
-                prediction
-                + test.select(residual_baseline_list).mean_horizontal().to_numpy()
-            )
         outputs.append(
             test.select(["date", "instrument"])
             .with_columns(pl.Series("factor", prediction).cast(pl.Float64))
@@ -880,16 +933,20 @@ def lightgbm_candidate_incremental_validation(
         raise ValueError("candidate_columns must not be empty")
     if set(base_feature_columns).intersection(candidate_columns):
         raise ValueError("base and candidate feature columns must be disjoint")
+    all_features = (*base_feature_columns, *candidate_columns)
     residual_baseline_columns = _validate_residual_baseline_columns(
-        base_feature_columns,
+        all_features,
         residual_baseline_columns,
     )
-    all_features = (*base_feature_columns, *candidate_columns)
     if prediction_loader is None:
+        prepared_columns = _joint_model_input_columns(
+            all_features,
+            residual_baseline_columns,
+        )
         prepared = _prepare_joint_model_frame(
             panel,
             labels,
-            feature_columns=all_features,
+            feature_columns=prepared_columns,
             label_column=label_column,
         )
 

@@ -341,7 +341,7 @@ PYTHONPATH=src conda run --no-capture-output -n quant \
 `--check` 只验证合成数据合同，不产生有效性结论。统一组合训练、冻结和
 `composite/` 登记由主仓库负责人完成。
 
-主仓库负责人使用已核验快照正式运行 I、T 和三条组合管线：
+主仓库负责人使用已核验快照正式运行 S、I、T 和三条组合管线：
 
 ```bash
 cd /Users/yuanye/Projects/bigquant
@@ -386,10 +386,8 @@ PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant
   --refresh-tree-candidate CANDIDATE_ID
 ```
 
-S、I、T 的内容寻址/冻结缓存分别位于
-`data/cache/single_factor_v3_trial_only/`、
-`data/cache/incremental_v7_entry_only/` 和
-`data/cache/tree_v6_orthogonal_entry/`，正常运行会自动复用完全相同的输入。新增或
+S、I、T 的内容寻址/冻结缓存目录必须由正式运行命令显式传入，并在准入合同、
+输入年份或数据快照变化时使用新版本名；正常运行只复用完全相同的输入。新增或
 修改候选只会生成包含该候选的新缓存键；S 满足质量/稳定/低重复要求、I 满足线性或残差信息要求、T 满足正交要求后
 才能写入冻结池。准入阶段不跑本地 J 或逐因子增量模型，不得通过删除缓存、改报告或
 沿用原编号绕过冻结验证。冻结候选发生机制或取值变化必须登记为新版本并重新走完整准入。

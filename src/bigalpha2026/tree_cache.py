@@ -10,7 +10,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v6-orthogonal-entry"
+TREE_CACHE_SCHEMA_VERSION = (
+    "tree-prediction-cache-v7-screened15-residual-output"
+)
 PREDICTION_COLUMNS = ("date", "instrument", "factor")
 LIGHTGBM_IMPORTANCE_COLUMNS = (
     "train_start",
@@ -147,11 +149,13 @@ class TreePredictionCache:
         )
         if missing:
             raise ValueError(f"tree cache lacks feature fingerprints: {missing}")
-        invalid_baseline = sorted(set(residual_baseline_columns).difference(feature_columns))
-        if invalid_baseline:
+        baseline_overlap = sorted(
+            set(residual_baseline_columns).intersection(feature_columns)
+        )
+        if baseline_overlap:
             raise ValueError(
-                "tree cache residual baseline columns must be a subset of "
-                f"feature_columns: {invalid_baseline}"
+                "tree cache residual controls must not enter model features: "
+                f"{baseline_overlap}"
             )
         return {
             "schema_version": TREE_CACHE_SCHEMA_VERSION,
@@ -159,6 +163,10 @@ class TreePredictionCache:
             "feature_fingerprints": {
                 feature: self.feature_fingerprints[feature]
                 for feature in feature_columns
+            },
+            "residual_baseline_fingerprints": {
+                feature: self.feature_fingerprints[feature]
+                for feature in residual_baseline_columns
             },
             "label_column": label_column,
             "label_fingerprint": self.label_fingerprint,

@@ -33,6 +33,13 @@ line-length = 100
 # repeated helper imports/definitions are intentional until it is promoted.
 "submissions/lgbm_t_top50_candidate.py" = ["F811", "I001"]
 "submissions/lgbm_t_top50_candidate.ipynb" = ["F811", "I001"]
+# Self-contained submission artifacts intentionally embed several standalone
+# candidate modules in one file/cell. Their duplicate imports and helper names
+# are isolated inside the runtime installer and are therefore expected.
+"submissions/*_candidate.py" = ["F811", "I001"]
+"submissions/*_candidate.ipynb" = ["F811", "I001"]
+"remote_submission_notebooks/*_candidate.py" = ["F811", "I001"]
+"remote_submission_notebooks/*_candidate.ipynb" = ["F811", "I001"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
