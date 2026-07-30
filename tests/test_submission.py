@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import ast
 import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SUBMISSIONS = ROOT / "submissions"
+REMOTE_SUBMISSIONS = ROOT / "remote_submission_notebooks"
 EXPECTED_FILES = {
     "README.md",
     "smoke_v01.py",
@@ -67,6 +70,56 @@ class SubmissionTest(unittest.TestCase):
                 self.assertEqual(
                     "".join(code_cells[0]["source"]),
                     source_path.read_text(encoding="utf-8"),
+                )
+
+    def test_embedded_candidate_transforms_execute_in_isolation(self):
+        sources = [
+            *sorted(SUBMISSIONS.glob("*_candidate.py")),
+            *sorted(REMOTE_SUBMISSIONS.glob("*_candidate.py")),
+        ]
+        smoke = r"""
+import ast
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+path = Path(sys.argv[1])
+tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+installer = next(
+    node
+    for node in tree.body
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    and node.name == "_install_bigalpha_candidate_modules"
+)
+namespace = {}
+exec(
+    compile(ast.Module(body=[installer], type_ignores=[]), str(path), "exec"),
+    namespace,
+)
+namespace["_install_bigalpha_candidate_modules"]()
+from bigalpha2026.candidate_transforms import daily_median_centered_rank
+
+frame = pd.DataFrame(
+    {
+        "date": pd.to_datetime(["2023-01-03"] * 3),
+        "factor_raw": [1.0, np.nan, 3.0],
+    }
+)
+result = daily_median_centered_rank(frame)
+assert result.tolist() == [-2.0 / 3.0, 0.0, 2.0 / 3.0], result.tolist()
+"""
+        for source_path in sources:
+            if "_install_bigalpha_candidate_modules" not in source_path.read_text(
+                encoding="utf-8"
+            ):
+                continue
+            with self.subTest(source=source_path.name):
+                subprocess.run(
+                    [sys.executable, "-c", smoke, str(source_path)],
+                    check=True,
+                    cwd=ROOT,
                 )
 
     def test_current_learned_models_keep_frozen_training_contracts(self):

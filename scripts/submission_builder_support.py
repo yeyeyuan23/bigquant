@@ -83,6 +83,7 @@ def discover_candidate_modules(candidate_ids: list[str]) -> dict[str, str]:
 
     pandas_transforms = '''"""Pandas-only transforms for self-contained AIStudio submission."""
 import numpy as np
+import pandas as pd
 
 def daily_median_centered_rank(frame, *, raw_column="factor_raw", date_column="date", orientation=1.0, fill_value=0.0):
     raw = pd.to_numeric(frame[raw_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
