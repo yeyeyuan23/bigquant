@@ -1980,6 +1980,40 @@ def _build_top50_daily_components(raw5, pool, factorlib, exposure, pd, np):
 def _candidate_factors(selected, financial, factorlib, exposure, daily_features, pool):
     _install_bigalpha_candidate_modules()
     import importlib
+    import inspect
+
+    available_inputs = {
+        "financial": financial,
+        "financial_panel": financial,
+        "factorlib": factorlib,
+        "exposure": exposure,
+        "exposures": exposure,
+        "daily_features": daily_features,
+        "daily_bars": daily_features,
+        "bars": daily_features,
+        "pv": daily_features,
+        "micro": daily_features,
+        "micro_daily": daily_features,
+        "pool": pool,
+    }
+
+    def invoke(builder, candidate_id):
+        arguments = []
+        for parameter in inspect.signature(builder).parameters.values():
+            if parameter.kind not in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            ):
+                continue
+            if parameter.default is not inspect.Parameter.empty:
+                continue
+            if parameter.name not in available_inputs:
+                raise ValueError(
+                    f"unsupported required parameter {parameter.name!r} "
+                    f"for {candidate_id}"
+                )
+            arguments.append(available_inputs[parameter.name])
+        return builder(*arguments)
 
     results = {}
     for candidate_id in selected:
@@ -1987,17 +2021,14 @@ def _candidate_factors(selected, financial, factorlib, exposure, daily_features,
         module_name = "bigalpha2026.candidates." + {"FR": "fr", "HF": "hf", "PV": "pv", "OB": "ob", "INT": "composite"}[family] + "." + family.lower() + "_" + number
         module = importlib.import_module(module_name)
         stem = candidate_id.lower().replace("-", "_")
-        builder = getattr(module, f"build_{stem}_factor_from_daily", None)
-        if builder is not None:
-            results[candidate_id] = builder(daily_features, pool)
-            continue
-        if family == "FR" and candidate_id == "FR-002":
-            results[candidate_id] = module.build_fr_002_factor_from_panel(financial, pool)
-            continue
-        builder = getattr(module, f"build_{stem}_factor", None)
+        builder = None
+        for suffix in ("factor_from_daily", "factor_from_panel", "factor"):
+            builder = getattr(module, f"build_{stem}_{suffix}", None)
+            if builder is not None:
+                break
         if builder is None:
             raise ValueError(f"no builder found for {candidate_id}")
-        results[candidate_id] = builder(daily_features, pool)
+        results[candidate_id] = invoke(builder, candidate_id)
     return results
 
 
@@ -2055,6 +2086,7 @@ def main(datasources, start_date, end_date):
     from sklearn.linear_model import ElasticNet
 
     self_columns = ['FR-005', 'HF-001', 'HF-003', 'PV-003', 'PV-014', 'PV-009', 'HF-039', 'HF-041', 'HF-042', 'HF-043', 'HF-044', 'HF-045', 'HF-046', 'HF-048', 'HF-049', 'HF-050', 'HF-053', 'HF-057', 'HF-059', 'HF-062', 'HF-063', 'HF-064', 'HF-065', 'HF-066', 'HF-067', 'HF-068', 'HF-069', 'HF-070', 'HF-071', 'HF-072', 'HF-076', 'HF-077', 'PV-026', 'PV-027', 'PV-028', 'PV-029', 'PV-031', 'PV-033', 'PV-034', 'PV-036', 'PV-040', 'PV-041', 'PV-042', 'HF-014', 'HF-015', 'HF-017', 'HF-018', 'HF-019', 'HF-023', 'HF-024', 'HF-025', 'HF-032', 'HF-034', 'HF-036']
+    screened15_lambda = 0.0
     start_ts, end_ts, model_history_start, public_columns, pool, factorlib, exposure, financial, daily_features = _load_common_inputs(datasources, start_date, end_date, pd, np)
     public_directions = {"amount": -1.0, "atr_14": -1.0, "bias_20": -1.0, "cci_14": -1.0, "float_market_cap": -1.0, "kdj_d_9_3_3": -1.0, "macd_diff_12_26_9": -1.0, "macd_hist_12_26_9": -1.0, "momentum_5": -1.0, "net_profit_rate_ttm": 1.0, "netflow_amount_rate_main": -1.0, "total_market_cap": -1.0, "turn": -1.0, "volatility_5": -1.0, "volume": -1.0}
     factors = _candidate_factors(self_columns, financial, factorlib, exposure, daily_features, pool)
@@ -2124,7 +2156,16 @@ def main(datasources, start_date, end_date):
             train["target_residual"].to_numpy(dtype=float),
         )
         block = test[["date", "instrument"]].copy()
-        block["factor_raw"] = model.predict(test.loc[:, list(feature_columns)].to_numpy(dtype=float))
+        residual_prediction = model.predict(
+            test.loc[:, list(feature_columns)].to_numpy(dtype=float)
+        )
+        baseline_prediction = test.loc[
+            :, list(residual_baseline_columns)
+        ].mean(axis=1).to_numpy(dtype=float)
+        block["factor_raw"] = (
+            residual_prediction
+            + screened15_lambda * baseline_prediction
+        )
         predictions.append(block)
     pred = pd.concat(predictions, ignore_index=True)
     pred["factor"] = _rank_center(pd.Series(pred["factor_raw"]), pred["date"], np)
