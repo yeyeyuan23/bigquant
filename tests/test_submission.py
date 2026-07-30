@@ -101,6 +101,10 @@ class SubmissionTest(unittest.TestCase):
             "screened15_lambda * baseline_prediction",
             lgbm,
         )
+        self.assertIn("def _iter_bar5m_parts(", lgbm)
+        self.assertIn("yield part", lgbm)
+        self.assertIn("gc.collect()", lgbm)
+        self.assertNotIn("return pd.concat(parts, ignore_index=True)", lgbm)
         self.assertIn('"exposures": exposure', lgbm)
         self.assertIn("inspect.signature(builder)", lgbm)
         self.assertIn("return builder(*arguments)", lgbm)

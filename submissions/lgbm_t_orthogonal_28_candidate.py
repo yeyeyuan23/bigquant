@@ -1802,7 +1802,7 @@ def _apply_financial_effective_dates(financial, pool, pd, np):
     return financial.drop(columns=["date"])
 
 
-def _query_bar5m(dai, pd, history_start, end_ts):
+def _iter_bar5m_parts(dai, pd, history_start, end_ts):
     sql = """
         SELECT date, instrument, pre_close, open, high, low, close, amount, volume, deal_number,
                ask_price1, ask_price2, ask_price3, ask_price4, ask_price5,
@@ -1811,23 +1811,27 @@ def _query_bar5m(dai, pd, history_start, end_ts):
                bid_volume1, bid_volume2, bid_volume3, bid_volume4, bid_volume5
         FROM bigalpha_2026_stock_bar5m
     """
-    parts = []
-    cursor = history_start.to_period("M")
-    final_period = end_ts.to_period("M")
-    while cursor <= final_period:
-        month_start = max(history_start, cursor.start_time.normalize())
-        month_end = end_ts if cursor == final_period else cursor.end_time.normalize()
+    cursor = history_start.normalize()
+    final_date = end_ts.normalize()
+    found = False
+    while cursor <= final_date:
+        chunk_end = min(final_date, cursor + pd.Timedelta(days=13))
         part = dai.query(
             sql,
-            filters={"date": [month_start.strftime("%Y-%m-%d 00:00:00"), month_end.strftime("%Y-%m-%d 23:59:59")]},
+            filters={
+                "date": [
+                    cursor.strftime("%Y-%m-%d 00:00:00"),
+                    chunk_end.strftime("%Y-%m-%d 23:59:59"),
+                ]
+            },
             compression=True,
         ).df()
         if not part.empty:
-            parts.append(part)
-        cursor += 1
-    if not parts:
+            found = True
+            yield part
+        cursor = chunk_end + pd.Timedelta(days=1)
+    if not found:
         raise ValueError("stock_bar5m query returned no rows")
-    return pd.concat(parts, ignore_index=True)
 
 
 def _canonicalize_bar5m(raw, pd, np):
@@ -1937,16 +1941,82 @@ def _daily_from_bar5m(canonical, pd, np):
     return output
 
 
-def _build_top50_daily_components(raw5, pool, factorlib, exposure, pd, np):
-    canonical = _canonicalize_bar5m(raw5, pd, np)
-    pool_keys = pool[["date", "instrument"]].rename(columns={"date": "trade_date"}).copy()
+def _build_top50_daily_components(
+    dai,
+    history_start,
+    end_ts,
+    pool,
+    factorlib,
+    exposure,
+    pd,
+    np,
+):
+    import gc
+
+    feature_pool = pool.loc[
+        pool["date"].between(history_start.normalize(), end_ts.normalize())
+    ].copy()
+    pool_keys = feature_pool[["date", "instrument"]].rename(
+        columns={"date": "trade_date"}
+    )
     pool_keys["trade_date"] = pd.to_datetime(pool_keys["trade_date"], errors="coerce").dt.normalize()
-    canonical = canonical.merge(pool_keys, on=["trade_date", "instrument"], how="inner", validate="many_to_one")
-    base = _daily_from_bar5m(canonical, pd, np)
-    pilot = compute_pilot_components(canonical, min_day_minutes=36, min_pm_returns=18, min_last30_returns=4, min_corr_pairs=24)
-    remaining = compute_remaining_components(canonical, min_day_minutes=36, min_session_returns=18, min_between_returns=18, min_qrs_windows=12, min_corr_pairs=24, min_amihud_pairs=24)
-    minute_daily = compute_minute_daily(canonical)
-    fz = compute_report_factors(minute_daily, base, base, factorlib, exposure, pool)
+    base_parts = []
+    pilot_parts = []
+    remaining_parts = []
+    minute_daily_parts = []
+    for raw5 in _iter_bar5m_parts(dai, pd, history_start, end_ts):
+        canonical = _canonicalize_bar5m(raw5, pd, np)
+        canonical = canonical.merge(
+            pool_keys,
+            on=["trade_date", "instrument"],
+            how="inner",
+            validate="many_to_one",
+        )
+        if not canonical.empty:
+            base_parts.append(_daily_from_bar5m(canonical, pd, np))
+            pilot_parts.append(
+                compute_pilot_components(
+                    canonical,
+                    min_day_minutes=36,
+                    min_pm_returns=18,
+                    min_last30_returns=4,
+                    min_corr_pairs=24,
+                )
+            )
+            remaining_parts.append(
+                compute_remaining_components(
+                    canonical,
+                    min_day_minutes=36,
+                    min_session_returns=18,
+                    min_between_returns=18,
+                    min_qrs_windows=12,
+                    min_corr_pairs=24,
+                    min_amihud_pairs=24,
+                )
+            )
+            minute_daily_parts.append(compute_minute_daily(canonical))
+        del raw5, canonical
+        gc.collect()
+    if not base_parts:
+        raise ValueError("stock_bar5m chunks produced no daily features")
+    base = pd.concat(base_parts, ignore_index=True)
+    pilot = pd.concat(pilot_parts, ignore_index=True)
+    remaining = pd.concat(remaining_parts, ignore_index=True)
+    minute_daily = pd.concat(minute_daily_parts, ignore_index=True)
+    feature_factorlib = factorlib.loc[
+        factorlib["date"].between(history_start.normalize(), end_ts.normalize())
+    ]
+    feature_exposure = exposure.loc[
+        exposure["date"].between(history_start.normalize(), end_ts.normalize())
+    ]
+    fz = compute_report_factors(
+        minute_daily,
+        base,
+        base,
+        feature_factorlib,
+        feature_exposure,
+        feature_pool,
+    )
     fz_columns = ["date", "instrument"] + [column for column in fz.columns if column.startswith("FZ-")]
     merged = base.merge(
         pilot,
@@ -2065,8 +2135,16 @@ def _load_common_inputs(datasources, start_date, end_date, pd, np):
         pd.to_numeric(factorlib["turn"], errors="coerce").abs()
     )
     financial = _apply_financial_effective_dates(financial, pool, pd, np)
-    raw5 = _query_bar5m(dai, pd, bar5m_start, end_ts)
-    daily_features = _build_top50_daily_components(raw5, pool, factorlib, exposure, pd, np)
+    daily_features = _build_top50_daily_components(
+        dai,
+        bar5m_start,
+        end_ts,
+        pool,
+        factorlib,
+        exposure,
+        pd,
+        np,
+    )
     return (
         start_ts,
         end_ts,
