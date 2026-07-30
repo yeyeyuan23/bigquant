@@ -232,7 +232,7 @@ class FactorLibraryPoolGate:
 
 @dataclass(frozen=True)
 class SingleFactorRouteGate:
-    """Strict pre-route gate for rule-composite S candidates."""
+    """Strict first-stage gate before a candidate may enter I."""
 
     minimum_coverage: float = 0.95
     minimum_active_days: int = 120
@@ -241,6 +241,10 @@ class SingleFactorRouteGate:
     minimum_positive_fold_ratio: float = 0.60
     minimum_sign_consistency: float = 0.60
     maximum_abs_rank_correlation: float = 0.85
+    minimum_neutral_rank_ic_mean: float = 0.005
+    minimum_industry_coverage: int = 10
+    minimum_industry_date_count: int = 40
+    minimum_industry_same_sign_ratio: float = 0.55
 
 
 @dataclass(frozen=True)

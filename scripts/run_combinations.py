@@ -216,7 +216,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         choices=("sit", "s", "i", "t-importance", "t-orthogonal"),
         default="sit",
         help=(
-            "which admission entrypoint to run: full independent S/I/T, S only, "
+            "which admission entrypoint to run: strict S/I/T funnel, S only, "
             "I only, experimental LightGBM importance ranking, or formal "
             "orthogonal T"
         ),
@@ -225,7 +225,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--single-factor-cache-dir",
         type=Path,
         default=None,
-        help="frozen S state (default: DATA/cache/single_factor_v3_trial_only)",
+        help="frozen S state (default: DATA/cache/single_factor_v4_funnel)",
     )
     parser.add_argument(
         "--incremental-cache-dir",
@@ -1477,12 +1477,12 @@ def run_route_admissions(
     IncrementalAdmissionResult,
     TreeAdmissionResult,
 ]:
-    """Run S, I and T independently without cross-route pre-filtering."""
+    """Run the strict S -> I -> T candidate funnel."""
 
     single_factor_state = (
         Path(single_factor_cache_dir)
         if single_factor_cache_dir is not None
-        else reports_dir.parent / "data" / "cache" / "single_factor_v3_trial_only"
+        else reports_dir.parent / "data" / "cache" / "single_factor_v4_funnel"
     ) / "frozen_state.json"
     single_factor = run_single_factor_route_admission(
         oriented.loc[oriented["date"].dt.year.isin(DEVELOPMENT_YEARS)],
@@ -1496,11 +1496,18 @@ def run_route_admissions(
         if incremental_cache_dir is not None
         else reports_dir.parent / "data" / "cache" / "incremental_v7_entry_only"
     )
+    incremental_candidates = tuple(
+        candidate
+        for candidate in single_factor.admitted_candidates
+        if candidate in self_columns
+    )
+    if not incremental_candidates:
+        raise ValueError("I requires at least one candidate admitted by S")
     incremental = run_incremental_admission(
         oriented,
         labels,
         selected_public,
-        self_columns,
+        incremental_candidates,
         score_reference,
         development_years=DEVELOPMENT_YEARS,
         cache_dir=resolved_incremental_cache,
@@ -1513,9 +1520,13 @@ def run_route_admissions(
         if tree_cache_dir is not None
         else reports_dir.parent / "data" / "cache" / "tree_v6_orthogonal_entry"
     )
-    # T is an independent route.  It must see every technically available
-    # self factor rather than inheriting I's frozen pool.
-    tree_candidate_columns = tuple(dict.fromkeys(self_columns))
+    tree_candidate_columns = tuple(
+        candidate
+        for candidate in incremental.frozen_after
+        if candidate in incremental_candidates
+    )
+    if not tree_candidate_columns:
+        raise ValueError("T requires at least one candidate admitted by I")
     tree = run_tree_admission(
         oriented,
         labels,
@@ -1550,7 +1561,7 @@ def build_validation_pipelines(
     dict[str, dict[str, float]],
     dict[str, dict[str, object]],
 ]:
-    """Train and orient the three routes on their independent admitted pools."""
+    """Train and orient the three routes on their nested admitted pools."""
 
     elastic_net_features = (
         *selected_public,
@@ -1947,7 +1958,7 @@ def build_experiment_result(
     """Build the stable JSON contract consumed by downstream tools."""
 
     return {
-        "protocol": "isolated_combination_pipelines_v12_2019_2022_dev_2023_2024_J",
+        "protocol": "strict_s_i_t_funnel_v13_2019_2022_dev_2023_2024_J",
         "development_years": list(DEVELOPMENT_YEARS),
         "validation_years": [
             EVALUATION_YEARS[0],
@@ -1972,7 +1983,7 @@ def build_experiment_result(
         "single_factor_route_admission": {
             "eligible_candidates": list(s_candidate_features),
             "admitted_candidates": list(single_factor_result.admitted_candidates),
-            "selection": "strict_trial_only",
+            "selection": "strict_s_funnel",
             "promotion": single_factor_result.promotion_summary,
         },
         "learned_model_preprocessing": ("daily_centered_rank_features_and_target_neutral_fill"),
@@ -2017,6 +2028,21 @@ def frozen_i_candidates_from_state(cache_dir: Path) -> tuple[str, ...]:
     candidates = tuple(dict.fromkeys(map(str, state.get("frozen_candidates", []))))
     if not candidates:
         raise ValueError(f"frozen I state has no candidates: {state_path}")
+    return candidates
+
+
+def frozen_s_candidates_from_state(cache_dir: Path) -> tuple[str, ...]:
+    state_path = cache_dir / "frozen_state.json"
+    if not state_path.exists():
+        raise FileNotFoundError(f"missing frozen S state: {state_path}")
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    candidates = tuple(
+        dict.fromkeys(
+            map(str, state.get("frozen_candidates", []))
+        )
+    )
+    if not candidates:
+        raise ValueError(f"frozen S state has no candidates: {state_path}")
     return candidates
 
 
@@ -2219,12 +2245,7 @@ def run_t_importance_stage(
     payload = {
         "stage": "t-importance",
         "mode": "lightgbm_importance_top_self_features",
-        "source_pool": (
-            "all_self_candidates"
-            if os.getenv("BIGALPHA_T_IMPORTANCE_SOURCE_POOL", "i").strip().lower()
-            in {"all", "all_self", "all_self_candidates"}
-            else "frozen_I_candidates"
-        ),
+        "source_pool": "frozen_I_candidates",
         "candidate_count": len(self_feature_columns),
         "top_n": top_n,
         "selected_self_count": len(selected_self),
@@ -2367,9 +2388,7 @@ def run_split_stage(
         screening["selected"] = screening["feature"].isin(public_columns)
         oriented = apply_feature_directions(panel, screening)
         selected_public = tuple(public_columns)
-        tree_candidate_columns = tuple(
-            column for column in self_columns if column.startswith("self__")
-        )
+        tree_candidate_columns = tuple(self_columns)
         if not tree_candidate_columns:
             raise ValueError("orthogonal T requires at least one self candidate")
         tree = run_tree_admission(
@@ -2390,7 +2409,7 @@ def run_split_stage(
         tree.write_states()
         payload = {
             "stage": "t-orthogonal",
-            "source_pool": "all_self_candidates",
+            "source_pool": "frozen_I_candidates",
             "candidate_count": len(tree_candidate_columns),
             "tree_admitted_count": len(tree.admitted_candidates),
             "tree_admitted_candidates": list(tree.admitted_candidates),
@@ -2585,7 +2604,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     single_factor_cache_dir = (
         args.single_factor_cache_dir
         if args.single_factor_cache_dir is not None
-        else args.data_dir / "cache" / "single_factor_v3_trial_only"
+        else args.data_dir / "cache" / "single_factor_v4_funnel"
     )
     incremental_cache_dir = (
         args.incremental_cache_dir
@@ -2597,31 +2616,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.tree_cache_dir is not None
         else args.data_dir / "cache" / "tree_v6_orthogonal_entry"
     )
-    t_source_pool = os.getenv(
-        "BIGALPHA_T_IMPORTANCE_SOURCE_POOL",
-        "i",
-    ).strip().lower()
-    if args.admission_routes == "t-importance":
-        if t_source_pool in {"all", "all_self", "all_self_candidates"}:
-            candidate_manifest = json.loads(
-                (args.data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
-            )
-            candidate_filter = tuple(
-                f"self__{candidate_id}"
-                for candidate_id in sorted(candidate_manifest.get("candidate_rows", {}))
-            )
-        else:
-            candidate_filter = frozen_i_candidates_from_state(incremental_cache_dir)
-    elif args.admission_routes == "t-orthogonal":
-        # Formal T is independent of I and therefore loads the full technical
-        # candidate universe.
-        candidate_filter = None
+    if args.admission_routes == "i":
+        candidate_filter = frozen_s_candidates_from_state(
+            single_factor_cache_dir
+        )
+    elif args.admission_routes in {"t-importance", "t-orthogonal"}:
+        candidate_filter = frozen_i_candidates_from_state(
+            incremental_cache_dir
+        )
     else:
         candidate_filter = None
     input_years = (
-        DEVELOPMENT_YEARS
-        if args.admission_routes in {"i", "t-orthogonal"}
-        else YEARS
+        YEARS
+        if args.admission_routes == "sit"
+        else DEVELOPMENT_YEARS
     )
     (
         panel,

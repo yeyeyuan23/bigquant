@@ -8,6 +8,7 @@ from bigalpha2026.official_week4_proxy import (
     barra_style_exposure_profile,
     index_enhancement_metrics,
     industry_rank_ic_profile,
+    neutralize_factor_against_styles_and_industry,
     paired_index_enhancement_delta,
     prepare_available_barra_styles,
 )
@@ -106,6 +107,74 @@ class OfficialWeek4ProxyTest(unittest.TestCase):
         self.assertEqual(summary["industry_coverage"], 2)
         self.assertAlmostEqual(summary["industry_ic_same_sign_ratio"], 1.0)
         self.assertAlmostEqual(summary["industry_ic_worst_oriented"], 1.0)
+
+    def test_neutralization_removes_industry_and_style_components(self):
+        dates = []
+        instruments = []
+        industries = []
+        sizes = []
+        factors = []
+        for day in range(3):
+            for industry_index, industry in enumerate(("A", "B")):
+                for rank in range(20):
+                    dates.append(f"2024-02-{day + 1:02d}")
+                    instruments.append(f"{industry}{rank:02d}")
+                    industries.append(industry)
+                    size = float(rank - 9.5)
+                    signal = float(((rank * 7) % 11) - 5)
+                    sizes.append(size)
+                    factors.append(
+                        4.0 * industry_index
+                        + 2.5 * size
+                        + signal
+                    )
+        keys = {"date": dates, "instrument": instruments}
+        factor = pl.DataFrame(
+            {**keys, "factor": factors}
+        ).with_columns(pl.col("date").str.to_datetime())
+        exposures = pl.DataFrame(
+            {
+                **keys,
+                "industry_level1_code": industries,
+                "SIZE": sizes,
+            }
+        ).with_columns(
+            pl.col("date").str.to_datetime().cast(pl.Datetime("ns"))
+        )
+
+        neutralized = neutralize_factor_against_styles_and_industry(
+            factor,
+            exposures,
+        ).join(
+            exposures,
+            on=["date", "instrument"],
+            how="inner",
+            validate="1:1",
+        )
+        daily_industry_means = neutralized.group_by(
+            ["date", "industry_level1_code"]
+        ).agg(
+            pl.col("factor").mean().abs().alias("absolute_mean")
+        )
+        daily_style_correlation = neutralized.group_by(
+            "date"
+        ).agg(
+            pl.corr("factor", "SIZE")
+            .abs()
+            .alias("absolute_correlation")
+        )
+        self.assertLess(
+            float(daily_industry_means["absolute_mean"].max()),
+            1e-10,
+        )
+        self.assertLess(
+            float(
+                daily_style_correlation[
+                    "absolute_correlation"
+                ].max()
+            ),
+            1e-10,
+        )
 
     def test_index_enhancement_delta_uses_identical_keys(self):
         dates = []

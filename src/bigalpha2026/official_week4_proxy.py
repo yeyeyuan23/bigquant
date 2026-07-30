@@ -54,6 +54,187 @@ class IndexEnhancementResult:
     summary: pl.DataFrame
 
 
+def neutralize_factor_against_styles_and_industry(
+    factor: pl.DataFrame,
+    exposures: pl.DataFrame,
+    *,
+    industry_column: str = "industry_level1_code",
+    minimum_rows: int = 30,
+) -> pl.DataFrame:
+    """Remove daily industry fixed effects and available BARRA style exposures.
+
+    Industry fixed effects are removed with a within-industry transform. The
+    remaining style coefficients are solved for all dates in one batched
+    linear-algebra operation; there is no Python loop over dates or stocks.
+    """
+
+    if minimum_rows < 2:
+        raise ValueError("minimum_rows must be at least 2")
+    normalized_factor = _normalize_keys(factor, name="factor")
+    if "factor" not in normalized_factor.columns:
+        raise ValueError("factor is missing factor column")
+    prepared_exposures = prepare_available_barra_styles(exposures)
+    used_styles = tuple(
+        style
+        for style in OFFICIAL_BARRA_STYLE_COLUMNS
+        if style in prepared_exposures.columns
+    )
+    has_industry = industry_column in prepared_exposures.columns
+    if not used_styles and not has_industry:
+        raise ValueError("no industry or disclosed BARRA styles are available")
+
+    exposure_columns = (
+        *used_styles,
+        *((industry_column,) if has_industry else ()),
+    )
+    joined = (
+        normalized_factor.select(
+            *KEY_COLUMNS,
+            pl.col("factor").cast(pl.Float64, strict=False),
+        )
+        .join(
+            prepared_exposures.select(
+                *KEY_COLUMNS,
+                *(
+                    pl.col(column).cast(pl.Float64, strict=False)
+                    if column in used_styles
+                    else pl.col(column)
+                    for column in exposure_columns
+                ),
+            ),
+            on=list(KEY_COLUMNS),
+            how="inner",
+            validate="1:1",
+        )
+        .drop_nulls(["factor", *exposure_columns])
+    )
+    if joined.is_empty():
+        raise ValueError("factor and exposures have no complete common rows")
+
+    standardize_columns = ("factor", *used_styles)
+    standardized_expressions: list[pl.Expr] = []
+    for column in standardize_columns:
+        value = pl.col(column)
+        if column == "factor":
+            lower = value.quantile(0.01).over("date")
+            upper = value.quantile(0.99).over("date")
+            value = (
+                pl.when(value < lower)
+                .then(lower)
+                .when(value > upper)
+                .then(upper)
+                .otherwise(value)
+            )
+        mean = value.mean().over("date")
+        std = value.std(ddof=0).over("date")
+        standardized_expressions.append(
+            pl.when(std > 1e-12)
+            .then((value - mean) / std)
+            .otherwise(None)
+            .alias(column)
+        )
+    joined = joined.with_columns(standardized_expressions).drop_nulls(
+        list(standardize_columns)
+    )
+
+    fixed_effect_groups = (
+        ["date", industry_column] if has_industry else ["date"]
+    )
+    centered_columns = {
+        column: f"_centered_{index}"
+        for index, column in enumerate(standardize_columns)
+    }
+    centered = joined.with_columns(
+        (
+            pl.col(column)
+            - pl.col(column).mean().over(fixed_effect_groups)
+        ).alias(centered_columns[column])
+        for column in standardize_columns
+    )
+    factor_centered = centered_columns["factor"]
+    if not used_styles:
+        return (
+            centered.select(
+                *KEY_COLUMNS,
+                pl.col(factor_centered).alias("factor"),
+            )
+            .drop_nulls("factor")
+            .sort(list(KEY_COLUMNS))
+        )
+
+    style_centered = tuple(
+        centered_columns[style] for style in used_styles
+    )
+    moment_expressions: list[pl.Expr] = [pl.len().alias("_n")]
+    for left_index, left in enumerate(style_centered):
+        for right_index in range(left_index, len(style_centered)):
+            right = style_centered[right_index]
+            moment_expressions.append(
+                (pl.col(left) * pl.col(right))
+                .sum()
+                .alias(f"_xx_{left_index}_{right_index}")
+            )
+        moment_expressions.append(
+            (pl.col(left) * pl.col(factor_centered))
+            .sum()
+            .alias(f"_xy_{left_index}")
+        )
+    moments = centered.group_by("date").agg(
+        moment_expressions
+    ).sort("date")
+    row_count = moments.height
+    width = len(style_centered)
+    xtx = np.zeros((row_count, width, width), dtype=np.float64)
+    xty = np.zeros((row_count, width), dtype=np.float64)
+    for left_index in range(width):
+        for right_index in range(left_index, width):
+            values = moments[
+                f"_xx_{left_index}_{right_index}"
+            ].to_numpy()
+            xtx[:, left_index, right_index] = values
+            xtx[:, right_index, left_index] = values
+        xty[:, left_index] = moments[
+            f"_xy_{left_index}"
+        ].to_numpy()
+    coefficients = np.einsum(
+        "nij,nj->ni",
+        np.linalg.pinv(xtx, rcond=1e-10),
+        xty,
+    )
+    valid_dates = moments["_n"].to_numpy() >= max(
+        minimum_rows,
+        width + 1,
+    )
+    coefficients[~valid_dates, :] = np.nan
+    daily_coefficients = pl.DataFrame(
+        {
+            "date": moments["date"],
+            **{
+                f"_beta_{index}": coefficients[:, index]
+                for index in range(width)
+            },
+        }
+    )
+    fitted = pl.sum_horizontal(
+        pl.col(column) * pl.col(f"_beta_{index}")
+        for index, column in enumerate(style_centered)
+    )
+    return (
+        centered.join(
+            daily_coefficients,
+            on="date",
+            how="left",
+            validate="m:1",
+        )
+        .with_columns(
+            (pl.col(factor_centered) - fitted).alias("factor")
+        )
+        .select(*KEY_COLUMNS, "factor")
+        .drop_nulls("factor")
+        .sort(list(KEY_COLUMNS))
+    )
+
+
 def _normalize_keys(frame: pl.DataFrame, *, name: str) -> pl.DataFrame:
     missing = sorted(set(KEY_COLUMNS).difference(frame.columns))
     if missing:

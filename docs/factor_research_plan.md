@@ -169,25 +169,30 @@ S 是规则复合，没有模型自动压低坏因子权重，因此先做严格
 - 年度 fold 最差 Rank IC 不低于 `-0.005`；
 - 年度正向比例和方向一致性均不低于 `0.60`；
 - 与当前 S baseline 的最大绝对 Rank 相关性不高于 `0.85`。
+- 去行业固定效应和可用 BARRA 风格后的 Rank IC 均值不低于 `0.005`；
+- 至少覆盖 10 个行业，每个行业至少 40 个有效日，行业内 IC 同向比例不低于
+  `0.55`。
 
-满足这些质量、稳定性和低重复要求后，候选直接进入最终 S。S 因此是：
+满足这些质量、稳定性、中性化有效性和低重复要求后，候选进入最终 S。这里不会
+因为因子存在风格暴露就直接否决，而是检查剔除行业和风格暴露后是否仍有效。S 因此是：
 
 ```text
 单因子质量合格、强且稳定
+→ 行业内普遍有效，且中性化后仍有效
 → 与当前 S 不过度重复
-→ 冻结进 self_factor_composite
+→ 冻结进 S，成为 I 的唯一候选来源
 ```
 
-Rank IC、t 值、中性化、可交易、稳定性和分组结果仍可作为人工诊断报告输出；
-准入阶段不计算本地 J。
+准入阶段不计算本地 J；可交易、分组和压力期结果继续作为人工诊断。
 
 单因子评价只产生明确路由：
 
 - 满足 S 的质量、稳定性和低重复要求后，其 FR/PV/HF/OB 原子成员进入
   `self_factor_composite`；
 - INT 等已经包含多个底层信号的复合候选不递归进入家族等权组合，避免同一信号
-  重复计权；它们保留独立候选身份并继续完成 I/T 评价；
-- S 路线未通过时保持旧冻结 S；I/T 仍按各自完整池独立评价。
+  重复计权；它们只有通过 S 后才可继续完成 I/T 评价；
+- `I candidates = frozen_S`，`T candidates = frozen_I`。任一层未通过，后续层不再
+  读取该候选。
 
 候选池冻结之后，最终路线选择使用 `competition_score_proxy.py` 计算本地 J。J 的本地参考池是
 `all36 + J baseline candidates`。all36 是公开基础坐标；J baseline candidates 是候选模块显式标记 `INCLUDE_IN_J_BASELINE = True` 的我方候选，用于模拟本队
@@ -286,12 +291,12 @@ I 缓存分成两层：
 时间切分、60/20 窗口、预处理和 Elastic Net 参数。`factor_pool_incremental.csv`
 只是审计报告，禁止再用“候选名称 + 协议文字”充当缓存。已冻结因子的值、可用性
 或评价合同变化时必须直接停止，恢复冻结版本或把修改登记为新候选重新验证。
-命令入口仍为 `scripts/run_combinations.py`；它只准备共享输入并调用独立的
+命令入口仍为 `scripts/run_combinations.py`；它只准备共享输入并调用
 `run_incremental_admission`，精确缓存自动复用，
 `--resume-incremental` 仅为向后兼容。
 
-S 和 I 只控制规则复合与 Elastic Net。LightGBM 使用第 7 节独立的正交准入
-确认 T，不能用 I 结果预筛树模型候选。
+I 只评价通过 S 的候选；LightGBM 使用第 7 节的正交准入确认 T，并且只评价
+通过 I 的候选。
 
 技术门槛未通过时直接标记 `technical_reject`。S/I/T 的前置规则不同：S 看质量、强度、稳定性和低冗余，I 看线性或残差信息，T 看最低质量和正交性。`all36 + J baseline candidates`
 只在候选池冻结后的最终路线选择中使用。
@@ -300,11 +305,11 @@ S 和 I 只控制规则复合与 Elastic Net。LightGBM 使用第 7 节独立的
 
 ## 7. LightGBM 增量评价（T）
 
-T 的独立准入模块为 `src/bigalpha2026/tree_admission.py`，核心入口为
+T 的准入模块为 `src/bigalpha2026/tree_admission.py`，核心入口为
 `run_tree_admission`。模块拥有完整池确认、冻结池晋级及缓存状态；
 `scripts/run_combinations.py` 只负责准备共享输入并调用该入口。
 
-T 只使用 2019—2022 开发期。满足最低质量门槛后，只要与
+T 的输入池固定为 `frozen_I`，只使用 2019—2022 开发期。满足最低质量门槛后，只要与
 `screened15 + frozen_T` 足够正交，就进入 `frozen_T`。逐因子 LightGBM 和条件前向
 J 增量不再作为准入步骤；准入阶段不跑本地 J。
 所有输入按相同股票日、标签、60 日训练、20 日 OOS 和中心化截面百分位秩处理，
@@ -331,11 +336,11 @@ LightGBM 参数。新增或修改候选只使包含该候选的最终联合模�
 
 固定路由为：
 
-- `S=通过`：进入规则复合；
-- `I=通过`：进入联合 Elastic Net；
+- 全部合格候选先跑 S；
+- `S=通过`：原子因子可进入规则复合，同时进入 I 候选池；
+- `I=通过`：进入联合 Elastic Net，同时进入 T 候选池；
 - `T=通过`：进入联合 LightGBM；
-- 三者互不替代，一个候选可以进入一条、两条或三条管线；
-- 三者均未通过：`rejected`。
+- 任一层未通过：停止该候选的后续评价。
 
 高频或盘口候选不足 120 个开发有效日时不运行 T，也不得据此声称树模型无增量；
 补齐连续日频聚合后再评价。
@@ -348,8 +353,8 @@ LightGBM 参数。新增或修改候选只使包含该候选的最终联合模�
 - `scripts/run_combinations.py`
 
 `combinations.py` 只保留准入后的组合、Elastic Net 和 LightGBM 训练原语；
-S/I/T 的流程与状态分别归属三个 admission 模块。组合阶段固定为三条彼此隔离的
-管线：
+S/I/T 的流程与状态分别归属三个 admission 模块，候选池按 `S -> I -> T`
+逐层收缩。组合训练仍固定为三条彼此隔离的管线：
 
 1. `self_factor_composite`：所有获准自研因子按数据族内等权、族间等权合成；
 2. `joint_elastic_net`：冻结的 15 个公开因子与 `I=通过` 的自研因子联合进入

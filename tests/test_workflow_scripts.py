@@ -63,7 +63,7 @@ class WorkflowScriptTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             parse_args(["--admission-routes", "t"])
 
-    def test_default_sit_tree_route_does_not_inherit_frozen_i(self):
+    def test_default_sit_uses_strict_s_i_t_funnel(self):
         oriented = pd.DataFrame(
             {
                 "date": pd.to_datetime(["2019-01-02"]),
@@ -76,12 +76,14 @@ class WorkflowScriptTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(
             run_combinations,
             "run_single_factor_route_admission",
-            return_value=SimpleNamespace(admitted_candidates=()),
+            return_value=SimpleNamespace(
+                admitted_candidates=("self__A",),
+            ),
         ), patch.object(
             run_combinations,
             "run_incremental_admission",
             return_value=incremental,
-        ), patch.object(
+        ) as incremental_mock, patch.object(
             run_combinations,
             "run_tree_admission",
             return_value=tree,
@@ -103,8 +105,12 @@ class WorkflowScriptTest(unittest.TestCase):
                 refresh_tree_candidates=(),
             )
         self.assertEqual(
+            incremental_mock.call_args.args[3],
+            ("self__A",),
+        )
+        self.assertEqual(
             tree_mock.call_args.args[3],
-            ("self__A", "self__B"),
+            ("self__A",),
         )
 
     def test_cleanup_obsolete_combination_reports_removes_only_retired_names(self):
@@ -716,6 +722,65 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertTrue(diagnostics["s_strength_passed"])
         self.assertTrue(diagnostics["s_stability_passed"])
         self.assertTrue(diagnostics["s_redundancy_passed"])
+        self.assertTrue(diagnostics["s_trial_passed"])
+
+    def test_s_trial_gate_checks_neutral_ic_and_industry_breadth(self):
+        dates = pd.date_range("2021-01-01", periods=130, freq="D")
+        rows = []
+        labels = []
+        exposures = []
+        for date in dates:
+            for industry_index in range(10):
+                industry = f"I{industry_index:02d}"
+                for rank in range(5):
+                    instrument = f"{industry}-{rank}"
+                    value = float(rank)
+                    rows.append(
+                        {
+                            "date": date,
+                            "instrument": instrument,
+                            "self__strong": value,
+                        }
+                    )
+                    labels.append(
+                        {
+                            "date": date,
+                            "instrument": instrument,
+                            "ret_close_to_close": value,
+                        }
+                    )
+                    exposures.append(
+                        {
+                            "date": date,
+                            "instrument": instrument,
+                            "industry_level1_code": industry,
+                            "SIZE": float(
+                                (
+                                    rank * 2
+                                    + industry_index
+                                )
+                                % 5
+                            ),
+                        }
+                    )
+
+        diagnostics = candidate_s_trial_diagnostics(
+            pd.DataFrame(rows),
+            pd.DataFrame(labels),
+            candidate="self__strong",
+            baseline_candidates=(),
+            exposures=pd.DataFrame(exposures),
+        )
+
+        self.assertTrue(diagnostics["s_neutral_evaluated"])
+        self.assertTrue(
+            diagnostics["s_neutral_strength_passed"]
+        )
+        self.assertTrue(diagnostics["s_industry_evaluated"])
+        self.assertTrue(
+            diagnostics["s_industry_breadth_passed"]
+        )
+        self.assertEqual(diagnostics["s_industry_coverage"], 10)
         self.assertTrue(diagnostics["s_trial_passed"])
 
     def test_i_entry_gate_accepts_residual_linear_signal(self):
