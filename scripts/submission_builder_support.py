@@ -1,15 +1,9 @@
 from __future__ import annotations
 
 import ast
-import json
 from pathlib import Path
 
-import pandas as pd
-
-ROOT = Path(".")
-TOP50_PATH = ROOT / "reports/runtime_all156_full_20260729/routes/tree_lightgbm_importance_selection.csv"
-OUT_PY = ROOT / "submissions/lgbm_t_top50_candidate.py"
-OUT_NB = ROOT / "submissions/lgbm_t_top50_candidate.ipynb"
+ROOT = Path(__file__).resolve().parents[1]
 
 FAMILY_DIR = {"FR": "fr", "HF": "hf", "PV": "pv", "OB": "ob", "INT": "composite"}
 
@@ -89,7 +83,6 @@ def discover_candidate_modules(candidate_ids: list[str]) -> dict[str, str]:
 
     pandas_transforms = '''"""Pandas-only transforms for self-contained AIStudio submission."""
 import numpy as np
-import pandas as pd
 
 def daily_median_centered_rank(frame, *, raw_column="factor_raw", date_column="date", orientation=1.0, fill_value=0.0):
     raw = pd.to_numeric(frame[raw_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
@@ -540,60 +533,3 @@ def main(datasources, start_date, end_date):
         raise ValueError("invalid factor output")
     return result
 '''
-
-
-def build_notebook(source: str) -> str:
-    notebook = {
-        "cells": [
-            {
-                "cell_type": "markdown",
-                "id": "factor-description",
-                "metadata": {},
-                "source": [
-                    "# BigAlpha 2026 T importance top50 LightGBM v01\n",
-                    "Experimental importance top50 self factors; stock_bar5m-generated CICC/FZ/HF/PV/OB components; causal rolling 60-day training and 20-day prediction blocks with a one-day label embargo.",
-                ],
-            },
-            {
-                "cell_type": "code",
-                "execution_count": None,
-                "id": "factor-code",
-                "metadata": {},
-                "outputs": [],
-                "source": source.splitlines(keepends=True),
-            },
-        ],
-        "metadata": {
-            "kernelspec": {
-                "display_name": "Python 3.11.8",
-                "language": "python",
-                "name": "python3",
-            },
-            "language_info": {"name": "python", "version": "3.11"},
-        },
-        "nbformat": 4,
-        "nbformat_minor": 5,
-    }
-    return json.dumps(notebook, ensure_ascii=False, indent=1) + "\n"
-
-
-def main() -> int:
-    top = pd.read_csv(TOP50_PATH).sort_values("importance_rank").head(50)
-    candidate_ids = [feature.replace("self__", "") for feature in top["feature"]]
-    source = (
-        '"""Top50 T-route rolling LightGBM submission v03."""\n\n'
-        "# Auto-generated from remote top50 T importance artifacts. Do not edit by hand.\n"
-        + installer_source(discover_candidate_modules(candidate_ids))
-        + cicc_helpers_source()
-        + fangzheng_helpers_source()
-        + submission_runtime_source(candidate_ids)
-    )
-    OUT_PY.write_text(source, encoding="utf-8")
-    OUT_NB.write_text(build_notebook(source), encoding="utf-8")
-    print(f"WROTE {OUT_PY} bytes={OUT_PY.stat().st_size} candidates={len(candidate_ids)}")
-    print(f"WROTE {OUT_NB} bytes={OUT_NB.stat().st_size}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

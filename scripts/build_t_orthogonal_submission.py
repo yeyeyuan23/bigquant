@@ -6,23 +6,21 @@ import argparse
 import json
 from pathlib import Path
 
-from build_top50_submission_full import (
+from submission_builder_support import (
     discover_candidate_modules,
     installer_source,
     submission_runtime_source,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-FROZEN_TOP50_SOURCE = ROOT / "submissions/lgbm_t_top50_candidate.py"
+EXTERNAL_HELPERS_SOURCE = (
+    ROOT / "scripts/assets/external_submission_helpers.py.txt"
+)
 
 
 def external_helpers_source() -> str:
-    source = FROZEN_TOP50_SOURCE.read_text(encoding="utf-8")
-    start_marker = "# ---- CICC 5m component helpers ----"
-    end_marker = "\ndef _rank_center("
-    start = source.index(start_marker)
-    end = source.index(end_marker, start)
-    return "\n" + source[start:end].rstrip() + "\n"
+    source = EXTERNAL_HELPERS_SOURCE.read_text(encoding="utf-8")
+    return "\n" + source.rstrip() + "\n"
 
 
 def render_notebook(source: str, candidate_count: int) -> str:

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from build_t_orthogonal_submission import external_helpers_source
-from build_top50_submission_full import (
+from submission_builder_support import (
     discover_candidate_modules,
     installer_source,
     submission_runtime_source,

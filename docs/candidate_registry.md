@@ -313,10 +313,10 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 
 | pipeline / version | 冻结输入 | 2022 Rank IC | 2023 Rank IC | Notebook | 比赛状态 |
 | --- | --- | ---: | ---: | --- | --- |
-| `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/rule_v02.ipynb` | 2026-07-26 已提交，保留为历史对照 |
-| `self_factor_composite / local-current` | `FR-002/005 + HF-001/003 + PV-010/011/014`，家族内等权后 FR/HF/PV 等权 | 0.929730 | — | `submissions/rule_v03.ipynb` | 最新 S winner 已生成，待 AIStudio/平台提交校验 |
-| `joint_elastic_net / local-current` | 冻结 `screened15 + PV-008/PV-019/FR-006/HF-004/PV-011`；日度截面秩目标、正系数 | 0.581098 | — | `submissions/enet_v02.ipynb` | 当前 I winner 已生成，待 AIStudio/平台提交校验 |
-| `joint_lightgbm / local-current` | 冻结 `screened15 + PV-008/OB-003/PV-020/PV-013`；日度截面秩目标、正单调约束 | 0.852356 | — | `submissions/lgbm_v03.ipynb` | 当前 T winner 已生成，待 AIStudio/平台提交校验 |
+| `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | 已清理 | 2026-07-26 已提交，但仓库未记录明确平台分数，提交文件已清理 |
+| `self_factor_composite / scored` | `FR-002/005 + HF-001/003 + PV-010/011/014`，家族内及族间等权 | 0.929730 | 0.981081 | `submissions/rule_v03.ipynb` | 平台公榜 `0.60478`，保留 |
+| `joint_elastic_net / candidate` | 最新冻结 I 池 54 因子；正系数 Elastic Net | — | — | `submissions/enet_i_54_candidate.ipynb` | 已生成，待 AIStudio/平台提交校验 |
+| `joint_lightgbm / candidate` | 最新正交 T 池 28 因子；正单调 LightGBM | — | — | `submissions/lgbm_t_orthogonal_28_candidate.ipynb` | 已生成，待 AIStudio/平台提交校验 |
 
 已提交 Notebook 均仅保留比赛要求的
 `main(datasources, start_date, end_date)`，返回列固定为
