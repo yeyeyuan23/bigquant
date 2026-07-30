@@ -101,6 +101,13 @@ class SubmissionTest(unittest.TestCase):
             "screened15_lambda * baseline_prediction",
             lgbm,
         )
+        self.assertIn(
+            "module.build_fr_005_factor(\n"
+            "                financial,\n"
+            "                exposure,\n"
+            "                pool,",
+            lgbm,
+        )
 
 
 if __name__ == "__main__":

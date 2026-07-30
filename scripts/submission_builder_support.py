@@ -411,6 +411,13 @@ def _candidate_factors(selected, financial, factorlib, exposure, daily_features,
         if family == "FR" and candidate_id == "FR-002":
             results[candidate_id] = module.build_fr_002_factor_from_panel(financial, pool)
             continue
+        if family == "FR" and candidate_id == "FR-005":
+            results[candidate_id] = module.build_fr_005_factor(
+                financial,
+                exposure,
+                pool,
+            )
+            continue
         builder = getattr(module, f"build_{{stem}}_factor", None)
         if builder is None:
             raise ValueError(f"no builder found for {{candidate_id}}")
