@@ -23,7 +23,12 @@ def external_helpers_source() -> str:
     return "\n" + source.rstrip() + "\n"
 
 
-def render_notebook(source: str, candidate_count: int) -> str:
+def render_notebook(
+    source: str,
+    candidate_count: int,
+    screened15_lambda: float,
+) -> str:
+    mode = "no15" if screened15_lambda == 0.0 else "add15"
     notebook = {
         "cells": [
             {
@@ -31,10 +36,14 @@ def render_notebook(source: str, candidate_count: int) -> str:
                 "id": "factor-description",
                 "metadata": {},
                 "source": [
-                    f"# BigAlpha 2026 orthogonal T LightGBM ({candidate_count} factors)\n",
+                    (
+                        "# BigAlpha 2026 orthogonal T LightGBM "
+                        f"({candidate_count} factors, {mode})\n"
+                    ),
                     (
                         "Frozen orthogonal T pool; screened15 residual target; "
-                        "self-only LightGBM output; causal rolling 60-day training "
+                        f"screened15 output lambda={screened15_lambda:g}; "
+                        "causal rolling 60-day training "
                         "and 20-day prediction blocks with a one-day label embargo."
                     ),
                 ],
@@ -73,7 +82,18 @@ def main() -> int:
             "submissions/lgbm_t_orthogonal_N_candidate"
         ),
     )
+    parser.add_argument(
+        "--screened15-lambda",
+        type=float,
+        default=0.0,
+        help=(
+            "weight added back from the screened15 baseline after fitting the "
+            "same residual-target T model; must be between 0 and 1"
+        ),
+    )
     args = parser.parse_args()
+    if not 0.0 <= args.screened15_lambda <= 1.0:
+        raise ValueError("--screened15-lambda must be between 0 and 1")
 
     result = json.loads(args.result.read_text(encoding="utf-8"))
     admitted = result.get("tree_admitted_candidates")
@@ -94,16 +114,27 @@ def main() -> int:
     output_py = output_stem.with_suffix(".py")
     output_nb = output_stem.with_suffix(".ipynb")
 
+    mode = "no15" if args.screened15_lambda == 0.0 else "add15"
     source = (
-        f'"""Orthogonal T pure-increment LightGBM with {len(candidate_ids)} factors."""\n\n'
-        "# Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.\n"
+        (
+            f'"""Orthogonal T LightGBM with {len(candidate_ids)} factors; '
+            f'{mode}, screened15 lambda={args.screened15_lambda:g}."""\n\n'
+        )
+        + "# Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.\n"
         + installer_source(discover_candidate_modules(candidate_ids))
         + external_helpers_source()
-        + submission_runtime_source(candidate_ids)
+        + submission_runtime_source(
+            candidate_ids,
+            screened15_lambda=args.screened15_lambda,
+        )
     )
     output_py.write_text(source, encoding="utf-8")
     output_nb.write_text(
-        render_notebook(source, len(candidate_ids)),
+        render_notebook(
+            source,
+            len(candidate_ids),
+            args.screened15_lambda,
+        ),
         encoding="utf-8",
     )
     print(
@@ -111,6 +142,8 @@ def main() -> int:
             {
                 "candidate_count": len(candidate_ids),
                 "candidates": candidate_ids,
+                "screened15_lambda": args.screened15_lambda,
+                "mode": mode,
                 "source": str(output_py.relative_to(ROOT)),
                 "notebook": str(output_nb.relative_to(ROOT)),
             },

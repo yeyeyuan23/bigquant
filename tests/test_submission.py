@@ -19,6 +19,10 @@ EXPECTED_FILES = {
     "enet_i_54_candidate.ipynb",
     "lgbm_t_orthogonal_28_candidate.py",
     "lgbm_t_orthogonal_28_candidate.ipynb",
+    "lgbm_t_orthogonal_28_no15_candidate.py",
+    "lgbm_t_orthogonal_28_no15_candidate.ipynb",
+    "lgbm_t_orthogonal_28_add15_candidate.py",
+    "lgbm_t_orthogonal_28_add15_candidate.ipynb",
 }
 
 
@@ -92,6 +96,11 @@ class SubmissionTest(unittest.TestCase):
                 "feature_columns = (*public_columns, *self_columns)",
                 source,
             )
+        self.assertIn("screened15_lambda = 0.0", lgbm)
+        self.assertIn(
+            "screened15_lambda * baseline_prediction",
+            lgbm,
+        )
 
 
 if __name__ == "__main__":

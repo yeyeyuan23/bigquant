@@ -1,4 +1,4 @@
-"""Orthogonal T LightGBM with 28 factors; no15, screened15 lambda=0."""
+"""Orthogonal T LightGBM with 28 factors; add15, screened15 lambda=1."""
 
 # Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.
 
@@ -2055,7 +2055,7 @@ def main(datasources, start_date, end_date):
     from lightgbm import LGBMRegressor
 
     self_columns = ['HF-044', 'PV-009', 'HF-057', 'HF-019', 'PV-029', 'HF-001', 'HF-025', 'HF-045', 'PV-034', 'HF-062', 'HF-068', 'HF-034', 'HF-053', 'HF-059', 'HF-067', 'HF-070', 'FR-005', 'HF-018', 'HF-017', 'HF-065', 'HF-049', 'HF-071', 'HF-024', 'HF-069', 'PV-031', 'HF-076', 'PV-027', 'HF-046']
-    screened15_lambda = 0.0
+    screened15_lambda = 1.0
     start_ts, end_ts, model_history_start, public_columns, pool, factorlib, exposure, financial, daily_features = _load_common_inputs(datasources, start_date, end_date, pd, np)
     public_directions = {"amount": -1.0, "atr_14": -1.0, "bias_20": -1.0, "cci_14": -1.0, "float_market_cap": -1.0, "kdj_d_9_3_3": -1.0, "macd_diff_12_26_9": -1.0, "macd_hist_12_26_9": -1.0, "momentum_5": -1.0, "net_profit_rate_ttm": 1.0, "netflow_amount_rate_main": -1.0, "total_market_cap": -1.0, "turn": -1.0, "volatility_5": -1.0, "volume": -1.0}
     factors = _candidate_factors(self_columns, financial, factorlib, exposure, daily_features, pool)

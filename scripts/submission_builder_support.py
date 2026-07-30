@@ -189,7 +189,13 @@ def fangzheng_helpers_source() -> str:
     return "\n# ---- Fangzheng 5m report helpers ----\n" + source
 
 
-def submission_runtime_source(candidate_ids: list[str]) -> str:
+def submission_runtime_source(
+    candidate_ids: list[str],
+    *,
+    screened15_lambda: float = 0.0,
+) -> str:
+    if not 0.0 <= screened15_lambda <= 1.0:
+        raise ValueError("screened15_lambda must be between 0 and 1")
     return f'''
 
 def _rank_center(values, dates, np):
@@ -466,6 +472,7 @@ def main(datasources, start_date, end_date):
     from lightgbm import LGBMRegressor
 
     self_columns = {candidate_ids!r}
+    screened15_lambda = {screened15_lambda!r}
     start_ts, end_ts, model_history_start, public_columns, pool, factorlib, exposure, financial, daily_features = _load_common_inputs(datasources, start_date, end_date, pd, np)
     public_directions = {{"amount": -1.0, "atr_14": -1.0, "bias_20": -1.0, "cci_14": -1.0, "float_market_cap": -1.0, "kdj_d_9_3_3": -1.0, "macd_diff_12_26_9": -1.0, "macd_hist_12_26_9": -1.0, "momentum_5": -1.0, "net_profit_rate_ttm": 1.0, "netflow_amount_rate_main": -1.0, "total_market_cap": -1.0, "turn": -1.0, "volatility_5": -1.0, "volume": -1.0}}
     factors = _candidate_factors(self_columns, financial, factorlib, exposure, daily_features, pool)
@@ -535,7 +542,16 @@ def main(datasources, start_date, end_date):
             train["target_residual"].to_numpy(dtype=float),
         )
         block = test[["date", "instrument"]].copy()
-        block["factor_raw"] = model.predict(test.loc[:, list(feature_columns)].to_numpy(dtype=float))
+        residual_prediction = model.predict(
+            test.loc[:, list(feature_columns)].to_numpy(dtype=float)
+        )
+        baseline_prediction = test.loc[
+            :, list(residual_baseline_columns)
+        ].mean(axis=1).to_numpy(dtype=float)
+        block["factor_raw"] = (
+            residual_prediction
+            + screened15_lambda * baseline_prediction
+        )
         predictions.append(block)
     pred = pd.concat(predictions, ignore_index=True)
     pred["factor"] = _rank_center(pd.Series(pred["factor_raw"]), pred["date"], np)
