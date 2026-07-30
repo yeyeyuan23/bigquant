@@ -16,6 +16,18 @@ from .evaluation import cross_section_rank_scale, rank_ic_series
 from .research_policy import fixed_weight_rank_combination
 
 
+def learned_model_training_config() -> dict[str, object]:
+    """Return the shared causal training contract used by J and submissions."""
+
+    return {
+        "training_start_date": "2019-01-01",
+        "minimum_train_days": 60,
+        "prediction_block_days": 20,
+        "label_embargo_days": 1,
+        "training": "causal_expanding_refit_20_label_embargo_1",
+    }
+
+
 def lightgbm_model_config() -> dict[str, object]:
     """Return the frozen, deliberately shallow LightGBM configuration."""
 
@@ -27,12 +39,12 @@ def lightgbm_model_config() -> dict[str, object]:
         )
     )
     return {
+        **learned_model_training_config(),
         "model": "LGBMRegressor",
         "learning_rate": 0.03,
         "n_estimators": 200,
         "max_depth": 3,
         "random_state": 20260726,
-        "training": "rolling_60_train_20_test",
         "num_leaves": 7,
         "min_child_samples": 100,
         "subsample": 1.0,
@@ -68,6 +80,28 @@ def _lightgbm_regressor(feature_count: int):
         verbosity=-1,
         monotone_constraints=[1] * feature_count,
     )
+
+
+def _causal_expanding_train_dates(
+    all_dates: pd.DatetimeIndex,
+    first_test_position: int,
+    *,
+    minimum_train_days: int,
+) -> pd.DatetimeIndex:
+    """Return all legally observed labeled dates before a prediction block."""
+
+    config = learned_model_training_config()
+    train_end_position = first_test_position - int(
+        config["label_embargo_days"]
+    )
+    if train_end_position <= 0:
+        return all_dates[:0]
+    training_start = pd.Timestamp(str(config["training_start_date"]))
+    train_dates = all_dates[:train_end_position]
+    train_dates = train_dates[train_dates >= training_start]
+    if len(train_dates) < minimum_train_days:
+        return all_dates[:0]
+    return train_dates
 
 
 
@@ -205,7 +239,7 @@ def _walk_forward_elastic_net(
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Generate predictions and coefficients under the shared EN contract."""
+    """Generate causal expanding-window predictions and coefficients."""
 
     from sklearn.linear_model import ElasticNet
 
@@ -227,11 +261,13 @@ def _walk_forward_elastic_net(
         if test_dates.empty:
             continue
         first_test_position = all_dates.get_loc(test_dates[0])
-        if first_test_position < train_window_days:
+        train_dates = _causal_expanding_train_dates(
+            all_dates,
+            first_test_position,
+            minimum_train_days=train_window_days,
+        )
+        if train_dates.empty:
             continue
-        train_dates = all_dates[
-            first_test_position - train_window_days : first_test_position
-        ]
         train = merged.loc[merged["date"].isin(train_dates)]
         test = merged.loc[merged["date"].isin(test_dates)]
         if train.empty or test.empty:
@@ -284,7 +320,7 @@ def walk_forward_elastic_net(
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
 ) -> pd.DataFrame:
-    """Generate strict, scale-consistent Elastic Net predictions."""
+    """Generate causal expanding, scale-consistent Elastic Net predictions."""
 
     predictions, _ = _walk_forward_elastic_net(
         panel,
@@ -468,7 +504,7 @@ def walk_forward_lightgbm(
     test_window_days: int = 20,
     residual_baseline_columns: tuple[str, ...] = (),
 ) -> pd.DataFrame:
-    """Generate strict 60-day train / 20-day OOS LightGBM predictions."""
+    """Generate causal expanding / 20-day OOS LightGBM predictions."""
 
     merged = _prepare_joint_model_frame_polars(
         panel,
@@ -550,11 +586,13 @@ def _walk_forward_lightgbm_prepared(
         if test_dates.empty:
             continue
         first_test_position = all_dates.get_loc(test_dates[0])
-        if first_test_position < train_window_days:
+        train_dates = _causal_expanding_train_dates(
+            all_dates,
+            first_test_position,
+            minimum_train_days=train_window_days,
+        )
+        if train_dates.empty:
             continue
-        train_dates = all_dates[
-            first_test_position - train_window_days : first_test_position
-        ]
         train = prepared.loc[prepared["date"].isin(train_dates)]
         test = prepared.loc[prepared["date"].isin(test_dates)]
         if train.empty or test.empty:
@@ -652,11 +690,13 @@ def _walk_forward_lightgbm_prepared_polars(
         if test_dates.empty:
             continue
         first_test_position = all_dates.get_loc(test_dates[0])
-        if first_test_position < train_window_days:
+        train_dates = _causal_expanding_train_dates(
+            all_dates,
+            first_test_position,
+            minimum_train_days=train_window_days,
+        )
+        if train_dates.empty:
             continue
-        train_dates = all_dates[
-            first_test_position - train_window_days : first_test_position
-        ]
         train_values = [pd.Timestamp(value).to_datetime64() for value in train_dates]
         test_values = [pd.Timestamp(value).to_datetime64() for value in test_dates]
         train = prepared.filter(pl.col("date").is_in(train_values))

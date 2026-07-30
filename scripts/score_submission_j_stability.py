@@ -23,15 +23,14 @@ if str(ROOT) not in sys.path:
 
 from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from scripts.run_combinations import (
-    VALIDATION_2022_YEAR,
-    VALIDATION_2023_YEAR,
+    EVALUATION_YEARS,
     j_baseline_columns_from_self_columns,
     load_dynamic_inputs,
     prepare_experiment_context,
 )
 
 KEY_COLUMNS = ("date", "instrument")
-DEFAULT_YEARS = (VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)
+DEFAULT_YEARS = EVALUATION_YEARS
 RULE_V03_MEMBERS = {
     "FR": ("FR-002", "FR-005"),
     "HF": ("HF-001", "HF-003"),

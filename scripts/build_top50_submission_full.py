@@ -454,7 +454,17 @@ def _load_common_inputs(datasources, start_date, end_date, pd, np):
     financial = _apply_financial_effective_dates(financial, pool, pd, np)
     raw5 = _query_bar5m(dai, pd, bar5m_start, end_ts)
     daily_features = _build_top50_daily_components(raw5, pool, factorlib, exposure, pd, np)
-    return start_ts, end_ts, public_columns, pool, factorlib, exposure, financial, daily_features
+    return (
+        start_ts,
+        end_ts,
+        bar5m_start,
+        public_columns,
+        pool,
+        factorlib,
+        exposure,
+        financial,
+        daily_features,
+    )
 
 
 def main(datasources, start_date, end_date):
@@ -463,7 +473,7 @@ def main(datasources, start_date, end_date):
     from lightgbm import LGBMRegressor
 
     self_columns = {candidate_ids!r}
-    start_ts, end_ts, public_columns, pool, factorlib, exposure, financial, daily_features = _load_common_inputs(datasources, start_date, end_date, pd, np)
+    start_ts, end_ts, model_history_start, public_columns, pool, factorlib, exposure, financial, daily_features = _load_common_inputs(datasources, start_date, end_date, pd, np)
     public_directions = {{"amount": -1.0, "atr_14": -1.0, "bias_20": -1.0, "cci_14": -1.0, "float_market_cap": -1.0, "kdj_d_9_3_3": -1.0, "macd_diff_12_26_9": -1.0, "macd_hist_12_26_9": -1.0, "momentum_5": -1.0, "net_profit_rate_ttm": 1.0, "netflow_amount_rate_main": -1.0, "total_market_cap": -1.0, "turn": -1.0, "volatility_5": -1.0, "volume": -1.0}}
     factors = _candidate_factors(self_columns, financial, factorlib, exposure, daily_features, pool)
     long_parts = []
@@ -489,20 +499,29 @@ def main(datasources, start_date, end_date):
     prediction_dates = all_dates[(all_dates >= start_ts) & (all_dates <= end_ts)]
     if prediction_dates.empty:
         raise ValueError("no prediction dates inside the requested window")
-    first_test_position = all_dates.get_loc(prediction_dates[0])
-    train_end_position = first_test_position - 1
-    train_start_position = train_end_position - 60
-    if train_start_position < 0:
-        raise ValueError("not enough pre-start history for model training")
-    train_dates = all_dates[train_start_position:train_end_position]
-    train = panel.loc[panel["date"].isin(train_dates) & panel["target"].notna()]
-    test = panel.loc[panel["date"].isin(prediction_dates)]
-    if train.empty or test.empty:
-        raise ValueError("empty train or prediction sample")
-    model = LGBMRegressor(objective="regression", learning_rate=0.03, n_estimators=220, max_depth=3, num_leaves=7, min_child_samples=100, subsample=1.0, colsample_bytree=0.8, reg_lambda=1.0, random_state=20260730, n_jobs=1, deterministic=True, force_col_wise=True, verbosity=-1, monotone_constraints=[1] * len(feature_columns))
-    model.fit(train.loc[:, list(feature_columns)].to_numpy(dtype=float), train["target"].to_numpy(dtype=float))
-    pred = test[["date", "instrument"]].copy()
-    pred["factor_raw"] = model.predict(test.loc[:, list(feature_columns)].to_numpy(dtype=float))
+    predictions = []
+    for offset in range(0, len(prediction_dates), 20):
+        block_dates = prediction_dates[offset:offset + 20]
+        first_test_position = all_dates.get_loc(block_dates[0])
+        train_end_position = first_test_position - 1
+        eligible_history = all_dates[
+            (all_dates >= model_history_start)
+            & (all_dates < all_dates[train_end_position])
+        ]
+        if len(eligible_history) < 60:
+            raise ValueError("not enough fully observed pre-block history for model training")
+        train = panel.loc[
+            panel["date"].isin(eligible_history) & panel["target"].notna()
+        ]
+        test = panel.loc[panel["date"].isin(block_dates)]
+        if train.empty or test.empty:
+            raise ValueError("empty train or prediction sample")
+        model = LGBMRegressor(objective="regression", learning_rate=0.03, n_estimators=220, max_depth=3, num_leaves=7, min_child_samples=100, subsample=1.0, colsample_bytree=0.8, reg_lambda=1.0, random_state=20260730, n_jobs=1, deterministic=True, force_col_wise=True, verbosity=-1, monotone_constraints=[1] * len(feature_columns))
+        model.fit(train.loc[:, list(feature_columns)].to_numpy(dtype=float), train["target"].to_numpy(dtype=float))
+        block = test[["date", "instrument"]].copy()
+        block["factor_raw"] = model.predict(test.loc[:, list(feature_columns)].to_numpy(dtype=float))
+        predictions.append(block)
+    pred = pd.concat(predictions, ignore_index=True)
     pred["factor"] = _rank_center(pd.Series(pred["factor_raw"]), pred["date"], np)
     result = pred[["date", "instrument", "factor"]].sort_values(["date", "instrument"]).reset_index(drop=True)
     if result.empty or result["factor"].isna().any() or not np.isfinite(result["factor"]).all():
@@ -520,7 +539,7 @@ def build_notebook(source: str) -> str:
                 "metadata": {},
                 "source": [
                     "# BigAlpha 2026 T importance top50 LightGBM v01\n",
-                    "T route all156 full-run top50 self factors; stock_bar5m-generated CICC/FZ/HF/PV/OB components; rolling LightGBM; v03 limits 5m history and guards sparse 5m component columns.",
+                    "Experimental importance top50 self factors; stock_bar5m-generated CICC/FZ/HF/PV/OB components; causal 20-day refits with expanding legal history; bounded 5m history and sparse-component guards.",
                 ],
             },
             {

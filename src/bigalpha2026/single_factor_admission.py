@@ -399,16 +399,16 @@ def classify_candidates(
             development_failures.append(
                 "development direction is positive in fewer than two years"
             )
-        validation_2022_observations, _ = period_failures(
-            candidate_id,
-            "validation_2022",
-            "2022 validation",
-            require_t_stat=False,
-        )
         validation_2023_observations, _ = period_failures(
             candidate_id,
             "validation_2023",
             "2023 validation",
+            require_t_stat=False,
+        )
+        validation_2024_observations, _ = period_failures(
+            candidate_id,
+            "validation_2024",
+            "2024 validation",
             require_t_stat=False,
         )
 
@@ -423,8 +423,8 @@ def classify_candidates(
                 "development_shape_evidence": development_shape_evidence,
                 "development_failures": development_failures,
                 "development_failures_are_diagnostic_only": True,
-                "validation_2022_observations": validation_2022_observations,
                 "validation_2023_observations": validation_2023_observations,
+                "validation_2024_observations": validation_2024_observations,
                 "upload_ready": False,
             }
         )
@@ -608,8 +608,8 @@ def run_single_factor_admission(
     exposures: pd.DataFrame,
     *,
     development_years: Sequence[int],
-    validation_2022_year: int,
     validation_2023_year: int,
+    validation_2024_year: int,
     cached_metrics: pd.DataFrame | None = None,
     cached_stability: pd.DataFrame | None = None,
 ) -> SingleFactorAdmissionResult:
@@ -646,11 +646,11 @@ def run_single_factor_admission(
             "development": clean.loc[
                 clean["date"].dt.year.isin(development_years)
             ],
-            "validation_2022": clean.loc[
-                clean["date"].dt.year.eq(validation_2022_year)
-            ],
             "validation_2023": clean.loc[
                 clean["date"].dt.year.eq(validation_2023_year)
+            ],
+            "validation_2024": clean.loc[
+                clean["date"].dt.year.eq(validation_2024_year)
             ],
         }
         for period, block in periods.items():
@@ -716,8 +716,8 @@ def run_single_factor_admission(
                 "development_failures": [
                     "candidate has no technically eligible evaluation metrics"
                 ],
-                "validation_2022_observations": [],
                 "validation_2023_observations": [],
+                "validation_2024_observations": [],
                 "upload_ready": False,
             }
         )

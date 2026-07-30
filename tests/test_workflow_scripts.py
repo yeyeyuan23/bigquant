@@ -31,10 +31,8 @@ from bigalpha2026.tree_admission import (
 from scripts import run_combinations
 from scripts.run_combinations import (
     DEVELOPMENT_YEARS,
-    FROZEN_TEST_YEAR,
+    EVALUATION_YEARS,
     PIPELINE_NAMES,
-    VALIDATION_2022_YEAR,
-    VALIDATION_2023_YEAR,
     cleanup_obsolete_reports,
     contract_summary,
     enters_family_equal_rank,
@@ -53,6 +51,62 @@ from scripts.run_first_round import (
 
 
 class WorkflowScriptTest(unittest.TestCase):
+    def test_t_entrypoints_have_distinct_names(self):
+        self.assertEqual(
+            parse_args(["--admission-routes", "t-importance"]).admission_routes,
+            "t-importance",
+        )
+        self.assertEqual(
+            parse_args(["--admission-routes", "t-orthogonal"]).admission_routes,
+            "t-orthogonal",
+        )
+        with self.assertRaises(SystemExit):
+            parse_args(["--admission-routes", "t"])
+
+    def test_default_sit_tree_route_does_not_inherit_frozen_i(self):
+        oriented = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2019-01-02"]),
+                "self__A": [0.1],
+                "self__B": [0.2],
+            }
+        )
+        incremental = SimpleNamespace(frozen_after=("self__A",))
+        tree = SimpleNamespace()
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            run_combinations,
+            "run_single_factor_route_admission",
+            return_value=SimpleNamespace(admitted_candidates=()),
+        ), patch.object(
+            run_combinations,
+            "run_incremental_admission",
+            return_value=incremental,
+        ), patch.object(
+            run_combinations,
+            "run_tree_admission",
+            return_value=tree,
+        ) as tree_mock:
+            run_combinations.run_route_admissions(
+                oriented,
+                pd.DataFrame(),
+                ("factorlib__amount",),
+                ("self__A", "self__B"),
+                SimpleNamespace(),
+                (),
+                Path(directory),
+                single_factor_cache_dir=Path(directory) / "s",
+                incremental_cache_dir=Path(directory) / "i",
+                refresh_incremental_cache=False,
+                refresh_incremental_candidates=(),
+                tree_cache_dir=Path(directory) / "t",
+                refresh_tree_cache=False,
+                refresh_tree_candidates=(),
+            )
+        self.assertEqual(
+            tree_mock.call_args.args[3],
+            ("self__A", "self__B"),
+        )
+
     def test_cleanup_obsolete_combination_reports_removes_only_retired_names(self):
         with tempfile.TemporaryDirectory() as directory:
             reports_dir = Path(directory)
@@ -313,10 +367,8 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertFalse(enters_family_equal_rank("factorlib__amount"))
 
     def test_dynamic_combination_periods_and_check_mode_are_frozen(self):
-        self.assertEqual(DEVELOPMENT_YEARS, (2019, 2020, 2021))
-        self.assertEqual(VALIDATION_2022_YEAR, 2022)
-        self.assertEqual(VALIDATION_2023_YEAR, 2023)
-        self.assertEqual(FROZEN_TEST_YEAR, 2024)
+        self.assertEqual(DEVELOPMENT_YEARS, (2019, 2020, 2021, 2022))
+        self.assertEqual(EVALUATION_YEARS, (2023, 2024))
         self.assertEqual(
             PIPELINE_NAMES,
             (
@@ -435,7 +487,7 @@ class WorkflowScriptTest(unittest.TestCase):
         )
 
     def test_validation_pipelines_allow_empty_s_pool(self):
-        dates = pd.to_datetime(["2022-01-04", "2022-01-05"])
+        dates = pd.to_datetime(["2023-01-04", "2024-01-05"])
         factor = pd.DataFrame(
             {
                 "date": dates,
@@ -577,7 +629,7 @@ class WorkflowScriptTest(unittest.TestCase):
 
     def test_single_factor_gate_never_uses_validation_years_for_admission(self):
         rows = []
-        for period in ("development", "validation_2022", "validation_2023"):
+        for period in ("development", "validation_2023", "validation_2024"):
             for variant in ("raw_full", "neutral_full", "raw_tradable"):
                 rows.append(
                     {
@@ -618,13 +670,13 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertTrue(passed["single_factor_cross_regime_passed"])
 
         metrics.loc[
-            metrics["period"].eq("validation_2023")
+            metrics["period"].eq("validation_2024")
             & metrics["variant"].eq("raw_full"),
             "rank_ic_mean",
         ] = -0.01
         failed = classify_candidates(metrics, stability)[0]
         self.assertTrue(failed["single_factor_cross_regime_passed"])
-        self.assertTrue(failed["validation_2023_observations"])
+        self.assertTrue(failed["validation_2024_observations"])
 
     def test_s_trial_gate_requires_strong_stable_candidate(self):
         dates = pd.date_range("2021-01-01", periods=130, freq="D")
@@ -707,7 +759,7 @@ class WorkflowScriptTest(unittest.TestCase):
 
     def test_single_factor_shape_is_diagnostic_not_a_gate(self):
         rows = []
-        for period in ("development", "validation_2022", "validation_2023"):
+        for period in ("development", "validation_2023", "validation_2024"):
             for variant in ("raw_full", "neutral_full", "raw_tradable"):
                 rows.append(
                     {
@@ -768,7 +820,7 @@ class WorkflowScriptTest(unittest.TestCase):
 
     def test_single_factor_ic_and_stability_do_not_veto_route_J(self):
         rows = []
-        for period in ("development", "validation_2022", "validation_2023"):
+        for period in ("development", "validation_2023", "validation_2024"):
             for variant in ("raw_full", "neutral_full", "raw_tradable"):
                 rows.append(
                     {

@@ -20,8 +20,6 @@ from bigalpha2026.combinations import (
     static_lightgbm_feature_importance,
     static_lightgbm_predict,
     walk_forward_elastic_net_with_weights,
-    walk_forward_lightgbm,
-    walk_forward_lightgbm_with_importance,
 )
 from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from bigalpha2026.evaluation import (
@@ -63,16 +61,17 @@ from bigalpha2026.tree_admission import (
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = ROOT / "data"
 DEFAULT_REPORTS = ROOT / "reports"
-YEARS = (2019, 2020, 2021, 2022, 2023)
 DEVELOPMENT_YEARS = tuple(
     range(
         int(FORMAL_EVALUATION_POLICY.development_start[:4]),
         int(FORMAL_EVALUATION_POLICY.development_end[:4]) + 1,
     )
 )
-VALIDATION_2022_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2022_start[:4])
-VALIDATION_2023_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4])
-FROZEN_TEST_YEAR = int(FORMAL_EVALUATION_POLICY.frozen_test_start[:4])
+EVALUATION_YEARS = (
+    int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4]),
+    int(FORMAL_EVALUATION_POLICY.validation_2024_start[:4]),
+)
+YEARS = tuple(range(DEVELOPMENT_YEARS[0], EVALUATION_YEARS[-1] + 1))
 PIPELINE_NAMES = (
     "self_factor_composite",
     "joint_elastic_net",
@@ -214,11 +213,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--admission-routes",
-        choices=("sit", "s", "i", "t", "t-orthogonal"),
+        choices=("sit", "s", "i", "t-importance", "t-orthogonal"),
         default="sit",
         help=(
-            "which admission entrypoint to run: full S/I/T, S only, "
-            "I only, direct T from frozen I pool, or orthogonal T"
+            "which admission entrypoint to run: full independent S/I/T, S only, "
+            "I only, experimental LightGBM importance ranking, or formal "
+            "orthogonal T"
         ),
     )
     parser.add_argument(
@@ -1492,7 +1492,9 @@ def run_route_admissions(
         if tree_cache_dir is not None
         else reports_dir.parent / "data" / "cache" / "tree_v6_orthogonal_entry"
     )
-    tree_candidate_columns = tuple(dict.fromkeys(incremental.frozen_after))
+    # T is an independent route.  It must see every technically available
+    # self factor rather than inheriting I's frozen pool.
+    tree_candidate_columns = tuple(dict.fromkeys(self_columns))
     tree = run_tree_admission(
         oriented,
         labels,
@@ -1542,8 +1544,8 @@ def build_validation_pipelines(
         labels,
         feature_columns=elastic_net_features,
         prediction_years=(
-            VALIDATION_2022_YEAR,
-            VALIDATION_2023_YEAR,
+            EVALUATION_YEARS[0],
+            EVALUATION_YEARS[1],
         ),
     )
     raw_pipelines: dict[tuple[str, str], pd.DataFrame] = {}
@@ -1566,10 +1568,10 @@ def build_validation_pipelines(
         (
             "joint_lightgbm",
             "lightgbm",
-        ): tree_result.predict_joint((VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)),
+        ): tree_result.predict_joint((EVALUATION_YEARS[0], EVALUATION_YEARS[1])),
         }
     )
-    validation_years = (VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)
+    validation_years = (EVALUATION_YEARS[0], EVALUATION_YEARS[1])
     factors: dict[tuple[str, str], pd.DataFrame] = {}
     score_summaries: dict[str, dict[str, float]] = {}
     for (experiment, method), factor in raw_pipelines.items():
@@ -1595,8 +1597,8 @@ def build_validation_pipelines(
             "validation_combined_base_score_proxy": float(
                 score_reference.score(combined_block)["score_proxy"]
             ),
-            "validation_2022_score_proxy": float(year_scores[VALIDATION_2022_YEAR]["score_proxy"]),
-            "validation_2023_score_proxy": float(year_scores[VALIDATION_2023_YEAR]["score_proxy"]),
+            "validation_2023_score_proxy": float(year_scores[EVALUATION_YEARS[0]]["score_proxy"]),
+            "validation_2024_score_proxy": float(year_scores[EVALUATION_YEARS[1]]["score_proxy"]),
         }
     validation_routes = {
         experiment: factor.loc[
@@ -1644,8 +1646,8 @@ def evaluate_validation_pipelines(
     metric_rows: list[dict[str, object]] = []
     if include_route_diagnostics:
         periods = {
-            "validation_2022": VALIDATION_2022_YEAR,
-            "validation_2023": VALIDATION_2023_YEAR,
+            "validation_2023": EVALUATION_YEARS[0],
+            "validation_2024": EVALUATION_YEARS[1],
         }
         for (experiment, method), factor in pipelines.items():
             for period, year in periods.items():
@@ -1671,30 +1673,6 @@ def evaluate_validation_pipelines(
     decisions: list[dict[str, object]] = []
     for experiment, method in pipelines:
         if include_route_diagnostics:
-            validation_2022_ic = metric_value(
-                metrics,
-                experiment,
-                method,
-                "validation_2022",
-                "raw_full",
-                "rank_ic_mean",
-            )
-            validation_2022_t = metric_value(
-                metrics,
-                experiment,
-                method,
-                "validation_2022",
-                "raw_full",
-                "rank_ic_t_stat",
-            )
-            validation_2022_tradable_ic = metric_value(
-                metrics,
-                experiment,
-                method,
-                "validation_2022",
-                "raw_tradable",
-                "rank_ic_mean",
-            )
             validation_2023_ic = metric_value(
                 metrics,
                 experiment,
@@ -1719,20 +1697,44 @@ def evaluate_validation_pipelines(
                 "raw_tradable",
                 "rank_ic_mean",
             )
+            validation_2024_ic = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2024",
+                "raw_full",
+                "rank_ic_mean",
+            )
+            validation_2024_t = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2024",
+                "raw_full",
+                "rank_ic_t_stat",
+            )
+            validation_2024_tradable_ic = metric_value(
+                metrics,
+                experiment,
+                method,
+                "validation_2024",
+                "raw_tradable",
+                "rank_ic_mean",
+            )
             cross_regime_worst_year_rank_ic = min(
-                validation_2022_ic,
                 validation_2023_ic,
+                validation_2024_ic,
             )
             cross_regime_mean_rank_ic = (
-                validation_2022_ic + validation_2023_ic
+                validation_2023_ic + validation_2024_ic
             ) / 2.0
         else:
-            validation_2022_ic = float("nan")
-            validation_2022_t = float("nan")
-            validation_2022_tradable_ic = float("nan")
             validation_2023_ic = float("nan")
             validation_2023_t = float("nan")
             validation_2023_tradable_ic = float("nan")
+            validation_2024_ic = float("nan")
+            validation_2024_t = float("nan")
+            validation_2024_tradable_ic = float("nan")
             cross_regime_worst_year_rank_ic = float("nan")
             cross_regime_mean_rank_ic = float("nan")
         score_summary = score_summaries[experiment]
@@ -1740,8 +1742,8 @@ def evaluate_validation_pipelines(
         crowded_score = float(crowding_summary["score_proxy"])
         score_values = (
             float(score_summary["validation_combined_base_score_proxy"]),
-            float(score_summary["validation_2022_score_proxy"]),
             float(score_summary["validation_2023_score_proxy"]),
+            float(score_summary["validation_2024_score_proxy"]),
             crowded_score,
         )
         score_ranking_eligible = all(pd.notna(value) for value in score_values)
@@ -1752,8 +1754,8 @@ def evaluate_validation_pipelines(
                 "score_ranking_eligible": score_ranking_eligible,
                 "passed_cross_regime_gate": score_ranking_eligible,
                 "validation_years": [
-                    VALIDATION_2022_YEAR,
-                    VALIDATION_2023_YEAR,
+                    EVALUATION_YEARS[0],
+                    EVALUATION_YEARS[1],
                 ],
                 **score_summary,
                 "validation_joint_crowding_score_proxy": crowded_score,
@@ -1776,12 +1778,12 @@ def evaluate_validation_pipelines(
                     crowding_summary["joint_common_rows"]
                 ),
                 "robust_score_proxy": min(score_values),
-                "validation_2022_rank_ic_mean": validation_2022_ic,
-                "validation_2022_rank_ic_t_stat": validation_2022_t,
-                "validation_2022_tradable_rank_ic_mean": (validation_2022_tradable_ic),
                 "validation_2023_rank_ic_mean": validation_2023_ic,
                 "validation_2023_rank_ic_t_stat": validation_2023_t,
                 "validation_2023_tradable_rank_ic_mean": (validation_2023_tradable_ic),
+                "validation_2024_rank_ic_mean": validation_2024_ic,
+                "validation_2024_rank_ic_t_stat": validation_2024_t,
+                "validation_2024_tradable_rank_ic_mean": (validation_2024_tradable_ic),
                 "cross_regime_worst_year_rank_ic": cross_regime_worst_year_rank_ic,
                 "cross_regime_mean_rank_ic": cross_regime_mean_rank_ic,
                 "rank_ic_is_diagnostic_only": True,
@@ -1924,19 +1926,19 @@ def build_experiment_result(
     """Build the stable JSON contract consumed by downstream tools."""
 
     return {
-        "protocol": "isolated_combination_pipelines_v11_score_first_J",
+        "protocol": "isolated_combination_pipelines_v12_2019_2022_dev_2023_2024_J",
         "development_years": list(DEVELOPMENT_YEARS),
         "validation_years": [
-            VALIDATION_2022_YEAR,
-            VALIDATION_2023_YEAR,
+            EVALUATION_YEARS[0],
+            EVALUATION_YEARS[1],
         ],
         "incremental_protocol": incremental_result.protocol_summary(),
         "competition_score_protocol": dict(score_reference.protocol()),
         "final_route_selection": {
             "primary_metric": "robust_score_proxy",
             "components": [
-                "validation_2022_score_proxy",
                 "validation_2023_score_proxy",
+                "validation_2024_score_proxy",
                 "validation_combined_base_score_proxy",
                 "validation_joint_crowding_score_proxy",
             ],
@@ -1954,8 +1956,7 @@ def build_experiment_result(
         },
         "learned_model_preprocessing": ("daily_centered_rank_features_and_target_neutral_fill"),
         "tree_incremental_protocol": tree_result.protocol_summary(),
-        "frozen_test_year": FROZEN_TEST_YEAR,
-        "frozen_test_changes_admission": False,
+        "evaluation_years_change_admission": False,
         "pipelines": {
             "self_factor_composite": {
                 "method": "family_equal_rank",
@@ -2110,7 +2111,7 @@ def run_t_importance_stage(
     self_columns: tuple[str, ...],
     reports_dir: Path,
 ) -> dict[str, object]:
-    """Direct T: train all self candidates, rank by LightGBM importance, validate top N."""
+    """Experimental importance route; this is not formal orthogonal T admission."""
 
     self_feature_columns = tuple(
         column for column in self_columns if column.startswith("self__")
@@ -2169,7 +2170,7 @@ def run_t_importance_stage(
         labels,
         feature_columns=feature_columns,
         train_years=DEVELOPMENT_YEARS,
-        prediction_years=(VALIDATION_2022_YEAR, VALIDATION_2023_YEAR),
+        prediction_years=(EVALUATION_YEARS[0], EVALUATION_YEARS[1]),
     )
     print(json.dumps({"status": "t_static_validation_predict_done", "rows": len(factor)}, ensure_ascii=False), flush=True)
     should_score = os.getenv("BIGALPHA_T_SCORE", "0") == "1"
@@ -2189,17 +2190,17 @@ def run_t_importance_stage(
             "method": "lightgbm",
             "score_ranking_eligible": False,
             "passed_cross_regime_gate": None,
-            "validation_years": [VALIDATION_2022_YEAR, VALIDATION_2023_YEAR],
+            "validation_years": [EVALUATION_YEARS[0], EVALUATION_YEARS[1]],
             "validation_rows": len(factor),
             "score_skipped": True,
             "score_skip_reason": "BIGALPHA_T_SCORE is not 1",
         }
     payload = {
-        "stage": "t",
+        "stage": "t-importance",
         "mode": "lightgbm_importance_top_self_features",
         "source_pool": (
             "all_self_candidates"
-            if os.getenv("BIGALPHA_T_SOURCE_POOL", "i").strip().lower()
+            if os.getenv("BIGALPHA_T_IMPORTANCE_SOURCE_POOL", "i").strip().lower()
             in {"all", "all_self", "all_self_candidates"}
             else "frozen_I_candidates"
         ),
@@ -2212,7 +2213,7 @@ def run_t_importance_stage(
         "importance_path": str(routes_dir / "tree_lightgbm_importance_selection.csv"),
         "decision": decision,
     }
-    write_stage_result(reports_dir, "t", payload)
+    write_stage_result(reports_dir, "t_importance", payload)
     return payload
 
 
@@ -2223,7 +2224,7 @@ def score_one_pipeline(
     method: str,
     score_reference: CompetitionScoreReference,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
-    validation_years = (VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)
+    validation_years = (EVALUATION_YEARS[0], EVALUATION_YEARS[1])
     validation_block = factor.loc[factor["date"].dt.year.isin(validation_years)].copy()
     direction_score = score_reference.score_best_direction(validation_block)
     direction = float(direction_score["selected_direction"])
@@ -2244,13 +2245,13 @@ def score_one_pipeline(
         "positive_score_proxy": float(direction_score["positive_score_proxy"]),
         "negative_score_proxy": float(direction_score["negative_score_proxy"]),
         "validation_combined_base_score_proxy": combined_score,
-        "validation_2022_score_proxy": float(year_scores[VALIDATION_2022_YEAR]["score_proxy"]),
-        "validation_2023_score_proxy": float(year_scores[VALIDATION_2023_YEAR]["score_proxy"]),
+        "validation_2023_score_proxy": float(year_scores[EVALUATION_YEARS[0]]["score_proxy"]),
+        "validation_2024_score_proxy": float(year_scores[EVALUATION_YEARS[1]]["score_proxy"]),
         "validation_joint_crowding_score_proxy": combined_score,
         "robust_score_proxy": min(
             combined_score,
-            float(year_scores[VALIDATION_2022_YEAR]["score_proxy"]),
-            float(year_scores[VALIDATION_2023_YEAR]["score_proxy"]),
+            float(year_scores[EVALUATION_YEARS[0]]["score_proxy"]),
+            float(year_scores[EVALUATION_YEARS[1]]["score_proxy"]),
         ),
         "rank_ic_is_diagnostic_only": True,
         "tradable_rank_ic_is_diagnostic_only": True,
@@ -2277,7 +2278,7 @@ def run_split_stage(
     refresh_tree_cache: bool,
     refresh_tree_candidates: Sequence[str],
 ) -> dict[str, object]:
-    if stage == "t":
+    if stage == "t-importance":
         oriented, selected_public, score_reference = prepare_t_fast_context(
             panel,
             labels,
@@ -2329,6 +2330,57 @@ def run_split_stage(
         }
         write_stage_result(reports_dir, "i", payload)
         return payload
+    if stage == "t-orthogonal":
+        development_panel = panel.loc[
+            panel["date"].dt.year.isin(DEVELOPMENT_YEARS)
+        ]
+        development_labels = labels.loc[
+            labels["date"].dt.year.isin(DEVELOPMENT_YEARS)
+        ]
+        screening = screen_public_factors(
+            development_panel,
+            development_labels,
+            public_columns,
+            development_years=DEVELOPMENT_YEARS,
+        ).rename(columns={"selected": "diagnostic_selected_under_current_contract"})
+        screening["selected"] = screening["feature"].isin(public_columns)
+        oriented = apply_feature_directions(panel, screening)
+        selected_public = tuple(public_columns)
+        tree_candidate_columns = tuple(
+            column for column in self_columns if column.startswith("self__")
+        )
+        if not tree_candidate_columns:
+            raise ValueError("orthogonal T requires at least one self candidate")
+        tree = run_tree_admission(
+            oriented,
+            labels,
+            selected_public,
+            tree_candidate_columns,
+            None,
+            development_years=DEVELOPMENT_YEARS,
+            prior_admission_path=existing_report_path(
+                reports_dir,
+                "routes/tree_factor_admission.csv",
+            ),
+            cache_dir=tree_cache_dir,
+            refresh_cache=refresh_tree_cache,
+            refresh_candidates=refresh_tree_candidates,
+        )
+        tree.write_states()
+        payload = {
+            "stage": "t-orthogonal",
+            "source_pool": "all_self_candidates",
+            "candidate_count": len(tree_candidate_columns),
+            "tree_admitted_count": len(tree.admitted_candidates),
+            "tree_admitted_candidates": list(tree.admitted_candidates),
+            "decision": {
+                "score_skipped": True,
+                "score_skip_reason": "J is final-route selection only",
+            },
+            "tree_protocol": tree.protocol_summary(),
+        }
+        write_stage_result(reports_dir, "t_orthogonal", payload)
+        return payload
     (
         oriented,
         selected_public,
@@ -2360,119 +2412,6 @@ def run_split_stage(
             "promotion": result.promotion_summary,
         }
         write_stage_result(reports_dir, "s", payload)
-        return payload
-    if stage == "t":
-        self_feature_columns = tuple(
-            column for column in self_columns if column.startswith("self__")
-        )
-        importance_feature_columns = tuple(
-            dict.fromkeys((*selected_public, *self_feature_columns))
-        )
-        _development_factor, development_importance = walk_forward_lightgbm_with_importance(
-            oriented,
-            labels,
-            feature_columns=importance_feature_columns,
-            prediction_years=DEVELOPMENT_YEARS,
-        )
-        routes_dir = route_reports_dir(reports_dir)
-        routes_dir.mkdir(parents=True, exist_ok=True)
-        import polars as pl
-
-        importance_summary = (
-            pl.from_pandas(development_importance)
-            .with_columns(
-                pl.col("feature").cast(pl.Utf8),
-                pl.col("gain_importance").cast(pl.Float64, strict=False),
-                pl.col("split_importance").cast(pl.Float64, strict=False),
-            )
-            .filter(pl.col("feature").str.starts_with("self__"))
-            .group_by("feature")
-            .agg(
-                pl.col("gain_importance").sum().alias("gain_importance"),
-                pl.col("split_importance").sum().alias("split_importance"),
-            )
-            .sort(
-                ["gain_importance", "split_importance", "feature"],
-                descending=[True, True, False],
-            )
-            .to_pandas()
-        )
-        top_n = 50
-        selected_self = tuple(importance_summary.head(top_n)["feature"].astype(str))
-        if not selected_self:
-            raise ValueError("LightGBM importance selected no self features")
-        importance_summary.insert(0, "importance_rank", range(1, len(importance_summary) + 1))
-        importance_summary["selected_for_t"] = importance_summary["feature"].isin(selected_self)
-        importance_summary.to_csv(
-            routes_dir / "tree_lightgbm_importance_selection.csv",
-            index=False,
-        )
-        feature_columns = tuple(dict.fromkeys((*selected_public, *selected_self)))
-        factor = walk_forward_lightgbm(
-            oriented,
-            labels,
-            feature_columns=feature_columns,
-            prediction_years=(VALIDATION_2022_YEAR, VALIDATION_2023_YEAR),
-        )
-        _oriented_factor, decision = score_one_pipeline(
-            factor,
-            experiment="joint_lightgbm",
-            method="lightgbm",
-            score_reference=score_reference,
-        )
-        payload = {
-            "stage": "t",
-            "mode": "lightgbm_importance_top_self_features",
-            "source_pool": "all_self_candidates",
-            "candidate_count": len(self_feature_columns),
-            "top_n": top_n,
-            "selected_self_count": len(selected_self),
-            "selected_self_features": list(selected_self),
-            "feature_count": len(feature_columns),
-            "features": list(feature_columns),
-            "importance_path": str(routes_dir / "tree_lightgbm_importance_selection.csv"),
-            "decision": decision,
-        }
-        write_stage_result(reports_dir, "t", payload)
-        return payload
-    if stage == "t-orthogonal":
-        frozen_i = frozen_i_candidates_from_state(incremental_cache_dir)
-        missing = sorted(set(frozen_i).difference(oriented.columns))
-        if missing:
-            raise ValueError(f"frozen I candidates missing from panel: {missing}")
-        tree = run_tree_admission(
-            oriented,
-            labels,
-            selected_public,
-            frozen_i,
-            score_reference,
-            development_years=DEVELOPMENT_YEARS,
-            prior_admission_path=existing_report_path(
-                reports_dir,
-                "routes/tree_factor_admission.csv",
-            ),
-            cache_dir=tree_cache_dir,
-            refresh_cache=refresh_tree_cache,
-            refresh_candidates=refresh_tree_candidates,
-        )
-        factor = tree.predict_joint((VALIDATION_2022_YEAR, VALIDATION_2023_YEAR))
-        _oriented_factor, decision = score_one_pipeline(
-            factor,
-            experiment="joint_lightgbm",
-            method="lightgbm",
-            score_reference=score_reference,
-        )
-        tree.write_states()
-        payload = {
-            "stage": "t-orthogonal",
-            "source_pool": "frozen_I",
-            "frozen_i_count": len(frozen_i),
-            "tree_admitted_count": len(tree.admitted_candidates),
-            "tree_admitted_candidates": list(tree.admitted_candidates),
-            "decision": decision,
-            "tree_protocol": tree.protocol_summary(),
-        }
-        write_stage_result(reports_dir, "t_orthogonal", payload)
         return payload
     raise ValueError(f"unknown split stage: {stage}")
 
@@ -2637,8 +2576,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.tree_cache_dir is not None
         else args.data_dir / "cache" / "tree_v6_orthogonal_entry"
     )
-    t_source_pool = os.getenv("BIGALPHA_T_SOURCE_POOL", "i").strip().lower()
-    if args.admission_routes == "t":
+    t_source_pool = os.getenv(
+        "BIGALPHA_T_IMPORTANCE_SOURCE_POOL",
+        "i",
+    ).strip().lower()
+    if args.admission_routes == "t-importance":
         if t_source_pool in {"all", "all_self", "all_self_candidates"}:
             candidate_manifest = json.loads(
                 (args.data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
@@ -2650,7 +2592,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             candidate_filter = frozen_i_candidates_from_state(incremental_cache_dir)
     elif args.admission_routes == "t-orthogonal":
-        candidate_filter = frozen_i_candidates_from_state(incremental_cache_dir)
+        # Formal T is independent of I and therefore loads the full technical
+        # candidate universe.
+        candidate_filter = None
     else:
         candidate_filter = None
     input_years = DEVELOPMENT_YEARS if args.admission_routes == "i" else YEARS
@@ -2667,9 +2611,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.reports_dir,
         candidate_filter=candidate_filter,
         years=input_years,
-        include_exposures=args.admission_routes != "i",
-        include_all36=args.admission_routes != "i",
-        panel_as_polars=args.admission_routes == "t",
+        include_exposures=args.admission_routes not in {"i", "t-orthogonal"},
+        include_all36=args.admission_routes not in {"i", "t-orthogonal"},
+        panel_as_polars=args.admission_routes == "t-importance",
     )
     print(
         json.dumps(
@@ -2682,8 +2626,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                     len(candidate_filter) if candidate_filter is not None else None
                 ),
                 "input_years": list(input_years),
-                "include_exposures": args.admission_routes != "i",
-                "include_all36": args.admission_routes != "i",
+                "include_exposures": args.admission_routes
+                not in {"i", "t-orthogonal"},
+                "include_all36": args.admission_routes
+                not in {"i", "t-orthogonal"},
                 "panel_cache_note": "enabled_for_filtered_or_year_subset_inputs",
             },
             ensure_ascii=False,

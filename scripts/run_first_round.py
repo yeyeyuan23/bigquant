@@ -87,10 +87,12 @@ DEVELOPMENT_YEARS = range(
     int(FORMAL_EVALUATION_POLICY.development_start[:4]),
     int(FORMAL_EVALUATION_POLICY.development_end[:4]) + 1,
 )
-VALIDATION_2022_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2022_start[:4])
-VALIDATION_2023_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4])
-MARKET_STATE_YEARS = range(2019, VALIDATION_2022_YEAR + 1)
-ALL_BASE_YEARS = range(2019, VALIDATION_2023_YEAR + 1)
+EVALUATION_YEARS = (
+    int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4]),
+    int(FORMAL_EVALUATION_POLICY.validation_2024_start[:4]),
+)
+MARKET_STATE_YEARS = range(2019, EVALUATION_YEARS[0] + 1)
+ALL_BASE_YEARS = range(2019, EVALUATION_YEARS[1] + 1)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -396,16 +398,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         if metric_path.exists() and stability_path.exists():
             cached_metrics = pd.read_csv(metric_path)
             cached_stability = pd.read_csv(stability_path)
-            period_aliases = {
-                "selection_2022": "validation_2022",
-                "confirmation_2023": "validation_2023",
+            expected_periods = {
+                "development",
+                "validation_2023",
+                "validation_2024",
             }
-            cached_metrics["period"] = cached_metrics["period"].replace(
-                period_aliases
-            )
-            cached_stability["period"] = cached_stability["period"].replace(
-                period_aliases
-            )
+            cached_periods = set(cached_metrics["period"].astype(str))
+            if cached_periods != expected_periods:
+                cached_metrics = pd.DataFrame()
+                cached_stability = pd.DataFrame()
             refresh_ids = set(map(str, args.refresh_candidate))
             if refresh_ids:
                 cached_metrics = cached_metrics.loc[
@@ -420,8 +421,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         labels,
         exposures,
         development_years=tuple(DEVELOPMENT_YEARS),
-        validation_2022_year=VALIDATION_2022_YEAR,
-        validation_2023_year=VALIDATION_2023_YEAR,
+        validation_2023_year=EVALUATION_YEARS[0],
+        validation_2024_year=EVALUATION_YEARS[1],
         cached_metrics=cached_metrics,
         cached_stability=cached_stability,
     )

@@ -106,15 +106,7 @@ class ResearchPolicyTest(unittest.TestCase):
 
     def test_formal_periods_and_representative_months_are_frozen(self):
         self.assertEqual(FORMAL_EVALUATION_POLICY.development_start, "2019-01-01")
-        self.assertEqual(FORMAL_EVALUATION_POLICY.development_end, "2021-12-31")
-        self.assertEqual(
-            FORMAL_EVALUATION_POLICY.validation_2022_start,
-            "2022-01-01",
-        )
-        self.assertEqual(
-            FORMAL_EVALUATION_POLICY.validation_2022_end,
-            "2022-12-31",
-        )
+        self.assertEqual(FORMAL_EVALUATION_POLICY.development_end, "2022-12-31")
         self.assertEqual(
             FORMAL_EVALUATION_POLICY.validation_2023_start,
             "2023-01-01",
@@ -122,6 +114,14 @@ class ResearchPolicyTest(unittest.TestCase):
         self.assertEqual(
             FORMAL_EVALUATION_POLICY.validation_2023_end,
             "2023-12-31",
+        )
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2024_start,
+            "2024-01-01",
+        )
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2024_end,
+            "2024-12-31",
         )
         self.assertEqual(FORMAL_EVALUATION_POLICY.primary_label, "ret_close_to_close")
         self.assertEqual(

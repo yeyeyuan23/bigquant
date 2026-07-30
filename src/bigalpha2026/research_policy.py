@@ -170,13 +170,11 @@ HF_OB_ACTIVATED_OPTIONAL_MONTHS: tuple[str, ...] = ("2022-11",)
 @dataclass(frozen=True)
 class FormalEvaluationPolicy:
     development_start: str = "2019-01-01"
-    development_end: str = "2021-12-31"
-    validation_2022_start: str = "2022-01-01"
-    validation_2022_end: str = "2022-12-31"
+    development_end: str = "2022-12-31"
     validation_2023_start: str = "2023-01-01"
     validation_2023_end: str = "2023-12-31"
-    frozen_test_start: str = "2024-01-01"
-    frozen_test_end: str = "2024-12-31"
+    validation_2024_start: str = "2024-01-01"
+    validation_2024_end: str = "2024-12-31"
     primary_label: str = "ret_close_to_close"
     sensitivity_labels: tuple[str, ...] = (
         "ret_next_open_to_close",

@@ -6,9 +6,11 @@ import numpy as np
 import pandas as pd
 
 from bigalpha2026.combinations import (
+    _causal_expanding_train_dates,
     _prepare_joint_model_frame,
     fixed_rank_blend,
     lightgbm_model_config,
+    learned_model_training_config,
     paired_factor_rank_ic_increment,
     walk_forward_elastic_net,
     walk_forward_elastic_net_with_weights,
@@ -303,7 +305,14 @@ class CombinationTest(unittest.TestCase):
     def test_lightgbm_config_is_shallow_and_deterministic(self):
         config = lightgbm_model_config()
         self.assertEqual(config["random_state"], 20260726)
-        self.assertEqual(config["training"], "rolling_60_train_20_test")
+        self.assertEqual(
+            config["training"],
+            "causal_expanding_refit_20_label_embargo_1",
+        )
+        self.assertEqual(config["training_start_date"], "2019-01-01")
+        self.assertEqual(config["minimum_train_days"], 60)
+        self.assertEqual(config["prediction_block_days"], 20)
+        self.assertEqual(config["label_embargo_days"], 1)
         self.assertEqual(
             config["feature_transform"],
             "daily_centered_percentile_rank",
@@ -315,6 +324,22 @@ class CombinationTest(unittest.TestCase):
         self.assertEqual(
             config["monotone_constraints"],
             "all_features_positive",
+        )
+
+    def test_shared_training_contract_expands_and_embargoes_last_label(self):
+        all_dates = pd.date_range("2019-01-02", periods=6, freq="B")
+        train_dates = _causal_expanding_train_dates(
+            all_dates,
+            5,
+            minimum_train_days=4,
+        )
+        self.assertEqual(
+            list(train_dates),
+            list(all_dates[:4]),
+        )
+        self.assertEqual(
+            learned_model_training_config()["training"],
+            "causal_expanding_refit_20_label_embargo_1",
         )
 
     def test_lightgbm_residual_baseline_changes_training_target_and_output(self):
