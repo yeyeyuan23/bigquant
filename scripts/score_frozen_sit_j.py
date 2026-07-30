@@ -25,10 +25,17 @@ from bigalpha2026.combinations import (
 )
 from scripts.run_combinations import (
     DEVELOPMENT_YEARS,
+    EVALUATION_YEARS,
     family_balanced_factor,
     j_baseline_columns_from_self_columns,
     load_dynamic_inputs,
     prepare_experiment_context,
+)
+
+J_PROTOCOL = "frozen_sit_official_proxy_v2"
+J_INCLUDE_EXPOSURES = True
+REQUIRED_J_EXPOSURE_COLUMNS = frozenset(
+    {"SIZE", "LIQUIDTY", "industry_level1_code"}
 )
 
 
@@ -53,6 +60,35 @@ def _membership_digest(routes: dict[str, tuple[str, ...]]) -> str:
     ).hexdigest()
 
 
+def _validated_prediction_years(years: list[int]) -> tuple[int, ...]:
+    prediction_years = tuple(dict.fromkeys(years))
+    unsupported_years = sorted(
+        set(prediction_years).difference(EVALUATION_YEARS)
+    )
+    if unsupported_years:
+        raise ValueError(
+            "J prediction years must be official evaluation years; "
+            f"unsupported={unsupported_years}, "
+            f"allowed={list(EVALUATION_YEARS)}"
+        )
+    return prediction_years
+
+
+def _continuous_input_years(
+    prediction_years: tuple[int, ...],
+) -> tuple[int, ...]:
+    return tuple(
+        range(DEVELOPMENT_YEARS[0], max(prediction_years) + 1)
+    )
+
+
+def _validate_funnel(routes: dict[str, tuple[str, ...]]) -> None:
+    if not set(routes["I"]).issubset(routes["S"]):
+        raise ValueError("frozen I is not a subset of frozen S")
+    if not set(routes["T"]).issubset(routes["I"]):
+        raise ValueError("frozen T is not a subset of frozen I")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -71,10 +107,16 @@ def main() -> int:
         type=Path,
         default=Path(
             "reports/runtime_all156_full_20260729/"
-            "j_frozen_sit_independent"
+            "j_frozen_sit_official_proxy_v2"
         ),
     )
     args = parser.parse_args()
+
+    prediction_years = _validated_prediction_years(args.years)
+    if args.output_dir.exists():
+        raise FileExistsError(
+            f"refusing to overwrite an existing J result: {args.output_dir}"
+        )
 
     latest = args.reports_dir / "latest"
     routes = {
@@ -85,10 +127,12 @@ def main() -> int:
             "tree_admitted_candidates",
         ),
     }
+    _validate_funnel(routes)
     requested_candidates = tuple(
         sorted({member for members in routes.values() for member in members})
     )
-    years = tuple(dict.fromkeys((*DEVELOPMENT_YEARS, *args.years)))
+    input_years = _continuous_input_years(prediction_years)
+    direction_calibration_year = DEVELOPMENT_YEARS[-1]
     (
         panel,
         labels,
@@ -101,10 +145,18 @@ def main() -> int:
         args.data_dir,
         args.reports_dir,
         candidate_filter=requested_candidates,
-        years=years,
-        include_exposures=False,
+        years=input_years,
+        include_exposures=J_INCLUDE_EXPOSURES,
         include_all36=True,
     )
+    missing_exposures = sorted(
+        REQUIRED_J_EXPOSURE_COLUMNS.difference(exposures.columns)
+    )
+    if missing_exposures:
+        raise ValueError(
+            "official-style J requires local risk exposures; "
+            f"missing={missing_exposures}"
+        )
     public_columns = tuple(
         column for column in panel.columns if column.startswith("factorlib__")
     )
@@ -137,31 +189,45 @@ def main() -> int:
         single_factor_candidates,
     )
 
-    prediction_years = tuple(args.years)
+    model_prediction_years = tuple(
+        dict.fromkeys((direction_calibration_year, *prediction_years))
+    )
     s_factor = family_balanced_factor(oriented, routes["S"])
     i_factor, i_weights = walk_forward_elastic_net_with_weights(
         oriented,
         labels,
         feature_columns=(*selected_public, *routes["I"]),
-        prediction_years=prediction_years,
+        prediction_years=model_prediction_years,
     )
     t_factor = walk_forward_lightgbm(
         oriented,
         labels,
         feature_columns=(*selected_public, *routes["T"]),
-        prediction_years=prediction_years,
+        prediction_years=model_prediction_years,
         residual_baseline_columns=selected_public,
     )
     raw = {"S": s_factor, "I": i_factor, "T": t_factor}
     scored_routes: dict[str, pd.DataFrame] = {}
     rows: list[dict[str, object]] = []
     for route, factor in raw.items():
+        calibration_block = factor.loc[
+            pd.to_datetime(factor["date"]).dt.year.eq(
+                direction_calibration_year
+            )
+        ].copy()
+        if calibration_block.empty:
+            raise ValueError(
+                f"{route} produced no direction-calibration rows for "
+                f"{direction_calibration_year}"
+            )
         block = factor.loc[
             pd.to_datetime(factor["date"]).dt.year.isin(prediction_years)
         ].copy()
         if block.empty:
             raise ValueError(f"{route} produced no rows for {prediction_years}")
-        direction_score = score_reference.score_best_direction(block)
+        direction_score = score_reference.score_best_direction(
+            calibration_block
+        )
         direction = float(direction_score["selected_direction"])
         block["factor"] = pd.to_numeric(
             block["factor"], errors="coerce"
@@ -174,18 +240,31 @@ def main() -> int:
                 "member_count": len(routes[route]),
                 "years": ",".join(str(year) for year in prediction_years),
                 "selected_direction": direction,
+                "direction_calibration_year": direction_calibration_year,
+                "direction_calibration_J": float(
+                    direction_score["score_proxy"]
+                ),
                 "J_base": float(score["score_proxy"]),
                 "A_base": float(score["a_proxy"]),
                 "B_base": float(score["b_proxy"]),
             }
         )
 
-    common_dates = set.intersection(
-        *(
-            set(pd.to_datetime(frame["date"]).dt.normalize().unique())
-            for frame in scored_routes.values()
+    route_dates = {
+        route: frozenset(
+            pd.to_datetime(frame["date"]).dt.normalize().unique()
         )
-    )
+        for route, frame in scored_routes.items()
+    }
+    if len(set(route_dates.values())) != 1:
+        raise ValueError(
+            "S/I/T routes do not have identical J evaluation dates: "
+            + ", ".join(
+                f"{route}={len(dates)}"
+                for route, dates in route_dates.items()
+            )
+        )
+    common_dates = set(next(iter(route_dates.values())))
     if not common_dates:
         raise ValueError("S/I/T routes have no common dates")
     crowding = score_reference.score_joint_routes(
@@ -204,7 +283,7 @@ def main() -> int:
             float(row["J_crowded"]),
         )
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    args.output_dir.mkdir(parents=True, exist_ok=False)
     summary = pd.DataFrame(rows).sort_values(
         ["J_robust", "J_base"],
         ascending=False,
@@ -213,7 +292,7 @@ def main() -> int:
     i_weights.to_csv(args.output_dir / "i_elastic_net_weights.csv", index=False)
     output = {
         "status": "ok",
-        "protocol": "frozen_sit_independent_J_v1",
+        "protocol": J_PROTOCOL,
         "note": (
             "Scores frozen report memberships as-is; admission and frozen "
             "state compatibility checks are intentionally not rerun."
@@ -221,7 +300,16 @@ def main() -> int:
         "data_dir": str(args.data_dir),
         "reports_dir": str(args.reports_dir),
         "years": list(prediction_years),
+        "input_years": list(input_years),
         "development_years": list(DEVELOPMENT_YEARS),
+        "direction_calibration_year": direction_calibration_year,
+        "direction_uses_evaluation_period": False,
+        "include_exposures": J_INCLUDE_EXPOSURES,
+        "exposure_columns": list(exposures.columns),
+        "required_exposure_columns": sorted(REQUIRED_J_EXPOSURE_COLUMNS),
+        "j_baseline_self_columns": list(j_baseline_columns),
+        "j_baseline_self_count": len(j_baseline_columns),
+        "competition_score_protocol": dict(score_reference.protocol()),
         "membership_digest": _membership_digest(routes),
         "members": {route: list(members) for route, members in routes.items()},
         "summary": summary.to_dict("records"),

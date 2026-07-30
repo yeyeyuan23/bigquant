@@ -1571,14 +1571,17 @@ def build_validation_pipelines(
         *selected_public,
         *tree_result.admitted_candidates,
     )
+    direction_calibration_year = DEVELOPMENT_YEARS[-1]
+    model_prediction_years = (
+        direction_calibration_year,
+        EVALUATION_YEARS[0],
+        EVALUATION_YEARS[1],
+    )
     elastic_net_factor, elastic_net_weights = walk_forward_elastic_net_with_weights(
         oriented,
         labels,
         feature_columns=elastic_net_features,
-        prediction_years=(
-            EVALUATION_YEARS[0],
-            EVALUATION_YEARS[1],
-        ),
+        prediction_years=model_prediction_years,
     )
     raw_pipelines: dict[tuple[str, str], pd.DataFrame] = {}
     if self_features:
@@ -1600,15 +1603,27 @@ def build_validation_pipelines(
         (
             "joint_lightgbm",
             "lightgbm",
-        ): tree_result.predict_joint((EVALUATION_YEARS[0], EVALUATION_YEARS[1])),
+        ): tree_result.predict_joint(model_prediction_years),
         }
     )
     validation_years = (EVALUATION_YEARS[0], EVALUATION_YEARS[1])
     factors: dict[tuple[str, str], pd.DataFrame] = {}
     score_summaries: dict[str, dict[str, float]] = {}
     for (experiment, method), factor in raw_pipelines.items():
-        validation_block = factor.loc[factor["date"].dt.year.isin(validation_years)].copy()
-        direction_score = score_reference.score_best_direction(validation_block)
+        calibration_block = factor.loc[
+            factor["date"].dt.year.eq(direction_calibration_year)
+        ].copy()
+        if calibration_block.empty:
+            raise ValueError(
+                f"{experiment} produced no direction-calibration rows for "
+                f"{direction_calibration_year}"
+            )
+        validation_block = factor.loc[
+            factor["date"].dt.year.isin(validation_years)
+        ].copy()
+        direction_score = score_reference.score_best_direction(
+            calibration_block
+        )
         direction = float(direction_score["selected_direction"])
         oriented_factor = factor.copy()
         oriented_factor["factor"] = (
@@ -1624,8 +1639,11 @@ def build_validation_pipelines(
         }
         score_summaries[experiment] = {
             "selected_direction": direction,
-            "positive_score_proxy": float(direction_score["positive_score_proxy"]),
-            "negative_score_proxy": float(direction_score["negative_score_proxy"]),
+            "direction_calibration_year": direction_calibration_year,
+            "direction_calibration_score_proxy": float(
+                direction_score["score_proxy"]
+            ),
+            "direction_uses_evaluation_period": False,
             "validation_combined_base_score_proxy": float(
                 score_reference.score(combined_block)["score_proxy"]
             ),
@@ -1974,7 +1992,11 @@ def build_experiment_result(
                 "validation_combined_base_score_proxy",
                 "validation_joint_crowding_score_proxy",
             ],
-            "direction": "best_of_z_and_negative_z_on_combined_validation_J",
+            "direction": (
+                "best_of_z_and_negative_z_on_last_development_year_J"
+            ),
+            "direction_calibration_year": DEVELOPMENT_YEARS[-1],
+            "direction_uses_evaluation_period": False,
             "crowding_scope": ("one_joint_fit_of_current_sibling_routes_not_global_history"),
             "rank_ic_and_tradability": (
                 "diagnostic_only" if include_route_diagnostics else "skipped_by_default"
@@ -2267,16 +2289,23 @@ def score_one_pipeline(
     score_reference: CompetitionScoreReference,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     validation_years = (EVALUATION_YEARS[0], EVALUATION_YEARS[1])
-    validation_block = factor.loc[factor["date"].dt.year.isin(validation_years)].copy()
-    direction_score = score_reference.score_best_direction(validation_block)
-    direction = float(direction_score["selected_direction"])
+    validation_block = factor.loc[
+        factor["date"].dt.year.isin(validation_years)
+    ].copy()
+    # The model is trained against the positive next-return target.  Do not
+    # inspect validation J to choose its sign.
+    direction = 1.0
     oriented_factor = factor.copy()
-    oriented_factor["factor"] = pd.to_numeric(oriented_factor["factor"], errors="coerce") * direction
+    oriented_factor["factor"] = pd.to_numeric(
+        oriented_factor["factor"], errors="coerce"
+    )
     year_scores = {
         year: score_reference.score(oriented_factor.loc[oriented_factor["date"].dt.year.eq(year)])
         for year in validation_years
     }
-    combined_score = float(direction_score["score_proxy"])
+    combined_score = float(
+        score_reference.score(validation_block)["score_proxy"]
+    )
     return oriented_factor, {
         "experiment": experiment,
         "method": method,
@@ -2284,8 +2313,8 @@ def score_one_pipeline(
         "passed_cross_regime_gate": True,
         "validation_years": list(validation_years),
         "selected_direction": direction,
-        "positive_score_proxy": float(direction_score["positive_score_proxy"]),
-        "negative_score_proxy": float(direction_score["negative_score_proxy"]),
+        "direction_rule": "fixed_positive_model_target",
+        "direction_uses_evaluation_period": False,
         "validation_combined_base_score_proxy": combined_score,
         "validation_2023_score_proxy": float(year_scores[EVALUATION_YEARS[0]]["score_proxy"]),
         "validation_2024_score_proxy": float(year_scores[EVALUATION_YEARS[1]]["score_proxy"]),

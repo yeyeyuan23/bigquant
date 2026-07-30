@@ -493,31 +493,34 @@ class WorkflowScriptTest(unittest.TestCase):
         )
 
     def test_validation_pipelines_allow_empty_s_pool(self):
-        dates = pd.to_datetime(["2023-01-04", "2024-01-05"])
+        dates = pd.to_datetime(
+            ["2022-01-04", "2023-01-04", "2024-01-05"]
+        )
         factor = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": ["A", "A"],
-                "factor": [0.1, 0.2],
+                "instrument": ["A", "A", "A"],
+                "factor": [0.05, 0.1, 0.2],
             }
         )
         oriented = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": ["A", "A"],
-                "factorlib__base": [0.0, 1.0],
+                "instrument": ["A", "A", "A"],
+                "factorlib__base": [0.0, 0.5, 1.0],
             }
         )
         labels = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": ["A", "A"],
-                "ret_close_to_close": [0.0, 0.1],
+                "instrument": ["A", "A", "A"],
+                "ret_close_to_close": [0.0, 0.05, 0.1],
             }
         )
         score_reference = SimpleNamespace(
             score_best_direction=lambda _factor: {
                 "selected_direction": 1.0,
+                "score_proxy": 0.6,
                 "positive_score_proxy": 0.6,
                 "negative_score_proxy": 0.4,
             },
@@ -537,7 +540,7 @@ class WorkflowScriptTest(unittest.TestCase):
                 run_combinations,
                 "walk_forward_elastic_net_with_weights",
                 return_value=(factor.copy(), pd.DataFrame()),
-            ),
+            ) as walk_forward,
             patch.object(
                 run_combinations,
                 "family_balanced_factor",
@@ -554,6 +557,10 @@ class WorkflowScriptTest(unittest.TestCase):
                 tree_result,
             )
 
+        self.assertEqual(
+            walk_forward.call_args.kwargs["prediction_years"],
+            (2022, 2023, 2024),
+        )
         self.assertEqual(
             {experiment for experiment, _method in pipelines},
             {"joint_elastic_net", "joint_lightgbm"},
