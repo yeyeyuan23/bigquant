@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 
 from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from scripts.run_combinations import (
+    DEVELOPMENT_YEARS,
     EVALUATION_YEARS,
     j_baseline_columns_from_self_columns,
     load_dynamic_inputs,
@@ -160,7 +161,23 @@ def load_route(version: str, data_dir: Path, years: tuple[int, ...]) -> tuple[pd
     return route, f"{path}:{file_sha256(path)}"
 
 
-def load_score_reference(data_dir: Path, reports_dir: Path) -> CompetitionScoreReference:
+def load_score_reference(
+    data_dir: Path,
+    reports_dir: Path,
+    years: tuple[int, ...],
+) -> CompetitionScoreReference:
+    candidate_manifest = json.loads(
+        (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
+    )
+    candidate_ids = tuple(
+        sorted(candidate_manifest.get("candidate_rows", {}).keys())
+    )
+    if not candidate_ids:
+        raise ValueError("candidate manifest contains no candidates")
+    # The current J baseline is all36-only, but the shared dynamic loader
+    # requires at least one candidate column to construct its feature panel.
+    loader_filter = (f"self__{candidate_ids[0]}",)
+    context_years = tuple(dict.fromkeys((*DEVELOPMENT_YEARS, *years)))
     (
         panel,
         labels,
@@ -169,7 +186,12 @@ def load_score_reference(data_dir: Path, reports_dir: Path) -> CompetitionScoreR
         _candidate_pool,
         all36_reference,
         single_factor_admitted,
-    ) = load_dynamic_inputs(data_dir, reports_dir)
+    ) = load_dynamic_inputs(
+        data_dir,
+        reports_dir,
+        candidate_filter=loader_filter,
+        years=context_years,
+    )
     public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
     self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
     j_baseline_columns = j_baseline_columns_from_self_columns(self_columns)
@@ -268,7 +290,7 @@ def main() -> int:
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     years = tuple(args.years)
-    score_reference = load_score_reference(args.data_dir, args.reports_dir)
+    score_reference = load_score_reference(args.data_dir, args.reports_dir, years)
     summaries = []
     for version in args.versions:
         route, route_source_digest = load_route(version, args.data_dir, years)
