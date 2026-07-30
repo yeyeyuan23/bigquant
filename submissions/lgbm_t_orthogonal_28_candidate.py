@@ -1,4 +1,4 @@
-"""Orthogonal T-route rolling LightGBM with 28 factors."""
+"""Orthogonal T pure-increment LightGBM with 28 factors."""
 
 # Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.
 
@@ -1786,7 +1786,7 @@ def _rank_center(values, dates, np):
     grouped = numeric.groupby(dates, sort=False)
     ranks = grouped.rank(method="average")
     counts = grouped.transform("count")
-    return (2.0 * (ranks - (counts + 1.0) / 2.0) / counts).fillna(0.0)
+    return (2.0 * (ranks / counts - 0.5)).fillna(0.0)
 
 
 def _apply_financial_effective_dates(financial, pool, pd, np):
@@ -2069,7 +2069,10 @@ def main(datasources, start_date, end_date):
         panel[column] = _rank_center(pd.to_numeric(panel[column], errors="coerce"), panel["date"], np) * public_directions[column]
     for column in self_columns:
         panel[column] = _rank_center(pd.to_numeric(panel[column], errors="coerce"), panel["date"], np)
-    feature_columns = (*public_columns, *self_columns)
+    # screened15 is a residual-target control only.  It must not enter the
+    # submitted model feature vector or be added back to its prediction.
+    feature_columns = tuple(self_columns)
+    residual_baseline_columns = tuple(public_columns)
     panel = panel.sort_values(["instrument", "date"]).reset_index(drop=True)
     panel["stock_return"] = pd.to_numeric(panel["daily_return"], errors="coerce").replace([np.inf, -np.inf], np.nan)
     all_dates = pd.DatetimeIndex(sorted(panel["date"].dropna().unique()))
@@ -2078,6 +2081,10 @@ def main(datasources, start_date, end_date):
     panel = panel.merge(target_frame, on=["date", "instrument"], how="left", validate="one_to_one")
     target_values = pd.to_numeric(panel["target_raw"], errors="coerce")
     panel["target"] = _rank_center(target_values, panel["date"], np).where(target_values.notna())
+    panel["target_residual"] = (
+        panel["target"]
+        - panel.loc[:, list(residual_baseline_columns)].mean(axis=1)
+    )
     prediction_dates = all_dates[(all_dates >= start_ts) & (all_dates <= end_ts)]
     prediction_dates = pd.DatetimeIndex([
         date
@@ -2105,13 +2112,17 @@ def main(datasources, start_date, end_date):
             raise ValueError("not enough fully observed pre-block history for model training")
         eligible_history = eligible_history[-60:]
         train = panel.loc[
-            panel["date"].isin(eligible_history) & panel["target"].notna()
+            panel["date"].isin(eligible_history)
+            & panel["target_residual"].notna()
         ]
         test = panel.loc[panel["date"].isin(block_dates)]
         if train.empty or test.empty:
             raise ValueError("empty train or prediction sample")
         model = LGBMRegressor(objective="regression", learning_rate=0.03, n_estimators=220, max_depth=3, num_leaves=7, min_child_samples=100, subsample=1.0, colsample_bytree=0.8, reg_lambda=1.0, random_state=20260730, n_jobs=1, deterministic=True, force_col_wise=True, verbosity=-1, monotone_constraints=[1] * len(feature_columns))
-        model.fit(train.loc[:, list(feature_columns)].to_numpy(dtype=float), train["target"].to_numpy(dtype=float))
+        model.fit(
+            train.loc[:, list(feature_columns)].to_numpy(dtype=float),
+            train["target_residual"].to_numpy(dtype=float),
+        )
         block = test[["date", "instrument"]].copy()
         block["factor_raw"] = model.predict(test.loc[:, list(feature_columns)].to_numpy(dtype=float))
         predictions.append(block)
