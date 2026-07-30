@@ -497,8 +497,19 @@ def main(datasources, start_date, end_date):
     target_values = pd.to_numeric(panel["target_raw"], errors="coerce")
     panel["target"] = _rank_center(target_values, panel["date"], np).where(target_values.notna())
     prediction_dates = all_dates[(all_dates >= start_ts) & (all_dates <= end_ts)]
+    prediction_dates = pd.DatetimeIndex([
+        date
+        for date in prediction_dates
+        if all_dates.get_loc(date) > 0
+        and len(
+            all_dates[
+                (all_dates >= model_history_start)
+                & (all_dates < all_dates[all_dates.get_loc(date) - 1])
+            ]
+        ) >= 60
+    ])
     if prediction_dates.empty:
-        raise ValueError("no prediction dates inside the requested window")
+        raise ValueError("no prediction dates have a complete causal 60-day training window")
     predictions = []
     for offset in range(0, len(prediction_dates), 20):
         block_dates = prediction_dates[offset:offset + 20]
@@ -510,6 +521,7 @@ def main(datasources, start_date, end_date):
         ]
         if len(eligible_history) < 60:
             raise ValueError("not enough fully observed pre-block history for model training")
+        eligible_history = eligible_history[-60:]
         train = panel.loc[
             panel["date"].isin(eligible_history) & panel["target"].notna()
         ]
@@ -539,7 +551,7 @@ def build_notebook(source: str) -> str:
                 "metadata": {},
                 "source": [
                     "# BigAlpha 2026 T importance top50 LightGBM v01\n",
-                    "Experimental importance top50 self factors; stock_bar5m-generated CICC/FZ/HF/PV/OB components; causal 20-day refits with expanding legal history; bounded 5m history and sparse-component guards.",
+                    "Experimental importance top50 self factors; stock_bar5m-generated CICC/FZ/HF/PV/OB components; causal rolling 60-day training and 20-day prediction blocks with a one-day label embargo.",
                 ],
             },
             {

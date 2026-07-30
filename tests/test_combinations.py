@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 
 from bigalpha2026.combinations import (
-    _causal_expanding_train_dates,
+    _causal_rolling_train_dates,
+    _eligible_prediction_dates,
     _prepare_joint_model_frame,
     fixed_rank_blend,
     lightgbm_model_config,
@@ -39,16 +40,17 @@ class _ZeroLightGBM:
 def _run_lightgbm_smoke() -> None:
     dates = pd.to_datetime(
         ["2019-01-02"] * 120
+        + ["2019-01-03"] * 120
         + ["2020-01-02"] * 120
         + ["2021-01-04"] * 120
     )
-    values = list(range(120)) * 3
+    values = list(range(120)) * 4
     panel = pd.DataFrame(
         {
             "date": dates,
-            "instrument": [str(value) for value in range(120)] * 3,
+            "instrument": [str(value) for value in range(120)] * 4,
             "FR-002": values,
-            "HF-001": list(reversed(values[:120])) * 3,
+            "HF-001": list(reversed(values[:120])) * 4,
         }
     )
     labels = panel[["date", "instrument"]].copy()
@@ -70,16 +72,17 @@ def _run_lightgbm_smoke() -> None:
 def _run_lightgbm_importance_smoke() -> None:
     dates = pd.to_datetime(
         ["2019-01-02"] * 120
+        + ["2019-01-03"] * 120
         + ["2020-01-02"] * 120
         + ["2021-01-04"] * 120
     )
-    values = list(range(120)) * 3
+    values = list(range(120)) * 4
     panel = pd.DataFrame(
         {
             "date": dates,
-            "instrument": [str(value) for value in range(120)] * 3,
+            "instrument": [str(value) for value in range(120)] * 4,
             "FR-002": values,
-            "HF-001": list(reversed(values[:120])) * 3,
+            "HF-001": list(reversed(values[:120])) * 4,
         }
     )
     labels = panel[["date", "instrument"]].copy()
@@ -163,16 +166,17 @@ class CombinationTest(unittest.TestCase):
     def test_elastic_net_predictions_are_strictly_walk_forward(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 120
+            + ["2019-01-03"] * 120
             + ["2020-01-02"] * 120
             + ["2021-01-04"] * 120
         )
-        values = list(range(120)) * 3
+        values = list(range(120)) * 4
         panel = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": [str(value) for value in range(120)] * 3,
+                "instrument": [str(value) for value in range(120)] * 4,
                 "public": values,
-                "candidate": list(reversed(values[:120])) * 3,
+                "candidate": list(reversed(values[:120])) * 4,
             }
         )
         labels = panel[["date", "instrument"]].copy()
@@ -193,16 +197,17 @@ class CombinationTest(unittest.TestCase):
     def test_elastic_net_is_invariant_to_label_units_and_records_weights(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 120
+            + ["2019-01-03"] * 120
             + ["2020-01-02"] * 120
             + ["2021-01-04"] * 120
         )
-        values = list(range(120)) * 3
+        values = list(range(120)) * 4
         panel = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": [str(value) for value in range(120)] * 3,
+                "instrument": [str(value) for value in range(120)] * 4,
                 "public": values,
-                "candidate": list(reversed(values[:120])) * 3,
+                "candidate": list(reversed(values[:120])) * 4,
             }
         )
         labels = panel[["date", "instrument"]].copy()
@@ -242,14 +247,15 @@ class CombinationTest(unittest.TestCase):
     def test_elastic_net_keeps_dates_with_a_neutral_constant_feature(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 120
+            + ["2019-01-03"] * 120
             + ["2020-01-02"] * 120
             + ["2021-01-04"] * 120
         )
-        values = list(range(120)) * 3
+        values = list(range(120)) * 4
         panel = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": [str(value) for value in range(120)] * 3,
+                "instrument": [str(value) for value in range(120)] * 4,
                 "public": values,
                 "sparse_candidate": [0.0] * len(dates),
             }
@@ -307,10 +313,10 @@ class CombinationTest(unittest.TestCase):
         self.assertEqual(config["random_state"], 20260726)
         self.assertEqual(
             config["training"],
-            "causal_expanding_refit_20_label_embargo_1",
+            "causal_rolling_60_train_20_predict_label_embargo_1",
         )
         self.assertEqual(config["training_start_date"], "2019-01-01")
-        self.assertEqual(config["minimum_train_days"], 60)
+        self.assertEqual(config["train_window_days"], 60)
         self.assertEqual(config["prediction_block_days"], 20)
         self.assertEqual(config["label_embargo_days"], 1)
         self.assertEqual(
@@ -326,32 +332,43 @@ class CombinationTest(unittest.TestCase):
             "all_features_positive",
         )
 
-    def test_shared_training_contract_expands_and_embargoes_last_label(self):
-        all_dates = pd.date_range("2019-01-02", periods=6, freq="B")
-        train_dates = _causal_expanding_train_dates(
+    def test_shared_training_contract_rolls_and_embargoes_last_label(self):
+        all_dates = pd.date_range("2019-01-02", periods=8, freq="B")
+        train_dates = _causal_rolling_train_dates(
             all_dates,
-            5,
-            minimum_train_days=4,
+            7,
+            train_window_days=4,
         )
         self.assertEqual(
             list(train_dates),
-            list(all_dates[:4]),
+            list(all_dates[2:6]),
         )
         self.assertEqual(
             learned_model_training_config()["training"],
-            "causal_expanding_refit_20_label_embargo_1",
+            "causal_rolling_60_train_20_predict_label_embargo_1",
         )
+
+    def test_prediction_blocks_start_after_first_complete_train_window(self):
+        all_dates = pd.date_range("2019-01-02", periods=85, freq="B")
+        prediction_dates = _eligible_prediction_dates(
+            all_dates,
+            (2019,),
+            train_window_days=60,
+        )
+        self.assertEqual(prediction_dates[0], all_dates[61])
 
     def test_lightgbm_residual_baseline_changes_training_target_and_output(self):
         dates = pd.to_datetime(
-            ["2019-01-02"] * 10 + ["2020-01-02"] * 10
+            ["2019-01-02"] * 10
+            + ["2019-01-03"] * 10
+            + ["2020-01-02"] * 10
         )
         panel = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": [str(value) for value in range(10)] * 2,
-                "public": list(range(10)) * 2,
-                "candidate": [0.0] * 20,
+                "instrument": [str(value) for value in range(10)] * 3,
+                "public": list(range(10)) * 3,
+                "candidate": [0.0] * 30,
             }
         )
         labels = panel[["date", "instrument"]].copy()

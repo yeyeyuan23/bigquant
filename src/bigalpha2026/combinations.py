@@ -17,14 +17,14 @@ from .research_policy import fixed_weight_rank_combination
 
 
 def learned_model_training_config() -> dict[str, object]:
-    """Return the shared causal training contract used by J and submissions."""
+    """Return the shared causal rolling contract used by I/T and submissions."""
 
     return {
         "training_start_date": "2019-01-01",
-        "minimum_train_days": 60,
+        "train_window_days": 60,
         "prediction_block_days": 20,
         "label_embargo_days": 1,
-        "training": "causal_expanding_refit_20_label_embargo_1",
+        "training": "causal_rolling_60_train_20_predict_label_embargo_1",
     }
 
 
@@ -82,13 +82,13 @@ def _lightgbm_regressor(feature_count: int):
     )
 
 
-def _causal_expanding_train_dates(
+def _causal_rolling_train_dates(
     all_dates: pd.DatetimeIndex,
     first_test_position: int,
     *,
-    minimum_train_days: int,
+    train_window_days: int,
 ) -> pd.DatetimeIndex:
-    """Return all legally observed labeled dates before a prediction block."""
+    """Return the latest fixed-size, fully labeled window before a test block."""
 
     config = learned_model_training_config()
     train_end_position = first_test_position - int(
@@ -97,11 +97,39 @@ def _causal_expanding_train_dates(
     if train_end_position <= 0:
         return all_dates[:0]
     training_start = pd.Timestamp(str(config["training_start_date"]))
-    train_dates = all_dates[:train_end_position]
-    train_dates = train_dates[train_dates >= training_start]
-    if len(train_dates) < minimum_train_days:
+    eligible_dates = all_dates[:train_end_position]
+    eligible_dates = eligible_dates[eligible_dates >= training_start]
+    if len(eligible_dates) < train_window_days:
         return all_dates[:0]
-    return train_dates
+    return eligible_dates[-train_window_days:]
+
+
+def _eligible_prediction_dates(
+    all_dates: pd.DatetimeIndex,
+    prediction_years: tuple[int, ...],
+    *,
+    train_window_days: int,
+) -> pd.DatetimeIndex:
+    """Drop only the initial dates that lack one complete causal train window."""
+
+    requested = all_dates[all_dates.year.isin(prediction_years)]
+    if requested.empty:
+        return requested
+    first_eligible = next(
+        (
+            date
+            for date in requested
+            if not _causal_rolling_train_dates(
+                all_dates,
+                all_dates.get_loc(date),
+                train_window_days=train_window_days,
+            ).empty
+        ),
+        None,
+    )
+    if first_eligible is None:
+        return requested[:0]
+    return requested[requested >= first_eligible]
 
 
 
@@ -239,7 +267,7 @@ def _walk_forward_elastic_net(
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Generate causal expanding-window predictions and coefficients."""
+    """Generate causal rolling 60/20 predictions and coefficients."""
 
     from sklearn.linear_model import ElasticNet
 
@@ -255,16 +283,20 @@ def _walk_forward_elastic_net(
     outputs: list[pd.DataFrame] = []
     weight_rows: list[dict[str, object]] = []
     all_dates = pd.DatetimeIndex(sorted(merged["date"].unique()))
-    prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
+    prediction_dates = _eligible_prediction_dates(
+        all_dates,
+        prediction_years,
+        train_window_days=train_window_days,
+    )
     for start in range(0, len(prediction_dates), test_window_days):
         test_dates = prediction_dates[start : start + test_window_days]
         if test_dates.empty:
             continue
         first_test_position = all_dates.get_loc(test_dates[0])
-        train_dates = _causal_expanding_train_dates(
+        train_dates = _causal_rolling_train_dates(
             all_dates,
             first_test_position,
-            minimum_train_days=train_window_days,
+            train_window_days=train_window_days,
         )
         if train_dates.empty:
             continue
@@ -320,7 +352,7 @@ def walk_forward_elastic_net(
     alpha: float = 0.001,
     l1_ratio: float = 0.5,
 ) -> pd.DataFrame:
-    """Generate causal expanding, scale-consistent Elastic Net predictions."""
+    """Generate causal rolling, scale-consistent Elastic Net predictions."""
 
     predictions, _ = _walk_forward_elastic_net(
         panel,
@@ -504,7 +536,7 @@ def walk_forward_lightgbm(
     test_window_days: int = 20,
     residual_baseline_columns: tuple[str, ...] = (),
 ) -> pd.DataFrame:
-    """Generate causal expanding / 20-day OOS LightGBM predictions."""
+    """Generate causal rolling 60-day train / 20-day OOS predictions."""
 
     merged = _prepare_joint_model_frame_polars(
         panel,
@@ -580,16 +612,20 @@ def _walk_forward_lightgbm_prepared(
         residual_baseline_columns,
     )
     all_dates = pd.DatetimeIndex(sorted(prepared["date"].unique()))
-    prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
+    prediction_dates = _eligible_prediction_dates(
+        all_dates,
+        prediction_years,
+        train_window_days=train_window_days,
+    )
     for start in range(0, len(prediction_dates), test_window_days):
         test_dates = prediction_dates[start : start + test_window_days]
         if test_dates.empty:
             continue
         first_test_position = all_dates.get_loc(test_dates[0])
-        train_dates = _causal_expanding_train_dates(
+        train_dates = _causal_rolling_train_dates(
             all_dates,
             first_test_position,
-            minimum_train_days=train_window_days,
+            train_window_days=train_window_days,
         )
         if train_dates.empty:
             continue
@@ -676,7 +712,11 @@ def _walk_forward_lightgbm_prepared_polars(
     all_dates = pd.DatetimeIndex(
         prepared.select(pl.col("date").unique().sort()).to_series().to_pandas()
     )
-    prediction_dates = all_dates[all_dates.year.isin(prediction_years)]
+    prediction_dates = _eligible_prediction_dates(
+        all_dates,
+        prediction_years,
+        train_window_days=train_window_days,
+    )
     outputs = []
     importance_rows: list[dict[str, object]] = []
     feature_list = list(feature_columns)
@@ -690,10 +730,10 @@ def _walk_forward_lightgbm_prepared_polars(
         if test_dates.empty:
             continue
         first_test_position = all_dates.get_loc(test_dates[0])
-        train_dates = _causal_expanding_train_dates(
+        train_dates = _causal_rolling_train_dates(
             all_dates,
             first_test_position,
-            minimum_train_days=train_window_days,
+            train_window_days=train_window_days,
         )
         if train_dates.empty:
             continue

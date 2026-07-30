@@ -318,6 +318,9 @@ def required_paths(
     data_dir: Path,
     reports_dir: Path,
     years: Sequence[int] = YEARS,
+    *,
+    include_exposures: bool = True,
+    include_all36: bool = True,
 ) -> tuple[Path, ...]:
     paths: list[Path] = []
     for year in years:
@@ -325,11 +328,15 @@ def required_paths(
             [
                 data_dir / f"universe/year={year}/part-{year}.parquet",
                 data_dir / f"labels/year={year}/part-{year}.parquet",
-                data_dir / f"exposures/year={year}/part-{year}.parquet",
                 data_dir / f"features/FACTORLIB/year={year}/part-{year}.parquet",
                 *(
+                    [data_dir / f"exposures/year={year}/part-{year}.parquet"]
+                    if include_exposures
+                    else []
+                ),
+                *(
                     [data_dir / (f"features/FACTORLIB_ALL36/year={year}/part-{year}.parquet")]
-                    if year in YEARS
+                    if include_all36 and year in YEARS
                     else []
                 ),
             ]
@@ -339,7 +346,11 @@ def required_paths(
             data_dir / "factors/candidate_pool.parquet",
             data_dir / "manifest_candidate_pool.json",
             data_dir / "features/FACTORLIB/manifest.json",
-            data_dir / "features/FACTORLIB_ALL36/manifest.json",
+            *(
+                [data_dir / "features/FACTORLIB_ALL36/manifest.json"]
+                if include_all36
+                else []
+            ),
             existing_report_path(
                 reports_dir,
                 "first_round/first_round_decisions.json",
@@ -676,7 +687,17 @@ def load_dynamic_inputs(
     tuple[str, ...],
 ]:
     selected_years = tuple(years)
-    missing = [str(path) for path in required_paths(data_dir, reports_dir, selected_years) if not path.exists()]
+    missing = [
+        str(path)
+        for path in required_paths(
+            data_dir,
+            reports_dir,
+            selected_years,
+            include_exposures=include_exposures,
+            include_all36=include_all36,
+        )
+        if not path.exists()
+    ]
     if missing:
         raise FileNotFoundError(f"dynamic combination inputs are missing: {missing}")
 
@@ -2597,7 +2618,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         candidate_filter = None
     else:
         candidate_filter = None
-    input_years = DEVELOPMENT_YEARS if args.admission_routes == "i" else YEARS
+    input_years = (
+        DEVELOPMENT_YEARS
+        if args.admission_routes in {"i", "t-orthogonal"}
+        else YEARS
+    )
     (
         panel,
         labels,
