@@ -6,7 +6,6 @@ candidate membership, evaluation gates, or combination weights in a notebook.
 
 from __future__ import annotations
 
-import importlib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 

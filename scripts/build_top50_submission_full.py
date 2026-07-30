@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 ROOT = Path(".")
 TOP50_PATH = ROOT / "reports/runtime_all156_full_20260729/routes/tree_lightgbm_importance_selection.csv"
 OUT_PY = ROOT / "submissions/lgbm_t_top50_candidate.py"
@@ -64,23 +63,17 @@ def discover_candidate_modules(candidate_ids: list[str]) -> dict[str, str]:
                 base = parent + ("." + node.module if node.module else "")
             if not base or not base.startswith("bigalpha2026.candidates"):
                 continue
-            try:
-                if path_for_module(base).exists():
-                    stack.append(base)
-            except Exception:
-                pass
+            if path_for_module(base).exists():
+                stack.append(base)
             for alias in node.names:
                 candidate_module = base + "." + alias.name
-                try:
-                    if path_for_module(candidate_module).exists():
-                        stack.append(candidate_module)
-                except Exception:
-                    pass
+                if path_for_module(candidate_module).exists():
+                    stack.append(candidate_module)
 
     def order_key(module_name: str) -> tuple[int, str]:
         if module_name == "bigalpha2026.candidate_transforms":
             return (0, module_name)
-        if module_name.endswith("._common") or module_name.endswith("._monthly"):
+        if module_name.endswith(("._common", "._monthly")):
             return (1, module_name)
         if ".fr." in module_name:
             return (2, module_name)

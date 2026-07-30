@@ -26,14 +26,12 @@ from bigalpha2026.combinations import (
 from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from bigalpha2026.evaluation import (
     evaluate_single_factor,
-    rank_ic_series,
 )
 from bigalpha2026.factor_pool import (
     CANDIDATE_POOL_COLUMNS,
     CANDIDATE_POOL_VERSION,
     KEY_COLUMNS,
     apply_feature_directions,
-    build_feature_panel,
     family_balanced_factor,
     file_sha256,
     screen_public_factors,
@@ -703,7 +701,6 @@ def load_dynamic_inputs(
 
     # Defer immutable feature loads until we know cache misses need them.
     factorlib: pd.DataFrame | None = None
-    factorlib_all36: pd.DataFrame | None = None
     candidate_path = data_dir / "factors/candidate_pool.parquet"
     candidate_manifest = json.loads(
         (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
@@ -2193,7 +2190,7 @@ def run_t_importance_stage(
             "score_ranking_eligible": False,
             "passed_cross_regime_gate": None,
             "validation_years": [VALIDATION_2022_YEAR, VALIDATION_2023_YEAR],
-            "validation_rows": int(len(factor)),
+            "validation_rows": len(factor),
             "score_skipped": True,
             "score_skip_reason": "BIGALPHA_T_SCORE is not 1",
         }
@@ -2232,7 +2229,6 @@ def score_one_pipeline(
     direction = float(direction_score["selected_direction"])
     oriented_factor = factor.copy()
     oriented_factor["factor"] = pd.to_numeric(oriented_factor["factor"], errors="coerce") * direction
-    combined_block = oriented_factor.loc[oriented_factor["date"].dt.year.isin(validation_years)]
     year_scores = {
         year: score_reference.score(oriented_factor.loc[oriented_factor["date"].dt.year.eq(year)])
         for year in validation_years
@@ -2615,7 +2611,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.reports_dir.mkdir(exist_ok=True)
     latest_reports_dir(args.reports_dir).mkdir(exist_ok=True)
     if args.check_files:
-        summary, loaded = contract_summary(args.data_dir, args.reports_dir)
+        summary, _loaded = contract_summary(args.data_dir, args.reports_dir)
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         if summary["status"] != "ok":
             return 2

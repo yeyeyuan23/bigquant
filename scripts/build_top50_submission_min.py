@@ -1,6 +1,8 @@
-from pathlib import Path
 import json
+from pathlib import Path
+
 import pandas as pd
+
 ROOT = Path('.')
 top = pd.read_csv('reports/runtime_all156_full_20260729/routes/tree_lightgbm_importance_selection.csv').sort_values('importance_rank').head(50)
 top_ids = [x.replace('self__','') for x in top.feature]

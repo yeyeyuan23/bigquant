@@ -20,7 +20,6 @@ import numpy as np
 import pandas as pd
 
 from .evaluation import (
-    cross_section_zscore,
     long_short_returns,
     preprocess_factor,
     rank_ic_series,
@@ -865,7 +864,7 @@ class CompetitionScoreReference:
                         "stage": "processed_reference_ready",
                         "seconds": round(time.perf_counter() - profile_start, 3),
                         "date_count": len(dates),
-                        "rows": int(len(processed)),
+                        "rows": len(processed),
                         "reference_count": len(self.reference_columns),
                     },
                     ensure_ascii=False,
@@ -933,7 +932,7 @@ class CompetitionScoreReference:
                             "seconds": round(time.perf_counter() - profile_start, 3),
                             "date_count": len(dates),
                             "source_date_count": len(cached_key),
-                            "rows": int(len(result)),
+                            "rows": len(result),
                         },
                         ensure_ascii=False,
                     ),
@@ -951,7 +950,7 @@ class CompetitionScoreReference:
                         "status": "j_processed_reference_stage",
                         "stage": "sliced_reference",
                         "seconds": round(time.perf_counter() - profile_start, 3),
-                        "rows": int(len(reference)),
+                        "rows": len(reference),
                         "date_count": len(dates),
                         "reference_count": len(self.reference_columns),
                     },
@@ -971,7 +970,7 @@ class CompetitionScoreReference:
                         "status": "j_processed_reference_stage",
                         "stage": "preprocessed_reference",
                         "seconds": round(time.perf_counter() - profile_start, 3),
-                        "rows": int(len(result)),
+                        "rows": len(result),
                     },
                     ensure_ascii=False,
                 ),
@@ -1039,7 +1038,7 @@ class CompetitionScoreReference:
                             "seconds": round(time.perf_counter() - profile_start, 3),
                             "date_count": len(dates),
                             "source_date_count": len(cached_key),
-                            "rows": int(len(result)),
+                            "rows": len(result),
                         },
                         ensure_ascii=False,
                     ),
@@ -1063,7 +1062,7 @@ class CompetitionScoreReference:
                         "stage": "preprocessed_route",
                         "seconds": round(time.perf_counter() - profile_start, 3),
                         "date_count": len(dates),
-                        "rows": int(len(result)),
+                        "rows": len(result),
                     },
                     ensure_ascii=False,
                 ),
@@ -1103,7 +1102,7 @@ class CompetitionScoreReference:
             raise ValueError("route_factor is missing factor column")
         route = route[[*KEY_COLUMNS, "factor"]].dropna(subset=["factor"])
         route_dates = pd.DatetimeIndex(sorted(route["date"].unique()))
-        profile_stage("normalized_route", route_rows=int(len(route)), date_count=len(route_dates))
+        profile_stage("normalized_route", route_rows=len(route), date_count=len(route_dates))
         reference_keys = self.reference_panel.loc[
             self.reference_panel["date"].isin(route_dates),
             list(KEY_COLUMNS),
@@ -1117,7 +1116,7 @@ class CompetitionScoreReference:
             _key_join(reference_keys, label_keys, how="inner")
         )
         aligned_route = _key_join(scorable_keys, route, how="left")
-        profile_stage("aligned_route", scorable_rows=int(len(aligned_route)))
+        profile_stage("aligned_route", scorable_rows=len(aligned_route))
         missing_route_rows = int(aligned_route["factor"].isna().sum())
         if missing_route_rows:
             raise ValueError(
@@ -1172,11 +1171,11 @@ class CompetitionScoreReference:
         a_proxy = float(np.mean(a_percentiles))
 
         processed_reference = self._processed_reference(dates)
-        profile_stage("processed_reference", rows=int(len(processed_reference)))
+        profile_stage("processed_reference", rows=len(processed_reference))
         processed_route = processed_route.rename(columns={"factor": ROUTE_COLUMN})
-        profile_stage("processed_route", rows=int(len(processed_route)))
+        profile_stage("processed_route", rows=len(processed_route))
         processed = _key_join(processed_reference, processed_route, how="left")
-        profile_stage("joined_processed", rows=int(len(processed)))
+        profile_stage("joined_processed", rows=len(processed))
         model_columns = (*self.reference_columns, ROUTE_COLUMN)
         scores, weights = _model_scores(
             processed,
@@ -1184,7 +1183,7 @@ class CompetitionScoreReference:
             model_columns,
             self.config,
         )
-        profile_stage("model_scores", score_rows=int(len(scores)), weight_windows=int(len(weights)))
+        profile_stage("model_scores", score_rows=len(scores), weight_windows=len(weights))
         route_score = scores.loc[scores["factor"].eq(ROUTE_COLUMN)]
         if len(route_score) != 1:
             raise RuntimeError("competition scorer did not produce one route score")
