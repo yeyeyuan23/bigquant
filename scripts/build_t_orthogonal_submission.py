@@ -13,10 +13,6 @@ from build_top50_submission_full import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_RESULT = (
-    ROOT
-    / "reports/runtime_all156_full_20260729/latest/t_orthogonal_only_result.json"
-)
 FROZEN_TOP50_SOURCE = ROOT / "submissions/lgbm_t_top50_candidate.py"
 
 
@@ -69,7 +65,7 @@ def render_notebook(source: str, candidate_count: int) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--result", type=Path, default=DEFAULT_RESULT)
+    parser.add_argument("--result", type=Path, required=True)
     parser.add_argument(
         "--output-stem",
         type=Path,

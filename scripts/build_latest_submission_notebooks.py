@@ -11,7 +11,29 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REPORTS_DIR = ROOT / "reports/runtime_all156_full_20260729"
+
+
+def discover_reports_dir() -> Path:
+    reports_root = ROOT / "reports"
+    candidates = [reports_root, *reports_root.iterdir()]
+    complete = [
+        path
+        for path in candidates
+        if path.is_dir()
+        and (path / "latest/i_only_result.json").is_file()
+        and (path / "latest/t_orthogonal_only_result.json").is_file()
+    ]
+    if not complete:
+        raise FileNotFoundError(
+            "no reports directory contains both latest I and T results"
+        )
+    return max(
+        complete,
+        key=lambda path: max(
+            (path / "latest/i_only_result.json").stat().st_mtime_ns,
+            (path / "latest/t_orthogonal_only_result.json").stat().st_mtime_ns,
+        ),
+    )
 
 
 def run_builder(script: str, result: Path) -> tuple[Path, Path, int]:
@@ -54,11 +76,11 @@ def main() -> int:
     parser.add_argument(
         "--reports-dir",
         type=Path,
-        default=DEFAULT_REPORTS_DIR,
+        help="explicit reports directory; otherwise use the newest complete I/T run",
     )
     args = parser.parse_args()
-    reports_dir = args.reports_dir
-    if not reports_dir.is_absolute():
+    reports_dir = args.reports_dir or discover_reports_dir()
+    if args.reports_dir is not None and not reports_dir.is_absolute():
         reports_dir = ROOT / reports_dir
 
     builds = [
@@ -82,7 +104,16 @@ def main() -> int:
                 "validation": "ok",
             }
         )
-    print(json.dumps({"builds": rows}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "reports_dir": str(reports_dir.relative_to(ROOT)),
+                "builds": rows,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 

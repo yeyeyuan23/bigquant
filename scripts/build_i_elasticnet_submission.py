@@ -14,9 +14,6 @@ from build_top50_submission_full import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_RESULT = (
-    ROOT / "reports/runtime_all156_full_20260729/latest/i_only_result.json"
-)
 LIGHTGBM_MODEL = (
     'model = LGBMRegressor(objective="regression", learning_rate=0.03, '
     "n_estimators=220, max_depth=3, num_leaves=7, min_child_samples=100, "
@@ -84,7 +81,7 @@ def render_notebook(source: str, candidate_count: int) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--result", type=Path, default=DEFAULT_RESULT)
+    parser.add_argument("--result", type=Path, required=True)
     parser.add_argument(
         "--output-stem",
         type=Path,
