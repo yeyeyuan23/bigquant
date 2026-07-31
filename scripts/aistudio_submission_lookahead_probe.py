@@ -45,12 +45,120 @@ def normalized_factor(
     ).dt.normalize()
     result["instrument"] = result["instrument"].astype(str)
     result["factor"] = pd.to_numeric(result["factor"], errors="coerce")
+    if result[["date", "instrument"]].isna().any().any():
+        raise ValueError("submission output contains invalid keys")
+    if result.duplicated([*KEY_COLUMNS]).any():
+        raise ValueError("submission output contains duplicate keys")
     return (
         result.loc[result["date"].le(cutoff)]
-        .drop_duplicates([*KEY_COLUMNS], keep="last")
         .sort_values([*KEY_COLUMNS])
         .reset_index(drop=True)
     )
+
+
+def validate_output_contract(
+    frame: pd.DataFrame,
+    expected_universe: pd.DataFrame,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    *,
+    maximum_daily_missing_rate: float = 0.40,
+) -> dict[str, object]:
+    """Mirror the platform's date coverage and daily missing-value checks."""
+
+    output = normalized_factor(frame, end)
+    output = output.loc[output["date"].between(start, end)]
+    expected = expected_universe[[*KEY_COLUMNS]].copy()
+    expected["date"] = pd.to_datetime(
+        expected["date"],
+        errors="coerce",
+    ).dt.normalize()
+    expected["instrument"] = expected["instrument"].astype(str)
+    expected = expected.loc[expected["date"].between(start, end)]
+    if expected.empty:
+        raise ValueError("expected universe is empty")
+    if expected[["date", "instrument"]].isna().any().any():
+        raise ValueError("expected universe contains invalid keys")
+    if expected.duplicated([*KEY_COLUMNS]).any():
+        raise ValueError("expected universe contains duplicate keys")
+
+    unexpected = output.merge(
+        expected,
+        on=[*KEY_COLUMNS],
+        how="left",
+        indicator=True,
+    ).loc[lambda block: block["_merge"].ne("both")]
+    checked = expected.merge(
+        output,
+        on=[*KEY_COLUMNS],
+        how="left",
+        validate="one_to_one",
+    )
+    checked["finite_factor"] = np.isfinite(
+        checked["factor"].to_numpy(dtype=float)
+    )
+    daily = (
+        checked.groupby("date", sort=True)["finite_factor"]
+        .agg(["count", "sum"])
+        .rename(columns={"count": "expected_rows", "sum": "finite_rows"})
+    )
+    daily["missing_rate"] = 1.0 - (
+        daily["finite_rows"] / daily["expected_rows"]
+    )
+    missing_dates = daily.index[daily["finite_rows"].eq(0)]
+    excessive_missing = daily.index[
+        daily["missing_rate"].gt(maximum_daily_missing_rate)
+    ]
+    status = (
+        "ok"
+        if (
+            len(missing_dates) == 0
+            and len(excessive_missing) == 0
+            and unexpected.empty
+        )
+        else "invalid_output_contract"
+    )
+    return {
+        "status": status,
+        "start": start.strftime("%Y-%m-%d"),
+        "end": end.strftime("%Y-%m-%d"),
+        "expected_rows": len(expected),
+        "returned_rows": len(output),
+        "missing_date_count": len(missing_dates),
+        "missing_date_sample": [
+            pd.Timestamp(value).strftime("%Y-%m-%d")
+            for value in missing_dates[:20]
+        ],
+        "excessive_missing_date_count": len(excessive_missing),
+        "excessive_missing_date_sample": [
+            {
+                "date": pd.Timestamp(value).strftime("%Y-%m-%d"),
+                "missing_rate": float(daily.loc[value, "missing_rate"]),
+            }
+            for value in excessive_missing[:20]
+        ],
+        "unexpected_key_count": len(unexpected),
+    }
+
+
+def load_expected_universe(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+) -> pd.DataFrame:
+    """Load the bounded platform universe needed for output validation."""
+
+    import dai
+
+    return dai.query(
+        "SELECT date, instrument FROM bigalpha_2026_instruments",
+        filters={
+            "date": [
+                start.strftime("%Y-%m-%d"),
+                end.strftime("%Y-%m-%d"),
+            ]
+        },
+        compression=True,
+    ).df()
 
 
 def compare_prefixes(
@@ -139,6 +247,9 @@ def main() -> int:
         raise ValueError("require start <= every cutoff < end")
 
     submission = load_submission(args.submission)
+    start = pd.Timestamp(args.start).normalize()
+    end = pd.Timestamp(args.end).normalize()
+    expected_universe = load_expected_universe(start, end)
     datasources = {
         "bar1m": args.bar1m,
         "financial": args.financial,
@@ -146,6 +257,12 @@ def main() -> int:
     started = time.perf_counter()
     full = submission.main(datasources, args.start, args.end)
     full_seconds = time.perf_counter() - started
+    full_contract = validate_output_contract(
+        full,
+        expected_universe,
+        start,
+        end,
+    )
     cutoff_results = []
     for cutoff in cutoffs:
         started = time.perf_counter()
@@ -156,17 +273,38 @@ def main() -> int:
         )
         cut_seconds = time.perf_counter() - started
         result = compare_prefixes(full, cut, cutoff)
+        result["output_contract"] = validate_output_contract(
+            cut,
+            expected_universe,
+            start,
+            cutoff,
+        )
         result["cut_seconds"] = round(cut_seconds, 3)
         cutoff_results.append(result)
+    invalid_contract = (
+        full_contract["status"] != "ok"
+        or any(
+            result["output_contract"]["status"] != "ok"
+            for result in cutoff_results
+        )
+    )
     summary = {
         "status": (
-            "ok"
-            if all(result["status"] == "ok" for result in cutoff_results)
-            else "lookahead_suspected"
+            "invalid_output_contract"
+            if invalid_contract
+            else (
+                "ok"
+                if all(
+                    result["status"] == "ok"
+                    for result in cutoff_results
+                )
+                else "lookahead_suspected"
+            )
         ),
         "start": args.start,
         "end": args.end,
         "full_seconds": round(full_seconds, 3),
+        "full_output_contract": full_contract,
         "cutoffs": cutoff_results,
         "total_compared_rows": sum(
             int(result["compared_rows"])
