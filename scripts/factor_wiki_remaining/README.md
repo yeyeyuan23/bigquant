@@ -1,18 +1,22 @@
 # Factor Wiki remaining component generators
 
 This directory contains the executable formulas that were missing from the
-candidate-only PR.  Candidate modules remain small wrappers, while these
+candidate-only PR. Candidate modules remain small wrappers, while these
 scripts rebuild their named daily component columns from the agreed E2E
-one-minute files.  No minute data or generated Parquet is committed.
+one-minute files. No minute data or generated Parquet is committed.
 
 ## Scope
 
 - `build_daily_base.py` builds the adjusted daily OHLCV base used by long-window
   formulas.
 - `build_changjiang_components.py` is the exact implementation used for the
-  Changjiang sandbox.  It emits all locally implementable columns and asserts
+  Changjiang sandbox. It emits all locally implementable columns and asserts
   that the 123 submitted component columns in
   `submission_manifest_changjiang_123.csv` are present.
+- `build_haitong_components.py` is the exact implementation used for the
+  Haitong sandbox. It emits 47 frozen Haitong columns and asserts the 12 still
+  missing from the current `main` against
+  `submission_manifest_haitong_12.csv`.
 - `build_cicc_remaining_components.py` preserves the exact CICC remaining-batch
   construction.  With `BIGALPHA_CICC_RAW_ONLY=1`, it emits the nine components
   constructed directly from minute close/volume without requiring prior
@@ -22,6 +26,21 @@ one-minute files.  No minute data or generated Parquet is committed.
   primitives and covers all 13 rows in `submission_manifest_cicc_13.csv`.
 - `changjiang_static_dedup_352.csv` is the frozen formula/data-routing audit read
   by the Changjiang builder.  It is metadata, not market data.
+
+## Exact remaining-132 handoff
+
+Against `origin/main` at `0183338`, the generation gap is exactly:
+
+- 120 Changjiang HF components (`HF-105` through `HF-224`);
+- 11 Haitong HF components (`HF-092` through `HF-102`);
+- one Haitong PV component (`PV-216`, source `HAITONG-0106`).
+
+The Changjiang manifest also contains `PV-217`, `PV-218`, and `PV-219` so the
+generator remains a complete reproduction of its sandbox. Current `main`
+already builds `PV-217` and `PV-218`. `PV-219` is intentionally outside the
+remaining 132 and is separately documented below. Current `main` also already
+contains executable builders for the CICC 13 and the other 14 Haitong PV
+components; the CICC code here is retained as provenance, not counted again.
 
 The code resolves the repository and project roots at runtime.  Input/output
 locations can be overridden without editing formulas:
@@ -33,6 +52,7 @@ export BIGALPHA_INSTRUMENT_MAP=/path/to/instrument_map.csv
 export BIGALPHA_FACTOR_WIKI_WORK=/path/to/generated/factor_wiki_remaining
 
 python scripts/factor_wiki_remaining/build_daily_base.py
+python scripts/factor_wiki_remaining/build_haitong_components.py
 python scripts/factor_wiki_remaining/build_changjiang_components.py
 ```
 
