@@ -5,12 +5,10 @@ from .fr import (
     build_fr_002_factor,
     build_fr_003_factor,
     build_fr_004_factor,
-    build_fr_005_factor,
     compute_fr_001_events,
     compute_fr_002_events,
     compute_fr_003_events,
     compute_fr_004_events,
-    compute_fr_005_events,
 )
 from .hf import (
     build_hf_001_factor,
@@ -48,7 +46,6 @@ __all__ = [
     "build_fr_002_factor",
     "build_fr_003_factor",
     "build_fr_004_factor",
-    "build_fr_005_factor",
     "build_hf_001_factor",
     "build_hf_002_factor",
     "build_ob_001_factor",
@@ -64,7 +61,6 @@ __all__ = [
     "compute_fr_002_events",
     "compute_fr_003_events",
     "compute_fr_004_events",
-    "compute_fr_005_events",
     "compute_hf_001_daily",
     "compute_hf_002_daily",
     "compute_ob_001_daily",

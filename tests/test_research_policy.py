@@ -13,11 +13,17 @@ from bigalpha2026.research_policy import (
     candidate_ids,
     factorlib_pool_incremental_gate,
     fixed_weight_rank_combination,
+    include_in_j_baseline,
     technical_gate,
 )
 
 
 class ResearchPolicyTest(unittest.TestCase):
+    def test_latent_candidates_enter_j_baseline_and_anchors_do_not(self):
+        self.assertTrue(include_in_j_baseline("HF-079"))
+        self.assertFalse(include_in_j_baseline("PV-045"))
+        self.assertFalse(include_in_j_baseline("HF-001"))
+
     def test_incremental_pool_gate_uses_joint_prediction_stability(self):
         passed, reasons = factorlib_pool_incremental_gate(
             {
@@ -44,7 +50,7 @@ class ResearchPolicyTest(unittest.TestCase):
         )
 
     def test_all_registered_candidates_are_available_to_first_round(self):
-        self.assertEqual(len(candidate_ids()), 49)
+        self.assertEqual(len(candidate_ids()), 30)
         self.assertEqual(len(candidate_ids("first_round")), 8)
         self.assertEqual(
             candidate_ids("oap_batch1"),
@@ -56,7 +62,6 @@ class ResearchPolicyTest(unittest.TestCase):
                 "PV-007",
                 "FR-003",
                 "FR-004",
-                "FR-005",
             ),
         )
         self.assertEqual(
@@ -64,32 +69,18 @@ class ResearchPolicyTest(unittest.TestCase):
             (
                 "FR-006",
                 "FR-007",
-                "PV-008",
-                "PV-009",
-                "PV-010",
-                "PV-011",
-                "PV-012",
             ),
         )
         self.assertEqual(
             candidate_ids("oap_b"),
             (
-                "FR-008",
-                "FR-009",
                 "FR-010",
-                "FR-011",
-                "PV-013",
                 "PV-014",
-                "PV-015",
-                "PV-016",
-                "PV-017",
-                "PV-018",
-                "PV-019",
             ),
         )
         self.assertEqual(
             candidate_ids("literature_round1"),
-            ("PV-020", "FR-012", "OB-003"),
+            ("PV-020", "OB-003"),
         )
         self.assertEqual(
             candidate_ids("literature_round2"),
@@ -101,20 +92,12 @@ class ResearchPolicyTest(unittest.TestCase):
         )
         self.assertEqual(
             candidate_ids("literature_round4"),
-            ("PV-022", "PV-023", "FR-014", "FR-015", "OB-005", "INT-003"),
+            ("PV-023", "FR-015", "OB-005"),
         )
 
     def test_formal_periods_and_representative_months_are_frozen(self):
         self.assertEqual(FORMAL_EVALUATION_POLICY.development_start, "2019-01-01")
-        self.assertEqual(FORMAL_EVALUATION_POLICY.development_end, "2021-12-31")
-        self.assertEqual(
-            FORMAL_EVALUATION_POLICY.validation_2022_start,
-            "2022-01-01",
-        )
-        self.assertEqual(
-            FORMAL_EVALUATION_POLICY.validation_2022_end,
-            "2022-12-31",
-        )
+        self.assertEqual(FORMAL_EVALUATION_POLICY.development_end, "2022-12-31")
         self.assertEqual(
             FORMAL_EVALUATION_POLICY.validation_2023_start,
             "2023-01-01",
@@ -122,6 +105,14 @@ class ResearchPolicyTest(unittest.TestCase):
         self.assertEqual(
             FORMAL_EVALUATION_POLICY.validation_2023_end,
             "2023-12-31",
+        )
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2024_start,
+            "2024-01-01",
+        )
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.validation_2024_end,
+            "2024-12-31",
         )
         self.assertEqual(FORMAL_EVALUATION_POLICY.primary_label, "ret_close_to_close")
         self.assertEqual(

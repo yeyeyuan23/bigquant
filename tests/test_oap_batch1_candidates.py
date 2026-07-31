@@ -13,7 +13,6 @@ from bigalpha2026.candidates.fr.fr_004 import (
     build_fr_004_factor,
     compute_fr_004_events,
 )
-from bigalpha2026.candidates.fr.fr_005 import build_fr_005_factor
 from bigalpha2026.candidates.pv.pv_003 import (
     build_pv_003_factor,
     compute_pv_003_daily,
@@ -220,11 +219,10 @@ class OapBatch1FrTest(unittest.TestCase):
         )
 
     def test_all_fr_outputs_and_future_leakage(self) -> None:
-        financial, pool, exposures = _financial_inputs()
+        financial, pool, _ = _financial_inputs()
         results = (
             build_fr_003_factor(financial, pool),
             build_fr_004_factor(financial, pool),
-            build_fr_005_factor(financial, exposures, pool),
         )
         for result in results:
             self.assertEqual(list(result.columns), ["date", "instrument", "factor"])
@@ -252,15 +250,6 @@ class OapBatch1FrTest(unittest.TestCase):
         changed = pd.concat([changed, pd.DataFrame(future_rows)], ignore_index=True)
         rerun = build_fr_003_factor(changed, pool)
         pd.testing.assert_frame_equal(asset, rerun)
-
-    def test_cfp_direction(self) -> None:
-        financial, pool, exposures = _financial_inputs()
-        result = build_fr_005_factor(financial, exposures, pool)
-        latest = result.loc[result["date"].eq(result["date"].max())].set_index(
-            "instrument"
-        )
-        self.assertGreater(latest.loc["A", "factor"], latest.loc["C", "factor"])
-
 
 if __name__ == "__main__":
     unittest.main()

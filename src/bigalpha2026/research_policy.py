@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from functools import cache
 
 import numpy as np
 import pandas as pd
@@ -38,35 +39,14 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
     CandidateSpec("PV-007", "PV", "oap_zero_trade_fraction", stage="oap_batch1"),
     CandidateSpec("FR-003", "FR", "oap_asset_growth", stage="oap_batch1"),
     CandidateSpec("FR-004", "FR", "oap_revenue_growth_surprise", stage="oap_batch1"),
-    CandidateSpec("FR-005", "FR", "oap_cash_flow_to_market", stage="oap_batch1"),
     CandidateSpec("FR-006", "FR", "oap_earnings_growth_surprise", stage="oap_batch2"),
     CandidateSpec("FR-007", "FR", "oap_earnings_increase_count", stage="oap_batch2"),
-    CandidateSpec("PV-008", "PV", "oap_52_week_high", stage="oap_batch2"),
-    CandidateSpec("PV-009", "PV", "oap_price_delay_rsq_adapted", stage="oap_batch2"),
-    CandidateSpec("PV-010", "PV", "oap_market_coskewness", stage="oap_batch2"),
-    CandidateSpec("PV-011", "PV", "oap_intermediate_momentum", stage="oap_batch2"),
-    CandidateSpec("PV-012", "PV", "oap_industry_momentum", stage="oap_batch2"),
-    CandidateSpec("FR-008", "FR", "oap_earnings_consistency_adapted", stage="oap_b"),
-    CandidateSpec("FR-009", "FR", "oap_mean_rank_revenue_growth", stage="oap_b"),
     CandidateSpec("FR-010", "FR", "oap_abnormal_accruals_proxy", stage="oap_b"),
-    CandidateSpec("FR-011", "FR", "oap_assets_to_market", stage="oap_b"),
-    CandidateSpec("PV-013", "PV", "oap_twelve_month_momentum", stage="oap_b"),
     CandidateSpec("PV-014", "PV", "oap_realized_residual_volatility", stage="oap_b"),
-    CandidateSpec("PV-015", "PV", "oap_monthly_volume_variability", stage="oap_b"),
-    CandidateSpec("PV-016", "PV", "oap_turnover_variability", stage="oap_b"),
-    CandidateSpec("PV-017", "PV", "oap_volume_trend", stage="oap_b"),
-    CandidateSpec("PV-018", "PV", "oap_long_term_reversal", stage="oap_b"),
-    CandidateSpec("PV-019", "PV", "oap_residual_momentum_proxy", stage="oap_b"),
     CandidateSpec(
         "PV-020",
         "PV",
         "liquidity_conditioned_short_term_reversal",
-        stage="literature_round1",
-    ),
-    CandidateSpec(
-        "FR-012",
-        "FR",
-        "revenue_confirmed_earnings_surprise",
         stage="literature_round1",
     ),
     CandidateSpec(
@@ -112,21 +92,9 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
         stage="literature_round3",
     ),
     CandidateSpec(
-        "PV-022",
-        "PV",
-        "continuous_information_momentum",
-        stage="literature_round4",
-    ),
-    CandidateSpec(
         "PV-023",
         "PV",
         "overnight_daytime_tug_of_war",
-        stage="literature_round4",
-    ),
-    CandidateSpec(
-        "FR-014",
-        "FR",
-        "point_in_time_earnings_yield",
         stage="literature_round4",
     ),
     CandidateSpec(
@@ -139,12 +107,6 @@ CANDIDATE_POOL: tuple[CandidateSpec, ...] = (
         "OB-005",
         "OB",
         "persistent_closing_microprice_pressure",
-        stage="literature_round4",
-    ),
-    CandidateSpec(
-        "INT-003",
-        "composite",
-        "earnings_surprise_liquidity_friction",
         stage="literature_round4",
     ),
 )
@@ -171,13 +133,11 @@ HF_OB_ACTIVATED_OPTIONAL_MONTHS: tuple[str, ...] = ("2022-11",)
 @dataclass(frozen=True)
 class FormalEvaluationPolicy:
     development_start: str = "2019-01-01"
-    development_end: str = "2021-12-31"
-    validation_2022_start: str = "2022-01-01"
-    validation_2022_end: str = "2022-12-31"
+    development_end: str = "2022-12-31"
     validation_2023_start: str = "2023-01-01"
     validation_2023_end: str = "2023-12-31"
-    frozen_test_start: str = "2024-01-01"
-    frozen_test_end: str = "2024-12-31"
+    validation_2024_start: str = "2024-01-01"
+    validation_2024_end: str = "2024-12-31"
     primary_label: str = "ret_close_to_close"
     sensitivity_labels: tuple[str, ...] = (
         "ret_next_open_to_close",
@@ -235,7 +195,7 @@ class FactorLibraryPoolGate:
 
 @dataclass(frozen=True)
 class SingleFactorRouteGate:
-    """Strict pre-route gate for rule-composite S candidates."""
+    """Strict first-stage gate before a candidate may enter I."""
 
     minimum_coverage: float = 0.95
     minimum_active_days: int = 120
@@ -244,6 +204,10 @@ class SingleFactorRouteGate:
     minimum_positive_fold_ratio: float = 0.60
     minimum_sign_consistency: float = 0.60
     maximum_abs_rank_correlation: float = 0.85
+    minimum_neutral_rank_ic_mean: float = 0.005
+    minimum_industry_coverage: int = 10
+    minimum_industry_date_count: int = 40
+    minimum_industry_same_sign_ratio: float = 0.55
 
 
 @dataclass(frozen=True)
@@ -252,9 +216,9 @@ class IncrementalEntryGate:
 
     minimum_coverage: float = 0.90
     minimum_active_days: int = 120
-    minimum_rank_ic_mean: float = 0.0
-    minimum_residual_rank_ic: float = 0.0
-    maximum_abs_rank_correlation: float = 0.85
+    minimum_rank_ic_mean: float = 0.005
+    minimum_residual_rank_ic: float = 0.005
+    maximum_abs_rank_correlation: float = 0.50
 
 
 @dataclass(frozen=True)
@@ -329,19 +293,37 @@ def candidate_module_name(candidate_id: str) -> str:
     return f"bigalpha2026.candidates.{family_path}.{module_stem}"
 
 
+@cache
 def include_in_j_baseline(candidate_id: str) -> bool:
     """Return whether a candidate belongs to the local J baseline.
 
-    Older candidates predate the explicit metadata field and default to True:
-    historically every candidate in candidate_pool.parquet was part of the
-    local all36+self J reference. New teammate candidates declare
-    INCLUDE_IN_J_BASELINE explicitly.
+    Every metadata-declared latent component is part of the J baseline.
+    Anchor components and candidates without semantic metadata are excluded.
     """
 
-    module = importlib.import_module(candidate_module_name(candidate_id))
-    if hasattr(module, "INCLUDE_IN_J_BASELINE"):
-        return bool(module.INCLUDE_IN_J_BASELINE)
-    return True
+    module_name = candidate_module_name(candidate_id)
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if exc.name == module_name:
+            return False
+        raise
+    semantic_class = getattr(module, "SEMANTIC_CLASS", None)
+    declared_include = getattr(module, "INCLUDE_IN_J_BASELINE", None)
+    if semantic_class is None and declared_include is None:
+        return False
+    expected_include = semantic_class == "LATENT_COMPONENT"
+    if semantic_class not in {"LATENT_COMPONENT", "ANCHOR_COMPONENT"}:
+        raise ValueError(
+            f"{candidate_id} has invalid SEMANTIC_CLASS={semantic_class!r}"
+        )
+    if declared_include is not expected_include:
+        raise ValueError(
+            f"{candidate_id} has inconsistent J baseline metadata: "
+            f"SEMANTIC_CLASS={semantic_class!r}, "
+            f"INCLUDE_IN_J_BASELINE={declared_include!r}"
+        )
+    return expected_include
 
 
 def j_baseline_candidate_ids(candidate_ids_: Iterable[str]) -> tuple[str, ...]:
@@ -368,8 +350,10 @@ def fixed_weight_rank_combination(
     if denominator <= 0:
         raise ValueError("at least one weight must be non-zero")
 
-    panel: pd.DataFrame | None = None
-    ranked_columns: list[tuple[str, float]] = []
+    import polars as pl
+
+    panel: pl.DataFrame | None = None
+    score_terms = []
     for member, raw_weight in weights.items():
         if member not in factors:
             raise KeyError(f"missing factor for combination: {member}")
@@ -379,33 +363,27 @@ def fixed_weight_rank_combination(
         if frame.duplicated(["date", "instrument"]).any():
             raise ValueError(f"{member} contains duplicate date-instrument keys")
         column = f"factor_{member.lower().replace('-', '_')}"
-        frame[column] = frame.groupby("date", sort=False)["factor"].rank(
-            pct=True,
-            method="average",
-        )
-        frame = frame.drop(columns="factor")
-        ranked_columns.append((column, float(raw_weight) / denominator))
-        panel = frame if panel is None else panel.merge(
-            frame,
+        block = pl.from_pandas(frame).with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col("factor").cast(pl.Float64, strict=False),
+        ).with_columns(
+            (pl.col("factor").rank("average").over("date") / pl.col("factor").count().over("date")).alias(column)
+        ).select(["date", "instrument", column])
+        score_terms.append(pl.col(column) * (float(raw_weight) / denominator))
+        panel = block if panel is None else panel.join(
+            block,
             on=["date", "instrument"],
             how="inner",
-            validate="one_to_one",
+            validate="1:1",
         )
 
     assert panel is not None
-    panel["factor"] = sum(
-        panel[column] * weight for column, weight in ranked_columns
-    )
-    panel["factor"] = (
-        panel.groupby("date", sort=False)["factor"]
-        .rank(pct=True, method="average")
-        .sub(0.5)
-        .mul(2.0)
-    )
-    return panel[["date", "instrument", "factor"]].sort_values(
-        ["date", "instrument"]
-    ).reset_index(drop=True)
-
+    score = sum(score_terms)
+    result = panel.with_columns(score.alias("_score")).with_columns(
+        (((pl.col("_score").rank("average").over("date") / pl.col("_score").count().over("date")) - 0.5) * 2.0).alias("factor")
+    ).select(["date", "instrument", "factor"]).sort(["date", "instrument"])
+    return result.to_pandas().reset_index(drop=True)
 
 def technical_gate(
     coverage: float,

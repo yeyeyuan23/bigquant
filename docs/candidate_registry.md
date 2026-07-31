@@ -26,18 +26,20 @@ registered
 ```
 
 失败候选标记为 `rejected` 并保留原因，不删除历史记录。
-评价完成后，当前组合路由直接写成 `admitted (S)`、`admitted (I)`、
-`admitted (T)` 或其组合；字母分别表示进入规则复合、Elastic Net 和
-LightGBM。唯一可执行路由以 `reports/latest/factor_pool_admission.csv` 为准。
+评价完成后，组合路由按严格漏斗写成 `admitted (S)`、`admitted (S/I)` 或
+`admitted (S/I/T)`；S、I、T 分别表示进入规则复合、Elastic Net 和
+LightGBM。候选必须依次通过 S、I、T，不能跳层。唯一可执行路由以指定运行目录
+下的 `latest/factor_pool_admission.csv` 和对应冻结状态为准；不得仅凭本表手工状态
+决定训练成员。
 
 > 2026-07-28 已将 S/I/T 准入合同改为轻量筛选；本地 J 只用于冻结路线后的选择
 > 下的 A/B/J 路由增量；
 > 最终路线另做一次兄弟路线联合拥挤评分，该场景不是平台全局历史的替代品。
-> 下表和现有 `reports/` 仍是升级前的 Rank IC 合同历史结果；在
-> `FACTORLIB_ALL36`、候选库快照、manifest 核验和完整 J 重评完成前，不得把这些
-> 历史状态当作新合同下的当前路由，也不得据此改写冻结池。
+> 下表是升级前的 Rank IC 合同历史结果，只用于追溯候选定义，不代表当前漏斗路由。
+> 当前运行必须使用 2019—2022 开发期冻结 S/I/T，并仅用 2023—2024 做冻结后
+> 评价与本地 J proxy；本地 J 不是平台正式分数。
 
-## 当前候选
+## 历史候选状态快照
 
 | ID | 类别 | 机制 | 方向 | 周期 | 当前状态 |
 |---|---|---|---|---|---|
@@ -92,18 +94,19 @@ LightGBM。唯一可执行路由以 `reports/latest/factor_pool_admission.csv` �
 | `INT-003` | composite `[FR, OB]` | 盈利惊喜×事件日流动性摩擦 | 盈利惊喜在尾盘流动性恶化时被增强 | 1—20 日 | `rejected` |
 | `INT-001` | composite `[FR, HF]` | `FR-002/HF-001` 等权截面秩 | 两组件越高越高 | 1 日 | `submitted_smoke` |
 
-表中状态来自 `literature_round4_v1_2026-07-27` 本地核验快照上的全量重跑：
-2019—2021 决定 S/I/T 准入，2022、2023 只评价冻结组合。长窗口候选允许
+表中状态来自 `literature_round4_v1_2026-07-27` 的旧合同本地核验快照：
+2019—2021 决定旧 S/I/T 状态，2022、2023 只评价旧冻结组合。它们是历史证据，
+不得被解释为当前路由。长窗口候选允许
 2019 年自然预热，从实际有效日期开始评价。
 
 旧合同的 `frozen_I` 为 `FR-002、PV-014`；旧合同的 `frozen_T` 为
 `FR-002/005/015、HF-003/004、OB-001/003、PV-001/009/014/020`。
-这些成员必须在当前轻量 I/T 合同下重新评价，不能自动迁移。两个旧冻结池相互独立；历史
+这些成员必须在当前严格 S→I→T 漏斗下重新评价，不能自动迁移。两个旧冻结池相互独立只是
+旧合同事实，不是当前规则；历史
 Git 证据为 `reports/latest/factor_pool_decisions.json`，旧本地运行状态另存于
 `data/cache/incremental_v3/frozen/frozen_state.json` 和
-`data/cache/tree_v3/frozen/frozen_state.json`。新合同使用独立
-`single_factor_v3_trial_only、incremental_v7_entry_only、
-tree_v6_orthogonal_entry` 缓存目录，缓存不进入 Git。
+`data/cache/tree_v3/frozen/frozen_state.json`。当前缓存目录由运行命令显式传入并
+随合同版本更新；缓存不进入 Git，也不能作为跨版本成员证据。
 
 ## 基础候选定义
 
@@ -245,8 +248,8 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 树增量 T。`PV-007` 因 21 日离散计数
 无法达到每日 50 个不同值，仍为 `technical_reject`。
 
-现行正式口径为：S 只使用 2019—2021 总体表现和月度稳定性；I 与 T 使用同一
-60日训练、20日样本外窗口，并同样只在开发期冻结准入。2022、2023 只报告，不
+现行正式口径为：S 只使用 2019—2022 总体表现和月度稳定性；I 与 T 使用同一
+60日训练、20日样本外窗口，并同样只在开发期冻结准入。2023、2024 只报告，不
 反向决定成员。通用微观数据底座更新后，旧路由和旧组合分数全部失效；新的获准
 列表与结果只能由全量重跑后的报告写回本节。
 
@@ -313,10 +316,10 @@ screened15 重算 I。S 只控制规则复合，I 只控制 Elastic Net；LightG
 
 | pipeline / version | 冻结输入 | 2022 Rank IC | 2023 Rank IC | Notebook | 比赛状态 |
 | --- | --- | ---: | ---: | --- | --- |
-| `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | `submissions/rule_v02.ipynb` | 2026-07-26 已提交，保留为历史对照 |
-| `self_factor_composite / local-current` | `FR-002/005 + HF-001/003 + PV-010/011/014`，家族内等权后 FR/HF/PV 等权 | 0.929730 | — | `submissions/rule_v03.ipynb` | 最新 S winner 已生成，待 AIStudio/平台提交校验 |
-| `joint_elastic_net / local-current` | 冻结 `screened15 + PV-008/PV-019/FR-006/HF-004/PV-011`；日度截面秩目标、正系数 | 0.581098 | — | `submissions/enet_v02.ipynb` | 当前 I winner 已生成，待 AIStudio/平台提交校验 |
-| `joint_lightgbm / local-current` | 冻结 `screened15 + PV-008/OB-003/PV-020/PV-013`；日度截面秩目标、正单调约束 | 0.852356 | — | `submissions/lgbm_v03.ipynb` | 当前 T winner 已生成，待 AIStudio/平台提交校验 |
+| `self_factor_composite / submitted-v1` | `FR-002/004/005/006 + PV-003/009/011/014`，家族内等权后 FR/PV 等权 | 0.04087 | 0.03650 | 已清理 | 2026-07-26 已提交，但仓库未记录明确平台分数，提交文件已清理 |
+| `self_factor_composite / scored` | `FR-002/005 + HF-001/003 + PV-010/011/014`，家族内及族间等权 | 0.929730 | 0.981081 | `submissions/rule_v03.ipynb` | 平台公榜 `0.60478`，保留 |
+| `joint_elastic_net / candidate` | 最新冻结 I 池 54 因子；正系数 Elastic Net | — | — | `submissions/enet_i_54_candidate.ipynb` | 已生成，待 AIStudio/平台提交校验 |
+| `joint_lightgbm / candidate` | 最新正交 T 池 28 因子；正单调 LightGBM | — | — | `submissions/lgbm_t_orthogonal_28_candidate.ipynb` | 已生成，待 AIStudio/平台提交校验 |
 
 已提交 Notebook 均仅保留比赛要求的
 `main(datasources, start_date, end_date)`，返回列固定为

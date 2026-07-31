@@ -10,6 +10,9 @@ are the global submission history.
 from __future__ import annotations
 
 import hashlib
+import json
+import os
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -17,7 +20,6 @@ import numpy as np
 import pandas as pd
 
 from .evaluation import (
-    cross_section_zscore,
     long_short_returns,
     preprocess_factor,
     rank_ic_series,
@@ -70,26 +72,104 @@ def _normalize_keys(frame: pd.DataFrame, *, name: str) -> pd.DataFrame:
     missing = sorted(set(KEY_COLUMNS).difference(frame.columns))
     if missing:
         raise ValueError(f"{name} is missing key columns: {missing}")
-    result = frame.copy()
-    result["date"] = pd.to_datetime(
-        result["date"],
-        errors="coerce",
-    ).dt.normalize()
-    result["instrument"] = result["instrument"].astype(str)
-    if result.loc[:, list(KEY_COLUMNS)].isna().any().any():
+    import polars as pl
+
+    result_pl = (
+        pl.from_pandas(frame)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+        )
+    )
+    null_keys = result_pl.select(
+        pl.any_horizontal(pl.col("date").is_null(), pl.col("instrument").is_null()).any()
+    ).item()
+    if bool(null_keys):
         raise ValueError(f"{name} contains null keys")
-    if result.duplicated(list(KEY_COLUMNS)).any():
+    duplicate_count = result_pl.select(
+        pl.struct(list(KEY_COLUMNS)).is_duplicated().sum()
+    ).item()
+    if int(duplicate_count) > 0:
         raise ValueError(f"{name} contains duplicate date-instrument keys")
-    return result
+    return result_pl.to_pandas()
 
 
 def _frame_digest(frame: pd.DataFrame, columns: Sequence[str]) -> str:
-    ordered = frame.loc[:, list(columns)].sort_values(
-        list(KEY_COLUMNS),
-        kind="stable",
+    import polars as pl
+
+    selected_columns = list(columns)
+    work = (
+        pl.from_pandas(frame.loc[:, selected_columns])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+        )
     )
-    hashed = pd.util.hash_pandas_object(ordered, index=False).to_numpy()
+    ordered = work.sort(list(KEY_COLUMNS))
+    hashed = ordered.select(pl.struct(selected_columns).hash(seed=0).alias("hash")).to_series().to_numpy()
     return hashlib.sha256(hashed.tobytes()).hexdigest()
+
+
+def _daily_std(values: pd.DataFrame, column: str) -> pd.Series:
+    """Daily standard deviation using polars, returned as pandas Series."""
+
+    import polars as pl
+
+    stats = (
+        pl.from_pandas(values[["date", column]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col(column).cast(pl.Float64, strict=False),
+        )
+        .group_by("date")
+        .agg(pl.col(column).std().alias(column))
+        .sort("date")
+        .to_pandas()
+    )
+    return pd.Series(
+        stats[column].to_numpy(dtype=float),
+        index=pd.to_datetime(stats["date"]),
+        name=column,
+    )
+
+
+def _keyed_polars_frame(frame: pd.DataFrame):
+    """Normalize date/instrument keys and return a polars DataFrame."""
+
+    import polars as pl
+
+    data = frame.copy()
+    data["date"] = pd.to_datetime(data["date"], errors="coerce").dt.normalize()
+    data["instrument"] = data["instrument"].astype(str)
+    return pl.from_pandas(data).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col("instrument").cast(pl.Utf8),
+    )
+
+
+def _key_join(
+    left: pd.DataFrame,
+    right: pd.DataFrame,
+    *,
+    how: str,
+) -> pd.DataFrame:
+    """Join stock-day keyed frames with polars and preserve pandas API."""
+
+    joined = _keyed_polars_frame(left).join(
+        _keyed_polars_frame(right),
+        on=list(KEY_COLUMNS),
+        how=how,
+        validate="1:1",
+    )
+    return joined.to_pandas()
+
+
+def _drop_duplicate_keys_polars(frame: pd.DataFrame) -> pd.DataFrame:
+    return (
+        _keyed_polars_frame(frame)
+        .unique(subset=list(KEY_COLUMNS), keep="first", maintain_order=True)
+        .to_pandas()
+    )
 
 
 def inserted_percentile(value: float, reference: Sequence[float]) -> float:
@@ -121,31 +201,37 @@ def _preprocess_wide_factors(
     if base_keys.duplicated(list(KEY_COLUMNS)).any():
         raise ValueError("factor panel contains duplicate date-instrument keys")
     columns = tuple(factor_columns)
-    values = (
-        panel.loc[:, list(columns)]
-        .reset_index(drop=True)
-        .apply(pd.to_numeric, errors="coerce")
+    import polars as pl
+
+    work = pl.from_pandas(
+        pd.concat(
+            [
+                base_keys,
+                panel.loc[:, list(columns)].reset_index(drop=True),
+            ],
+            axis=1,
+        )
+    ).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+        pl.col("instrument").cast(pl.Utf8),
     )
-    raw = values.to_numpy(dtype=float, copy=True)
-    standardized_array = np.full_like(raw, np.nan, dtype=float)
-    for indices in base_keys.groupby("date", sort=False).groups.values():
-        block = raw[np.asarray(indices, dtype=int), :]
-        if block.size == 0:
-            continue
-        lower = np.nanquantile(block, 0.01, axis=0)
-        upper = np.nanquantile(block, 0.99, axis=0)
-        winsorized = np.clip(block, lower, upper)
-        mean = np.nanmean(winsorized, axis=0)
-        std = np.nanstd(winsorized, axis=0, ddof=1)
-        std[std == 0] = np.nan
-        standardized_array[np.asarray(indices, dtype=int), :] = (
-            winsorized - mean
-        ) / std
-    standardized = pd.DataFrame(
-        standardized_array,
-        columns=columns,
-        index=values.index,
-    )
+    exprs = []
+    for column in columns:
+        raw = pl.col(column).cast(pl.Float64, strict=False)
+        lower = raw.quantile(0.01).over("date")
+        upper = raw.quantile(0.99).over("date")
+        winsorized = raw.clip(lower, upper)
+        mean = winsorized.mean().over("date")
+        std = winsorized.std().over("date")
+        exprs.append(
+            pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+            .then((winsorized - mean) / std)
+            .otherwise(None)
+            .alias(column)
+        )
+    standardized_panel = work.with_columns(exprs).select([*KEY_COLUMNS, *columns]).to_pandas()
+    base_keys = standardized_panel.loc[:, list(KEY_COLUMNS)].copy()
+    standardized = standardized_panel.loc[:, list(columns)].copy()
 
     if exposures is None or exposures.empty:
         return pd.concat([base_keys, standardized], axis=1)
@@ -186,18 +272,22 @@ def _preprocess_wide_factors(
             exposure_valid &= block[numeric_columns].notna().all(axis=1)
         if categorical_columns:
             exposure_valid &= block[categorical_columns].notna().all(axis=1)
+        valid_groups: dict[tuple[int, ...], list[str]] = {}
         for column in columns:
             valid = exposure_valid & block[column].notna()
             if not valid.any():
                 continue
+            valid_groups.setdefault(tuple(block.index[valid]), []).append(column)
+        for valid_index_tuple, grouped_columns in valid_groups.items():
+            valid_index = pd.Index(valid_index_tuple)
             design_parts: list[np.ndarray] = []
             if numeric_columns:
                 design_parts.append(
-                    block.loc[valid, numeric_columns].to_numpy(dtype=float)
+                    block.loc[valid_index, numeric_columns].to_numpy(dtype=float)
                 )
             if categorical_columns:
                 dummies = pd.get_dummies(
-                    block.loc[valid, categorical_columns].astype("string"),
+                    block.loc[valid_index, categorical_columns].astype("string"),
                     drop_first=True,
                     dtype=float,
                 )
@@ -206,14 +296,14 @@ def _preprocess_wide_factors(
             x = (
                 np.column_stack(design_parts)
                 if design_parts
-                else np.empty((int(valid.sum()), 0))
+                else np.empty((len(valid_index), 0))
             )
-            if valid.sum() <= x.shape[1] + 1:
+            if len(valid_index) <= x.shape[1] + 1:
                 continue
             x = np.column_stack([np.ones(len(x)), x])
-            y = block.loc[valid, column].to_numpy(dtype=float)
+            y = block.loc[valid_index, grouped_columns].to_numpy(dtype=float)
             beta, *_ = np.linalg.lstsq(x, y, rcond=None)
-            residuals.loc[block.index[valid], column] = y - x @ beta
+            residuals.loc[valid_index, grouped_columns] = y - x @ beta
     return pd.concat([base_keys, residuals], axis=1)
 
 
@@ -238,7 +328,7 @@ def _a_components(
         merged,
         label_column=label_column,
     ).dropna()
-    market_volatility = merged.groupby("date", sort=False)[label_column].std()
+    market_volatility = _daily_std(merged, label_column)
     stress_cutoff = (
         market_volatility.quantile(0.75)
         if not market_volatility.empty
@@ -291,7 +381,7 @@ def _a_components_from_processed(
         merged,
         label_column=label_column,
     ).dropna()
-    market_volatility = merged.groupby("date", sort=False)[label_column].std()
+    market_volatility = _daily_std(merged, label_column)
     stress_cutoff = (
         market_volatility.quantile(0.75)
         if not market_volatility.empty
@@ -324,6 +414,191 @@ def _a_components_from_processed(
     }
 
 
+def _ratio_array(values: np.ndarray) -> float:
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return np.nan
+    std = float(np.std(values, ddof=1)) if values.size > 1 else np.nan
+    return (
+        float(np.mean(values) / std)
+        if np.isfinite(std) and std > 1e-12
+        else np.nan
+    )
+
+
+def _a_components_from_processed_wide(
+    processed_panel: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    factor_columns: Sequence[str],
+    label_column: str,
+) -> pd.DataFrame:
+    """Compute A inputs for many already-preprocessed factor columns.
+
+    This is the batched equivalent of calling
+    ``_a_components_from_processed`` for each column.  It keeps the same
+    daily rank-IC and long-short definitions, but avoids rebuilding and
+    collecting one Polars frame per factor.
+    """
+
+    columns = tuple(factor_columns)
+    if not columns:
+        return pd.DataFrame(columns=("factor", *A_COMPONENT_COLUMNS))
+
+    import polars as pl
+
+    merged = processed_panel.loc[:, [*KEY_COLUMNS, *columns]].merge(
+        labels.loc[:, [*KEY_COLUMNS, label_column]],
+        on=list(KEY_COLUMNS),
+        how="inner",
+        validate="one_to_one",
+    )
+    work = (
+        pl.from_pandas(merged)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+        )
+        .drop_nulls(["date"])
+    )
+    if work.is_empty():
+        return pd.DataFrame(
+            [
+                {
+                    "factor": column,
+                    "rank_ic_mean": np.nan,
+                    "rank_ic_ir": np.nan,
+                    "long_short_sharpe": np.nan,
+                    "stress_ic_ir": np.nan,
+                }
+                for column in columns
+            ]
+        )
+
+    market_volatility = work.group_by("date").agg(
+        pl.col("_label").std().alias("_label_std")
+    )
+    volatility_frame = market_volatility.sort("date").to_pandas()
+    volatility_values = volatility_frame["_label_std"].to_numpy(dtype=float)
+    stress_cutoff = (
+        float(np.nanquantile(volatility_values, 0.75))
+        if np.isfinite(volatility_values).any()
+        else np.nan
+    )
+    stress_dates = set(
+        pd.to_datetime(
+            volatility_frame.loc[
+                volatility_frame["_label_std"] >= stress_cutoff,
+                "date",
+            ],
+        )
+    )
+
+    clean_exprs = []
+    rank_exprs = []
+    rank_pct_exprs = []
+    agg_exprs = []
+    column_temp_names: dict[str, tuple[str, str, str, str]] = {}
+    for index, column in enumerate(columns):
+        factor_name = f"__factor_{index}"
+        label_name = f"__label_{index}"
+        factor_rank_name = f"__factor_rank_{index}"
+        label_rank_name = f"__label_rank_{index}"
+        count_name = f"__count_{index}"
+        rank_pct_name = f"__rank_pct_{index}"
+        ic_name = f"__rank_ic_{index}"
+        ls_name = f"__long_short_{index}"
+        value = pl.col(column).cast(pl.Float64, strict=False)
+        label = pl.col("_label")
+        valid = (
+            value.is_not_null()
+            & value.is_finite()
+            & label.is_not_null()
+            & label.is_finite()
+        )
+        clean_exprs.extend(
+            [
+                pl.when(valid).then(value).otherwise(None).alias(factor_name),
+                pl.when(valid).then(label).otherwise(None).alias(label_name),
+            ]
+        )
+        column_temp_names[column] = (ic_name, ls_name, count_name, rank_pct_name)
+        rank_exprs.extend(
+            [
+                pl.col(factor_name)
+                .rank("average")
+                .over("date")
+                .alias(factor_rank_name),
+                pl.col(label_name)
+                .rank("average")
+                .over("date")
+                .alias(label_rank_name),
+                pl.col(factor_name).count().over("date").alias(count_name),
+            ]
+        )
+        rank_pct_exprs.append(
+            (pl.col(factor_rank_name) / pl.col(count_name)).alias(rank_pct_name)
+        )
+        agg_exprs.extend(
+            [
+                pl.first(count_name).alias(count_name),
+                pl.corr(factor_rank_name, label_rank_name).alias(ic_name),
+                (
+                    pl.when(pl.col(rank_pct_name) > 0.8)
+                    .then(pl.col(label_name))
+                    .otherwise(None)
+                    .mean()
+                    - pl.when(pl.col(rank_pct_name) <= 0.2)
+                    .then(pl.col(label_name))
+                    .otherwise(None)
+                    .mean()
+                ).alias(ls_name),
+            ]
+        )
+
+    daily = (
+        work.with_columns(clean_exprs)
+        .with_columns(rank_exprs)
+        .with_columns(rank_pct_exprs)
+        .group_by("date")
+        .agg(agg_exprs)
+        .sort("date")
+        .to_pandas()
+    )
+    daily_dates = pd.to_datetime(daily["date"])
+    stress_mask = daily_dates.isin(stress_dates).to_numpy()
+
+    rows: list[dict[str, object]] = []
+    for column in columns:
+        ic_name, ls_name, count_name, _rank_pct_name = column_temp_names[column]
+        counts = daily[count_name].to_numpy(dtype=float)
+        ic_values = daily[ic_name].to_numpy(dtype=float)
+        ic_values = np.where(counts >= 5, ic_values, np.nan)
+        long_short_values = daily[ls_name].to_numpy(dtype=float)
+        long_short_values = np.where(counts >= 10, long_short_values, np.nan)
+        stress_ic_values = ic_values[stress_mask]
+        rows.append(
+            {
+                "factor": column,
+                "rank_ic_mean": (
+                    float(np.nanmean(ic_values))
+                    if np.isfinite(ic_values).any()
+                    else np.nan
+                ),
+                "rank_ic_ir": _ratio_array(ic_values),
+                "long_short_sharpe": (
+                    _ratio_array(long_short_values) * np.sqrt(252)
+                    if np.isfinite(long_short_values).any()
+                    else np.nan
+                ),
+                "stress_ic_ir": _ratio_array(stress_ic_values),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _model_scores(
     processed_panel: pd.DataFrame,
     labels: pd.DataFrame,
@@ -339,20 +614,59 @@ def _model_scores(
             "scikit-learn is required for competition score evaluation"
         ) from exc
 
+    import polars as pl
+
     columns = tuple(factor_columns)
     target_column = config.primary_label
-    merged = processed_panel.merge(
-        labels[["date", "instrument", target_column]],
-        on=list(KEY_COLUMNS),
-        how="inner",
-        validate="one_to_one",
+    processed_pl = (
+        pl.from_pandas(processed_panel.loc[:, [*KEY_COLUMNS, *columns]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+        )
     )
-    # Factors have already been winsorized, standardized and residualized.
-    # Only the official contribution-model target is standardized here.
-    merged = cross_section_zscore(merged, [target_column])
-    merged.loc[:, list(columns)] = merged.loc[:, list(columns)].fillna(0.0)
-    merged = merged.dropna(subset=[target_column])
-    dates = np.array(sorted(pd.to_datetime(merged["date"].unique())))
+    labels_pl = (
+        pl.from_pandas(labels.loc[:, [*KEY_COLUMNS, target_column]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col(target_column).cast(pl.Float64, strict=False),
+        )
+    )
+    merged = processed_pl.join(labels_pl, on=list(KEY_COLUMNS), how="inner", validate="1:1")
+    target = pl.col(target_column).cast(pl.Float64, strict=False)
+    mean = target.mean().over("date")
+    std = target.std().over("date")
+    merged = (
+        merged.with_columns(
+            [pl.col(column).cast(pl.Float64, strict=False).fill_null(0.0).alias(column) for column in columns]
+            + [
+                pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+                .then((target - mean) / std)
+                .otherwise(None)
+                .alias(target_column)
+            ]
+        )
+        .filter(pl.col(target_column).is_not_null())
+        .sort(list(KEY_COLUMNS))
+    )
+    date_np = (
+        merged.select("date")
+        .to_series()
+        .cast(pl.Datetime("ns"))
+        .to_numpy()
+        .astype("datetime64[ns]")
+    )
+    dates_np, date_start, date_counts = np.unique(
+        date_np,
+        return_index=True,
+        return_counts=True,
+    )
+    dates = pd.DatetimeIndex(dates_np)
+    date_stop = date_start + date_counts
+    feature_matrix = merged.select(list(columns)).to_numpy()
+    target_array = merged.select(target_column).to_series().to_numpy()
+    profile_windows = os.getenv("BIGALPHA_J_PROFILE_WINDOWS", "0") == "1"
 
     rows: list[dict[str, object]] = []
     for end in range(
@@ -360,9 +674,10 @@ def _model_scores(
         len(dates) + 1,
         config.step_days,
     ):
-        window = dates[end - config.train_window_days : end]
-        train = merged.loc[merged["date"].isin(window)]
-        if len(train) <= len(columns) + 2:
+        window_start_index = end - config.train_window_days
+        row_start = int(date_start[window_start_index])
+        row_stop = int(date_stop[end - 1])
+        if row_stop - row_start <= len(columns) + 2:
             continue
         model = ElasticNet(
             alpha=config.alpha,
@@ -373,13 +688,30 @@ def _model_scores(
             random_state=0,
             positive=False,
         )
+        fit_start = time.perf_counter()
         model.fit(
-            train.loc[:, list(columns)].to_numpy(dtype=float),
-            train[target_column].to_numpy(dtype=float),
+            feature_matrix[row_start:row_stop],
+            target_array[row_start:row_stop],
         )
+        if profile_windows:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_model_score_window",
+                        "columns": len(columns),
+                        "rows": row_stop - row_start,
+                        "window_start": str(pd.Timestamp(dates[window_start_index]).date()),
+                        "window_end": str(pd.Timestamp(dates[end - 1]).date()),
+                        "seconds": round(time.perf_counter() - fit_start, 3),
+                        "n_iter": int(getattr(model, "n_iter_", -1)),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         row: dict[str, object] = {
-            "window_start": pd.Timestamp(window[0]),
-            "window_end": pd.Timestamp(window[-1]),
+            "window_start": pd.Timestamp(dates[window_start_index]),
+            "window_end": pd.Timestamp(dates[end - 1]),
         }
         row.update(dict(zip(columns, model.coef_, strict=True)))
         rows.append(row)
@@ -404,11 +736,7 @@ def _model_scores(
                 "mean_abs_weight": mean_abs,
                 "std_abs_weight": std_abs,
                 "nonzero_window_ratio": (
-                    float(
-                        (
-                            coefficients > config.coefficient_epsilon
-                        ).mean()
-                    )
+                    float((coefficients > config.coefficient_epsilon).mean())
                     if not coefficients.empty
                     else 0.0
                 ),
@@ -487,6 +815,13 @@ class CompetitionScoreReference:
             tuple[pd.Timestamp, ...],
             pd.DataFrame,
         ] = {}
+        self._processed_route_cache: list[
+            tuple[
+                tuple[pd.Timestamp, ...],
+                pd.DataFrame,
+                pd.DataFrame,
+            ]
+        ] = []
         self._score_cache: dict[str, dict[str, float]] = {}
 
     def _slice_exposures(
@@ -501,29 +836,60 @@ class CompetitionScoreReference:
         self,
         dates: pd.DatetimeIndex,
     ) -> pd.DataFrame:
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        profile_start = time.perf_counter()
         cache_key = tuple(pd.Timestamp(date) for date in dates)
         if cache_key in self._a_cache:
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_reference_a_stage",
+                            "stage": "a_cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
             return self._a_cache[cache_key].copy()
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         processed = self._processed_reference(dates)
-        rows: list[dict[str, object]] = []
-        for column in self.reference_columns:
-            metrics = _a_components_from_processed(
-                processed[[*KEY_COLUMNS, column]],
-                labels,
-                factor_column=column,
-                label_column=self.config.primary_label,
-            )
-            rows.append(
-                {
-                    "factor": column,
-                    **{
-                        component: float(metrics[component])
-                        for component in A_COMPONENT_COLUMNS
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_reference_a_stage",
+                        "stage": "processed_reference_ready",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "date_count": len(dates),
+                        "rows": len(processed),
+                        "reference_count": len(self.reference_columns),
                     },
-                }
+                    ensure_ascii=False,
+                ),
+                flush=True,
             )
-        result = pd.DataFrame(rows)
+        result = _a_components_from_processed_wide(
+            processed,
+            labels,
+            factor_columns=self.reference_columns,
+            label_column=self.config.primary_label,
+        )
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_reference_a_stage",
+                        "stage": "reference_a_wide",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "reference_count": len(self.reference_columns),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         self._a_cache[cache_key] = result.copy()
         return result
 
@@ -531,52 +897,226 @@ class CompetitionScoreReference:
         self,
         dates: pd.DatetimeIndex,
     ) -> pd.DataFrame:
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        profile_start = time.perf_counter()
         cache_key = tuple(pd.Timestamp(date) for date in dates)
         if cache_key in self._processed_reference_cache:
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_processed_reference_stage",
+                            "stage": "cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
             return self._processed_reference_cache[cache_key].copy()
+        requested_dates = set(cache_key)
+        for cached_key, cached_frame in self._processed_reference_cache.items():
+            if not requested_dates.issubset(set(cached_key)):
+                continue
+            result = cached_frame.loc[
+                cached_frame["date"].isin(requested_dates)
+            ].copy()
+            self._processed_reference_cache[cache_key] = result.copy()
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_processed_reference_stage",
+                            "stage": "superset_cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                            "source_date_count": len(cached_key),
+                            "rows": len(result),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+            return result
         reference = self.reference_panel.loc[
             self.reference_panel["date"].isin(dates),
             [*KEY_COLUMNS, *self.reference_columns],
         ]
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_reference_stage",
+                        "stage": "sliced_reference",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "rows": len(reference),
+                        "date_count": len(dates),
+                        "reference_count": len(self.reference_columns),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         result = _preprocess_wide_factors(
             reference,
             self.reference_columns,
             self._slice_exposures(dates),
         )
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_reference_stage",
+                        "stage": "preprocessed_reference",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "rows": len(result),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         self._processed_reference_cache[cache_key] = result.copy()
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_reference_stage",
+                        "stage": "stored_cache",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+        return result
+
+    def _processed_route(
+        self,
+        route: pd.DataFrame,
+        dates: pd.DatetimeIndex,
+        exposures: pd.DataFrame | None,
+    ) -> pd.DataFrame:
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        profile_start = time.perf_counter()
+        cache_key = tuple(pd.Timestamp(date) for date in dates)
+        requested_dates = set(cache_key)
+        route_compare = (
+            route.loc[:, [*KEY_COLUMNS, "factor"]]
+            .sort_values(list(KEY_COLUMNS))
+            .reset_index(drop=True)
+        )
+        for cached_key, cached_route, cached_processed in self._processed_route_cache:
+            if not requested_dates.issubset(set(cached_key)):
+                continue
+            cached_compare = (
+                cached_route.loc[cached_route["date"].isin(requested_dates)]
+                .sort_values(list(KEY_COLUMNS))
+                .reset_index(drop=True)
+            )
+            if len(cached_compare) != len(route_compare):
+                continue
+            if not cached_compare.loc[:, list(KEY_COLUMNS)].equals(
+                route_compare.loc[:, list(KEY_COLUMNS)]
+            ):
+                continue
+            if not np.array_equal(
+                cached_compare["factor"].to_numpy(dtype=float),
+                route_compare["factor"].to_numpy(dtype=float),
+                equal_nan=True,
+            ):
+                continue
+            result = cached_processed.loc[
+                cached_processed["date"].isin(requested_dates)
+            ].copy()
+            if profile_stages:
+                print(
+                    json.dumps(
+                        {
+                            "status": "j_processed_route_stage",
+                            "stage": "superset_cache_hit",
+                            "seconds": round(time.perf_counter() - profile_start, 3),
+                            "date_count": len(dates),
+                            "source_date_count": len(cached_key),
+                            "rows": len(result),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+            return result
+
+        result = preprocess_factor(route, exposures)
+        self._processed_route_cache.append(
+            (
+                cache_key,
+                route.loc[:, [*KEY_COLUMNS, "factor"]].copy(),
+                result.copy(),
+            )
+        )
+        if profile_stages:
+            print(
+                json.dumps(
+                    {
+                        "status": "j_processed_route_stage",
+                        "stage": "preprocessed_route",
+                        "seconds": round(time.perf_counter() - profile_start, 3),
+                        "date_count": len(dates),
+                        "rows": len(result),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         return result
 
     def score(self, factor: pd.DataFrame) -> dict[str, float]:
         """Score one submission-shaped route output against the all36 base."""
+
+        profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
+        stage_start = time.perf_counter()
+        last_stage = stage_start
+
+        def profile_stage(stage: str, **extra: object) -> None:
+            nonlocal last_stage
+            if not profile_stages:
+                return
+            now = time.perf_counter()
+            print(
+                json.dumps(
+                    {
+                        "status": "j_score_stage",
+                        "stage": stage,
+                        "step_seconds": round(now - last_stage, 3),
+                        "total_seconds": round(now - stage_start, 3),
+                        **extra,
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+            last_stage = now
 
         route = _normalize_keys(factor, name="route_factor")
         if "factor" not in route:
             raise ValueError("route_factor is missing factor column")
         route = route[[*KEY_COLUMNS, "factor"]].dropna(subset=["factor"])
         route_dates = pd.DatetimeIndex(sorted(route["date"].unique()))
-        scorable_keys = (
-            self.reference_panel.loc[
-                self.reference_panel["date"].isin(route_dates),
-                list(KEY_COLUMNS),
-            ]
-            .merge(
-                self.labels.loc[
-                    self.labels["date"].isin(route_dates)
-                    & self.labels[self.config.primary_label].notna(),
-                    list(KEY_COLUMNS),
-                ],
-                on=list(KEY_COLUMNS),
-                how="inner",
-                validate="one_to_one",
-            )
-            .drop_duplicates(list(KEY_COLUMNS))
+        profile_stage("normalized_route", route_rows=len(route), date_count=len(route_dates))
+        reference_keys = self.reference_panel.loc[
+            self.reference_panel["date"].isin(route_dates),
+            list(KEY_COLUMNS),
+        ]
+        label_keys = self.labels.loc[
+            self.labels["date"].isin(route_dates)
+            & self.labels[self.config.primary_label].notna(),
+            list(KEY_COLUMNS),
+        ]
+        scorable_keys = _drop_duplicate_keys_polars(
+            _key_join(reference_keys, label_keys, how="inner")
         )
-        aligned_route = scorable_keys.merge(
-            route,
-            on=list(KEY_COLUMNS),
-            how="left",
-            validate="one_to_one",
-        )
+        aligned_route = _key_join(scorable_keys, route, how="left")
+        profile_stage("aligned_route", scorable_rows=len(aligned_route))
         missing_route_rows = int(aligned_route["factor"].isna().sum())
         if missing_route_rows:
             raise ValueError(
@@ -592,6 +1132,7 @@ class CompetitionScoreReference:
             ).encode("utf-8")
         ).hexdigest()
         if score_cache_key in self._score_cache:
+            profile_stage("score_cache_hit")
             return dict(self._score_cache[score_cache_key])
         dates = pd.DatetimeIndex(sorted(route["date"].unique()))
         if len(dates) < self.config.minimum_score_days:
@@ -601,13 +1142,20 @@ class CompetitionScoreReference:
             )
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         exposures = self._slice_exposures(dates)
-        route_metrics = _a_components(
+        processed_route = self._processed_route(
             route,
-            labels,
+            dates,
             exposures,
+        )
+        route_metrics = _a_components_from_processed(
+            processed_route,
+            labels,
+            factor_column="factor",
             label_column=self.config.primary_label,
         )
+        profile_stage("route_a_components")
         reference_a = self._reference_a_components(dates)
+        profile_stage("reference_a_components", reference_count=len(reference_a))
 
         output: dict[str, float] = {}
         a_percentiles: list[float] = []
@@ -623,16 +1171,11 @@ class CompetitionScoreReference:
         a_proxy = float(np.mean(a_percentiles))
 
         processed_reference = self._processed_reference(dates)
-        processed_route = preprocess_factor(
-            route,
-            exposures,
-        ).rename(columns={"factor": ROUTE_COLUMN})
-        processed = processed_reference.merge(
-            processed_route,
-            on=list(KEY_COLUMNS),
-            how="left",
-            validate="one_to_one",
-        )
+        profile_stage("processed_reference", rows=len(processed_reference))
+        processed_route = processed_route.rename(columns={"factor": ROUTE_COLUMN})
+        profile_stage("processed_route", rows=len(processed_route))
+        processed = _key_join(processed_reference, processed_route, how="left")
+        profile_stage("joined_processed", rows=len(processed))
         model_columns = (*self.reference_columns, ROUTE_COLUMN)
         scores, weights = _model_scores(
             processed,
@@ -640,6 +1183,7 @@ class CompetitionScoreReference:
             model_columns,
             self.config,
         )
+        profile_stage("model_scores", score_rows=len(scores), weight_windows=len(weights))
         route_score = scores.loc[scores["factor"].eq(ROUTE_COLUMN)]
         if len(route_score) != 1:
             raise RuntimeError("competition scorer did not produce one route score")
@@ -675,15 +1219,29 @@ class CompetitionScoreReference:
         """
 
         positive = self.score(factor)
-        negative_factor = _normalize_keys(
+        route = _normalize_keys(
             factor,
             name="route_factor",
-        )[[*KEY_COLUMNS, "factor"]]
-        negative_factor["factor"] = -pd.to_numeric(
-            negative_factor["factor"],
-            errors="coerce",
+        )[[*KEY_COLUMNS, "factor"]].dropna(subset=["factor"])
+        dates = pd.DatetimeIndex(sorted(route["date"].unique()))
+        reference_a = self._reference_a_components(dates)
+        negative = dict(positive)
+        negative_a_percentiles: list[float] = []
+        for component in A_COMPONENT_COLUMNS:
+            raw_value = -float(positive[f"a_{component}"])
+            percentile = inserted_percentile(
+                raw_value,
+                reference_a[component].to_numpy(dtype=float),
+            )
+            negative[f"a_{component}"] = raw_value
+            negative[f"a_{component}_percentile"] = percentile
+            negative_a_percentiles.append(percentile)
+        negative_a_proxy = float(np.mean(negative_a_percentiles))
+        negative["a_proxy"] = negative_a_proxy
+        negative["score_proxy"] = float(
+            self.config.a_weight * negative_a_proxy
+            + self.config.b_weight * float(positive["b_proxy"])
         )
-        negative = self.score(negative_factor)
         direction = (
             -1.0
             if float(negative["score_proxy"]) > float(positive["score_proxy"])
@@ -731,33 +1289,24 @@ class CompetitionScoreReference:
             common_key_frame = (
                 keys
                 if common_key_frame is None
-                else common_key_frame.merge(
-                    keys,
-                    on=list(KEY_COLUMNS),
-                    how="inner",
-                    validate="one_to_one",
-                )
+                else _key_join(common_key_frame, keys, how="inner")
             )
             normalized[str(name)] = route
 
         assert common_key_frame is not None
-        common_key_frame = (
-            common_key_frame.merge(
-                self.reference_panel.loc[:, list(KEY_COLUMNS)],
-                on=list(KEY_COLUMNS),
-                how="inner",
-                validate="one_to_one",
-            )
-            .merge(
+        common_key_frame = _drop_duplicate_keys_polars(
+            _key_join(
+                _key_join(
+                    common_key_frame,
+                    self.reference_panel.loc[:, list(KEY_COLUMNS)],
+                    how="inner",
+                ),
                 self.labels.loc[
                     self.labels[self.config.primary_label].notna(),
                     list(KEY_COLUMNS),
                 ],
-                on=list(KEY_COLUMNS),
                 how="inner",
-                validate="one_to_one",
             )
-            .drop_duplicates(list(KEY_COLUMNS))
         )
         if common_key_frame.empty:
             raise ValueError("joint routes have no common scorable stock-days")
@@ -772,44 +1321,25 @@ class CompetitionScoreReference:
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         exposures = self._slice_exposures(dates)
         scorable_keys = common_key_frame
-        common_reference = scorable_keys.merge(
-            self.reference_panel[
-                [*KEY_COLUMNS, *self.reference_columns]
-            ],
-            on=list(KEY_COLUMNS),
+        common_reference = _key_join(
+            scorable_keys,
+            self.reference_panel[[*KEY_COLUMNS, *self.reference_columns]],
             how="inner",
-            validate="one_to_one",
-        )
-        reference_a = pd.DataFrame(
-            [
-                {
-                    "factor": column,
-                    **_a_components(
-                        common_reference[
-                            [*KEY_COLUMNS, column]
-                        ].rename(columns={column: "factor"}),
-                        labels,
-                        exposures,
-                        label_column=self.config.primary_label,
-                    ),
-                }
-                for column in self.reference_columns
-            ]
         )
         processed = _preprocess_wide_factors(
             common_reference,
             self.reference_columns,
             exposures,
         )
+        reference_a = _a_components_from_processed_wide(
+            processed,
+            labels,
+            factor_columns=self.reference_columns,
+            label_column=self.config.primary_label,
+        )
         route_columns: dict[str, str] = {}
-        route_metrics: dict[str, dict[str, float]] = {}
         for index, (name, route) in enumerate(normalized.items()):
-            aligned = scorable_keys.merge(
-                route,
-                on=list(KEY_COLUMNS),
-                how="left",
-                validate="one_to_one",
-            )
+            aligned = _key_join(scorable_keys, route, how="left")
             missing_rows = int(aligned["factor"].isna().sum())
             if missing_rows:
                 raise ValueError(
@@ -818,22 +1348,26 @@ class CompetitionScoreReference:
                 )
             model_column = f"{ROUTE_COLUMN}_{index}"
             route_columns[name] = model_column
-            route_metrics[name] = _a_components(
+            processed_route = self._processed_route(
                 aligned,
-                labels,
-                exposures,
-                label_column=self.config.primary_label,
-            )
-            processed_route = preprocess_factor(
-                aligned,
+                dates,
                 exposures,
             ).rename(columns={"factor": model_column})
-            processed = processed.merge(
-                processed_route,
-                on=list(KEY_COLUMNS),
-                how="left",
-                validate="one_to_one",
-            )
+            processed = _key_join(processed, processed_route, how="left")
+
+        route_a = _a_components_from_processed_wide(
+            processed.loc[:, [*KEY_COLUMNS, *route_columns.values()]],
+            labels,
+            factor_columns=tuple(route_columns.values()),
+            label_column=self.config.primary_label,
+        ).set_index("factor")
+        route_metrics: dict[str, dict[str, float]] = {
+            name: {
+                component: float(route_a.loc[model_column, component])
+                for component in A_COMPONENT_COLUMNS
+            }
+            for name, model_column in route_columns.items()
+        }
 
         model_columns = (*self.reference_columns, *route_columns.values())
         scores, weights = _model_scores(

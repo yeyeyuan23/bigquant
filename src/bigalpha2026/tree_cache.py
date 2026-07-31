@@ -10,7 +10,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-TREE_CACHE_SCHEMA_VERSION = "tree-prediction-cache-v6-orthogonal-entry"
+TREE_CACHE_SCHEMA_VERSION = (
+    "tree-prediction-cache-v8-dynamic-pool-orthogonality"
+)
 PREDICTION_COLUMNS = ("date", "instrument", "factor")
 LIGHTGBM_IMPORTANCE_COLUMNS = (
     "train_start",
@@ -71,12 +73,42 @@ def feature_fingerprints(
     frame: pd.DataFrame,
     columns: Sequence[str],
 ) -> dict[str, str]:
-    """Fingerprint every model feature independently."""
+    """Fingerprint every model feature independently.
 
-    return {
-        column: frame_column_fingerprint(frame, column)
-        for column in columns
-    }
+    The old implementation sorted and validated the same keyed frame once per
+    feature.  I/T admission calls this for hundreds of columns, so do the key
+    work once and only hash the value column independently.
+    """
+
+    columns = tuple(columns)
+    if not columns:
+        return {}
+    required = {"date", "instrument", *columns}
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"feature fingerprint is missing columns: {missing}")
+    keyed = frame.loc[:, ["date", "instrument", *columns]].copy()
+    keyed["date"] = pd.to_datetime(keyed["date"], errors="coerce").dt.normalize()
+    keyed["instrument"] = keyed["instrument"].astype(str)
+    if keyed[["date", "instrument"]].isna().any().any():
+        raise ValueError("feature fingerprint contains invalid keys")
+    if keyed.duplicated(["date", "instrument"]).any():
+        raise ValueError("feature fingerprint contains duplicate keys")
+    keyed = keyed.sort_values(["date", "instrument"]).reset_index(drop=True)
+    result: dict[str, str] = {}
+    row_count = str(len(keyed)).encode("ascii")
+    keys = keyed.loc[:, ["date", "instrument"]]
+    for column in columns:
+        hashes = pd.util.hash_pandas_object(
+            pd.concat([keys, keyed.loc[:, [column]]], axis=1),
+            index=False,
+            categorize=True,
+        ).to_numpy(dtype=np.uint64, copy=False)
+        digest = hashlib.sha256()
+        digest.update(row_count)
+        digest.update(hashes.tobytes())
+        result[column] = digest.hexdigest()
+    return result
 
 
 class TreePredictionCache:
@@ -107,12 +139,24 @@ class TreePredictionCache:
         label_column: str,
         train_window_days: int,
         test_window_days: int,
+        residual_baseline_columns: Sequence[str] = (),
     ) -> dict[str, object]:
+        residual_baseline_columns = tuple(dict.fromkeys(residual_baseline_columns))
         missing = sorted(
-            set(feature_columns).difference(self.feature_fingerprints)
+            {*feature_columns, *residual_baseline_columns}.difference(
+                self.feature_fingerprints
+            )
         )
         if missing:
             raise ValueError(f"tree cache lacks feature fingerprints: {missing}")
+        baseline_overlap = sorted(
+            set(residual_baseline_columns).intersection(feature_columns)
+        )
+        if baseline_overlap:
+            raise ValueError(
+                "tree cache residual controls must not enter model features: "
+                f"{baseline_overlap}"
+            )
         return {
             "schema_version": TREE_CACHE_SCHEMA_VERSION,
             "feature_columns": list(feature_columns),
@@ -120,8 +164,13 @@ class TreePredictionCache:
                 feature: self.feature_fingerprints[feature]
                 for feature in feature_columns
             },
+            "residual_baseline_fingerprints": {
+                feature: self.feature_fingerprints[feature]
+                for feature in residual_baseline_columns
+            },
             "label_column": label_column,
             "label_fingerprint": self.label_fingerprint,
+            "residual_baseline_columns": list(residual_baseline_columns),
             "prediction_years": [int(year) for year in prediction_years],
             "train_window_days": int(train_window_days),
             "test_window_days": int(test_window_days),
@@ -157,6 +206,7 @@ class TreePredictionCache:
         label_column: str,
         train_window_days: int,
         test_window_days: int,
+        residual_baseline_columns: Sequence[str] = (),
         force_refresh: bool = False,
         compute: Callable[[], pd.DataFrame],
     ) -> tuple[pd.DataFrame, bool, str]:
@@ -168,6 +218,7 @@ class TreePredictionCache:
             label_column=label_column,
             train_window_days=train_window_days,
             test_window_days=test_window_days,
+            residual_baseline_columns=residual_baseline_columns,
         )
         key = content_digest(payload)
         parquet_path = self.cache_dir / f"{key}.parquet"
@@ -208,6 +259,7 @@ class TreePredictionCache:
         label_column: str,
         train_window_days: int,
         test_window_days: int,
+        residual_baseline_columns: Sequence[str] = (),
         force_refresh: bool = False,
         compute: Callable[[], tuple[pd.DataFrame, pd.DataFrame]],
     ) -> tuple[pd.DataFrame, pd.DataFrame, bool, str]:
@@ -219,6 +271,7 @@ class TreePredictionCache:
             label_column=label_column,
             train_window_days=train_window_days,
             test_window_days=test_window_days,
+            residual_baseline_columns=residual_baseline_columns,
         )
         key = content_digest(payload)
         parquet_path = self.cache_dir / f"{key}.parquet"

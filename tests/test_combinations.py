@@ -1,11 +1,16 @@
 import unittest
 from multiprocessing import get_context
+from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 
 from bigalpha2026.combinations import (
+    _causal_rolling_train_dates,
+    _eligible_prediction_dates,
     _prepare_joint_model_frame,
     fixed_rank_blend,
+    learned_model_training_config,
     lightgbm_model_config,
     paired_factor_rank_ic_increment,
     walk_forward_elastic_net,
@@ -16,19 +21,38 @@ from bigalpha2026.combinations import (
 from bigalpha2026.research_policy import fixed_weight_rank_combination
 
 
+class _ZeroLightGBM:
+    def __init__(self, fitted_targets: list[np.ndarray]):
+        self.fitted_targets = fitted_targets
+        self.booster_ = self
+        self.feature_count = 0
+
+    def fit(self, x, y):
+        self.feature_count = x.shape[1]
+        self.fitted_targets.append(np.asarray(y, dtype=float))
+        return self
+
+    def predict(self, x):
+        return np.zeros(len(x), dtype=float)
+
+    def feature_importance(self, importance_type="split"):
+        return np.zeros(self.feature_count, dtype=float)
+
+
 def _run_lightgbm_smoke() -> None:
     dates = pd.to_datetime(
         ["2019-01-02"] * 120
+        + ["2019-01-03"] * 120
         + ["2020-01-02"] * 120
         + ["2021-01-04"] * 120
     )
-    values = list(range(120)) * 3
+    values = list(range(120)) * 4
     panel = pd.DataFrame(
         {
             "date": dates,
-            "instrument": [str(value) for value in range(120)] * 3,
+            "instrument": [str(value) for value in range(120)] * 4,
             "FR-002": values,
-            "HF-001": list(reversed(values[:120])) * 3,
+            "HF-001": list(reversed(values[:120])) * 4,
         }
     )
     labels = panel[["date", "instrument"]].copy()
@@ -50,16 +74,17 @@ def _run_lightgbm_smoke() -> None:
 def _run_lightgbm_importance_smoke() -> None:
     dates = pd.to_datetime(
         ["2019-01-02"] * 120
+        + ["2019-01-03"] * 120
         + ["2020-01-02"] * 120
         + ["2021-01-04"] * 120
     )
-    values = list(range(120)) * 3
+    values = list(range(120)) * 4
     panel = pd.DataFrame(
         {
             "date": dates,
-            "instrument": [str(value) for value in range(120)] * 3,
+            "instrument": [str(value) for value in range(120)] * 4,
             "FR-002": values,
-            "HF-001": list(reversed(values[:120])) * 3,
+            "HF-001": list(reversed(values[:120])) * 4,
         }
     )
     labels = panel[["date", "instrument"]].copy()
@@ -143,16 +168,17 @@ class CombinationTest(unittest.TestCase):
     def test_elastic_net_predictions_are_strictly_walk_forward(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 120
+            + ["2019-01-03"] * 120
             + ["2020-01-02"] * 120
             + ["2021-01-04"] * 120
         )
-        values = list(range(120)) * 3
+        values = list(range(120)) * 4
         panel = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": [str(value) for value in range(120)] * 3,
+                "instrument": [str(value) for value in range(120)] * 4,
                 "public": values,
-                "candidate": list(reversed(values[:120])) * 3,
+                "candidate": list(reversed(values[:120])) * 4,
             }
         )
         labels = panel[["date", "instrument"]].copy()
@@ -173,16 +199,17 @@ class CombinationTest(unittest.TestCase):
     def test_elastic_net_is_invariant_to_label_units_and_records_weights(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 120
+            + ["2019-01-03"] * 120
             + ["2020-01-02"] * 120
             + ["2021-01-04"] * 120
         )
-        values = list(range(120)) * 3
+        values = list(range(120)) * 4
         panel = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": [str(value) for value in range(120)] * 3,
+                "instrument": [str(value) for value in range(120)] * 4,
                 "public": values,
-                "candidate": list(reversed(values[:120])) * 3,
+                "candidate": list(reversed(values[:120])) * 4,
             }
         )
         labels = panel[["date", "instrument"]].copy()
@@ -222,14 +249,15 @@ class CombinationTest(unittest.TestCase):
     def test_elastic_net_keeps_dates_with_a_neutral_constant_feature(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 120
+            + ["2019-01-03"] * 120
             + ["2020-01-02"] * 120
             + ["2021-01-04"] * 120
         )
-        values = list(range(120)) * 3
+        values = list(range(120)) * 4
         panel = pd.DataFrame(
             {
                 "date": dates,
-                "instrument": [str(value) for value in range(120)] * 3,
+                "instrument": [str(value) for value in range(120)] * 4,
                 "public": values,
                 "sparse_candidate": [0.0] * len(dates),
             }
@@ -285,19 +313,143 @@ class CombinationTest(unittest.TestCase):
     def test_lightgbm_config_is_shallow_and_deterministic(self):
         config = lightgbm_model_config()
         self.assertEqual(config["random_state"], 20260726)
-        self.assertEqual(config["training"], "rolling_60_train_20_test")
+        self.assertEqual(
+            config["training"],
+            "causal_rolling_60_train_20_predict_label_embargo_1",
+        )
+        self.assertEqual(config["training_start_date"], "2019-01-01")
+        self.assertEqual(config["train_window_days"], 60)
+        self.assertEqual(config["prediction_block_days"], 20)
+        self.assertEqual(config["label_embargo_days"], 1)
         self.assertEqual(
             config["feature_transform"],
             "daily_centered_percentile_rank",
         )
         self.assertEqual(
             config["target_transform"],
-            "daily_centered_percentile_rank",
+            "daily_centered_percentile_rank_residual_to_baseline",
         )
         self.assertEqual(
             config["monotone_constraints"],
-            "all_features_positive",
+            "all_self_features_positive",
         )
+        self.assertEqual(
+            config["residual_baseline_role"],
+            "target_control_and_prediction_addback",
+        )
+        self.assertEqual(config["model_features"], "self_candidates_only")
+        self.assertEqual(
+            config["prediction_output"],
+            "baseline_plus_residual_prediction",
+        )
+
+    def test_shared_training_contract_rolls_and_embargoes_last_label(self):
+        all_dates = pd.date_range("2019-01-02", periods=8, freq="B")
+        train_dates = _causal_rolling_train_dates(
+            all_dates,
+            7,
+            train_window_days=4,
+        )
+        self.assertEqual(
+            list(train_dates),
+            list(all_dates[2:6]),
+        )
+        self.assertEqual(
+            learned_model_training_config()["training"],
+            "causal_rolling_60_train_20_predict_label_embargo_1",
+        )
+
+    def test_prediction_blocks_start_after_first_complete_train_window(self):
+        all_dates = pd.date_range("2019-01-02", periods=85, freq="B")
+        prediction_dates = _eligible_prediction_dates(
+            all_dates,
+            (2019,),
+            train_window_days=60,
+        )
+        self.assertEqual(prediction_dates[0], all_dates[61])
+
+    def test_lightgbm_screened_baseline_residualizes_and_is_added_back(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 10
+            + ["2019-01-03"] * 10
+            + ["2020-01-02"] * 10
+        )
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(10)] * 3,
+                "public": list(range(10)) * 3,
+                "candidate": [0.0] * 30,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["public"]
+        fitted_targets: list[np.ndarray] = []
+
+        with patch(
+            "bigalpha2026.combinations._lightgbm_regressor",
+            return_value=_ZeroLightGBM(fitted_targets),
+        ):
+            result = walk_forward_lightgbm(
+                panel,
+                labels,
+                feature_columns=("candidate",),
+                prediction_years=(2020,),
+                train_window_days=1,
+                test_window_days=1,
+                residual_baseline_columns=("public",),
+            )
+
+        self.assertEqual(len(fitted_targets), 1)
+        self.assertTrue(np.allclose(fitted_targets[0], 0.0))
+        expected = panel.loc[
+            panel["date"].dt.year.eq(2020),
+            ["date", "instrument"],
+        ].copy()
+        expected["date"] = expected["date"].astype("datetime64[ns]")
+        expected["factor"] = np.tile(
+            np.linspace(-0.8, 1.0, 10),
+            len(expected) // 10,
+        )
+        expected = expected.sort_values(["date", "instrument"]).reset_index(drop=True)
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_lightgbm_screened_baseline_addback_weight_changes_only_output(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 10
+            + ["2019-01-03"] * 10
+            + ["2020-01-02"] * 10
+        )
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(10)] * 3,
+                "public": list(range(10)) * 3,
+                "candidate": [0.0] * 30,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["public"]
+        fitted_targets: list[np.ndarray] = []
+
+        with patch(
+            "bigalpha2026.combinations._lightgbm_regressor",
+            return_value=_ZeroLightGBM(fitted_targets),
+        ):
+            result = walk_forward_lightgbm(
+                panel,
+                labels,
+                feature_columns=("candidate",),
+                prediction_years=(2020,),
+                train_window_days=1,
+                test_window_days=1,
+                residual_baseline_columns=("public",),
+                residual_baseline_addback_weight=0.0,
+            )
+
+        self.assertEqual(len(fitted_targets), 1)
+        self.assertTrue(np.allclose(fitted_targets[0], 0.0))
+        self.assertTrue(np.allclose(result["factor"], 0.1))
 
     def test_paired_tree_increment_uses_daily_oos_rank_ic(self):
         dates = pd.bdate_range("2021-01-04", periods=40)

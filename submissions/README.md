@@ -1,50 +1,41 @@
-# 提交文件命名
+# Submission artifacts
 
-正式提交文件只保留组合路线和版本：
+This directory intentionally contains only:
 
-```text
-<route>_v<version>.py
-<route>_v<version>.ipynb
+- historical submissions with explicit platform-score evidence;
+- the historical platform-top LightGBM reconstruction;
+- retained candidate snapshots that still need platform validation.
+
+Each submission is stored as an exact `.py` / `.ipynb` pair. The notebook has
+one code cell whose contents must exactly match the corresponding Python file.
+
+| Version | Status | Evidence |
+| --- | --- | --- |
+| `smoke_v01` | Historical scored submission | Public score `0.57416` |
+| `rule_v03` | Historical scored submission | Public score `0.60478` |
+| `lgbm_platform_top_v01` | Historical platform-top reconstruction | Highest historical total/B mechanism; exact score not recorded here |
+| `enet_i_51_candidate` | Retained candidate snapshot | Superseded locally; not platform-scored |
+| `lgbm_t_orthogonal_26_candidate` | Retained candidate snapshot | Superseded locally; not platform-scored |
+
+Generate all three current S/I/T candidate pairs with:
+
+```bash
+python scripts/build_latest_submission_notebooks.py
 ```
 
-- `route`：`rule`、`enet`、`lgbm`；端到端冒烟版本使用 `smoke`。
-- `version`：同一路线从 `v01` 开始递增。
-- 因子成员、规则、参数或数据逻辑任一发生变化，都生成新版本，不覆盖旧文件。
-- 禁止使用 `current`、`latest`、`final`、日期或平台分数命名。
+Use `--reports-dir PATH` to select a specific completed S/I/T run. Without it,
+the builder chooses the newest compatible reports directory and prints the
+selected path. New, unverified outputs are written to
+`remote_submission_notebooks/`; they must pass real AIStudio execution and
+prefix/look-ahead probes before promotion into this directory.
 
-具体方案和分数只在下表管理。`J` 必须是该文件对应代码在相同评价口径下的
-本地 J，不能用其他因子池的分数代替。
+Local J is diagnostic and must not be presented as an official platform score.
 
-当前正式比较口径为年度稳定 J：
+Candidate notebooks use normal Python imports. Upload the `.ipynb` together
+with its generated sibling `*_deps.py` file; AIStudio does not need a directory
+upload. Each dependency file contains only that notebook's frozen candidates.
+Generated notebooks must not embed module source strings or install modules
+through `exec`/`sys.modules`.
 
-```text
-J_mean = mean(J_year)
-J_worst = min(J_year)
-J_std = std(J_year)
-J_stable = J_mean - 0.5 * J_std
-```
-
-本地目前只有 2022、2023 完整验证数据；2024 暂不进入本地 J 表，等平台或本地
-补齐同口径数据后再追加。
-
-| 版本 | 组合规则 | J | ΔJ | 本版改动 |
-|---|---|---:|---:|---|
-| `smoke_v01` | FR-002 与 HF-001 等权 | — | — | INT-001 端到端冒烟 |
-| `rule_v01` | PV-003/009/014 截面秩等权 | — | — | 第一版纯 PV 规则组合 |
-| `rule_v02` | FR 4个、PV 4个，族内及族间等权 | 0.700658 | — | 从单族扩展为 FR/PV 家族平衡 |
-| `rule_v03` | S 路线冻结 FR-002/005、HF-001/003、PV-010/011/014，族内及族间等权 | J_mean 0.955405 / J_stable 0.942568 | — | 2022/2023 年度 J：0.929730/0.981081；平台公榜 0.60478，非冠军 |
-| `enet_v01` | screened15 + FR-002/PV-014 Elastic Net | 0.522973 | — | 第一版冻结准入线性组合；已修正训练标签边界 |
-| `enet_v02` | screened15 + PV-008/PV-019/FR-006/HF-004/PV-011 Elastic Net | 0.581098 | +0.058125 | 当前 I 冻结池；提交版改为 start_date 前固定训练以规避未来函数 |
-| `lgbm_v01` | screened15 + 11个自研因子 LightGBM | 0.856410 | — | 平台判定疑似未来函数，不再提交 |
-| `lgbm_v02` | 与 v01 相同 | 0.856410 | 0.000000 | 查询不再超过 `end_date`；待平台校验 |
-| `lgbm_v03` | screened15 + PV-008/OB-003/PV-020/PV-013 LightGBM | 0.852356 | -0.004054 | 昨日手工重跑 T 池；提交版改为 start_date 前固定训练以规避未来函数 |
-| `lgbm_platform_top_v01` | screened15 + FR-002/FR-004/FR-011/HF-002/HF-003/OB-005/PV-001/PV-002/PV-003/PV-006/PV-014 LightGBM | J_mean 0.858784 / J_stable 0.811149 | — | 历史平台最高总分/B分机制复刻；2022/2023 年度 J：0.954054/0.763514；旧 Rank IC 0.04409/0.03388 |
-
-生成下一版时必须先把同口径的基准 J、本版 J 和 ΔJ 写入本表，并说明规则改动。
-AIStudio 未通过的文件不得作为正式提交版本保留。
-
-## 已评价、尚未生成提交文件
-
-| 下一版本 | 组合规则 | J | 相对当前文件 ΔJ | 状态 |
-|---|---|---:|---:|---|
-| — | — | — | — | 当前没有已评价但未生成提交代码的正式版本 |
+`PV-009` and `HF-048` are hard-excluded from generated submissions because
+their historical implementations rely on disallowed data.

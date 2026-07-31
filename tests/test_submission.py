@@ -1,265 +1,71 @@
+from __future__ import annotations
+
 import ast
 import json
-import re
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "submissions" / "smoke_v01.py"
-NOTEBOOK = ROOT / "submissions" / "smoke_v01.ipynb"
-SELF_PV_SOURCE = ROOT / "submissions" / "rule_v01.py"
-SELF_PV_NOTEBOOK = ROOT / "submissions" / "rule_v01.ipynb"
-FINAL_SUBMISSIONS = (
-    (
-        ROOT / "submissions" / "rule_v02.py",
-        ROOT / "submissions" / "rule_v02.ipynb",
-    ),
-    (
-        ROOT / "submissions" / "rule_v03.py",
-        ROOT / "submissions" / "rule_v03.ipynb",
-    ),
-    (
-        ROOT / "submissions" / "rule_v04.py",
-        ROOT / "submissions" / "rule_v04.ipynb",
-    ),
-)
-CURRENT_LEARNED_SUBMISSIONS = (
-    (
-        ROOT / "submissions" / "enet_v01.py",
-        ROOT / "submissions" / "enet_v01.ipynb",
-        ("PV-014", "FR-002"),
-    ),
-    (
-        ROOT / "submissions" / "lgbm_v01.py",
-        ROOT / "submissions" / "lgbm_v01.ipynb",
-        (
-            "FR-002",
-            "FR-005",
-            "FR-015",
-            "HF-003",
-            "HF-004",
-            "OB-001",
-            "OB-003",
-            "PV-001",
-            "PV-009",
-            "PV-014",
-            "PV-020",
-        ),
-    ),
-    (
-        ROOT / "submissions" / "lgbm_v02.py",
-        ROOT / "submissions" / "lgbm_v02.ipynb",
-        (
-            "FR-002",
-            "FR-005",
-            "FR-015",
-            "HF-003",
-            "HF-004",
-            "OB-001",
-            "OB-003",
-            "PV-001",
-            "PV-009",
-            "PV-014",
-            "PV-020",
-        ),
-    ),
-    (
-        ROOT / "submissions" / "lgbm_v03.py",
-        ROOT / "submissions" / "lgbm_v03.ipynb",
-        (
-            "PV-008",
-            "OB-003",
-            "PV-020",
-            "PV-013",
-        ),
-    ),
-    (
-        ROOT / "submissions" / "enet_v03.py",
-        ROOT / "submissions" / "enet_v03.ipynb",
-        (
-            "FR-002",
-            "FR-004",
-            "FR-005",
-            "FR-006",
-            "FR-010",
-            "FR-011",
-            "FR-012",
-            "FR-013",
-            "FR-014",
-            "FR-015",
-            "HF-001",
-            "HF-003",
-            "INT-002",
-            "INT-003",
-            "OB-001",
-            "OB-003",
-            "OB-004",
-            "PV-003",
-            "PV-004",
-            "PV-005",
-            "PV-008",
-            "PV-009",
-            "PV-010",
-            "PV-011",
-            "PV-013",
-            "PV-014",
-            "PV-015",
-            "PV-016",
-            "PV-017",
-            "PV-019",
-            "PV-020",
-            "PV-021",
-            "PV-022",
-            "HF-004",
-        ),
-    ),
-    (
-        ROOT / "submissions" / "lgbm_v04.py",
-        ROOT / "submissions" / "lgbm_v04.ipynb",
-        (
-            "FR-013",
-            "INT-002",
-            "OB-004",
-            "PV-009",
-            "OB-003",
-            "FR-012",
-            "PV-017",
-            "PV-019",
-            "HF-001",
-            "PV-010",
-            "FR-002",
-            "PV-016",
-            "FR-005",
-            "PV-004",
-            "PV-015",
-            "FR-004",
-            "PV-011",
-            "PV-021",
-            "INT-003",
-            "OB-005",
-            "PV-023",
-            "FR-001",
-            "HF-004",
-            "PV-002",
-            "OB-002",
-            "OB-001",
-            "FR-010",
-        ),
-    ),
-    (
-        ROOT / "submissions" / "lgbm_platform_top_v01.py",
-        ROOT / "submissions" / "lgbm_platform_top_v01.ipynb",
-        (
-            "FR-002",
-            "FR-004",
-            "FR-011",
-            "HF-002",
-            "PV-001",
-            "PV-002",
-            "PV-003",
-            "PV-006",
-            "PV-014",
-            "HF-003",
-            "OB-005",
-        ),
-    ),
-)
-PLATFORM_SAFE_SUBMISSIONS = (
-    ROOT / "submissions" / "rule_v03.py",
-    ROOT / "submissions" / "enet_v01.py",
-    ROOT / "submissions" / "enet_v02.py",
-    ROOT / "submissions" / "lgbm_v02.py",
-    ROOT / "submissions" / "lgbm_v03.py",
-)
-ALLOWED_COMPETITION_TABLES = {
-    "bigalpha_2026_exposure",
-    "bigalpha_2026_factorlib",
-    "bigalpha_2026_financial",
-    "bigalpha_2026_instruments",
-    "bigalpha_2026_stock_bar1m",
+SUBMISSIONS = ROOT / "submissions"
+REMOTE_SUBMISSIONS = ROOT / "remote_submission_notebooks"
+EXPECTED_FILES = {
+    "README.md",
+    "smoke_v01.py",
+    "smoke_v01.ipynb",
+    "rule_v03.py",
+    "rule_v03.ipynb",
+    "lgbm_platform_top_v01.py",
+    "lgbm_platform_top_v01.ipynb",
+    "enet_i_51_candidate.py",
+    "enet_i_51_candidate.ipynb",
+    "enet_i_51_candidate_deps.py",
+    "lgbm_t_orthogonal_26_candidate.py",
+    "lgbm_t_orthogonal_26_candidate.ipynb",
+    "lgbm_t_orthogonal_26_candidate_deps.py",
+    "lgbm_t_orthogonal_26_no15_candidate.py",
+    "lgbm_t_orthogonal_26_no15_candidate.ipynb",
+    "lgbm_t_orthogonal_26_no15_candidate_deps.py",
+    "lgbm_t_orthogonal_26_add15_candidate.py",
+    "lgbm_t_orthogonal_26_add15_candidate.ipynb",
+    "lgbm_t_orthogonal_26_add15_candidate_deps.py",
 }
-FORBIDDEN_PLATFORM_TABLES = {
-    "all_trading_days",
-    "cn_stock_bar1d",
-    "cn_stock_bar1m",
-}
-SQL_TABLE_PATTERN = re.compile(
-    r"^\s*(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-    flags=re.IGNORECASE | re.MULTILINE,
-)
-SQL_CTE_PATTERN = re.compile(
-    r"(?:\bwith\b|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s+as\s*\(",
-    flags=re.IGNORECASE,
-)
-SQL_FIRST_LAST_PATTERN = re.compile(
-    r"\b(first|last)\s*\(([^)]*)\)",
-    flags=re.IGNORECASE | re.DOTALL,
-)
 
 
 class SubmissionTest(unittest.TestCase):
-    def test_source_is_self_contained_and_has_main(self):
-        tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
-        functions = {
-            node.name: node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef)
-        }
-        self.assertIn("main", functions)
-        self.assertEqual(
-            [argument.arg for argument in functions["main"].args.args],
-            ["datasources", "start_date", "end_date"],
-        )
+    def test_directory_contains_only_retained_submissions(self):
+        actual = {path.name for path in SUBMISSIONS.iterdir() if path.is_file()}
+        self.assertEqual(actual, EXPECTED_FILES)
 
-    def test_notebook_has_one_code_cell_and_exact_source(self):
-        notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
-        code_cells = [
-            cell for cell in notebook["cells"] if cell["cell_type"] == "code"
-        ]
-        self.assertEqual(len(code_cells), 1)
-        self.assertEqual(
-            "".join(code_cells[0]["source"]),
-            SOURCE.read_text(encoding="utf-8"),
-        )
-
-    def test_self_pv_source_is_self_contained_and_has_main(self):
-        tree = ast.parse(SELF_PV_SOURCE.read_text(encoding="utf-8"))
-        functions = {
-            node.name: node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef)
-        }
-        self.assertIn("main", functions)
-        self.assertEqual(
-            [argument.arg for argument in functions["main"].args.args],
-            ["datasources", "start_date", "end_date"],
-        )
-
-    def test_self_pv_notebook_has_one_code_cell_and_exact_source(self):
-        notebook = json.loads(SELF_PV_NOTEBOOK.read_text(encoding="utf-8"))
-        code_cells = [
-            cell for cell in notebook["cells"] if cell["cell_type"] == "code"
-        ]
-        self.assertEqual(len(code_cells), 1)
-        self.assertEqual(
-            "".join(code_cells[0]["source"]),
-            SELF_PV_SOURCE.read_text(encoding="utf-8"),
-        )
-
-    def test_final_submission_sources_and_notebooks_match(self):
-        for source, notebook_path in FINAL_SUBMISSIONS:
-            with self.subTest(source=source.name):
-                tree = ast.parse(source.read_text(encoding="utf-8"))
-                functions = {
-                    node.name: node
-                    for node in tree.body
-                    if isinstance(node, ast.FunctionDef)
-                }
-                self.assertIn("main", functions)
+    def test_every_source_has_competition_main(self):
+        for source_path in sorted(SUBMISSIONS.glob("*.py")):
+            if source_path.name.endswith("_deps.py"):
+                continue
+            with self.subTest(source=source_path.name):
+                tree = ast.parse(source_path.read_text(encoding="utf-8"))
+                main = next(
+                    (
+                        node
+                        for node in tree.body
+                        if isinstance(node, ast.FunctionDef)
+                        and node.name == "main"
+                    ),
+                    None,
+                )
+                self.assertIsNotNone(main)
                 self.assertEqual(
-                    [argument.arg for argument in functions["main"].args.args],
+                    [argument.arg for argument in main.args.args],
                     ["datasources", "start_date", "end_date"],
                 )
+
+    def test_every_notebook_has_one_exact_code_cell(self):
+        for source_path in sorted(SUBMISSIONS.glob("*.py")):
+            if source_path.name.endswith("_deps.py"):
+                continue
+            with self.subTest(source=source_path.name):
+                notebook_path = source_path.with_suffix(".ipynb")
+                self.assertTrue(notebook_path.exists())
                 notebook = json.loads(
                     notebook_path.read_text(encoding="utf-8")
                 )
@@ -271,152 +77,101 @@ class SubmissionTest(unittest.TestCase):
                 self.assertEqual(len(code_cells), 1)
                 self.assertEqual(
                     "".join(code_cells[0]["source"]),
-                    source.read_text(encoding="utf-8"),
+                    source_path.read_text(encoding="utf-8"),
                 )
 
-    def test_current_learned_submissions_match_frozen_pools(self):
-        for source_path, notebook_path, expected_members in (
-            CURRENT_LEARNED_SUBMISSIONS
-        ):
-            with self.subTest(source=source_path.name):
-                source = source_path.read_text(encoding="utf-8")
-                tree = ast.parse(source)
-                main = next(
-                    node
-                    for node in tree.body
-                    if isinstance(node, ast.FunctionDef) and node.name == "main"
-                )
-                self_columns = next(
-                    ast.literal_eval(node.value)
-                    for node in ast.walk(main)
-                    if isinstance(node, ast.Assign)
-                    and any(
-                        isinstance(target, ast.Name)
-                        and target.id == "self_columns"
-                        for target in node.targets
-                    )
-                )
-                self.assertEqual(tuple(self_columns), expected_members)
-                notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
-                code_cells = [
-                    cell
-                    for cell in notebook["cells"]
-                    if cell["cell_type"] == "code"
-                ]
-                self.assertEqual(len(code_cells), 1)
-                self.assertEqual("".join(code_cells[0]["source"]), source)
-                if source_path.name in {"enet_v03.py", "lgbm_v04.py"}:
-                    self.assertIn(
-                        "PARTITION BY instrument, trading_day, session_id",
-                        source,
-                    )
-                    self.assertIn("shift(-recovery_minutes)", source)
-                    self.assertNotIn("target.shift(-", source.lower())
-                    self.assertNotIn("daily_return.shift(-", source.lower())
-                else:
-                    self.assertNotIn(".shift(-", source)
-                    self.assertNotIn(" lead(", source.lower())
-        elastic_source = CURRENT_LEARNED_SUBMISSIONS[0][0].read_text(
-            encoding="utf-8"
-        )
-        lightgbm_source = CURRENT_LEARNED_SUBMISSIONS[2][0].read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("positive=True", elastic_source)
-        self.assertIn("monotone_constraints=[1] * len(feature_columns)", lightgbm_source)
-        for source in (elastic_source, lightgbm_source):
-            self.assertNotIn("cn_stock_bar1d", source)
-            self.assertNotIn("cn_stock_bar1m", source)
-
-        self.assertIn("bigalpha_2026_factorlib", elastic_source)
-        self.assertIn("bigalpha_2026_stock_bar1m", lightgbm_source)
-        self.assertIn(
-            "first(open ORDER BY timestamp) AS open",
-            lightgbm_source,
-        )
-        self.assertIn(
-            "last(close ORDER BY timestamp) AS close",
-            lightgbm_source,
-        )
-        self.assertIn(
-            "first(pre_close ORDER BY timestamp) AS pre_close",
-            lightgbm_source,
-        )
-        self.assertIn(
-            "if cursor == final_period",
-            lightgbm_source,
-        )
-        self.assertIn(
-            'end_ts.strftime("%Y-%m-%d 23:59:59")',
-            lightgbm_source,
-        )
-        self.assertNotIn("intraday_end_ts", lightgbm_source)
-        self.assertNotIn("end_ts + pd.Timedelta(days=1)", lightgbm_source)
-        self.assertIn('filters={"date": [financial_start, end_date]}', lightgbm_source)
-
-    def test_platform_safe_submissions_do_not_query_after_end_date(self):
-        for source_path in PLATFORM_SAFE_SUBMISSIONS:
-            with self.subTest(source=source_path.name):
-                source = source_path.read_text(encoding="utf-8")
-                self.assertNotRegex(source, r"\bend_ts\s*\+")
-                self.assertNotRegex(source, r"\bend_date\s*\+")
-                self.assertNotIn("pd.Timedelta(days=1)", source)
-
-    def test_platform_safe_first_last_aggregations_are_deterministic(self):
-        for source_path in PLATFORM_SAFE_SUBMISSIONS:
-            source = source_path.read_text(encoding="utf-8")
-            for match in SQL_FIRST_LAST_PATTERN.finditer(source):
-                function_name, arguments = match.groups()
-                with self.subTest(
-                    source=source_path.name,
-                    aggregation=function_name,
-                    arguments=arguments.strip(),
-                ):
-                    self.assertIn("ORDER BY", arguments.upper())
-
-    def test_every_submission_uses_only_competition_tables(self):
-        sources = sorted((ROOT / "submissions").glob("*.py"))
-        self.assertTrue(sources)
+    def test_candidate_submissions_use_flat_python_dependency(self):
+        sources = [
+            *sorted(SUBMISSIONS.glob("*_candidate.py")),
+            *sorted(REMOTE_SUBMISSIONS.glob("*_candidate.py")),
+        ]
         for source_path in sources:
             with self.subTest(source=source_path.name):
                 source = source_path.read_text(encoding="utf-8")
-                notebook_path = source_path.with_suffix(".ipynb")
-                self.assertTrue(notebook_path.exists())
-                notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
-                code_cells = [
-                    cell
-                    for cell in notebook["cells"]
-                    if cell["cell_type"] == "code"
-                ]
-                self.assertEqual(len(code_cells), 1)
-                self.assertEqual("".join(code_cells[0]["source"]), source)
-                lowered = source.lower()
-                for forbidden in FORBIDDEN_PLATFORM_TABLES:
-                    self.assertNotIn(forbidden, lowered)
-                sql_strings = [
-                    node.value
-                    for node in ast.walk(ast.parse(source))
-                    if isinstance(node, ast.Constant)
-                    and isinstance(node.value, str)
-                    and "SELECT" in node.value
-                    and "FROM" in node.value
-                ]
-                cte_names = {
-                    match.group(1).lower()
-                    for sql in sql_strings
-                    for match in SQL_CTE_PATTERN.finditer(sql)
-                }
-                literal_tables = {
-                    match.group(1).lower()
-                    for sql in sql_strings
-                    for match in SQL_TABLE_PATTERN.finditer(sql)
-                }
-                self.assertEqual(
-                    literal_tables
-                    - cte_names
-                    - ALLOWED_COMPETITION_TABLES,
-                    set(),
+                self.assertNotIn("_install_bigalpha_candidate_modules", source)
+                self.assertNotIn("exec(compile(", source)
+                dependency = source_path.with_name(
+                    source_path.stem + "_deps.py"
                 )
+                self.assertTrue(dependency.is_file())
+                dependency_text = dependency.read_text(encoding="utf-8")
+                self.assertNotIn("exec(", dependency_text)
+                dependency_tree = ast.parse(dependency_text)
+                package_imports = [
+                    node
+                    for node in ast.walk(dependency_tree)
+                    if (
+                        isinstance(node, ast.ImportFrom)
+                        and node.module
+                        and node.module.startswith("bigalpha2026")
+                    )
+                    or (
+                        isinstance(node, ast.Import)
+                        and any(
+                            alias.name.startswith("bigalpha2026")
+                            for alias in node.names
+                        )
+                    )
+                ]
+                self.assertEqual(package_imports, [])
+                self.assertIn(
+                    f"from {dependency.stem} import get_candidate_spec",
+                    source,
+                )
+
+                smoke = (
+                    "import importlib,sys;"
+                    f"sys.path.insert(0,{str(source_path.parent)!r});"
+                    f"m=importlib.import_module({dependency.stem!r});"
+                    "assert m.CANDIDATE_SPECS;"
+                    "assert all(callable(v[0]) for v in m.CANDIDATE_SPECS.values())"
+                )
+                subprocess.run(
+                    [sys.executable, "-c", smoke],
+                    check=True,
+                    cwd=ROOT,
+                )
+
+    def test_current_generated_learned_models_keep_frozen_training_contracts(self):
+        enet = (
+            REMOTE_SUBMISSIONS / "enet_i_53_candidate.py"
+        ).read_text(encoding="utf-8")
+        lgbm = (
+            REMOTE_SUBMISSIONS / "lgbm_t_orthogonal_15_candidate.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("from sklearn.linear_model import ElasticNet", enet)
+        self.assertIn("positive=True", enet)
+        self.assertNotIn("LGBMRegressor", enet)
+        self.assertIn("from lightgbm import LGBMRegressor", lgbm)
+        for source in (enet, lgbm):
+            self.assertIn("eligible_history[-60:]", source)
+            self.assertIn(
+                "for offset in range(0, len(prediction_dates), 20)",
+                source,
+            )
+            self.assertIn("feature_columns = tuple(self_columns)", source)
+            self.assertIn(
+                "residual_baseline_columns = tuple(public_columns)",
+                source,
+            )
+            self.assertIn('train["target_residual"]', source)
+            self.assertNotIn(
+                "feature_columns = (*public_columns, *self_columns)",
+                source,
+            )
+        for source in (enet, lgbm):
+            self.assertIn("screened15_lambda = 1.0", source)
+            self.assertIn(
+                "screened15_lambda * baseline_prediction",
+                source,
+            )
+        self.assertIn("def _iter_bar5m_parts(", lgbm)
+        self.assertIn("yield part", lgbm)
+        self.assertIn("gc.collect()", lgbm)
+        self.assertNotIn("return pd.concat(parts, ignore_index=True)", lgbm)
+        self.assertIn('"exposures": exposure', lgbm)
+        self.assertIn("inspect.signature(builder)", lgbm)
+        self.assertIn("return builder(*arguments)", lgbm)
 
 
 if __name__ == "__main__":

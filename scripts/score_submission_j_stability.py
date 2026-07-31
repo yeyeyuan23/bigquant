@@ -23,15 +23,15 @@ if str(ROOT) not in sys.path:
 
 from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from scripts.run_combinations import (
-    VALIDATION_2022_YEAR,
-    VALIDATION_2023_YEAR,
+    DEVELOPMENT_YEARS,
+    EVALUATION_YEARS,
     j_baseline_columns_from_self_columns,
     load_dynamic_inputs,
     prepare_experiment_context,
 )
 
 KEY_COLUMNS = ("date", "instrument")
-DEFAULT_YEARS = (VALIDATION_2022_YEAR, VALIDATION_2023_YEAR)
+DEFAULT_YEARS = EVALUATION_YEARS
 RULE_V03_MEMBERS = {
     "FR": ("FR-002", "FR-005"),
     "HF": ("HF-001", "HF-003"),
@@ -75,13 +75,27 @@ def normalized_route(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def daily_rank(values: pd.Series, dates: pd.Series) -> pd.Series:
-    return (
-        pd.to_numeric(values, errors="coerce")
-        .groupby(dates, sort=False)
-        .rank(pct=True, method="average")
-        .sub(0.5)
-        .mul(2.0)
+    import polars as pl
+
+    work = pd.DataFrame(
+        {
+            "date": pd.to_datetime(dates, errors="coerce").dt.normalize(),
+            "value": pd.to_numeric(values, errors="coerce"),
+        }
     )
+    ranked = (
+        pl.from_pandas(work)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col("value").cast(pl.Float64, strict=False),
+        )
+        .with_columns(
+            (((pl.col("value").rank("average").over("date") / pl.col("value").count().over("date")) - 0.5) * 2.0).alias("factor")
+        )
+        .get_column("factor")
+        .to_numpy()
+    )
+    return pd.Series(ranked, index=values.index, dtype=float)
 
 
 def build_rule_v03_route(data_dir: Path, years: Iterable[int]) -> pd.DataFrame:
@@ -103,11 +117,24 @@ def build_rule_v03_route(data_dir: Path, years: Iterable[int]) -> pd.DataFrame:
     candidate_pool = candidate_pool.loc[
         candidate_pool["date"].dt.year.isin(tuple(years))
     ].copy()
-    wide = candidate_pool.pivot(
-        index=["date", "instrument"],
-        columns="candidate_id",
-        values="factor",
-    ).reset_index()
+    import polars as pl
+
+    wide = (
+        pl.from_pandas(candidate_pool)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col("instrument").cast(pl.Utf8),
+            pl.col("candidate_id").cast(pl.Utf8),
+            pl.col("factor").cast(pl.Float64, strict=False),
+        )
+        .pivot(
+            values="factor",
+            index=["date", "instrument"],
+            on="candidate_id",
+            aggregate_function="first",
+        )
+        .to_pandas()
+    )
     missing = sorted(set(members).difference(wide.columns))
     if missing:
         raise ValueError(f"candidate_pool is missing rule_v03 members: {missing}")
@@ -134,7 +161,24 @@ def load_route(version: str, data_dir: Path, years: tuple[int, ...]) -> tuple[pd
     return route, f"{path}:{file_sha256(path)}"
 
 
-def load_score_reference(data_dir: Path, reports_dir: Path) -> CompetitionScoreReference:
+def load_score_reference(
+    data_dir: Path,
+    reports_dir: Path,
+    years: tuple[int, ...],
+) -> CompetitionScoreReference:
+    candidate_manifest = json.loads(
+        (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
+    )
+    candidate_ids = tuple(
+        sorted(candidate_manifest.get("candidate_rows", {}).keys())
+    )
+    if not candidate_ids:
+        raise ValueError("candidate manifest contains no candidates")
+    # The current J baseline is all36 plus metadata-declared latent candidates;
+    # the shared dynamic loader
+    # requires at least one candidate column to construct its feature panel.
+    loader_filter = (f"self__{candidate_ids[0]}",)
+    context_years = tuple(dict.fromkeys((*DEVELOPMENT_YEARS, *years)))
     (
         panel,
         labels,
@@ -143,7 +187,12 @@ def load_score_reference(data_dir: Path, reports_dir: Path) -> CompetitionScoreR
         _candidate_pool,
         all36_reference,
         single_factor_admitted,
-    ) = load_dynamic_inputs(data_dir, reports_dir)
+    ) = load_dynamic_inputs(
+        data_dir,
+        reports_dir,
+        candidate_filter=loader_filter,
+        years=context_years,
+    )
     public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
     self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
     j_baseline_columns = j_baseline_columns_from_self_columns(self_columns)
@@ -242,7 +291,7 @@ def main() -> int:
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     years = tuple(args.years)
-    score_reference = load_score_reference(args.data_dir, args.reports_dir)
+    score_reference = load_score_reference(args.data_dir, args.reports_dir, years)
     summaries = []
     for version in args.versions:
         route, route_source_digest = load_route(version, args.data_dir, years)

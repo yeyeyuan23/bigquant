@@ -39,6 +39,8 @@ data/**/*.parquet
 data/raw/
 data/transfers/
 data/cache/
+data/e2e_parquet/
+data/runtime/
 data/**/*.zip
 data/**/*.tar
 data/**/*.tar.gz
@@ -50,3 +52,9 @@ data/manifest_candidate_pool_fz76_delta.json
 reports/fz76_delta/development_daily_rank_ic.csv
 data/manifest_candidate_pool_cicc34_delta.json
 reports/cicc34_delta/development_daily_rank_ic.csv
+
+# Remote execution outputs are local operational artifacts. Canonical reports
+# remain under reports/latest, reports/routes, and the tracked root reports.
+logs/
+reports/current_independent/
+reports/runtime_*/

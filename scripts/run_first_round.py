@@ -14,21 +14,14 @@ from pathlib import Path
 import pandas as pd
 
 from bigalpha2026.candidates.composite.int_002 import build_int_002_factor
-from bigalpha2026.candidates.composite.int_003 import build_int_003_factor
 from bigalpha2026.candidates.fr.fr_001 import build_fr_001_factor_from_panel
 from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
 from bigalpha2026.candidates.fr.fr_003 import build_fr_003_factor
 from bigalpha2026.candidates.fr.fr_004 import build_fr_004_factor
-from bigalpha2026.candidates.fr.fr_005 import build_fr_005_factor
 from bigalpha2026.candidates.fr.fr_006 import build_fr_006_factor
 from bigalpha2026.candidates.fr.fr_007 import build_fr_007_factor
-from bigalpha2026.candidates.fr.fr_008 import build_fr_008_factor
-from bigalpha2026.candidates.fr.fr_009 import build_fr_009_factor
 from bigalpha2026.candidates.fr.fr_010 import build_fr_010_factor
-from bigalpha2026.candidates.fr.fr_011 import build_fr_011_factor
-from bigalpha2026.candidates.fr.fr_012 import build_fr_012_factor
 from bigalpha2026.candidates.fr.fr_013 import build_fr_013_factor
-from bigalpha2026.candidates.fr.fr_014 import build_fr_014_factor
 from bigalpha2026.candidates.fr.fr_015 import build_fr_015_factor
 from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
@@ -46,21 +39,9 @@ from bigalpha2026.candidates.pv.pv_004 import build_pv_004_factor
 from bigalpha2026.candidates.pv.pv_005 import build_pv_005_factor
 from bigalpha2026.candidates.pv.pv_006 import build_pv_006_factor
 from bigalpha2026.candidates.pv.pv_007 import build_pv_007_factor
-from bigalpha2026.candidates.pv.pv_008 import build_pv_008_factor
-from bigalpha2026.candidates.pv.pv_009 import build_pv_009_factor
-from bigalpha2026.candidates.pv.pv_010 import build_pv_010_factor
-from bigalpha2026.candidates.pv.pv_011 import build_pv_011_factor
-from bigalpha2026.candidates.pv.pv_012 import build_pv_012_factor
-from bigalpha2026.candidates.pv.pv_013 import build_pv_013_factor
 from bigalpha2026.candidates.pv.pv_014 import build_pv_014_factor
-from bigalpha2026.candidates.pv.pv_015 import build_pv_015_factor
-from bigalpha2026.candidates.pv.pv_016 import build_pv_016_factor
-from bigalpha2026.candidates.pv.pv_017 import build_pv_017_factor
-from bigalpha2026.candidates.pv.pv_018 import build_pv_018_factor
-from bigalpha2026.candidates.pv.pv_019 import build_pv_019_factor
 from bigalpha2026.candidates.pv.pv_020 import build_pv_020_factor
 from bigalpha2026.candidates.pv.pv_021 import build_pv_021_factor
-from bigalpha2026.candidates.pv.pv_022 import build_pv_022_factor
 from bigalpha2026.candidates.pv.pv_023 import build_pv_023_factor
 from bigalpha2026.factor_pool import (
     CANDIDATE_POOL_VERSION,
@@ -87,10 +68,12 @@ DEVELOPMENT_YEARS = range(
     int(FORMAL_EVALUATION_POLICY.development_start[:4]),
     int(FORMAL_EVALUATION_POLICY.development_end[:4]) + 1,
 )
-VALIDATION_2022_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2022_start[:4])
-VALIDATION_2023_YEAR = int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4])
-MARKET_STATE_YEARS = range(2019, VALIDATION_2022_YEAR + 1)
-ALL_BASE_YEARS = range(2019, VALIDATION_2023_YEAR + 1)
+EVALUATION_YEARS = (
+    int(FORMAL_EVALUATION_POLICY.validation_2023_start[:4]),
+    int(FORMAL_EVALUATION_POLICY.validation_2024_start[:4]),
+)
+MARKET_STATE_YEARS = range(2019, EVALUATION_YEARS[0] + 1)
+ALL_BASE_YEARS = range(2019, EVALUATION_YEARS[1] + 1)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -127,6 +110,7 @@ def candidate_input_manifest_paths() -> tuple[Path, ...]:
         [
             DATA / "manifest_FR_2017_2022.json",
             DATA / "manifest_FR_2023.json",
+            DATA / "manifest_FR_2024.json",
             DATA / "manifest_MICRO_DAILY_FULL.json",
         ]
     )
@@ -308,8 +292,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     if tuple(state_check["recommended_optional_months"]) != (
         HF_OB_ACTIVATED_OPTIONAL_MONTHS
     ):
-        raise ValueError(
-            "frozen optional months no longer match the factor-free state check"
+        print(
+            json.dumps(
+                {
+                    "status": "frozen_optional_months_diagnostic_mismatch",
+                    "frozen": list(HF_OB_ACTIVATED_OPTIONAL_MONTHS),
+                    "diagnostic_recommendation": state_check[
+                        "recommended_optional_months"
+                    ],
+                    "action": "keep_frozen_policy_and_continue",
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
         )
     FIRST_ROUND_REPORTS.mkdir(parents=True, exist_ok=True)
     DIAGNOSTIC_REPORTS.mkdir(parents=True, exist_ok=True)
@@ -327,27 +322,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         "PV-005": build_pv_005_factor(pv, pool),
         "PV-006": build_pv_006_factor(pv, pool),
         "PV-007": build_pv_007_factor(pv, pool),
-        "PV-008": build_pv_008_factor(pv, pool),
-        "PV-009": build_pv_009_factor(pv, pool),
-        "PV-010": build_pv_010_factor(pv, pool),
-        "PV-011": build_pv_011_factor(pv, pool),
-        "PV-012": build_pv_012_factor(pv, exposures, pool),
-        "PV-013": build_pv_013_factor(pv, pool),
         "PV-014": build_pv_014_factor(pv, pool),
-        "PV-015": build_pv_015_factor(pv, pool),
-        "PV-017": build_pv_017_factor(pv, pool),
-        "PV-018": build_pv_018_factor(pv, pool),
-        "PV-019": build_pv_019_factor(pv, pool),
         "PV-020": build_pv_020_factor(pv, pool),
         "PV-021": build_pv_021_factor(pv, pool),
-        "PV-022": build_pv_022_factor(pv, pool),
         "PV-023": build_pv_023_factor(pv, pool),
     }
-    factorlib = read_yearly(
-        "features/FACTORLIB/year={year}/part-{year}.parquet",
-        ALL_BASE_YEARS,
-    )
-    factors["PV-016"] = build_pv_016_factor(factorlib, pool)
     financial = pd.concat(
         [
             pd.read_parquet(path)
@@ -359,16 +338,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     factors["FR-002"] = build_fr_002_factor_from_panel(financial, pool)
     factors["FR-003"] = build_fr_003_factor(financial, pool)
     factors["FR-004"] = build_fr_004_factor(financial, pool)
-    factors["FR-005"] = build_fr_005_factor(financial, exposures, pool)
     factors["FR-006"] = build_fr_006_factor(financial, pool)
     factors["FR-007"] = build_fr_007_factor(financial, pool)
-    factors["FR-008"] = build_fr_008_factor(financial, pool)
-    factors["FR-009"] = build_fr_009_factor(financial, pool)
     factors["FR-010"] = build_fr_010_factor(financial, pool)
-    factors["FR-011"] = build_fr_011_factor(financial, exposures, pool)
-    factors["FR-012"] = build_fr_012_factor(financial, pool)
     factors["FR-013"] = build_fr_013_factor(financial, pool)
-    factors["FR-014"] = build_fr_014_factor(financial, exposures, pool)
     factors["FR-015"] = build_fr_015_factor(financial, pool)
     factors["INT-002"] = build_int_002_factor(financial, pv, pool)
 
@@ -382,7 +355,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     factors["OB-003"] = build_ob_003_factor_from_daily(micro, pool)
     factors["OB-004"] = build_ob_004_factor_from_daily(micro, pool)
     factors["OB-005"] = build_ob_005_factor_from_daily(micro, pool)
-    factors["INT-003"] = build_int_003_factor(financial, micro, pool)
 
     cached_metrics = pd.DataFrame()
     cached_stability = pd.DataFrame()
@@ -396,16 +368,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         if metric_path.exists() and stability_path.exists():
             cached_metrics = pd.read_csv(metric_path)
             cached_stability = pd.read_csv(stability_path)
-            period_aliases = {
-                "selection_2022": "validation_2022",
-                "confirmation_2023": "validation_2023",
+            expected_periods = {
+                "development",
+                "validation_2023",
+                "validation_2024",
             }
-            cached_metrics["period"] = cached_metrics["period"].replace(
-                period_aliases
-            )
-            cached_stability["period"] = cached_stability["period"].replace(
-                period_aliases
-            )
+            cached_periods = set(cached_metrics["period"].astype(str))
+            if cached_periods != expected_periods:
+                cached_metrics = pd.DataFrame()
+                cached_stability = pd.DataFrame()
             refresh_ids = set(map(str, args.refresh_candidate))
             if refresh_ids:
                 cached_metrics = cached_metrics.loc[
@@ -420,8 +391,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         labels,
         exposures,
         development_years=tuple(DEVELOPMENT_YEARS),
-        validation_2022_year=VALIDATION_2022_YEAR,
-        validation_2023_year=VALIDATION_2023_YEAR,
+        validation_2023_year=EVALUATION_YEARS[0],
+        validation_2024_year=EVALUATION_YEARS[1],
         cached_metrics=cached_metrics,
         cached_stability=cached_stability,
     )

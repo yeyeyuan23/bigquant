@@ -90,6 +90,62 @@ def candidate_tree_entry_diagnostics(
     }
 
 
+def select_mutually_orthogonal_candidates(
+    candidates: Sequence[str],
+    *,
+    baseline_columns: Sequence[str],
+    correlations: pd.DataFrame,
+    maximum_abs_rank_correlation: float,
+) -> tuple[tuple[str, ...], dict[str, dict[str, object]]]:
+    """Greedily admit candidates while updating the T baseline in real time.
+
+    Rank IC is deliberately excluded from both the gate and the ordering. At
+    each step the candidate with the lowest current maximum absolute rank
+    correlation is considered first; an admitted candidate immediately joins
+    the baseline used for every remaining candidate.
+    """
+
+    remaining = list(dict.fromkeys(candidates))
+    accepted: list[str] = []
+    diagnostics: dict[str, dict[str, object]] = {}
+    fixed_baseline = tuple(dict.fromkeys(baseline_columns))
+    while remaining:
+        active_baseline = tuple(
+            dict.fromkeys((*fixed_baseline, *accepted))
+        )
+        scored: list[tuple[float, str, float]] = []
+        for candidate in remaining:
+            if active_baseline:
+                correlation = float(
+                    correlations.loc[candidate, list(active_baseline)]
+                    .abs()
+                    .max()
+                )
+            else:
+                correlation = 0.0
+            sort_value = (
+                correlation if pd.notna(correlation) else float("inf")
+            )
+            scored.append((sort_value, candidate, correlation))
+        _, candidate, correlation = min(
+            scored,
+            key=lambda item: (item[0], item[1]),
+        )
+        passed = bool(
+            pd.notna(correlation)
+            and correlation <= maximum_abs_rank_correlation
+        )
+        diagnostics[candidate] = {
+            "baseline_columns": active_baseline,
+            "candidate_max_abs_rank_correlation": correlation,
+            "orthogonal_passed": passed,
+        }
+        remaining.remove(candidate)
+        if passed:
+            accepted.append(candidate)
+    return tuple(accepted), diagnostics
+
+
 def promote_frozen_tree_pool(
     frozen_pool: Sequence[str],
     pending_passed: Sequence[str],
@@ -209,7 +265,9 @@ class TreeAdmissionResult:
 
     @property
     def joint_features(self) -> tuple[str, ...]:
-        return (*self.selected_public, *self.admitted_candidates)
+        """Return only proprietary features entering the final T model."""
+
+        return self.admitted_candidates
 
     def _cached_prediction(
         self,
@@ -223,11 +281,13 @@ class TreeAdmissionResult:
             label_column="ret_close_to_close",
             train_window_days=60,
             test_window_days=20,
+            residual_baseline_columns=self.selected_public,
             compute=lambda: walk_forward_lightgbm(
                 self.oriented,
                 self.labels,
                 feature_columns=feature_columns,
                 prediction_years=prediction_years,
+                residual_baseline_columns=self.selected_public,
             ),
         )
         self.cache_keys.add(cache_key)
@@ -271,28 +331,36 @@ class TreeAdmissionResult:
 
     def protocol_summary(self) -> dict[str, object]:
         return {
-            "baseline": "lightgbm_screened15",
+            "baseline": "screened15_residual_target_and_prediction_addback",
             "candidate_filter": "basic_quality_and_orthogonality",
             "admission_metric": "orthogonal_entry_only",
+            "target_transform": "daily_rank_residual_to_screened15",
+            "model_features": "admitted_self_candidates_only",
+            "prediction_output": "screened15_plus_residual_prediction",
             "selection": "orthogonal_entry_only",
             "evaluation_years": list(self.development_years),
             "train_days": 60,
             "test_days": 20,
-            "minimum_active_days": TREE_INCREMENTAL_GATE.minimum_active_days,
-            "minimum_entry_rank_ic_mean": (
-                TREE_INCREMENTAL_GATE.minimum_entry_rank_ic_mean
-            ),
-            "maximum_entry_abs_rank_correlation": (
-                TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
-            ),
-            "minimum_oos_days": TREE_INCREMENTAL_GATE.minimum_oos_days,
-            "minimum_windows": TREE_INCREMENTAL_GATE.minimum_windows,
-            "minimum_positive_window_ratio": (
-                TREE_INCREMENTAL_GATE.minimum_positive_window_ratio
-            ),
-            "minimum_positive_years": (
-                TREE_INCREMENTAL_GATE.minimum_positive_years
-            ),
+            "formal_entry_gate": {
+                "minimum_active_days": (
+                    TREE_INCREMENTAL_GATE.minimum_active_days
+                ),
+                "maximum_abs_rank_correlation": (
+                    TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
+                ),
+                "correlation_baseline": (
+                    "screened15_plus_frozen_T_plus_current_batch_admitted_T"
+                ),
+                "dynamic_baseline_update": True,
+            },
+            "diagnostics_only_not_admission_gates": {
+                "rank_ic": True,
+                "positive_window_ratio": True,
+                "positive_years": True,
+                "split_importance": True,
+                "gain_importance": True,
+                "shap": True,
+            },
             "cache_schema": TREE_CACHE_SCHEMA_VERSION,
             "frozen_pool_state_digest": self.frozen_cache.pool_state_digest(
                 self.admitted_candidates
@@ -379,15 +447,30 @@ def run_tree_admission(
     development_labels = labels.loc[
         labels["date"].dt.year.isin(development_years)
     ]
-    active_days_by_feature = {
-        self_column: int(
-            development.groupby("date", sort=True)[self_column]
-            .nunique()
-            .gt(1)
-            .sum()
+    import polars as pl
+
+    if self_columns:
+        active_stats = (
+            pl.from_pandas(development[["date", *self_columns]])
+            .with_columns(pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"))
+            .group_by("date")
+            .agg(
+                [
+                    (pl.col(self_column).cast(pl.Float64, strict=False).drop_nulls().n_unique() > 1)
+                    .cast(pl.Int64)
+                    .alias(self_column)
+                    for self_column in self_columns
+                ]
+            )
+            .select([pl.col(self_column).sum().alias(self_column) for self_column in self_columns])
+            .to_dicts()
         )
-        for self_column in self_columns
-    }
+        active_days_by_feature = {
+            self_column: int(active_stats[0].get(self_column, 0)) if active_stats else 0
+            for self_column in self_columns
+        }
+    else:
+        active_days_by_feature = {}
     eligible = tuple(
         self_column
         for self_column in self_columns
@@ -447,6 +530,7 @@ def run_tree_admission(
             label_column="ret_close_to_close",
             train_window_days=60,
             test_window_days=20,
+            residual_baseline_columns=selected_public,
             force_refresh=bool(
                 set(feature_columns).intersection(refresh_features)
             ),
@@ -455,6 +539,7 @@ def run_tree_admission(
                 labels,
                 feature_columns=feature_columns,
                 prediction_years=prediction_years,
+                residual_baseline_columns=selected_public,
             ),
         )
         cache_keys.add(cache_key)
@@ -472,6 +557,7 @@ def run_tree_admission(
                 label_column="ret_close_to_close",
                 train_window_days=60,
                 test_window_days=20,
+                residual_baseline_columns=selected_public,
                 force_refresh=bool(
                     set(feature_columns).intersection(refresh_features)
                 ),
@@ -480,6 +566,7 @@ def run_tree_admission(
                     labels,
                     feature_columns=feature_columns,
                     prediction_years=prediction_years,
+                    residual_baseline_columns=selected_public,
                 ),
             )
         )
@@ -691,39 +778,52 @@ def run_tree_admission(
         if bool(row.get("tree_entry_passed"))
         and row["candidate"] in pending
     )
-    ordered_candidates = tuple(
-        row["candidate"]
-        for row in sorted(
-            (
-                row
-                for row in incremental_rows
-                if row["candidate"] in entry_passed_candidates
-            ),
-            key=lambda row: (
-                -int(bool(row.get("single_effect_passed"))),
-                float(
-                    row.get(
-                        "candidate_max_abs_rank_correlation",
-                        float("inf"),
-                    )
-                ),
-                str(row["candidate"]),
-            ),
-        )
+    pending_passed, dynamic_entry = select_mutually_orthogonal_candidates(
+        entry_passed_candidates,
+        baseline_columns=entry_baseline_columns,
+        correlations=entry_correlations,
+        maximum_abs_rank_correlation=(
+            TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
+        ),
     )
-    accepted: list[str] = list(ordered_candidates)
-
-    pending_passed = tuple(accepted)
     for row in incremental_rows:
-        if row["candidate"] in pending_passed:
-            row["evaluation_status"] = "entry_passed_pending_freeze"
+        candidate = str(row["candidate"])
+        if candidate not in dynamic_entry:
+            continue
+        dynamic = dynamic_entry[candidate]
+        passed = bool(dynamic["orthogonal_passed"])
+        reasons = "" if passed else "entry correlation is not low enough"
+        row.update(
+            {
+                "evaluation_protocol": "orthogonal_T_entry_v2_dynamic_pool",
+                "individual_baseline_candidates": ",".join(
+                    dynamic["baseline_columns"]
+                ),
+                "candidate_max_abs_rank_correlation": dynamic[
+                    "candidate_max_abs_rank_correlation"
+                ],
+                "orthogonal_passed": passed,
+                "tree_entry_passed": passed,
+                "tree_entry_reasons": reasons,
+                "individual_passed": passed,
+                "individual_reasons": reasons,
+                "evaluation_status": (
+                    "entry_passed_pending_freeze"
+                    if passed
+                    else "entry_failed_dynamic_orthogonality"
+                ),
+            }
+        )
+        admission[candidate].update(row)
+        admission[candidate]["marginal_reasons"] = reasons
+        admission[candidate]["reasons"] = reasons
     provisional_pool = tuple(
         dict.fromkeys((*frozen_before, *pending_passed))
     )
     if pending_passed:
         _, provisional_importance = cached_prediction_with_importance(
             validation_cache,
-            (*selected_public, *provisional_pool),
+            provisional_pool,
             development_years,
         )
         record_importance(

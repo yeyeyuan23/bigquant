@@ -12,6 +12,12 @@ import pandas as pd
 from .competition_score_proxy import CompetitionScoreReference
 from .evaluation import evaluate_single_factor, factor_rank_correlation, rank_ic_series
 from .factor_pool import family_balanced_factor
+from .official_week4_proxy import (
+    OFFICIAL_BARRA_STYLE_COLUMNS,
+    industry_rank_ic_profile,
+    neutralize_factor_against_styles_and_industry,
+    prepare_available_barra_styles,
+)
 from .research_policy import (
     FORMAL_EVALUATION_POLICY,
     SINGLE_FACTOR_ROUTE_GATE,
@@ -19,7 +25,7 @@ from .research_policy import (
 )
 from .tree_cache import feature_fingerprints
 
-S_ROUTE_STATE_SCHEMA_VERSION = "single-factor-route-state-v3-trial-only"
+S_ROUTE_STATE_SCHEMA_VERSION = "single-factor-route-state-v4-funnel"
 
 
 @dataclass(frozen=True)
@@ -51,29 +57,54 @@ def eligible_factor(
 ) -> tuple[pd.DataFrame, dict[str, float]]:
     """Remove dates without enough cross-sectional factor dispersion."""
 
+    import polars as pl
+
     frame = factor.copy()
-    unique = frame.groupby("date", sort=False)["factor"].nunique()
-    eligible_dates = unique.index[
-        unique >= TECHNICAL_GATE.minimum_daily_unique_values
-    ]
+    stats = (
+        pl.from_pandas(frame[["date", "factor"]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col("factor").cast(pl.Float64, strict=False),
+        )
+        .group_by("date")
+        .agg(pl.col("factor").drop_nulls().n_unique().alias("unique"))
+        .to_pandas()
+    )
+    eligible_dates = set(
+        pd.to_datetime(stats.loc[stats["unique"] >= TECHNICAL_GATE.minimum_daily_unique_values, "date"]).dt.normalize()
+    )
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
     filtered = frame.loc[frame["date"].isin(eligible_dates)].copy()
+    minimum_unique = float(stats["unique"].min()) if not stats.empty else 0.0
+    excluded_sparse_days = int((stats["unique"] < TECHNICAL_GATE.minimum_daily_unique_values).sum()) if not stats.empty else 0
     return filtered, {
         "factor_coverage": float(frame["factor"].notna().mean()),
-        "minimum_daily_unique_values": float(unique.min()),
+        "minimum_daily_unique_values": minimum_unique,
         "eligible_days": float(len(eligible_dates)),
-        "excluded_sparse_days": float(
-            (unique < TECHNICAL_GATE.minimum_daily_unique_values).sum()
-        ),
+        "excluded_sparse_days": float(excluded_sparse_days),
     }
 
 
 def tradable_subset(exposures: pd.DataFrame) -> pd.DataFrame:
     """Apply the frozen size and liquidity tradability screen."""
 
+    import polars as pl
+
     exp = exposures.copy()
-    size_rank = exp.groupby("date", sort=False)["float_market_cap"].rank(pct=True)
-    liquidity_rank = exp.groupby("date", sort=False)["LIQUIDTY"].rank(pct=True)
-    return exp.loc[(size_rank > 0.20) & (liquidity_rank > 0.20)].copy()
+    work = pl.from_pandas(exp).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+        pl.col("float_market_cap").cast(pl.Float64, strict=False),
+        pl.col("LIQUIDTY").cast(pl.Float64, strict=False),
+    )
+    size = pl.col("float_market_cap")
+    liq = pl.col("LIQUIDTY")
+    screened = work.with_columns(
+        (size.rank("average").over("date") / size.count().over("date")).alias("_size_rank"),
+        (liq.rank("average").over("date") / liq.count().over("date")).alias("_liquidity_rank"),
+    ).filter(
+        (pl.col("_size_rank") > 0.20) & (pl.col("_liquidity_rank") > 0.20)
+    ).drop(["_size_rank", "_liquidity_rank"])
+    return screened.to_pandas()
 
 
 def metric_rows(
@@ -154,15 +185,26 @@ def candidate_s_trial_diagnostics(
     *,
     candidate: str,
     baseline_candidates: Sequence[str],
+    exposures: pd.DataFrame | None = None,
 ) -> dict[str, object]:
-    """Strict cheap S evidence before route admission."""
+    """Strict S evidence before a candidate may enter the I stage."""
 
     gate = SINGLE_FACTOR_ROUTE_GATE
     label_column = "ret_close_to_close"
     frame = oriented_panel[["date", "instrument", candidate]].copy()
     coverage = float(pd.to_numeric(frame[candidate], errors="coerce").notna().mean())
+    import polars as pl
+
     active_days = int(
-        frame.groupby("date", sort=True)[candidate].nunique().gt(1).sum()
+        pl.from_pandas(frame[["date", candidate]])
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")).dt.truncate("1d"),
+            pl.col(candidate).cast(pl.Float64, strict=False),
+        )
+        .group_by("date")
+        .agg(pl.col(candidate).drop_nulls().n_unique().alias("unique"))
+        .filter(pl.col("unique") > 1)
+        .height
     )
     merged = frame.merge(
         labels[["date", "instrument", label_column]],
@@ -213,8 +255,119 @@ def candidate_s_trial_diagnostics(
         pd.notna(max_abs_rank_correlation)
         and max_abs_rank_correlation <= gate.maximum_abs_rank_correlation
     )
+    neutral_evaluated = False
+    neutral_rank_ic_mean = float("nan")
+    neutral_strength_pass = True
+    industry_evaluated = False
+    industry_coverage = 0
+    minimum_industry_date_count = 0
+    industry_same_sign_ratio = float("nan")
+    industry_worst_oriented_ic = float("nan")
+    industry_breadth_pass = True
+    available_styles: tuple[str, ...] = ()
+    if exposures is not None and not exposures.empty:
+        factor = frame.rename(columns={candidate: "factor"})
+        factor_pl = pl.from_pandas(factor)
+        labels_pl = pl.from_pandas(
+            labels[["date", "instrument", label_column]]
+        ).with_columns(
+            pl.col("date").cast(pl.Datetime("ns"), strict=False),
+            pl.col("instrument").cast(pl.String),
+        )
+        exposures_pl = pl.from_pandas(exposures)
+        prepared_exposures = prepare_available_barra_styles(
+            exposures_pl
+        )
+        available_styles = tuple(
+            style
+            for style in OFFICIAL_BARRA_STYLE_COLUMNS
+            if style in prepared_exposures.columns
+        )
+        has_industry = (
+            "industry_level1_code" in prepared_exposures.columns
+        )
+        if available_styles or has_industry:
+            neutral_strength_pass = False
+            neutralized = neutralize_factor_against_styles_and_industry(
+                factor_pl,
+                prepared_exposures,
+            )
+            neutral_daily = (
+                neutralized.join(
+                    labels_pl,
+                    on=["date", "instrument"],
+                    how="inner",
+                    validate="1:1",
+                )
+                .drop_nulls(["factor", label_column])
+                .with_columns(
+                    pl.col("factor")
+                    .rank("average")
+                    .over("date")
+                    .alias("_factor_rank"),
+                    pl.col(label_column)
+                    .cast(pl.Float64, strict=False)
+                    .rank("average")
+                    .over("date")
+                    .alias("_label_rank"),
+                )
+                .group_by("date")
+                .agg(
+                    pl.len().alias("_n"),
+                    pl.corr(
+                        "_factor_rank",
+                        "_label_rank",
+                    ).alias("rank_ic"),
+                )
+                .filter(pl.col("_n") >= 5)
+                .drop_nulls("rank_ic")
+            )
+            neutral_evaluated = not neutral_daily.is_empty()
+            if neutral_evaluated:
+                neutral_rank_ic_mean = float(
+                    neutral_daily["rank_ic"].mean()
+                )
+                neutral_strength_pass = bool(
+                    neutral_rank_ic_mean
+                    >= gate.minimum_neutral_rank_ic_mean
+                )
+        if has_industry:
+            industry_breadth_pass = False
+            industry = industry_rank_ic_profile(
+                factor_pl,
+                labels_pl,
+                prepared_exposures,
+            )
+            if not industry.by_industry.is_empty():
+                summary = industry.summary.row(0, named=True)
+                industry_coverage = int(
+                    summary["industry_coverage"]
+                )
+                minimum_industry_date_count = int(
+                    summary["minimum_industry_date_count"]
+                )
+                industry_same_sign_ratio = float(
+                    summary["industry_ic_same_sign_ratio"]
+                )
+                industry_worst_oriented_ic = float(
+                    summary["industry_ic_worst_oriented"]
+                )
+                industry_evaluated = True
+                industry_breadth_pass = bool(
+                    industry_coverage
+                    >= gate.minimum_industry_coverage
+                    and minimum_industry_date_count
+                    >= gate.minimum_industry_date_count
+                    and industry_same_sign_ratio
+                    >= gate.minimum_industry_same_sign_ratio
+                )
     trial_passed = bool(
-        quality_pass and strength_pass and stability_pass and redundancy_pass
+        quality_pass
+        and strength_pass
+        and stability_pass
+        and redundancy_pass
+        and neutral_strength_pass
+        and industry_breadth_pass
     )
     reasons = []
     if not quality_pass:
@@ -225,12 +378,20 @@ def candidate_s_trial_diagnostics(
         reasons.append("S stability gate failed")
     if not redundancy_pass:
         reasons.append("S redundancy gate failed")
+    if not neutral_strength_pass:
+        reasons.append("S neutralized strength gate failed")
+    if not industry_breadth_pass:
+        reasons.append("S within-industry breadth gate failed")
     return {
         "s_trial_passed": trial_passed,
         "s_quality_passed": quality_pass,
         "s_strength_passed": strength_pass,
         "s_stability_passed": stability_pass,
         "s_redundancy_passed": redundancy_pass,
+        "s_neutral_evaluated": neutral_evaluated,
+        "s_neutral_strength_passed": neutral_strength_pass,
+        "s_industry_evaluated": industry_evaluated,
+        "s_industry_breadth_passed": industry_breadth_pass,
         "s_trial_reasons": "; ".join(reasons),
         "s_coverage": coverage,
         "s_active_days": active_days,
@@ -239,6 +400,16 @@ def candidate_s_trial_diagnostics(
         "s_positive_fold_ratio": positive_fold_ratio,
         "s_sign_consistency": sign_consistency,
         "s_max_abs_rank_correlation": max_abs_rank_correlation,
+        "s_neutral_rank_ic_mean": neutral_rank_ic_mean,
+        "s_available_barra_styles": ",".join(available_styles),
+        "s_industry_coverage": industry_coverage,
+        "s_minimum_industry_date_count": (
+            minimum_industry_date_count
+        ),
+        "s_industry_same_sign_ratio": industry_same_sign_ratio,
+        "s_industry_worst_oriented_ic": (
+            industry_worst_oriented_ic
+        ),
     }
 
 
@@ -364,16 +535,16 @@ def classify_candidates(
             development_failures.append(
                 "development direction is positive in fewer than two years"
             )
-        validation_2022_observations, _ = period_failures(
-            candidate_id,
-            "validation_2022",
-            "2022 validation",
-            require_t_stat=False,
-        )
         validation_2023_observations, _ = period_failures(
             candidate_id,
             "validation_2023",
             "2023 validation",
+            require_t_stat=False,
+        )
+        validation_2024_observations, _ = period_failures(
+            candidate_id,
+            "validation_2024",
+            "2024 validation",
             require_t_stat=False,
         )
 
@@ -388,8 +559,8 @@ def classify_candidates(
                 "development_shape_evidence": development_shape_evidence,
                 "development_failures": development_failures,
                 "development_failures_are_diagnostic_only": True,
-                "validation_2022_observations": validation_2022_observations,
                 "validation_2023_observations": validation_2023_observations,
+                "validation_2024_observations": validation_2024_observations,
                 "upload_ready": False,
             }
         )
@@ -404,11 +575,12 @@ def run_single_factor_route_admission(
     frozen_candidates: Sequence[str] = (),
     frozen_state_path: Path | None = None,
 ) -> SingleFactorRouteAdmissionResult:
-    """Admit one family-balanced S pool from the cheap trial gate.
+    """Admit the first-stage S pool from development-only evidence.
 
     The local J proxy is not authoritative enough to veto S membership. Route
     J can still be computed downstream as diagnostics, but S freezing is driven
-    only by quality, strength, stability, and redundancy trial evidence.
+    by quality, strength, stability, redundancy, neutralized strength, and
+    within-industry breadth.
     """
 
     candidates = tuple(dict.fromkeys(map(str, candidate_columns)))
@@ -492,6 +664,7 @@ def run_single_factor_route_admission(
                 score_reference.labels,
                 candidate=candidate,
                 baseline_candidates=baseline_candidates,
+                exposures=getattr(score_reference, "exposures", None),
             )
         else:
             trial = {
@@ -500,6 +673,10 @@ def run_single_factor_route_admission(
                 "s_strength_passed": True,
                 "s_stability_passed": True,
                 "s_redundancy_passed": True,
+                "s_neutral_evaluated": False,
+                "s_neutral_strength_passed": True,
+                "s_industry_evaluated": False,
+                "s_industry_breadth_passed": True,
                 "s_trial_reasons": "",
             }
         route_passed = bool(trial["s_trial_passed"])
@@ -520,7 +697,7 @@ def run_single_factor_route_admission(
         promotion_summary = {
             "passed": False,
             "reasons": "no S candidate passed trial gate",
-            "selection": "strict_trial_only",
+            "selection": "strict_s_funnel",
         }
         promotion_passed = False
     else:
@@ -528,7 +705,7 @@ def run_single_factor_route_admission(
         promotion_summary = {
             "passed": True,
             "reasons": "",
-            "selection": "strict_trial_only",
+            "selection": "strict_s_funnel",
             "retained_pending_candidates": ",".join(retained_pending),
             "frozen_candidates_after": ",".join(admitted),
         }
@@ -551,7 +728,7 @@ def run_single_factor_route_admission(
             json.dumps(
                 {
                     "schema_version": S_ROUTE_STATE_SCHEMA_VERSION,
-                    "route_contract": "strict_trial_only_v1",
+                    "route_contract": "strict_s_funnel_v2",
                     "frozen_candidates": list(result.admitted_candidates),
                     "candidate_fingerprints": {
                         candidate: fingerprints[candidate]
@@ -573,8 +750,8 @@ def run_single_factor_admission(
     exposures: pd.DataFrame,
     *,
     development_years: Sequence[int],
-    validation_2022_year: int,
     validation_2023_year: int,
+    validation_2024_year: int,
     cached_metrics: pd.DataFrame | None = None,
     cached_stability: pd.DataFrame | None = None,
 ) -> SingleFactorAdmissionResult:
@@ -611,11 +788,11 @@ def run_single_factor_admission(
             "development": clean.loc[
                 clean["date"].dt.year.isin(development_years)
             ],
-            "validation_2022": clean.loc[
-                clean["date"].dt.year.eq(validation_2022_year)
-            ],
             "validation_2023": clean.loc[
                 clean["date"].dt.year.eq(validation_2023_year)
+            ],
+            "validation_2024": clean.loc[
+                clean["date"].dt.year.eq(validation_2024_year)
             ],
         }
         for period, block in periods.items():
@@ -681,8 +858,8 @@ def run_single_factor_admission(
                 "development_failures": [
                     "candidate has no technically eligible evaluation metrics"
                 ],
-                "validation_2022_observations": [],
                 "validation_2023_observations": [],
+                "validation_2024_observations": [],
                 "upload_ready": False,
             }
         )

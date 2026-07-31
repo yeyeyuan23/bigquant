@@ -5,11 +5,6 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.composite.int_003 import (
-    build_int_003_factor,
-    compute_int_003_events,
-)
-from bigalpha2026.candidates.fr.fr_014 import build_fr_014_factor
 from bigalpha2026.candidates.fr.fr_015 import (
     build_fr_015_factor,
     compute_fr_015_events,
@@ -18,62 +13,10 @@ from bigalpha2026.candidates.ob.ob_005 import (
     build_ob_005_factor_from_daily,
     compute_ob_005_daily,
 )
-from bigalpha2026.candidates.pv.pv_022 import (
-    build_pv_022_factor,
-    compute_pv_022_daily,
-)
 from bigalpha2026.candidates.pv.pv_023 import (
     build_pv_023_factor,
     compute_pv_023_daily,
 )
-
-
-def _continuous_momentum_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
-    dates = pd.bdate_range("2022-01-03", periods=280)
-    rows: list[dict[str, object]] = []
-    for instrument, returns in (
-        ("A", np.full(len(dates), 0.002)),
-        ("B", np.full(len(dates), -0.0015)),
-        ("C", np.where(np.arange(len(dates)) % 2 == 0, 0.003, -0.003)),
-    ):
-        previous_close = 10.0
-        for date, daily_return in zip(dates, returns, strict=True):
-            close = previous_close * (1.0 + daily_return)
-            rows.append(
-                {
-                    "date": date,
-                    "instrument": instrument,
-                    "close": close,
-                    "pre_close": previous_close,
-                }
-            )
-            previous_close = close
-    bars = pd.DataFrame(rows)
-    return bars, bars[["date", "instrument"]].copy()
-
-
-class LiteratureRound4Pv022Test(unittest.TestCase):
-    def test_direction_interface_and_future_safety(self) -> None:
-        bars, pool = _continuous_momentum_inputs()
-        components = compute_pv_022_daily(bars)
-        latest = components.groupby("instrument", sort=False).tail(1).set_index(
-            "instrument"
-        )
-        self.assertGreater(latest.loc["A", "factor_raw"], 0.0)
-        self.assertLess(latest.loc["B", "factor_raw"], 0.0)
-
-        result = build_pv_022_factor(bars, pool)
-        self.assertEqual(list(result.columns), ["date", "instrument", "factor"])
-        self.assertTrue(np.isfinite(result["factor"]).all())
-
-        cutoff = bars["date"].sort_values().unique()[-10]
-        changed = bars.copy()
-        changed.loc[changed["date"] > cutoff, ["close", "pre_close"]] *= 2.0
-        rerun = build_pv_022_factor(changed, pool)
-        pd.testing.assert_frame_equal(
-            result.loc[result["date"] <= cutoff].reset_index(drop=True),
-            rerun.loc[rerun["date"] <= cutoff].reset_index(drop=True),
-        )
 
 
 def _overnight_daytime_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -150,29 +93,6 @@ def _financial_row(
 
 
 class LiteratureRound4FinancialTest(unittest.TestCase):
-    def test_earnings_yield_direction_and_interface(self) -> None:
-        financial = pd.DataFrame(
-            [
-                _financial_row(
-                    instrument,
-                    pd.Timestamp("2023-12-31"),
-                    net_profit=earnings,
-                    operating_revenue=100.0,
-                )
-                for instrument, earnings in (("A", 20.0), ("B", 10.0), ("C", -5.0))
-            ]
-        )
-        date = financial["effective_date"].max()
-        pool = pd.DataFrame(
-            {"date": [date] * 3, "instrument": ["A", "B", "C"]}
-        )
-        exposures = pool.assign(float_market_cap=100.0)
-        result = build_fr_014_factor(financial, exposures, pool)
-        self.assertEqual(list(result.columns), ["date", "instrument", "factor"])
-        ranked = result.set_index("instrument")
-        self.assertGreater(ranked.loc["A", "factor"], ranked.loc["B", "factor"])
-        self.assertGreater(ranked.loc["B", "factor"], ranked.loc["C", "factor"])
-
     def test_margin_improvement_direction_interface_and_future_safety(self) -> None:
         rows: list[dict[str, object]] = []
         margins = {
@@ -286,25 +206,6 @@ def _surprise_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         tail_60_total_depth_median=[40.0, 100.0, 80.0],
     )
     return financial, micro, pool
-
-
-class LiteratureRound4CompositeTest(unittest.TestCase):
-    def test_surprise_liquidity_interaction_direction_and_interface(self) -> None:
-        financial, micro, pool = _surprise_inputs()
-        latest = (
-            compute_int_003_events(financial, micro, pool)
-            .groupby("instrument", sort=False)
-            .tail(1)
-            .set_index("instrument")
-        )
-        self.assertGreater(latest.loc["A", "factor_raw"], 0.0)
-        self.assertLess(latest.loc["B", "factor_raw"], 0.0)
-
-        result = build_int_003_factor(financial, micro, pool)
-        self.assertEqual(list(result.columns), ["date", "instrument", "factor"])
-        self.assertTrue(np.isfinite(result["factor"]).all())
-        ranked = result.set_index("instrument")
-        self.assertGreater(ranked.loc["A", "factor"], ranked.loc["B", "factor"])
 
 
 if __name__ == "__main__":
