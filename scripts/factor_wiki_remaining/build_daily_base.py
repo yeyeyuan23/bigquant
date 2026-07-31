@@ -19,7 +19,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = Path(
     os.environ.get("BIGALPHA_PROJECT_ROOT", str(REPO_ROOT.parent))
@@ -194,7 +193,7 @@ def main() -> None:
     daily.loc[:, ordered].to_parquet(OUTPUT_PATH, index=False)
     manifest = {
         "path": str(OUTPUT_PATH),
-        "rows": int(len(daily)),
+        "rows": len(daily),
         "instruments": int(daily["instrument"].nunique()),
         "first_date": str(daily["date"].min().date()),
         "last_date": str(daily["date"].max().date()),

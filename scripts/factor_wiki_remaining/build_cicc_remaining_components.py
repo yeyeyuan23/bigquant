@@ -10,7 +10,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = Path(
     os.environ.get("BIGALPHA_PROJECT_ROOT", str(REPO_ROOT.parent))

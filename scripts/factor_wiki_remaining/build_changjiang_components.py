@@ -16,11 +16,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from pandas.errors import PerformanceWarning
 from scipy.special import ndtr
 from scipy.stats import rankdata
 from scipy.stats import t as student_t
-from pandas.errors import PerformanceWarning
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = Path(
@@ -745,7 +744,7 @@ def _rolling_corr(
 ) -> pd.Series:
     minimum = max(5, int(np.ceil(window * 0.75)))
     output = pd.Series(np.nan, index=base.index, dtype=float)
-    for _, index in base.groupby("instrument", sort=False).groups.items():
+    for index in base.groupby("instrument", sort=False).groups.values():
         positions = np.asarray(index)
         local_left = left.loc[positions].reset_index(drop=True)
         local_right = right.loc[positions].reset_index(drop=True)
@@ -769,7 +768,7 @@ def _rolling_spearman(
     """
     minimum = max(5, int(np.ceil(window * 0.75)))
     output = pd.Series(np.nan, index=base.index, dtype=float)
-    for _, index in base.groupby("instrument", sort=False).groups.items():
+    for index in base.groupby("instrument", sort=False).groups.values():
         positions = np.asarray(index)
         local_left = pd.to_numeric(left.loc[positions], errors="coerce").to_numpy()
         local_right = pd.to_numeric(right.loc[positions], errors="coerce").to_numpy()
@@ -1273,7 +1272,7 @@ def main() -> None:
             .groupby("date", sort=False)["value"]
             .nunique()
         )
-        valid_days = int(len(daily_distinct))
+        valid_days = len(daily_distinct)
         min_daily_distinct = (
             int(daily_distinct.min()) if valid_days else 0
         )

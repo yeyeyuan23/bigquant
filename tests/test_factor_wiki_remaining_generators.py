@@ -95,7 +95,7 @@ def test_haitong_factor_panel_emits_all_12_remaining_components() -> None:
         }
     )
     # These are the minute primitives consumed by the frozen formula mapping.
-    for column in {
+    for column in (
         "m1_rv_origin",
         "m1_rv_central",
         "m5_rv_origin",
@@ -123,7 +123,7 @@ def test_haitong_factor_panel_emits_all_12_remaining_components() -> None:
         "m10_down_vol",
         "m10_up_ratio",
         "m10_down_ratio",
-    }:
+    ):
         base[column] = np.linspace(1.0, 2.0, 30)
 
     panel, formulas = haitong.build_factor_panel(base)

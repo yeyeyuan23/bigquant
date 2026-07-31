@@ -17,7 +17,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = Path(
     os.environ.get("BIGALPHA_PROJECT_ROOT", str(REPO_ROOT.parent))
@@ -472,7 +471,7 @@ def main() -> None:
     summary = {
         "implemented_count": len(rows),
         "status_counts": {str(key): int(value) for key, value in counts.items()},
-        "panel_rows": int(len(panel)),
+        "panel_rows": len(panel),
         "first_date": str(base["date"].min().date()),
         "last_date": str(base["date"].max().date()),
         "minute_formula_policy": (
