@@ -44,7 +44,7 @@ class ResearchPolicyTest(unittest.TestCase):
         )
 
     def test_all_registered_candidates_are_available_to_first_round(self):
-        self.assertEqual(len(candidate_ids()), 49)
+        self.assertEqual(len(candidate_ids()), 30)
         self.assertEqual(len(candidate_ids("first_round")), 8)
         self.assertEqual(
             candidate_ids("oap_batch1"),
@@ -56,7 +56,6 @@ class ResearchPolicyTest(unittest.TestCase):
                 "PV-007",
                 "FR-003",
                 "FR-004",
-                "FR-005",
             ),
         )
         self.assertEqual(
@@ -64,32 +63,18 @@ class ResearchPolicyTest(unittest.TestCase):
             (
                 "FR-006",
                 "FR-007",
-                "PV-008",
-                "PV-009",
-                "PV-010",
-                "PV-011",
-                "PV-012",
             ),
         )
         self.assertEqual(
             candidate_ids("oap_b"),
             (
-                "FR-008",
-                "FR-009",
                 "FR-010",
-                "FR-011",
-                "PV-013",
                 "PV-014",
-                "PV-015",
-                "PV-016",
-                "PV-017",
-                "PV-018",
-                "PV-019",
             ),
         )
         self.assertEqual(
             candidate_ids("literature_round1"),
-            ("PV-020", "FR-012", "OB-003"),
+            ("PV-020", "OB-003"),
         )
         self.assertEqual(
             candidate_ids("literature_round2"),
@@ -101,7 +86,7 @@ class ResearchPolicyTest(unittest.TestCase):
         )
         self.assertEqual(
             candidate_ids("literature_round4"),
-            ("PV-022", "PV-023", "FR-014", "FR-015", "OB-005", "INT-003"),
+            ("PV-023", "FR-015", "OB-005"),
         )
 
     def test_formal_periods_and_representative_months_are_frozen(self):

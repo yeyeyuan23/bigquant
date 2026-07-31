@@ -42,10 +42,10 @@ def rank(frame):
 
 def test_current_submission_sources_pass_local_preflight():
     sources = [
-        ROOT / "remote_submission_notebooks" / "rule_s_59_candidate.py",
-        ROOT / "remote_submission_notebooks" / "enet_i_55_candidate.py",
-        ROOT / "submissions" / "lgbm_t_orthogonal_28_no15_candidate.py",
-        ROOT / "submissions" / "lgbm_t_orthogonal_28_add15_candidate.py",
+        ROOT / "remote_submission_notebooks" / "rule_s_56_candidate.py",
+        ROOT / "remote_submission_notebooks" / "enet_i_53_candidate.py",
+        ROOT / "submissions" / "lgbm_t_orthogonal_26_no15_candidate.py",
+        ROOT / "submissions" / "lgbm_t_orthogonal_26_add15_candidate.py",
     ]
     for source in sources:
         completed = subprocess.run(
@@ -58,7 +58,7 @@ def test_current_submission_sources_pass_local_preflight():
         assert completed.returncode == 0, completed.stdout + completed.stderr
         payload = json.loads(completed.stdout)
         assert payload["status"] == "ok"
-        assert payload["static"]["module_mode"] == "sibling_package"
+        assert payload["static"]["module_mode"] == "flat_dependency"
 
 
 def test_platform_schema_queries_use_a_bounded_date_filter(monkeypatch):
@@ -73,7 +73,7 @@ def test_platform_schema_queries_use_a_bounded_date_filter(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "dai", SimpleNamespace(query=query))
     result = preflight.platform_schema_preflight(
-        ROOT / "remote_submission_notebooks" / "enet_i_55_candidate.py",
+        ROOT / "remote_submission_notebooks" / "enet_i_53_candidate.py",
         "bigalpha_2026_financial",
         "2023-01-04",
     )

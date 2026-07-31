@@ -14,8 +14,8 @@ one code cell whose contents must exactly match the corresponding Python file.
 | `smoke_v01` | Historical scored submission | Public score `0.57416` |
 | `rule_v03` | Historical scored submission | Public score `0.60478` |
 | `lgbm_platform_top_v01` | Historical platform-top reconstruction | Highest historical total/B mechanism; exact score not recorded here |
-| `enet_i_54_candidate` | Retained candidate snapshot | Superseded locally; not platform-scored |
-| `lgbm_t_orthogonal_28_candidate` | Retained candidate snapshot | Superseded locally; not platform-scored |
+| `enet_i_51_candidate` | Retained candidate snapshot | Superseded locally; not platform-scored |
+| `lgbm_t_orthogonal_26_candidate` | Retained candidate snapshot | Superseded locally; not platform-scored |
 
 Generate all three current S/I/T candidate pairs with:
 
@@ -31,6 +31,11 @@ prefix/look-ahead probes before promotion into this directory.
 
 Local J is diagnostic and must not be presented as an official platform score.
 
-Candidate notebooks use normal Python imports. Upload the generated sibling
-`bigalpha2026/` directory together with the `.ipynb`; generated notebooks must
-not embed module source strings or install modules through `exec`/`sys.modules`.
+Candidate notebooks use normal Python imports. Upload the `.ipynb` together
+with its generated sibling `*_deps.py` file; AIStudio does not need a directory
+upload. Each dependency file contains only that notebook's frozen candidates.
+Generated notebooks must not embed module source strings or install modules
+through `exec`/`sys.modules`.
+
+`PV-009` and `HF-048` are hard-excluded from generated submissions because
+their historical implementations rely on disallowed data.

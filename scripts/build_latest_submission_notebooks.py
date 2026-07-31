@@ -54,14 +54,14 @@ def run_builder(script: str, result: Path) -> tuple[Path, Path, Path, int]:
     payload = json.loads(completed.stdout)
     source = ROOT / payload["source"]
     notebook = ROOT / payload["notebook"]
-    package = ROOT / payload["package"]
-    return source, notebook, package, int(payload["candidate_count"])
+    dependency = ROOT / payload["dependency"]
+    return source, notebook, dependency, int(payload["candidate_count"])
 
 
 def validate_pair(
     source: Path,
     notebook: Path,
-    package: Path,
+    dependency: Path,
     candidate_count: int,
 ) -> None:
     py_compile.compile(str(source), doraise=True)
@@ -77,8 +77,29 @@ def validate_pair(
         raise ValueError(f"{notebook} code does not match {source}")
     if "_install_bigalpha_candidate_modules" in source_text or "exec(compile(" in source_text:
         raise ValueError(f"{source} still embeds candidate module source")
-    if not (package / "candidate_transforms.py").is_file():
-        raise ValueError(f"{source} is missing its sibling bigalpha2026 package")
+    if not dependency.is_file():
+        raise ValueError(f"{source} is missing sibling dependency {dependency.name}")
+    py_compile.compile(str(dependency), doraise=True)
+    dependency_text = dependency.read_text(encoding="utf-8")
+    dependency_tree = ast.parse(dependency_text)
+    expected_import = f"from {dependency.stem} import get_candidate_spec"
+    if expected_import not in source_text:
+        raise ValueError(f"{source} does not import {dependency.name}")
+    package_imports = [
+        node
+        for node in ast.walk(dependency_tree)
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.module
+            and node.module.startswith("bigalpha2026")
+        )
+        or (
+            isinstance(node, ast.Import)
+            and any(alias.name.startswith("bigalpha2026") for alias in node.names)
+        )
+    ]
+    if package_imports or "exec(" in dependency_text:
+        raise ValueError(f"{dependency} is not a flat static dependency")
     if candidate_count < 1:
         raise ValueError(f"{source} contains no frozen candidates")
 
@@ -110,13 +131,13 @@ def main() -> int:
         ),
     ]
     rows = []
-    for source, notebook, package, candidate_count in builds:
-        validate_pair(source, notebook, package, candidate_count)
+    for source, notebook, dependency, candidate_count in builds:
+        validate_pair(source, notebook, dependency, candidate_count)
         rows.append(
             {
                 "source": str(source.relative_to(ROOT)),
                 "notebook": str(notebook.relative_to(ROOT)),
-                "package": str(package.relative_to(ROOT)),
+                "dependency": str(dependency.relative_to(ROOT)),
                 "candidate_count": candidate_count,
                 "validation": "ok",
             }

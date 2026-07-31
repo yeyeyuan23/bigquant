@@ -335,12 +335,12 @@ class CombinationTest(unittest.TestCase):
         )
         self.assertEqual(
             config["residual_baseline_role"],
-            "target_control_only",
+            "target_control_and_prediction_addback",
         )
         self.assertEqual(config["model_features"], "self_candidates_only")
         self.assertEqual(
             config["prediction_output"],
-            "pure_increment_without_baseline_addback",
+            "baseline_plus_residual_prediction",
         )
 
     def test_shared_training_contract_rolls_and_embargoes_last_label(self):
@@ -368,7 +368,7 @@ class CombinationTest(unittest.TestCase):
         )
         self.assertEqual(prediction_dates[0], all_dates[61])
 
-    def test_lightgbm_screened_baseline_only_residualizes_target(self):
+    def test_lightgbm_screened_baseline_residualizes_and_is_added_back(self):
         dates = pd.to_datetime(
             ["2019-01-02"] * 10
             + ["2019-01-03"] * 10
@@ -407,7 +407,10 @@ class CombinationTest(unittest.TestCase):
             ["date", "instrument"],
         ].copy()
         expected["date"] = expected["date"].astype("datetime64[ns]")
-        expected["factor"] = 0.1
+        expected["factor"] = np.tile(
+            np.linspace(-0.8, 1.0, 10),
+            len(expected) // 10,
+        )
         expected = expected.sort_values(["date", "instrument"]).reset_index(drop=True)
         pd.testing.assert_frame_equal(result, expected)
 

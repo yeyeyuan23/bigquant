@@ -6,6 +6,26 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 FAMILY_DIR = {"FR": "fr", "HF": "hf", "PV": "pv", "OB": "ob", "INT": "composite"}
+UNSUPPORTED_SUBMISSION_CANDIDATES = frozenset({"HF-048", "PV-009"})
+
+
+def filter_submission_candidates(candidate_ids: list[str]) -> tuple[list[str], list[str]]:
+    excluded = [
+        candidate_id
+        for candidate_id in candidate_ids
+        if (
+            candidate_id in UNSUPPORTED_SUBMISSION_CANDIDATES
+            or not path_for_module(
+                module_name_for_candidate(candidate_id)
+            ).is_file()
+        )
+    ]
+    retained = [
+        candidate_id
+        for candidate_id in candidate_ids
+        if candidate_id not in excluded
+    ]
+    return retained, excluded
 
 
 def module_name_for_candidate(candidate_id: str) -> str:
@@ -84,38 +104,196 @@ def discover_candidate_modules(candidate_ids: list[str]) -> tuple[str, ...]:
     return tuple(sorted(needed, key=order_key))
 
 
-def write_candidate_package(
+def _flat_symbol_prefix(module_name: str) -> str:
+    suffix = module_name.removeprefix("bigalpha2026.").replace(".", "__")
+    return f"_ba_{suffix}__"
+
+
+def _assigned_names(node: ast.AST) -> set[str]:
+    names: set[str] = set()
+    if isinstance(node, ast.Name):
+        names.add(node.id)
+    elif isinstance(node, (ast.Tuple, ast.List)):
+        for element in node.elts:
+            names.update(_assigned_names(element))
+    return names
+
+
+def _module_local_names(tree: ast.Module) -> set[str]:
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                names.update(_assigned_names(target))
+        elif isinstance(node, ast.AnnAssign):
+            names.update(_assigned_names(node.target))
+    return names
+
+
+def _resolved_internal_module(current_module: str, node: ast.ImportFrom) -> str | None:
+    if node.module and node.module.startswith("bigalpha2026"):
+        return node.module
+    if not node.level:
+        return None
+    package_parts = current_module.rsplit(".", 1)[0].split(".")
+    keep = len(package_parts) - node.level + 1
+    base = ".".join(package_parts[:keep])
+    return base + (f".{node.module}" if node.module else "")
+
+
+class _FlattenModule(ast.NodeTransformer):
+    def __init__(self, module_name: str, local_names: set[str]) -> None:
+        self.module_name = module_name
+        prefix = _flat_symbol_prefix(module_name)
+        self.rename = {name: prefix + name for name in local_names}
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> ast.AST | None:
+        target_module = _resolved_internal_module(self.module_name, node)
+        if target_module and target_module.startswith("bigalpha2026"):
+            target_prefix = _flat_symbol_prefix(target_module)
+            for alias in node.names:
+                self.rename[alias.asname or alias.name] = target_prefix + alias.name
+            return None
+        if node.module == "__future__":
+            return None
+        return node
+
+    def visit_Name(self, node: ast.Name) -> ast.Name:
+        replacement = self.rename.get(node.id)
+        if replacement:
+            node.id = replacement
+        return node
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        node.name = self.rename.get(node.name, node.name)
+        return self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST:
+        node.name = self.rename.get(node.name, node.name)
+        return self.generic_visit(node)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> ast.AST:
+        node.name = self.rename.get(node.name, node.name)
+        return self.generic_visit(node)
+
+
+def write_candidate_module(
     candidate_ids: list[str],
-    output_directory: Path,
+    output_path: Path,
 ) -> Path:
-    """Write normal importable candidate modules beside a submission."""
+    """Write one ordinary, flat Python dependency module beside a submission."""
 
-    package_names = (
-        "bigalpha2026",
-        "bigalpha2026.candidates",
-        "bigalpha2026.candidates.fr",
-        "bigalpha2026.candidates.pv",
-        "bigalpha2026.candidates.hf",
-        "bigalpha2026.candidates.ob",
-        "bigalpha2026.candidates.composite",
-    )
-    for package_name in package_names:
-        package_directory = output_directory / package_name.replace(".", "/")
-        package_directory.mkdir(parents=True, exist_ok=True)
-        (package_directory / "__init__.py").write_text(
-            f'"""Generated submission package: {package_name}."""\n',
-            encoding="utf-8",
-        )
-
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     module_names = discover_candidate_modules(candidate_ids)
+    trees: dict[str, ast.Module] = {}
+    local_names: dict[str, set[str]] = {}
     for module_name in module_names:
-        module_path = output_directory / (module_name.replace(".", "/") + ".py")
-        module_path.parent.mkdir(parents=True, exist_ok=True)
-        module_path.write_text(
-            path_for_module(module_name).read_text(encoding="utf-8"),
-            encoding="utf-8",
+        tree = ast.parse(path_for_module(module_name).read_text(encoding="utf-8"))
+        trees[module_name] = tree
+        local_names[module_name] = _module_local_names(tree)
+
+    external_imports: set[str] = set()
+    for module_name in module_names:
+        for node in trees[module_name].body:
+            if isinstance(node, ast.Import):
+                external_imports.add(ast.unparse(node))
+            elif isinstance(node, ast.ImportFrom):
+                target = _resolved_internal_module(module_name, node)
+                if node.module != "__future__" and not (
+                    target and target.startswith("bigalpha2026")
+                ):
+                    external_imports.add(ast.unparse(node))
+    standard_imports = sorted(
+        line
+        for line in external_imports
+        if line.startswith(("from collections", "import collections"))
+    )
+    third_party_imports = sorted(set(external_imports) - set(standard_imports))
+    sections = [
+        '"""Generated flat candidate dependency module; upload beside the notebook."""\n',
+        "from __future__ import annotations\n\n",
+        *[line + "\n" for line in standard_imports],
+        "\n" if standard_imports else "",
+        *[line + "\n" for line in third_party_imports],
+        "\n" if third_party_imports else "",
+    ]
+    for module_name in module_names:
+        tree = trees[module_name]
+        if (
+            tree.body
+            and isinstance(tree.body[0], ast.Expr)
+            and isinstance(tree.body[0].value, ast.Constant)
+            and isinstance(tree.body[0].value.value, str)
+        ):
+            tree.body.pop(0)
+        tree.body = [
+            node
+            for node in tree.body
+            if not isinstance(node, ast.Import)
+            and not (
+                isinstance(node, ast.ImportFrom)
+                and node.module != "__future__"
+                and not (
+                    (
+                        target := _resolved_internal_module(module_name, node)
+                    )
+                    and target.startswith("bigalpha2026")
+                )
+            )
+        ]
+        transformed = _FlattenModule(
+            module_name,
+            local_names[module_name],
+        ).visit(tree)
+        ast.fix_missing_locations(transformed)
+        sections.append(f"\n# ---- {module_name} ----\n")
+        sections.append(ast.unparse(transformed) + "\n")
+
+    specs: list[str] = []
+    for candidate_id in candidate_ids:
+        module_name = module_name_for_candidate(candidate_id)
+        stem = candidate_id.lower().replace("-", "_")
+        candidates = (
+            f"build_{stem}_factor_from_daily",
+            f"build_{stem}_factor_from_panel",
+            f"build_{stem}_factor",
         )
-    return output_directory / "bigalpha2026"
+        builder_name = next(
+            (name for name in candidates if name in local_names[module_name]),
+            None,
+        )
+        if builder_name is None:
+            raise ValueError(f"no builder found for {candidate_id}")
+        prefix = _flat_symbol_prefix(module_name)
+        component = (
+            prefix + "COMPONENT_COLUMN"
+            if "COMPONENT_COLUMN" in local_names[module_name]
+            else "None"
+        )
+        orientation = (
+            prefix + "ORIENTATION"
+            if "ORIENTATION" in local_names[module_name]
+            else "1.0"
+        )
+        specs.append(
+            f"    {candidate_id!r}: ({prefix + builder_name}, {component}, {orientation}),"
+        )
+    sections.extend(
+        [
+            "\nCANDIDATE_SPECS = {\n",
+            *[line + "\n" for line in specs],
+            "}\n\n",
+            "def get_candidate_spec(candidate_id):\n",
+            "    try:\n",
+            "        return CANDIDATE_SPECS[candidate_id]\n",
+            "    except KeyError as exc:\n",
+            "        raise ValueError(f'unknown candidate: {candidate_id}') from exc\n",
+        ]
+    )
+    output_path.write_text("".join(sections), encoding="utf-8")
+    return output_path
 
 
 def cicc_helpers_source() -> str:
@@ -160,6 +338,7 @@ def fangzheng_helpers_source() -> str:
 def submission_runtime_source(
     candidate_ids: list[str],
     *,
+    companion_module: str,
     screened15_lambda: float = 0.0,
     lean_market_runtime: bool = False,
 ) -> str:
@@ -511,8 +690,8 @@ def _build_top50_daily_components(
 
 
 def _candidate_factors(selected, financial, factorlib, exposure, daily_features, pool, pd, np):
-    import importlib
     import inspect
+    from {companion_module} import get_candidate_spec
 
     available_inputs = {{
         "financial": financial,
@@ -550,25 +729,11 @@ def _candidate_factors(selected, financial, factorlib, exposure, daily_features,
     results = {{}}
     component_specs = {{}}
     for candidate_id in selected:
-        family, number = candidate_id.split("-")
-        module_name = "bigalpha2026.candidates." + {{"FR": "fr", "HF": "hf", "PV": "pv", "OB": "ob", "INT": "composite"}}[family] + "." + family.lower() + "_" + number
-        module = importlib.import_module(module_name)
-        stem = candidate_id.lower().replace("-", "_")
-        builder = None
-        for suffix in ("factor_from_daily", "factor_from_panel", "factor"):
-            builder = getattr(module, f"build_{{stem}}_{{suffix}}", None)
-            if builder is not None:
-                break
-        if builder is None:
-            raise ValueError(f"no builder found for {{candidate_id}}")
-        if (
-            builder.__name__.endswith("_factor_from_daily")
-            and hasattr(module, "COMPONENT_COLUMN")
-            and hasattr(module, "ORIENTATION")
-        ):
+        builder, component_column, orientation = get_candidate_spec(candidate_id)
+        if component_column is not None:
             component_specs[candidate_id] = (
-                str(module.COMPONENT_COLUMN),
-                float(module.ORIENTATION),
+                str(component_column),
+                float(orientation),
             )
             continue
         results[candidate_id] = invoke(builder, candidate_id)

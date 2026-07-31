@@ -14,21 +14,14 @@ from pathlib import Path
 import pandas as pd
 
 from bigalpha2026.candidates.composite.int_002 import build_int_002_factor
-from bigalpha2026.candidates.composite.int_003 import build_int_003_factor
 from bigalpha2026.candidates.fr.fr_001 import build_fr_001_factor_from_panel
 from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
 from bigalpha2026.candidates.fr.fr_003 import build_fr_003_factor
 from bigalpha2026.candidates.fr.fr_004 import build_fr_004_factor
-from bigalpha2026.candidates.fr.fr_005 import build_fr_005_factor
 from bigalpha2026.candidates.fr.fr_006 import build_fr_006_factor
 from bigalpha2026.candidates.fr.fr_007 import build_fr_007_factor
-from bigalpha2026.candidates.fr.fr_008 import build_fr_008_factor
-from bigalpha2026.candidates.fr.fr_009 import build_fr_009_factor
 from bigalpha2026.candidates.fr.fr_010 import build_fr_010_factor
-from bigalpha2026.candidates.fr.fr_011 import build_fr_011_factor
-from bigalpha2026.candidates.fr.fr_012 import build_fr_012_factor
 from bigalpha2026.candidates.fr.fr_013 import build_fr_013_factor
-from bigalpha2026.candidates.fr.fr_014 import build_fr_014_factor
 from bigalpha2026.candidates.fr.fr_015 import build_fr_015_factor
 from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
 from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
@@ -46,21 +39,9 @@ from bigalpha2026.candidates.pv.pv_004 import build_pv_004_factor
 from bigalpha2026.candidates.pv.pv_005 import build_pv_005_factor
 from bigalpha2026.candidates.pv.pv_006 import build_pv_006_factor
 from bigalpha2026.candidates.pv.pv_007 import build_pv_007_factor
-from bigalpha2026.candidates.pv.pv_008 import build_pv_008_factor
-from bigalpha2026.candidates.pv.pv_009 import build_pv_009_factor
-from bigalpha2026.candidates.pv.pv_010 import build_pv_010_factor
-from bigalpha2026.candidates.pv.pv_011 import build_pv_011_factor
-from bigalpha2026.candidates.pv.pv_012 import build_pv_012_factor
-from bigalpha2026.candidates.pv.pv_013 import build_pv_013_factor
 from bigalpha2026.candidates.pv.pv_014 import build_pv_014_factor
-from bigalpha2026.candidates.pv.pv_015 import build_pv_015_factor
-from bigalpha2026.candidates.pv.pv_016 import build_pv_016_factor
-from bigalpha2026.candidates.pv.pv_017 import build_pv_017_factor
-from bigalpha2026.candidates.pv.pv_018 import build_pv_018_factor
-from bigalpha2026.candidates.pv.pv_019 import build_pv_019_factor
 from bigalpha2026.candidates.pv.pv_020 import build_pv_020_factor
 from bigalpha2026.candidates.pv.pv_021 import build_pv_021_factor
-from bigalpha2026.candidates.pv.pv_022 import build_pv_022_factor
 from bigalpha2026.candidates.pv.pv_023 import build_pv_023_factor
 from bigalpha2026.factor_pool import (
     CANDIDATE_POOL_VERSION,
@@ -341,27 +322,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         "PV-005": build_pv_005_factor(pv, pool),
         "PV-006": build_pv_006_factor(pv, pool),
         "PV-007": build_pv_007_factor(pv, pool),
-        "PV-008": build_pv_008_factor(pv, pool),
-        "PV-009": build_pv_009_factor(pv, pool),
-        "PV-010": build_pv_010_factor(pv, pool),
-        "PV-011": build_pv_011_factor(pv, pool),
-        "PV-012": build_pv_012_factor(pv, exposures, pool),
-        "PV-013": build_pv_013_factor(pv, pool),
         "PV-014": build_pv_014_factor(pv, pool),
-        "PV-015": build_pv_015_factor(pv, pool),
-        "PV-017": build_pv_017_factor(pv, pool),
-        "PV-018": build_pv_018_factor(pv, pool),
-        "PV-019": build_pv_019_factor(pv, pool),
         "PV-020": build_pv_020_factor(pv, pool),
         "PV-021": build_pv_021_factor(pv, pool),
-        "PV-022": build_pv_022_factor(pv, pool),
         "PV-023": build_pv_023_factor(pv, pool),
     }
-    factorlib = read_yearly(
-        "features/FACTORLIB/year={year}/part-{year}.parquet",
-        ALL_BASE_YEARS,
-    )
-    factors["PV-016"] = build_pv_016_factor(factorlib, pool)
     financial = pd.concat(
         [
             pd.read_parquet(path)
@@ -373,16 +338,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     factors["FR-002"] = build_fr_002_factor_from_panel(financial, pool)
     factors["FR-003"] = build_fr_003_factor(financial, pool)
     factors["FR-004"] = build_fr_004_factor(financial, pool)
-    factors["FR-005"] = build_fr_005_factor(financial, exposures, pool)
     factors["FR-006"] = build_fr_006_factor(financial, pool)
     factors["FR-007"] = build_fr_007_factor(financial, pool)
-    factors["FR-008"] = build_fr_008_factor(financial, pool)
-    factors["FR-009"] = build_fr_009_factor(financial, pool)
     factors["FR-010"] = build_fr_010_factor(financial, pool)
-    factors["FR-011"] = build_fr_011_factor(financial, exposures, pool)
-    factors["FR-012"] = build_fr_012_factor(financial, pool)
     factors["FR-013"] = build_fr_013_factor(financial, pool)
-    factors["FR-014"] = build_fr_014_factor(financial, exposures, pool)
     factors["FR-015"] = build_fr_015_factor(financial, pool)
     factors["INT-002"] = build_int_002_factor(financial, pv, pool)
 
@@ -396,7 +355,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     factors["OB-003"] = build_ob_003_factor_from_daily(micro, pool)
     factors["OB-004"] = build_ob_004_factor_from_daily(micro, pool)
     factors["OB-005"] = build_ob_005_factor_from_daily(micro, pool)
-    factors["INT-003"] = build_int_003_factor(financial, micro, pool)
 
     cached_metrics = pd.DataFrame()
     cached_stability = pd.DataFrame()

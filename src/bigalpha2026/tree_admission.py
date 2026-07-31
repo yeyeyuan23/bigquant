@@ -331,12 +331,12 @@ class TreeAdmissionResult:
 
     def protocol_summary(self) -> dict[str, object]:
         return {
-            "baseline": "screened15_residual_target_only",
+            "baseline": "screened15_residual_target_and_prediction_addback",
             "candidate_filter": "basic_quality_and_orthogonality",
             "admission_metric": "orthogonal_entry_only",
             "target_transform": "daily_rank_residual_to_screened15",
             "model_features": "admitted_self_candidates_only",
-            "prediction_output": "pure_increment_without_screened15_addback",
+            "prediction_output": "screened15_plus_residual_prediction",
             "selection": "orthogonal_entry_only",
             "evaluation_years": list(self.development_years),
             "train_days": 60,

@@ -54,9 +54,9 @@ def lightgbm_model_config() -> dict[str, object]:
         "num_threads": num_threads,
         "feature_transform": "daily_centered_percentile_rank",
         "target_transform": "daily_centered_percentile_rank_residual_to_baseline",
-        "residual_baseline_role": "target_control_only",
+        "residual_baseline_role": "target_control_and_prediction_addback",
         "model_features": "self_candidates_only",
-        "prediction_output": "pure_increment_without_baseline_addback",
+        "prediction_output": "baseline_plus_residual_prediction",
         "monotone_constraints": "all_self_features_positive",
     }
 
@@ -283,7 +283,7 @@ def _walk_forward_elastic_net(
     l1_ratio: float = 0.5,
     residual_baseline_columns: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Generate pure-increment rolling 60/20 predictions and coefficients."""
+    """Generate baseline-plus-residual rolling 60/20 predictions and coefficients."""
 
     from sklearn.linear_model import ElasticNet
 
@@ -357,9 +357,17 @@ def _walk_forward_elastic_net(
         weight_row.update(dict(zip(feature_columns, model.coef_, strict=True)))
         weight_rows.append(weight_row)
         block = test[["date", "instrument"]].copy()
-        block["factor"] = model.predict(
+        prediction = model.predict(
             test.loc[:, list(feature_columns)].to_numpy(dtype=float)
         )
+        if residual_baseline_columns:
+            prediction = (
+                prediction
+                + test.loc[:, list(residual_baseline_columns)]
+                .mean(axis=1)
+                .to_numpy(dtype=float)
+            )
+        block["factor"] = prediction
         outputs.append(_daily_rank_factor_polars(block))
     if not outputs:
         raise ValueError("no walk-forward prediction year had train and test rows")
@@ -385,7 +393,7 @@ def walk_forward_elastic_net(
     l1_ratio: float = 0.5,
     residual_baseline_columns: tuple[str, ...] = (),
 ) -> pd.DataFrame:
-    """Generate causal pure-increment Elastic Net predictions."""
+    """Generate causal baseline-plus-residual Elastic Net predictions."""
 
     predictions, _ = _walk_forward_elastic_net(
         panel,
@@ -415,7 +423,7 @@ def walk_forward_elastic_net_with_weights(
     l1_ratio: float = 0.5,
     residual_baseline_columns: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return pure-increment predictions plus per-window coefficients."""
+    """Return baseline-plus-residual predictions and per-window coefficients."""
 
     return _walk_forward_elastic_net(
         panel,
@@ -550,6 +558,13 @@ def static_lightgbm_predict(
         y_train,
     )
     prediction = model.predict(test.select(feature_list).to_numpy())
+    if residual_baseline_columns:
+        prediction = (
+            prediction
+            + test.select(list(residual_baseline_columns))
+            .mean_horizontal()
+            .to_numpy()
+        )
     ranked = (
         test.select(["date", "instrument"])
         .with_columns(pl.Series("factor", prediction).cast(pl.Float64))
@@ -729,6 +744,13 @@ def _walk_forward_lightgbm_prepared(
         prediction = model.predict(
             test.loc[:, list(feature_columns)].to_numpy(dtype=float)
         )
+        if residual_baseline_columns:
+            prediction = (
+                prediction
+                + test.loc[:, list(residual_baseline_columns)]
+                .mean(axis=1)
+                .to_numpy(dtype=float)
+            )
         block["factor"] = prediction
         outputs.append(_daily_rank_factor_polars(block))
     if not outputs:
@@ -831,6 +853,13 @@ def _walk_forward_lightgbm_prepared_polars(
                 }
             )
         prediction = model.predict(test.select(feature_list).to_numpy())
+        if residual_baseline_columns:
+            prediction = (
+                prediction
+                + test.select(residual_baseline_list)
+                .mean_horizontal()
+                .to_numpy()
+            )
         outputs.append(
             test.select(["date", "instrument"])
             .with_columns(pl.Series("factor", prediction).cast(pl.Float64))

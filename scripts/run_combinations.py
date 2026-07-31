@@ -17,6 +17,12 @@ from pathlib import Path
 import pandas as pd
 import polars as pl
 
+try:
+    from scripts.audit_submission_candidate_eligibility import (
+        filter_candidate_ids,
+    )
+except ModuleNotFoundError:
+    from audit_submission_candidate_eligibility import filter_candidate_ids
 from bigalpha2026.combinations import (
     static_lightgbm_feature_importance,
     static_lightgbm_predict,
@@ -749,11 +755,26 @@ def load_dynamic_inputs(
     candidate_manifest = json.loads(
         (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
     )
-    requested_candidate_ids = (
+    raw_requested_candidate_ids = (
         tuple(candidate.removeprefix("self__") for candidate in candidate_filter)
         if candidate_filter is not None
         else tuple(sorted(candidate_manifest.get("candidate_rows", {}).keys()))
     )
+    eligible_candidate_ids, excluded_candidates = filter_candidate_ids(
+        list(raw_requested_candidate_ids)
+    )
+    requested_candidate_ids = tuple(eligible_candidate_ids)
+    if excluded_candidates:
+        print(
+            json.dumps(
+                {
+                    "status": "submission_eligibility_filter",
+                    "excluded_count": len(excluded_candidates),
+                    "excluded_candidates": excluded_candidates,
+                },
+                ensure_ascii=False,
+            )
+        )
     panel_cache_enabled = bool(candidate_filter is not None or selected_years != YEARS)
     panel_cache_payload = {
         "years": list(selected_years),
@@ -2253,7 +2274,7 @@ def build_experiment_result(
             "screened15_residual_target_then_self_only_model_output"
         ),
         "screened15_role": (
-            "residual_target_control_only_not_model_feature_or_prediction_addback"
+            "residual_target_control_and_prediction_addback_not_model_feature"
         ),
         "tree_incremental_protocol": tree_result.protocol_summary(),
         "evaluation_years_change_admission": False,

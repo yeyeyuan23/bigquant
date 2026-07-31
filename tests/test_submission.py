@@ -18,14 +18,18 @@ EXPECTED_FILES = {
     "rule_v03.ipynb",
     "lgbm_platform_top_v01.py",
     "lgbm_platform_top_v01.ipynb",
-    "enet_i_54_candidate.py",
-    "enet_i_54_candidate.ipynb",
-    "lgbm_t_orthogonal_28_candidate.py",
-    "lgbm_t_orthogonal_28_candidate.ipynb",
-    "lgbm_t_orthogonal_28_no15_candidate.py",
-    "lgbm_t_orthogonal_28_no15_candidate.ipynb",
-    "lgbm_t_orthogonal_28_add15_candidate.py",
-    "lgbm_t_orthogonal_28_add15_candidate.ipynb",
+    "enet_i_51_candidate.py",
+    "enet_i_51_candidate.ipynb",
+    "enet_i_51_candidate_deps.py",
+    "lgbm_t_orthogonal_26_candidate.py",
+    "lgbm_t_orthogonal_26_candidate.ipynb",
+    "lgbm_t_orthogonal_26_candidate_deps.py",
+    "lgbm_t_orthogonal_26_no15_candidate.py",
+    "lgbm_t_orthogonal_26_no15_candidate.ipynb",
+    "lgbm_t_orthogonal_26_no15_candidate_deps.py",
+    "lgbm_t_orthogonal_26_add15_candidate.py",
+    "lgbm_t_orthogonal_26_add15_candidate.ipynb",
+    "lgbm_t_orthogonal_26_add15_candidate_deps.py",
 }
 
 
@@ -36,6 +40,8 @@ class SubmissionTest(unittest.TestCase):
 
     def test_every_source_has_competition_main(self):
         for source_path in sorted(SUBMISSIONS.glob("*.py")):
+            if source_path.name.endswith("_deps.py"):
+                continue
             with self.subTest(source=source_path.name):
                 tree = ast.parse(source_path.read_text(encoding="utf-8"))
                 main = next(
@@ -55,6 +61,8 @@ class SubmissionTest(unittest.TestCase):
 
     def test_every_notebook_has_one_exact_code_cell(self):
         for source_path in sorted(SUBMISSIONS.glob("*.py")):
+            if source_path.name.endswith("_deps.py"):
+                continue
             with self.subTest(source=source_path.name):
                 notebook_path = source_path.with_suffix(".ipynb")
                 self.assertTrue(notebook_path.exists())
@@ -72,62 +80,64 @@ class SubmissionTest(unittest.TestCase):
                     source_path.read_text(encoding="utf-8"),
                 )
 
-    def test_candidate_submissions_use_normal_sibling_package(self):
+    def test_candidate_submissions_use_flat_python_dependency(self):
         sources = [
             *sorted(SUBMISSIONS.glob("*_candidate.py")),
             *sorted(REMOTE_SUBMISSIONS.glob("*_candidate.py")),
         ]
-        package_directories = set()
         for source_path in sources:
             with self.subTest(source=source_path.name):
                 source = source_path.read_text(encoding="utf-8")
                 self.assertNotIn("_install_bigalpha_candidate_modules", source)
                 self.assertNotIn("exec(compile(", source)
-                package = source_path.parent / "bigalpha2026"
-                self.assertTrue((package / "candidate_transforms.py").is_file())
-                package_directories.add(source_path.parent)
+                dependency = source_path.with_name(
+                    source_path.stem + "_deps.py"
+                )
+                self.assertTrue(dependency.is_file())
+                dependency_text = dependency.read_text(encoding="utf-8")
+                self.assertNotIn("exec(", dependency_text)
+                dependency_tree = ast.parse(dependency_text)
+                package_imports = [
+                    node
+                    for node in ast.walk(dependency_tree)
+                    if (
+                        isinstance(node, ast.ImportFrom)
+                        and node.module
+                        and node.module.startswith("bigalpha2026")
+                    )
+                    or (
+                        isinstance(node, ast.Import)
+                        and any(
+                            alias.name.startswith("bigalpha2026")
+                            for alias in node.names
+                        )
+                    )
+                ]
+                self.assertEqual(package_imports, [])
+                self.assertIn(
+                    f"from {dependency.stem} import get_candidate_spec",
+                    source,
+                )
 
-        smoke = r"""
-import importlib
-import sys
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-
-package_parent = Path(sys.argv[1])
-sys.path.insert(0, str(package_parent))
-from bigalpha2026.candidate_transforms import daily_median_centered_rank
-
-package_root = package_parent / "bigalpha2026"
-for module_path in sorted(package_root.rglob("*.py")):
-    if module_path.name == "__init__.py":
-        continue
-    module_name = ".".join(module_path.relative_to(package_parent).with_suffix("").parts)
-    importlib.import_module(module_name)
-
-frame = pd.DataFrame(
-    {
-        "date": pd.to_datetime(["2023-01-03"] * 3),
-        "factor_raw": [1.0, np.nan, 3.0],
-    }
-)
-result = daily_median_centered_rank(frame)
-assert np.allclose(result, [-2.0 / 3.0, 0.0, 2.0 / 3.0]), result.tolist()
-"""
-        for directory in sorted(package_directories):
-            subprocess.run(
-                [sys.executable, "-c", smoke, str(directory)],
-                check=True,
-                cwd=ROOT,
-            )
+                smoke = (
+                    "import importlib,sys;"
+                    f"sys.path.insert(0,{str(source_path.parent)!r});"
+                    f"m=importlib.import_module({dependency.stem!r});"
+                    "assert m.CANDIDATE_SPECS;"
+                    "assert all(callable(v[0]) for v in m.CANDIDATE_SPECS.values())"
+                )
+                subprocess.run(
+                    [sys.executable, "-c", smoke],
+                    check=True,
+                    cwd=ROOT,
+                )
 
     def test_current_learned_models_keep_frozen_training_contracts(self):
         enet = (
-            SUBMISSIONS / "enet_i_54_candidate.py"
+            SUBMISSIONS / "enet_i_51_candidate.py"
         ).read_text(encoding="utf-8")
         lgbm = (
-            SUBMISSIONS / "lgbm_t_orthogonal_28_candidate.py"
+            SUBMISSIONS / "lgbm_t_orthogonal_26_candidate.py"
         ).read_text(encoding="utf-8")
         self.assertIn("from sklearn.linear_model import ElasticNet", enet)
         self.assertIn("positive=True", enet)

@@ -6,17 +6,30 @@ import argparse
 import json
 from pathlib import Path
 
+try:
+    from scripts.audit_submission_candidate_eligibility import (
+        filter_candidate_ids,
+    )
+except ModuleNotFoundError:
+    from audit_submission_candidate_eligibility import filter_candidate_ids
 from build_t_orthogonal_submission import external_helpers_source
 from submission_builder_support import (
     submission_runtime_source,
-    write_candidate_package,
+    write_candidate_module,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def family_runtime_source(candidate_ids: list[str]) -> str:
-    runtime = submission_runtime_source(candidate_ids)
+def family_runtime_source(
+    candidate_ids: list[str],
+    *,
+    companion_module: str,
+) -> str:
+    runtime = submission_runtime_source(
+        candidate_ids,
+        companion_module=companion_module,
+    )
     helpers, marker, _model_main = runtime.partition(
         "\ndef main(datasources, start_date, end_date):"
     )
@@ -154,9 +167,14 @@ def main() -> int:
     admitted = result.get("admitted_candidates")
     if not isinstance(admitted, list) or not admitted:
         raise ValueError("S result contains no admitted_candidates")
-    candidate_ids = [str(value).removeprefix("self__") for value in admitted]
-    if len(candidate_ids) != len(set(candidate_ids)):
+    raw_candidate_ids = [
+        str(value).removeprefix("self__") for value in admitted
+    ]
+    if len(raw_candidate_ids) != len(set(raw_candidate_ids)):
         raise ValueError("S result contains duplicate admitted candidates")
+    candidate_ids, excluded_candidates = filter_candidate_ids(
+        raw_candidate_ids
+    )
 
     output_stem = args.output_stem or (
         ROOT
@@ -168,13 +186,19 @@ def main() -> int:
     output_stem.parent.mkdir(parents=True, exist_ok=True)
     output_py = output_stem.with_suffix(".py")
     output_nb = output_stem.with_suffix(".ipynb")
-    package = write_candidate_package(candidate_ids, output_stem.parent)
+    dependency = output_stem.with_name(
+        f"{output_stem.name}_deps"
+    ).with_suffix(".py")
+    write_candidate_module(candidate_ids, dependency)
     source = (
         f'"""S-route family-balanced composite with {len(candidate_ids)} factors."""\n\n'
         "# Auto-generated from the frozen S artifact. Do not edit by hand.\n"
-        + "# Requires the generated sibling bigalpha2026 package.\n"
+        + f"# Requires the generated sibling {dependency.name} module.\n"
         + external_helpers_source()
-        + family_runtime_source(candidate_ids)
+        + family_runtime_source(
+            candidate_ids,
+            companion_module=dependency.stem,
+        )
     )
     output_py.write_text(source, encoding="utf-8")
     output_nb.write_text(render_notebook(source, len(candidate_ids)), encoding="utf-8")
@@ -183,9 +207,10 @@ def main() -> int:
             {
                 "candidate_count": len(candidate_ids),
                 "candidates": candidate_ids,
+                "excluded_candidates": excluded_candidates,
                 "source": str(output_py.relative_to(ROOT)),
                 "notebook": str(output_nb.relative_to(ROOT)),
-                "package": str(package.relative_to(ROOT)),
+                "dependency": str(dependency.relative_to(ROOT)),
             },
             ensure_ascii=False,
             indent=2,

@@ -49,13 +49,6 @@ def main() -> int:
         ["date", "instrument"],
     ].copy()
     pv = normalize(read_yearly("features/PV/year={year}/part-{year}.parquet"))
-    exposures = normalize(
-        read_yearly("exposures/year={year}/part-{year}.parquet")
-    )
-    factorlib = normalize(
-        read_yearly("features/FACTORLIB/year={year}/part-{year}.parquet")
-    )
-
     factors: dict[str, pd.DataFrame] = {
         "PV-001": rf.build_pv_001_factor(pv, pool),
         "PV-002": rf.build_pv_002_factor(pv, pool),
@@ -63,21 +56,9 @@ def main() -> int:
         "PV-004": rf.build_pv_004_factor(pv, pool),
         "PV-005": rf.build_pv_005_factor(pv, pool),
         "PV-006": rf.build_pv_006_factor(pv, pool),
-        "PV-008": rf.build_pv_008_factor(pv, pool),
-        "PV-009": rf.build_pv_009_factor(pv, pool),
-        "PV-010": rf.build_pv_010_factor(pv, pool),
-        "PV-011": rf.build_pv_011_factor(pv, pool),
-        "PV-012": rf.build_pv_012_factor(pv, exposures, pool),
-        "PV-013": rf.build_pv_013_factor(pv, pool),
         "PV-014": rf.build_pv_014_factor(pv, pool),
-        "PV-015": rf.build_pv_015_factor(pv, pool),
-        "PV-016": rf.build_pv_016_factor(factorlib, pool),
-        "PV-017": rf.build_pv_017_factor(pv, pool),
-        "PV-018": rf.build_pv_018_factor(pv, pool),
-        "PV-019": rf.build_pv_019_factor(pv, pool),
         "PV-020": rf.build_pv_020_factor(pv, pool),
         "PV-021": rf.build_pv_021_factor(pv, pool),
-        "PV-022": rf.build_pv_022_factor(pv, pool),
         "PV-023": rf.build_pv_023_factor(pv, pool),
     }
     print("built PV family", flush=True)
@@ -97,16 +78,10 @@ def main() -> int:
             "FR-002": rf.build_fr_002_factor_from_panel(financial, pool),
             "FR-003": rf.build_fr_003_factor(financial, pool),
             "FR-004": rf.build_fr_004_factor(financial, pool),
-            "FR-005": rf.build_fr_005_factor(financial, exposures, pool),
             "FR-006": rf.build_fr_006_factor(financial, pool),
             "FR-007": rf.build_fr_007_factor(financial, pool),
-            "FR-008": rf.build_fr_008_factor(financial, pool),
-            "FR-009": rf.build_fr_009_factor(financial, pool),
             "FR-010": rf.build_fr_010_factor(financial, pool),
-            "FR-011": rf.build_fr_011_factor(financial, exposures, pool),
-            "FR-012": rf.build_fr_012_factor(financial, pool),
             "FR-013": rf.build_fr_013_factor(financial, pool),
-            "FR-014": rf.build_fr_014_factor(financial, exposures, pool),
             "FR-015": rf.build_fr_015_factor(financial, pool),
             "INT-002": rf.build_int_002_factor(financial, pv, pool),
         }
@@ -127,10 +102,9 @@ def main() -> int:
             "OB-003": rf.build_ob_003_factor_from_daily(micro, pool),
             "OB-004": rf.build_ob_004_factor_from_daily(micro, pool),
             "OB-005": rf.build_ob_005_factor_from_daily(micro, pool),
-            "INT-003": rf.build_int_003_factor(financial, micro, pool),
         }
     )
-    print("built HF, OB, and INT-003", flush=True)
+    print("built HF and OB", flush=True)
 
     clean = {
         candidate_id: eligible_factor(factor)[0]

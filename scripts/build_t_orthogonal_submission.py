@@ -6,9 +6,15 @@ import argparse
 import json
 from pathlib import Path
 
+try:
+    from scripts.audit_submission_candidate_eligibility import (
+        filter_candidate_ids,
+    )
+except ModuleNotFoundError:
+    from audit_submission_candidate_eligibility import filter_candidate_ids
 from submission_builder_support import (
     submission_runtime_source,
-    write_candidate_package,
+    write_candidate_module,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -154,7 +160,7 @@ def main() -> int:
     parser.add_argument(
         "--screened15-lambda",
         type=float,
-        default=0.0,
+        default=1.0,
         help=(
             "weight added back from the screened15 baseline after fitting the "
             "same residual-target T model; must be between 0 and 1"
@@ -168,9 +174,14 @@ def main() -> int:
     admitted = result.get("tree_admitted_candidates")
     if not isinstance(admitted, list) or not admitted:
         raise ValueError("T result contains no tree_admitted_candidates")
-    candidate_ids = [str(value).removeprefix("self__") for value in admitted]
-    if len(candidate_ids) != len(set(candidate_ids)):
+    raw_candidate_ids = [
+        str(value).removeprefix("self__") for value in admitted
+    ]
+    if len(raw_candidate_ids) != len(set(raw_candidate_ids)):
         raise ValueError("T result contains duplicate admitted candidates")
+    candidate_ids, excluded_candidates = filter_candidate_ids(
+        raw_candidate_ids
+    )
 
     output_stem = args.output_stem or (
         ROOT
@@ -182,7 +193,10 @@ def main() -> int:
     output_stem.parent.mkdir(parents=True, exist_ok=True)
     output_py = output_stem.with_suffix(".py")
     output_nb = output_stem.with_suffix(".ipynb")
-    package = write_candidate_package(candidate_ids, output_stem.parent)
+    dependency = output_stem.with_name(
+        f"{output_stem.name}_deps"
+    ).with_suffix(".py")
+    write_candidate_module(candidate_ids, dependency)
 
     mode = "no15" if args.screened15_lambda == 0.0 else "add15"
     source = (
@@ -191,10 +205,11 @@ def main() -> int:
             f'{mode}, screened15 lambda={args.screened15_lambda:g}."""\n\n'
         )
         + "# Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.\n"
-        + "# Requires the generated sibling bigalpha2026 package.\n"
+        + f"# Requires the generated sibling {dependency.name} module.\n"
         + external_helpers_source()
         + submission_runtime_source(
             candidate_ids,
+            companion_module=dependency.stem,
             screened15_lambda=args.screened15_lambda,
             lean_market_runtime=True,
         )
@@ -213,11 +228,12 @@ def main() -> int:
             {
                 "candidate_count": len(candidate_ids),
                 "candidates": candidate_ids,
+                "excluded_candidates": excluded_candidates,
                 "screened15_lambda": args.screened15_lambda,
                 "mode": mode,
                 "source": str(output_py.relative_to(ROOT)),
                 "notebook": str(output_nb.relative_to(ROOT)),
-                "package": str(package.relative_to(ROOT)),
+                "dependency": str(dependency.relative_to(ROOT)),
             },
             ensure_ascii=False,
             indent=2,

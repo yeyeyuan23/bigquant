@@ -9,13 +9,15 @@ import pandas as pd
 from scripts.submission_builder_support import submission_runtime_source
 
 ROOT = Path(__file__).resolve().parents[1]
-I55 = ROOT / "remote_submission_notebooks" / "enet_i_55_candidate.py"
-T28_VARIANTS = (
-    ROOT / "submissions" / "lgbm_t_orthogonal_28_no15_candidate.py",
-    ROOT / "submissions" / "lgbm_t_orthogonal_28_add15_candidate.py",
+I53 = ROOT / "remote_submission_notebooks" / "enet_i_53_candidate.py"
+T26_VARIANTS = (
+    ROOT / "submissions" / "lgbm_t_orthogonal_26_no15_candidate.py",
+    ROOT / "submissions" / "lgbm_t_orthogonal_26_add15_candidate.py",
 )
+
+
 def test_generated_learned_submissions_keep_fast_runtime_contract():
-    for path in (I55, *T28_VARIANTS):
+    for path in (I53, *T26_VARIANTS):
         source = path.read_text(encoding="utf-8")
         assert "_LEAN_MARKET_RUNTIME = True" in source
         assert "chunk_days = 31" in source
@@ -26,7 +28,8 @@ def test_generated_learned_submissions_keep_fast_runtime_contract():
 
 def test_generated_runtime_keeps_long_history_and_complete_output_contract():
     source = submission_runtime_source(
-        ["PV-009"],
+        ["HF-001"],
+        companion_module="test_candidate_deps",
         lean_market_runtime=True,
     )
 
@@ -39,7 +42,7 @@ def test_generated_runtime_keeps_long_history_and_complete_output_contract():
 
 def test_s_runtime_passes_numeric_libraries_to_candidate_builder():
     source = (
-        ROOT / "remote_submission_notebooks" / "rule_s_59_candidate.py"
+        ROOT / "remote_submission_notebooks" / "rule_s_56_candidate.py"
     ).read_text(encoding="utf-8")
     candidate_call = source.split(
         "factors = _candidate_factors(",
@@ -51,7 +54,7 @@ def test_s_runtime_passes_numeric_libraries_to_candidate_builder():
 
 
 def test_fast_group_rolling_matches_embedded_pandas_reference():
-    tree = ast.parse(I55.read_text(encoding="utf-8"))
+    tree = ast.parse(I53.read_text(encoding="utf-8"))
     definitions = [
         node
         for node in tree.body
@@ -69,7 +72,7 @@ def test_fast_group_rolling_matches_embedded_pandas_reference():
         exec(  # noqa: S102 - execute only the two parsed local function nodes
             compile(
                 ast.Module(body=[definition], type_ignores=[]),
-                str(I55),
+                str(I53),
                 "exec",
             ),
             namespace,

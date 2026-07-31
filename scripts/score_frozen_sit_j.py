@@ -311,7 +311,7 @@ def main() -> int:
         "j_baseline_self_columns": list(j_baseline_columns),
         "j_baseline_self_count": len(j_baseline_columns),
         "screened15_role": (
-            "residual_target_control_only_not_model_feature_or_prediction_addback"
+            "residual_target_control_and_prediction_addback_not_model_feature"
         ),
         "I_model_features": list(routes["I"]),
         "T_model_features": list(routes["T"]),

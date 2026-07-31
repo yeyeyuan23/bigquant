@@ -6,10 +6,16 @@ import argparse
 import json
 from pathlib import Path
 
+try:
+    from scripts.audit_submission_candidate_eligibility import (
+        filter_candidate_ids,
+    )
+except ModuleNotFoundError:
+    from audit_submission_candidate_eligibility import filter_candidate_ids
 from build_t_orthogonal_submission import external_helpers_source
 from submission_builder_support import (
     submission_runtime_source,
-    write_candidate_package,
+    write_candidate_module,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,9 +33,15 @@ ELASTIC_NET_MODEL = (
 )
 
 
-def elastic_net_runtime_source(candidate_ids: list[str]) -> str:
+def elastic_net_runtime_source(
+    candidate_ids: list[str],
+    *,
+    companion_module: str,
+) -> str:
     runtime = submission_runtime_source(
         candidate_ids,
+        companion_module=companion_module,
+        screened15_lambda=1.0,
         lean_market_runtime=True,
     )
     runtime = runtime.replace(
@@ -52,10 +64,10 @@ def render_notebook(source: str, candidate_count: int) -> str:
                 "source": [
                     f"# BigAlpha 2026 I-pool Elastic Net ({candidate_count} factors)\n",
                     (
-                        "Frozen I pool; screened15 residual target; self-only "
-                        "positive Elastic Net output; causal rolling 60-day "
-                        "training and 20-day prediction blocks with a one-day "
-                        "label embargo."
+                        "Frozen I pool; screened15 residual target and prediction "
+                        "add-back; self-only positive Elastic Net model features; "
+                        "causal rolling 60-day training and 20-day prediction "
+                        "blocks with a one-day label embargo."
                     ),
                 ],
             },
@@ -99,9 +111,14 @@ def main() -> int:
     frozen = result.get("frozen_candidates")
     if not isinstance(frozen, list) or not frozen:
         raise ValueError("I result contains no frozen_candidates")
-    candidate_ids = [str(value).removeprefix("self__") for value in frozen]
-    if len(candidate_ids) != len(set(candidate_ids)):
+    raw_candidate_ids = [
+        str(value).removeprefix("self__") for value in frozen
+    ]
+    if len(raw_candidate_ids) != len(set(raw_candidate_ids)):
         raise ValueError("I result contains duplicate frozen candidates")
+    candidate_ids, excluded_candidates = filter_candidate_ids(
+        raw_candidate_ids
+    )
 
     output_stem = args.output_stem or (
         ROOT / "remote_submission_notebooks" / f"enet_i_{len(candidate_ids)}_candidate"
@@ -111,14 +128,23 @@ def main() -> int:
     output_stem.parent.mkdir(parents=True, exist_ok=True)
     output_py = output_stem.with_suffix(".py")
     output_nb = output_stem.with_suffix(".ipynb")
-    package = write_candidate_package(candidate_ids, output_stem.parent)
+    dependency = output_stem.with_name(
+        f"{output_stem.name}_deps"
+    ).with_suffix(".py")
+    write_candidate_module(candidate_ids, dependency)
 
     source = (
-        f'"""I-route pure-increment Elastic Net with {len(candidate_ids)} factors."""\n\n'
-        "# Auto-generated from the frozen I artifact. Do not edit by hand.\n"
-        + "# Requires the generated sibling bigalpha2026 package.\n"
+        (
+            f'"""I-route screened15 plus residual Elastic Net with '
+            f'{len(candidate_ids)} factors."""\n\n'
+        )
+        + "# Auto-generated from the frozen I artifact. Do not edit by hand.\n"
+        + f"# Requires the generated sibling {dependency.name} module.\n"
         + external_helpers_source()
-        + elastic_net_runtime_source(candidate_ids)
+        + elastic_net_runtime_source(
+            candidate_ids,
+            companion_module=dependency.stem,
+        )
     )
     output_py.write_text(source, encoding="utf-8")
     output_nb.write_text(
@@ -130,9 +156,10 @@ def main() -> int:
             {
                 "candidate_count": len(candidate_ids),
                 "candidates": candidate_ids,
+                "excluded_candidates": excluded_candidates,
                 "source": str(output_py.relative_to(ROOT)),
                 "notebook": str(output_nb.relative_to(ROOT)),
-                "package": str(package.relative_to(ROOT)),
+                "dependency": str(dependency.relative_to(ROOT)),
             },
             ensure_ascii=False,
             indent=2,
