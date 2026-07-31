@@ -16,7 +16,7 @@ class TreePredictionCacheTest(unittest.TestCase):
     def test_orthogonal_entry_contract_uses_current_schema(self):
         self.assertEqual(
             TREE_CACHE_SCHEMA_VERSION,
-            "tree-prediction-cache-v7-screened15-residual-output",
+            "tree-prediction-cache-v8-dynamic-pool-orthogonality",
         )
 
     def setUp(self):

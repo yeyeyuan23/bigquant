@@ -674,7 +674,10 @@ def _load_common_inputs(datasources, start_date, end_date, pd, np):
     start_ts = pd.Timestamp(start_date).normalize()
     end_ts = pd.Timestamp(end_date).normalize()
     history_start = start_ts - pd.Timedelta(days=500)
-    bar5m_start = start_ts - pd.Timedelta(days=220)
+    # Longest current intraday-derived candidate uses a 252-trading-day
+    # window. Keep the 5m history aligned with the shared 500-calendar-day
+    # history so short platform calls do not silently neutralize it.
+    bar5m_start = history_start
     financial_start = start_ts - pd.Timedelta(days=2200)
     financial_source = datasources.get("financial", "bigalpha_2026_financial")
     import dai
@@ -786,10 +789,12 @@ def main(datasources, start_date, end_date):
         - panel.loc[:, list(residual_baseline_columns)].mean(axis=1)
     )
     panel = panel.sort_values(["date", "instrument"]).reset_index(drop=True)
-    prediction_dates = all_dates[(all_dates >= start_ts) & (all_dates <= end_ts)]
+    requested_prediction_dates = all_dates[
+        (all_dates >= start_ts) & (all_dates <= end_ts)
+    ]
     prediction_dates = pd.DatetimeIndex([
         date
-        for date in prediction_dates
+        for date in requested_prediction_dates
         if all_dates.get_loc(date) > 0
         and len(
             all_dates[
@@ -798,8 +803,6 @@ def main(datasources, start_date, end_date):
             ]
         ) >= 60
     ])
-    if prediction_dates.empty:
-        raise ValueError("no prediction dates have a complete causal 60-day training window")
     panel_date_values = panel["date"].to_numpy(dtype="datetime64[ns]")
 
     def date_slice(first_date, last_date):
@@ -852,10 +855,49 @@ def main(datasources, start_date, end_date):
             + screened15_lambda * baseline_prediction
         )
         predictions.append(block)
-    pred = pd.concat(predictions, ignore_index=True)
-    pred["factor"] = _rank_center(pd.Series(pred["factor_raw"]), pred["date"], np)
-    result = pred[["date", "instrument", "factor"]].sort_values(["date", "instrument"]).reset_index(drop=True)
-    if result.empty or result["factor"].isna().any() or not np.isfinite(result["factor"]).all():
+    requested = (
+        pool.loc[
+            pool["date"].between(start_ts, end_ts),
+            ["date", "instrument"],
+        ]
+        .drop_duplicates(["date", "instrument"], keep="last")
+        .sort_values(["date", "instrument"])
+        .reset_index(drop=True)
+    )
+    if predictions:
+        pred = pd.concat(predictions, ignore_index=True)
+        pred["factor"] = _rank_center(
+            pd.Series(pred["factor_raw"]),
+            pred["date"],
+            np,
+        )
+        pred = pred[["date", "instrument", "factor"]]
+    else:
+        pred = requested.iloc[0:0].assign(factor=pd.Series(dtype=float))
+    if pred.duplicated(["date", "instrument"]).any():
+        raise ValueError("duplicate model predictions")
+    result = requested.merge(
+        pred,
+        on=["date", "instrument"],
+        how="left",
+        validate="one_to_one",
+    )
+    # The competition requires every requested trading day. Dates without a
+    # complete causal 60-day window receive a neutral factor instead of being
+    # silently omitted.
+    result["factor"] = pd.to_numeric(
+        result["factor"],
+        errors="coerce",
+    ).fillna(0.0)
+    result = result.sort_values(["date", "instrument"]).reset_index(drop=True)
+    if (
+        result.empty
+        or len(result) != len(requested)
+        or result.duplicated(["date", "instrument"]).any()
+        or result["factor"].isna().any()
+        or not np.isfinite(result["factor"]).all()
+        or set(result["date"].unique()) != set(requested_prediction_dates)
+    ):
         raise ValueError("invalid factor output")
     return result
 '''

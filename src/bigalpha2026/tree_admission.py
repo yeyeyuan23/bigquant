@@ -90,6 +90,62 @@ def candidate_tree_entry_diagnostics(
     }
 
 
+def select_mutually_orthogonal_candidates(
+    candidates: Sequence[str],
+    *,
+    baseline_columns: Sequence[str],
+    correlations: pd.DataFrame,
+    maximum_abs_rank_correlation: float,
+) -> tuple[tuple[str, ...], dict[str, dict[str, object]]]:
+    """Greedily admit candidates while updating the T baseline in real time.
+
+    Rank IC is deliberately excluded from both the gate and the ordering. At
+    each step the candidate with the lowest current maximum absolute rank
+    correlation is considered first; an admitted candidate immediately joins
+    the baseline used for every remaining candidate.
+    """
+
+    remaining = list(dict.fromkeys(candidates))
+    accepted: list[str] = []
+    diagnostics: dict[str, dict[str, object]] = {}
+    fixed_baseline = tuple(dict.fromkeys(baseline_columns))
+    while remaining:
+        active_baseline = tuple(
+            dict.fromkeys((*fixed_baseline, *accepted))
+        )
+        scored: list[tuple[float, str, float]] = []
+        for candidate in remaining:
+            if active_baseline:
+                correlation = float(
+                    correlations.loc[candidate, list(active_baseline)]
+                    .abs()
+                    .max()
+                )
+            else:
+                correlation = 0.0
+            sort_value = (
+                correlation if pd.notna(correlation) else float("inf")
+            )
+            scored.append((sort_value, candidate, correlation))
+        _, candidate, correlation = min(
+            scored,
+            key=lambda item: (item[0], item[1]),
+        )
+        passed = bool(
+            pd.notna(correlation)
+            and correlation <= maximum_abs_rank_correlation
+        )
+        diagnostics[candidate] = {
+            "baseline_columns": active_baseline,
+            "candidate_max_abs_rank_correlation": correlation,
+            "orthogonal_passed": passed,
+        }
+        remaining.remove(candidate)
+        if passed:
+            accepted.append(candidate)
+    return tuple(accepted), diagnostics
+
+
 def promote_frozen_tree_pool(
     frozen_pool: Sequence[str],
     pending_passed: Sequence[str],
@@ -285,21 +341,26 @@ class TreeAdmissionResult:
             "evaluation_years": list(self.development_years),
             "train_days": 60,
             "test_days": 20,
-            "minimum_active_days": TREE_INCREMENTAL_GATE.minimum_active_days,
-            "minimum_entry_rank_ic_mean": (
-                TREE_INCREMENTAL_GATE.minimum_entry_rank_ic_mean
-            ),
-            "maximum_entry_abs_rank_correlation": (
-                TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
-            ),
-            "minimum_oos_days": TREE_INCREMENTAL_GATE.minimum_oos_days,
-            "minimum_windows": TREE_INCREMENTAL_GATE.minimum_windows,
-            "minimum_positive_window_ratio": (
-                TREE_INCREMENTAL_GATE.minimum_positive_window_ratio
-            ),
-            "minimum_positive_years": (
-                TREE_INCREMENTAL_GATE.minimum_positive_years
-            ),
+            "formal_entry_gate": {
+                "minimum_active_days": (
+                    TREE_INCREMENTAL_GATE.minimum_active_days
+                ),
+                "maximum_abs_rank_correlation": (
+                    TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
+                ),
+                "correlation_baseline": (
+                    "screened15_plus_frozen_T_plus_current_batch_admitted_T"
+                ),
+                "dynamic_baseline_update": True,
+            },
+            "diagnostics_only_not_admission_gates": {
+                "rank_ic": True,
+                "positive_window_ratio": True,
+                "positive_years": True,
+                "split_importance": True,
+                "gain_importance": True,
+                "shap": True,
+            },
             "cache_schema": TREE_CACHE_SCHEMA_VERSION,
             "frozen_pool_state_digest": self.frozen_cache.pool_state_digest(
                 self.admitted_candidates
@@ -717,32 +778,45 @@ def run_tree_admission(
         if bool(row.get("tree_entry_passed"))
         and row["candidate"] in pending
     )
-    ordered_candidates = tuple(
-        row["candidate"]
-        for row in sorted(
-            (
-                row
-                for row in incremental_rows
-                if row["candidate"] in entry_passed_candidates
-            ),
-            key=lambda row: (
-                -int(bool(row.get("single_effect_passed"))),
-                float(
-                    row.get(
-                        "candidate_max_abs_rank_correlation",
-                        float("inf"),
-                    )
-                ),
-                str(row["candidate"]),
-            ),
-        )
+    pending_passed, dynamic_entry = select_mutually_orthogonal_candidates(
+        entry_passed_candidates,
+        baseline_columns=entry_baseline_columns,
+        correlations=entry_correlations,
+        maximum_abs_rank_correlation=(
+            TREE_INCREMENTAL_GATE.maximum_entry_abs_rank_correlation
+        ),
     )
-    accepted: list[str] = list(ordered_candidates)
-
-    pending_passed = tuple(accepted)
     for row in incremental_rows:
-        if row["candidate"] in pending_passed:
-            row["evaluation_status"] = "entry_passed_pending_freeze"
+        candidate = str(row["candidate"])
+        if candidate not in dynamic_entry:
+            continue
+        dynamic = dynamic_entry[candidate]
+        passed = bool(dynamic["orthogonal_passed"])
+        reasons = "" if passed else "entry correlation is not low enough"
+        row.update(
+            {
+                "evaluation_protocol": "orthogonal_T_entry_v2_dynamic_pool",
+                "individual_baseline_candidates": ",".join(
+                    dynamic["baseline_columns"]
+                ),
+                "candidate_max_abs_rank_correlation": dynamic[
+                    "candidate_max_abs_rank_correlation"
+                ],
+                "orthogonal_passed": passed,
+                "tree_entry_passed": passed,
+                "tree_entry_reasons": reasons,
+                "individual_passed": passed,
+                "individual_reasons": reasons,
+                "evaluation_status": (
+                    "entry_passed_pending_freeze"
+                    if passed
+                    else "entry_failed_dynamic_orthogonality"
+                ),
+            }
+        )
+        admission[candidate].update(row)
+        admission[candidate]["marginal_reasons"] = reasons
+        admission[candidate]["reasons"] = reasons
     provisional_pool = tuple(
         dict.fromkeys((*frozen_before, *pending_passed))
     )

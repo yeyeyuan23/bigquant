@@ -42,6 +42,8 @@ def main(datasources, start_date, end_date):
         exposure,
         daily_features,
         pool,
+        pd,
+        np,
     )
     long_parts = []
     for candidate_id, frame in factors.items():

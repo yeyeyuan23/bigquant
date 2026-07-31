@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 TREE_CACHE_SCHEMA_VERSION = (
-    "tree-prediction-cache-v7-screened15-residual-output"
+    "tree-prediction-cache-v8-dynamic-pool-orthogonality"
 )
 PREDICTION_COLUMNS = ("date", "instrument", "factor")
 LIGHTGBM_IMPORTANCE_COLUMNS = (

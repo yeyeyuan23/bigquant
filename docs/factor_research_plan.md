@@ -253,8 +253,9 @@ I 的候选评价、联合池确认、冻结池晋级和缓存状态写入统一
    也不得用 2022、2023 或 2024 修改成员。
 3. I 准入本身不做逐候选滚动训练；60/20 只属于最终 Elastic Net 的 walk-forward
    训练与评价合同。
-4. 每个 pending 候选先做 I entry gate：质量合格后，只要有弱线性信号或相对
-   `screened15 + frozen_I` 的残差信号，就进入训练 trial pool。
+4. 每个 pending 候选先做严格 I entry gate：质量合格后，原始 Rank IC 或相对
+   `screened15 + frozen_I` 的残差 Rank IC 必须达到 `0.005`；同时最大绝对 Rank
+   相关性必须不高于 `0.50`，除非残差 Rank IC 已达到 `0.005`。
 5. 所有候选使用相同开发日历；特征与标签均按日转换为中心化截面百分位秩，
    缺失或无截面离散度的候选值按中性值 0 处理，禁止通过各自活跃日期改变
    baseline 样本。
@@ -266,17 +267,18 @@ I 的候选评价、联合池确认、冻结池晋级和缓存状态写入统一
 8. 轻量口径保留条件前向相关报告字段用于兼容旧报表，但不再用条件前向 J 否决。
 9. `frozen_I` 只由 entry gate 决定，更新时仍记录候选指纹、标签指纹和评估合同；
    因子取值或合同变化时走新缓存版本，不静默复用旧 frozen state。
-10. 最终 Elastic Net 只读取 `screened15 + frozen_I`。2023、2024 的表现不得
-   反向修改候选级 I、联合确认或冻结成员。
+10. 最终 Elastic Net 的模型特征只读取 `frozen_I`；`screened15` 只用于构造残差
+    训练目标，不进入模型特征。2023、2024 的表现不得反向修改候选级 I、联合确认
+    或冻结成员。
 
 I entry gate 当前口径：
 
 - `coverage >= 0.90`；
 - 至少 120 个有截面离散度的开发日；
-- 原始 Rank IC 均值不低于 `0.0`，或对 `screened15 + frozen_I` 做日内秩残差化
-  后的 residual Rank IC 不低于 `0.0`；
-- 与 `screened15 + frozen_I` 的最大绝对 Rank 相关性不高于 `0.85`，或 residual
-  Rank IC 通过。
+- 原始 Rank IC 均值不低于 `0.005`，或对 `screened15 + frozen_I` 做日内秩残差化
+  后的 residual Rank IC 不低于 `0.005`；
+- 与 `screened15 + frozen_I` 的最大绝对 Rank 相关性不高于 `0.50`，或 residual
+  Rank IC 已达到 `0.005`。
 
 I 的定位是“线性增量”：它不要求候选单独足够强，但必须证明有可被 Elastic Net
 使用的线性或残差信息。
@@ -310,16 +312,19 @@ T 的准入模块为 `src/bigalpha2026/tree_admission.py`，核心入口为
 `run_tree_admission`。模块拥有完整池确认、冻结池晋级及缓存状态；
 `scripts/run_combinations.py` 只负责准备共享输入并调用该入口。
 
-T 的输入池固定为 `frozen_I`，只使用 2019—2022 开发期。满足最低质量门槛后，只要与
-`screened15 + frozen_T` 足够正交，就进入 `frozen_T`。逐因子 LightGBM 和条件前向
-J 增量不再作为准入步骤；准入阶段不跑本地 J。
+T 的输入池固定为 `frozen_I`，只使用 2019—2022 开发期。满足最低质量门槛后，候选
+按“与当前基准的最大绝对 Rank 相关性从低到高、候选 ID 打破并列”的确定性顺序检查。
+当前基准初始为 `screened15 + 已冻结 frozen_T`；同一次运行中每接纳一个候选，就立即
+加入当前基准，后续候选必须同时与它保持正交。逐因子 LightGBM、Rank IC 和条件前向
+J 增量不作为准入步骤；准入阶段不跑本地 J。
 所有输入按相同股票日、标签、60 日训练、20 日 OOS 和中心化截面百分位秩处理，
 并固定浅层 LightGBM 参数和正单调约束。
 
 T 的正式准入门槛：
 
 - 至少 120 个有截面离散度的开发日；
-- 与 `screened15 + frozen_T` 的最大绝对 Rank 相关性不高于 `0.35`。
+- 与 `screened15 + 已冻结 frozen_T + 本批已接纳 T` 的最大绝对 Rank 相关性不高于
+  `0.35`。
 
 Rank IC、正 J 窗口比例、正 J 年份数、分裂次数、gain importance 与 SHAP 只作解释
 和诊断，不作准入条件。

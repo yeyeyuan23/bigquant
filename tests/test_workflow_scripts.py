@@ -25,6 +25,7 @@ from bigalpha2026.single_factor_admission import (
 from bigalpha2026.tree_admission import (
     candidate_tree_entry_diagnostics,
     promote_frozen_tree_pool,
+    select_mutually_orthogonal_candidates,
     unresolved_tree_candidates,
     validated_frozen_tree_pool,
 )
@@ -342,6 +343,52 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertFalse(diagnostics["single_effect_passed"])
         self.assertTrue(diagnostics["orthogonal_passed"])
         self.assertTrue(diagnostics["tree_entry_passed"])
+
+    def test_tree_entry_updates_accepted_pool_in_real_time(self):
+        correlations = pd.DataFrame(
+            {
+                "base": {
+                    "base": 1.0,
+                    "A": 0.10,
+                    "B": 0.20,
+                    "C": 0.30,
+                },
+                "A": {
+                    "base": 0.10,
+                    "A": 1.0,
+                    "B": 0.80,
+                    "C": 0.15,
+                },
+                "B": {
+                    "base": 0.20,
+                    "A": 0.80,
+                    "B": 1.0,
+                    "C": 0.10,
+                },
+                "C": {
+                    "base": 0.30,
+                    "A": 0.15,
+                    "B": 0.10,
+                    "C": 1.0,
+                },
+            }
+        )
+
+        accepted, diagnostics = select_mutually_orthogonal_candidates(
+            ("A", "B", "C"),
+            baseline_columns=("base",),
+            correlations=correlations,
+            maximum_abs_rank_correlation=0.35,
+        )
+
+        self.assertEqual(accepted, ("A", "C"))
+        self.assertEqual(
+            diagnostics["A"]["baseline_columns"],
+            ("base",),
+        )
+        self.assertIn("A", diagnostics["B"]["baseline_columns"])
+        self.assertFalse(diagnostics["B"]["orthogonal_passed"])
+        self.assertTrue(diagnostics["C"]["orthogonal_passed"])
 
     def test_frozen_tree_pool_rejects_implicit_content_change(self):
         state = {

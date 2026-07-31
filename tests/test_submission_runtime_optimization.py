@@ -6,6 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from scripts.submission_builder_support import submission_runtime_source
+
 ROOT = Path(__file__).resolve().parents[1]
 I55 = ROOT / "remote_submission_notebooks" / "enet_i_55_candidate.py"
 T28_VARIANTS = (
@@ -20,6 +22,32 @@ def test_generated_learned_submissions_keep_fast_runtime_contract():
         assert "component_specs = {}" in source
         assert "np.searchsorted(" in source
         assert "_pandas_group_rolling = _group_rolling" in source
+
+
+def test_generated_runtime_keeps_long_history_and_complete_output_contract():
+    source = submission_runtime_source(
+        ["PV-009"],
+        lean_market_runtime=True,
+    )
+
+    assert "bar5m_start = history_start" in source
+    assert "requested_prediction_dates" in source
+    assert 'result["factor"]' in source
+    assert ".fillna(0.0)" in source
+    assert "no prediction dates have a complete causal" not in source
+
+
+def test_s_runtime_passes_numeric_libraries_to_candidate_builder():
+    source = (
+        ROOT / "remote_submission_notebooks" / "rule_s_59_candidate.py"
+    ).read_text(encoding="utf-8")
+    candidate_call = source.split(
+        "factors = _candidate_factors(",
+        maxsplit=1,
+    )[1].split(")", maxsplit=1)[0]
+
+    assert "pd," in candidate_call
+    assert "np," in candidate_call
 
 
 def test_fast_group_rolling_matches_embedded_pandas_reference():
