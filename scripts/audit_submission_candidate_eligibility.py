@@ -35,6 +35,7 @@ RETIRED_CANDIDATES = {
     "PV-018": ["daily_history:756>126"],
     "PV-019": ["daily_history:252>126"],
     "PV-022": ["daily_history:252>126"],
+    "PV-216": ["frozen_formula_daily_history:252>126"],
     "INT-003": ["transitive_dependency:FR-012"],
 }
 
@@ -131,6 +132,40 @@ def history(tree: ast.Module, family: str) -> tuple[int, int, list[str]]:
     return daily, months, evidence
 
 
+def frozen_formula_history(tree: ast.Module) -> tuple[int, int, list[str]]:
+    docstring = ast.get_docstring(tree) or ""
+    formula = next(
+        (
+            line.split(":", 1)[1].strip()
+            for line in docstring.splitlines()
+            if line.startswith("Frozen formula:")
+        ),
+        "",
+    )
+    daily_values = [
+        int(value)
+        for value in re.findall(r"(?<![A-Za-z])(\d+)(?=d\b)", formula)
+    ]
+    month_values = [
+        int(value)
+        for value in re.findall(
+            r"(?<![A-Za-z])(\d+)\s*(?=months?\b)",
+            formula,
+            flags=re.IGNORECASE,
+        )
+    ]
+    evidence = []
+    if daily_values:
+        evidence.append(f"frozen_formula:max_daily={max(daily_values)}d")
+    if month_values:
+        evidence.append(f"frozen_formula:max_monthly={max(month_values)}m")
+    return (
+        max(daily_values, default=0),
+        max(month_values, default=0),
+        evidence,
+    )
+
+
 def audit(path: Path) -> dict[str, object] | None:
     match = ID_RE.match(path.stem)
     if match is None:
@@ -141,6 +176,12 @@ def audit(path: Path) -> dict[str, object] | None:
     dependencies = candidate_dependencies(tree)
     forbidden = sorted(set(inputs) & FORBIDDEN_INPUTS)
     daily, months, evidence = history(tree, factor_id.split("-")[0])
+    formula_daily, formula_months, formula_evidence = frozen_formula_history(
+        tree
+    )
+    daily = max(daily, formula_daily)
+    months = max(months, formula_months)
+    evidence.extend(formula_evidence)
     reasons = []
     if forbidden:
         reasons.append("forbidden_input:" + ",".join(forbidden))
@@ -298,7 +339,7 @@ def write_eligibility_report(
 ) -> dict[str, object]:
     rows = scan_candidates()
     report = {
-        "schema_version": "factor-track-submission-eligibility-v1",
+        "schema_version": "factor-track-submission-eligibility-v2",
         "policy": {
             "factor_inputs": ["bar1m", "financial"],
             "auxiliary_inputs": ["instruments"],

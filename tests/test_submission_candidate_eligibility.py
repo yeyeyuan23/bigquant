@@ -32,6 +32,20 @@ def test_retired_candidates_are_filtered_from_old_cached_pools():
     assert set(excluded) == {"FR-005", "PV-009"}
 
 
+def test_frozen_formula_history_is_included_in_the_window_scan():
+    module = load_module()
+    tree = module.ast.parse(
+        '"""Frozen formula: max_252d(close) and mean over 7 months."""'
+    )
+    daily, months, evidence = module.frozen_formula_history(tree)
+    assert daily == 252
+    assert months == 7
+    assert evidence == [
+        "frozen_formula:max_daily=252d",
+        "frozen_formula:max_monthly=7m",
+    ]
+
+
 def test_report_persists_scanner_and_candidate_hashes(tmp_path):
     module = load_module()
     report = module.write_eligibility_report(
