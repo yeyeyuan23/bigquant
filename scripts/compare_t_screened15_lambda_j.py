@@ -180,6 +180,10 @@ def main() -> int:
         "S": {},
         "I": {},
     }
+    fixed_scores: dict[
+        str,
+        dict[tuple[int, ...], dict[str, object]],
+    ] = {"S": {}, "I": {}}
     direction_metadata: dict[str, dict[str, float]] = {}
     for route, factor in {"S": s_raw, "I": i_raw}.items():
         for years in ((2023,), (2024,), (2023, 2024)):
@@ -189,12 +193,14 @@ def main() -> int:
                 years,
             )
             fixed[route][years] = block
+            fixed_scores[route][years] = score_reference.score(block)
             direction_metadata[route] = {
                 "direction": direction,
                 "calibration_J": calibration_j,
             }
 
     rows: list[dict[str, object]] = []
+    all_route_rows: list[dict[str, object]] = []
     for screened15_lambda in args.lambdas:
         t_raw = walk_forward_lightgbm(
             oriented,
@@ -211,13 +217,14 @@ def main() -> int:
                 years,
             )
             base = score_reference.score(t_block)
-            crowding = score_reference.score_joint_routes(
+            crowded_scores = score_reference.score_joint_routes(
                 {
                     "S": fixed["S"][years],
                     "I": fixed["I"][years],
                     "T": t_block,
                 }
-            )["T"]
+            )
+            crowding = crowded_scores["T"]
             j_base = float(base["score_proxy"])
             j_crowded = float(crowding["score_proxy"])
             rows.append(
@@ -235,6 +242,46 @@ def main() -> int:
                     "J_robust": min(j_base, j_crowded),
                 }
             )
+            route_blocks = {
+                "S": fixed["S"][years],
+                "I": fixed["I"][years],
+                "T": t_block,
+            }
+            route_base_scores = {
+                "S": fixed_scores["S"][years],
+                "I": fixed_scores["I"][years],
+                "T": base,
+            }
+            for route, route_block in route_blocks.items():
+                route_base = route_base_scores[route]
+                route_crowded = crowded_scores[route]
+                route_j_base = float(route_base["score_proxy"])
+                route_j_crowded = float(route_crowded["score_proxy"])
+                if route == "T":
+                    route_direction = direction
+                    route_calibration_j = calibration_j
+                else:
+                    route_direction = direction_metadata[route]["direction"]
+                    route_calibration_j = direction_metadata[route][
+                        "calibration_J"
+                    ]
+                all_route_rows.append(
+                    {
+                        "route": route,
+                        "t_screened15_lambda": screened15_lambda,
+                        "years": ",".join(str(year) for year in years),
+                        "rows": len(route_block),
+                        "selected_direction": route_direction,
+                        "direction_calibration_J": route_calibration_j,
+                        "J_base": route_j_base,
+                        "A_base": float(route_base["a_proxy"]),
+                        "B_base": float(route_base["b_proxy"]),
+                        "J_crowded": route_j_crowded,
+                        "A_crowded": float(route_crowded["a_proxy"]),
+                        "B_crowded": float(route_crowded["b_proxy"]),
+                        "J_robust": min(route_j_base, route_j_crowded),
+                    }
+                )
 
     summary = pd.DataFrame(rows).sort_values(
         ["years", "J_robust", "J_base"],
@@ -262,10 +309,49 @@ def main() -> int:
         ["J_stable", "J_worst"],
         ascending=False,
     )
+    all_routes = pd.DataFrame(all_route_rows).sort_values(
+        ["years", "J_robust", "J_base"],
+        ascending=[True, False, False],
+    )
+    all_route_stability_rows: list[dict[str, object]] = []
+    annual_routes = all_routes.loc[
+        all_routes["years"].isin(["2023", "2024"])
+    ]
+    for (route, screened15_lambda), block in annual_routes.groupby(
+        ["route", "t_screened15_lambda"],
+        sort=True,
+    ):
+        values = block["J_robust"].astype(float)
+        j_mean = float(values.mean())
+        j_std = float(values.std(ddof=0))
+        all_route_stability_rows.append(
+            {
+                "route": route,
+                "t_screened15_lambda": float(screened15_lambda),
+                "J_mean": j_mean,
+                "J_worst": float(values.min()),
+                "J_std": j_std,
+                "J_stable": j_mean - args.lambda_std * j_std,
+            }
+        )
+    all_route_stability = pd.DataFrame(
+        all_route_stability_rows
+    ).sort_values(
+        ["J_stable", "J_worst"],
+        ascending=False,
+    )
     args.output_dir.mkdir(parents=True)
     summary.to_csv(args.output_dir / "t_lambda_j_comparison.csv", index=False)
     stability.to_csv(
         args.output_dir / "t_lambda_j_stability.csv",
+        index=False,
+    )
+    all_routes.to_csv(
+        args.output_dir / "all_route_j_comparison.csv",
+        index=False,
+    )
+    all_route_stability.to_csv(
+        args.output_dir / "all_route_j_stability.csv",
         index=False,
     )
     payload = {
@@ -287,6 +373,8 @@ def main() -> int:
         "screened15_columns": list(selected_public),
         "fixed_route_direction_metadata": direction_metadata,
         "stability": stability.to_dict("records"),
+        "all_route_stability": all_route_stability.to_dict("records"),
+        "all_route_summary": all_routes.to_dict("records"),
         "summary": summary.to_dict("records"),
     }
     (args.output_dir / "t_lambda_j_comparison.json").write_text(
@@ -294,6 +382,8 @@ def main() -> int:
         encoding="utf-8",
     )
     print(stability.to_string(index=False))
+    print()
+    print(all_route_stability.to_string(index=False))
     print()
     print(summary.to_string(index=False))
     return 0
