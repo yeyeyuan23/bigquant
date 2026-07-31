@@ -587,6 +587,7 @@ def walk_forward_lightgbm(
     train_window_days: int = 60,
     test_window_days: int = 20,
     residual_baseline_columns: tuple[str, ...] = (),
+    residual_baseline_addback_weight: float = 1.0,
 ) -> pd.DataFrame:
     """Generate causal rolling 60-day train / 20-day OOS predictions."""
 
@@ -612,6 +613,7 @@ def walk_forward_lightgbm(
         train_window_days=train_window_days,
         test_window_days=test_window_days,
         residual_baseline_columns=residual_baseline_columns,
+        residual_baseline_addback_weight=residual_baseline_addback_weight,
     )
     return predictions
 
@@ -626,6 +628,7 @@ def walk_forward_lightgbm_with_importance(
     train_window_days: int = 60,
     test_window_days: int = 20,
     residual_baseline_columns: tuple[str, ...] = (),
+    residual_baseline_addback_weight: float = 1.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Generate LightGBM predictions plus per-window feature importance."""
 
@@ -651,6 +654,7 @@ def walk_forward_lightgbm_with_importance(
         train_window_days=train_window_days,
         test_window_days=test_window_days,
         residual_baseline_columns=residual_baseline_columns,
+        residual_baseline_addback_weight=residual_baseline_addback_weight,
     )
 
 
@@ -663,6 +667,7 @@ def _walk_forward_lightgbm_prepared(
     train_window_days: int = 60,
     test_window_days: int = 20,
     residual_baseline_columns: tuple[str, ...] = (),
+    residual_baseline_addback_weight: float = 1.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit LightGBM on a pre-standardized common sample."""
 
@@ -747,7 +752,8 @@ def _walk_forward_lightgbm_prepared(
         if residual_baseline_columns:
             prediction = (
                 prediction
-                + test.loc[:, list(residual_baseline_columns)]
+                + residual_baseline_addback_weight
+                * test.loc[:, list(residual_baseline_columns)]
                 .mean(axis=1)
                 .to_numpy(dtype=float)
             )
@@ -771,6 +777,7 @@ def _walk_forward_lightgbm_prepared_polars(
     train_window_days: int = 60,
     test_window_days: int = 20,
     residual_baseline_columns: tuple[str, ...] = (),
+    residual_baseline_addback_weight: float = 1.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit LightGBM from a Polars prepared frame; convert only model arrays/output."""
 
@@ -856,7 +863,8 @@ def _walk_forward_lightgbm_prepared_polars(
         if residual_baseline_columns:
             prediction = (
                 prediction
-                + test.select(residual_baseline_list)
+                + residual_baseline_addback_weight
+                * test.select(residual_baseline_list)
                 .mean_horizontal()
                 .to_numpy()
             )

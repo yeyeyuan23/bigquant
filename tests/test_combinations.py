@@ -414,6 +414,43 @@ class CombinationTest(unittest.TestCase):
         expected = expected.sort_values(["date", "instrument"]).reset_index(drop=True)
         pd.testing.assert_frame_equal(result, expected)
 
+    def test_lightgbm_screened_baseline_addback_weight_changes_only_output(self):
+        dates = pd.to_datetime(
+            ["2019-01-02"] * 10
+            + ["2019-01-03"] * 10
+            + ["2020-01-02"] * 10
+        )
+        panel = pd.DataFrame(
+            {
+                "date": dates,
+                "instrument": [str(value) for value in range(10)] * 3,
+                "public": list(range(10)) * 3,
+                "candidate": [0.0] * 30,
+            }
+        )
+        labels = panel[["date", "instrument"]].copy()
+        labels["ret_close_to_close"] = panel["public"]
+        fitted_targets: list[np.ndarray] = []
+
+        with patch(
+            "bigalpha2026.combinations._lightgbm_regressor",
+            return_value=_ZeroLightGBM(fitted_targets),
+        ):
+            result = walk_forward_lightgbm(
+                panel,
+                labels,
+                feature_columns=("candidate",),
+                prediction_years=(2020,),
+                train_window_days=1,
+                test_window_days=1,
+                residual_baseline_columns=("public",),
+                residual_baseline_addback_weight=0.0,
+            )
+
+        self.assertEqual(len(fitted_targets), 1)
+        self.assertTrue(np.allclose(fitted_targets[0], 0.0))
+        self.assertTrue(np.allclose(result["factor"], 0.1))
+
     def test_paired_tree_increment_uses_daily_oos_rank_ic(self):
         dates = pd.bdate_range("2021-01-04", periods=40)
         rows = [
