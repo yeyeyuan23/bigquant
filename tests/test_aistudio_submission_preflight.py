@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import subprocess
 import sys
@@ -55,7 +56,9 @@ def test_current_submission_sources_pass_local_preflight():
             text=True,
         )
         assert completed.returncode == 0, completed.stdout + completed.stderr
-        assert '"status": "ok"' in completed.stdout
+        payload = json.loads(completed.stdout)
+        assert payload["status"] == "ok"
+        assert payload["static"]["module_mode"] == "sibling_package"
 
 
 def test_platform_schema_queries_use_a_bounded_date_filter(monkeypatch):

@@ -1,4 +1,4 @@
-"""Fast preflight checks for self-contained BigAlpha submission sources.
+"""Fast preflight checks for packaged BigAlpha submission sources.
 
 The default checks are local and do not execute ``main``.  ``--platform-schema``
 adds tiny ``LIMIT 1`` queries and therefore must run inside AIStudio.
@@ -56,14 +56,16 @@ def _main_signature(tree: ast.Module) -> list[str]:
     raise ValueError("submission has no main()")
 
 
-def _installer_node(tree: ast.Module) -> ast.FunctionDef | ast.AsyncFunctionDef:
+def _installer_node(
+    tree: ast.Module,
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
     for node in tree.body:
         if (
             isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             and node.name == "_install_bigalpha_candidate_modules"
         ):
             return node
-    raise ValueError("submission has no embedded candidate-module installer")
+    return None
 
 
 def _embedded_sources(
@@ -83,6 +85,27 @@ def _embedded_sources(
             raise TypeError("embedded sources must be a string-to-string dictionary")
         return value
     raise ValueError("installer has no literal sources dictionary")
+
+
+def _sibling_package_sources(source_path: Path) -> dict[str, str]:
+    package_parent = source_path.parent
+    package_root = package_parent / "bigalpha2026"
+    if not package_root.is_dir():
+        raise ValueError(
+            "submission has neither a sibling bigalpha2026 package nor an "
+            "embedded candidate-module installer"
+        )
+    sources: dict[str, str] = {}
+    for module_path in sorted(package_root.rglob("*.py")):
+        if module_path.name == "__init__.py":
+            continue
+        module_name = ".".join(
+            module_path.relative_to(package_parent).with_suffix("").parts
+        )
+        sources[module_name] = module_path.read_text(encoding="utf-8")
+    if "bigalpha2026.candidate_transforms" not in sources:
+        raise ValueError("sibling package has no candidate_transforms module")
+    return sources
 
 
 def _bound_module_names(table: symtable.SymbolTable) -> set[str]:
@@ -159,7 +182,17 @@ def _install_embedded_modules(
     namespace["_install_bigalpha_candidate_modules"]()
 
 
-def _check_embedded_runtime(sources: dict[str, str]) -> dict[str, Any]:
+def _install_sibling_package(source_path: Path) -> None:
+    for name in tuple(sys.modules):
+        if name == "bigalpha2026" or name.startswith("bigalpha2026."):
+            del sys.modules[name]
+    package_parent = str(source_path.parent)
+    if package_parent not in sys.path:
+        sys.path.insert(0, package_parent)
+    importlib.invalidate_caches()
+
+
+def _check_candidate_runtime(sources: dict[str, str]) -> dict[str, Any]:
     transforms = importlib.import_module("bigalpha2026.candidate_transforms")
     frame = pd.DataFrame(
         {
@@ -170,7 +203,7 @@ def _check_embedded_runtime(sources: dict[str, str]) -> dict[str, Any]:
     result = transforms.daily_median_centered_rank(frame)
     expected = np.asarray([-2.0 / 3.0, 0.0, 2.0 / 3.0])
     if not np.allclose(result.to_numpy(dtype=float), expected):
-        raise ValueError(f"embedded rank smoke returned {result.tolist()}")
+        raise ValueError(f"candidate rank smoke returned {result.tolist()}")
 
     checked_builders = 0
     for module_name in sources:
@@ -213,8 +246,17 @@ def static_preflight(source_path: Path) -> dict[str, Any]:
     signature = _main_signature(tree)
     if signature != ["datasources", "start_date", "end_date"]:
         raise ValueError(f"unexpected main signature: {signature}")
+
     installer = _installer_node(tree)
-    sources = _embedded_sources(installer)
+    if installer is None:
+        mode = "sibling_package"
+        sources = _sibling_package_sources(source_path)
+        _install_sibling_package(source_path)
+    else:
+        mode = "embedded_legacy"
+        sources = _embedded_sources(installer)
+        _install_embedded_modules(installer, source_path)
+
     undefined: dict[str, list[str]] = {}
     for module_name, module_source in sources.items():
         compile(module_source, module_name, "exec")
@@ -222,14 +264,14 @@ def static_preflight(source_path: Path) -> dict[str, Any]:
         if missing:
             undefined[module_name] = missing
     if undefined:
-        raise NameError(f"undefined embedded globals: {undefined}")
+        raise NameError(f"undefined candidate-module globals: {undefined}")
     notebook = _check_notebook_pair(source_path, source)
-    _install_embedded_modules(installer, source_path)
-    runtime = _check_embedded_runtime(sources)
+    runtime = _check_candidate_runtime(sources)
     return {
         "status": "ok",
         "submission": source_path.name,
-        "embedded_modules": len(sources),
+        "module_mode": mode,
+        "candidate_modules": len(sources),
         "notebook": notebook,
         "runtime": runtime,
     }

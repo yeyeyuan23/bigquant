@@ -1,4 +1,4 @@
-"""Build a self-contained Elastic Net submission from the latest I result."""
+"""Build an Elastic Net submission from the latest I result."""
 
 from __future__ import annotations
 
@@ -8,9 +8,8 @@ from pathlib import Path
 
 from build_t_orthogonal_submission import external_helpers_source
 from submission_builder_support import (
-    discover_candidate_modules,
-    installer_source,
     submission_runtime_source,
+    write_candidate_package,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,7 +90,7 @@ def main() -> int:
         type=Path,
         help=(
             "output path without .py/.ipynb; defaults to "
-            "submissions/enet_i_N_candidate"
+            "remote_submission_notebooks/enet_i_N_candidate"
         ),
     )
     args = parser.parse_args()
@@ -105,18 +104,19 @@ def main() -> int:
         raise ValueError("I result contains duplicate frozen candidates")
 
     output_stem = args.output_stem or (
-        ROOT / "submissions" / f"enet_i_{len(candidate_ids)}_candidate"
+        ROOT / "remote_submission_notebooks" / f"enet_i_{len(candidate_ids)}_candidate"
     )
     if not output_stem.is_absolute():
         output_stem = ROOT / output_stem
     output_stem.parent.mkdir(parents=True, exist_ok=True)
     output_py = output_stem.with_suffix(".py")
     output_nb = output_stem.with_suffix(".ipynb")
+    package = write_candidate_package(candidate_ids, output_stem.parent)
 
     source = (
         f'"""I-route pure-increment Elastic Net with {len(candidate_ids)} factors."""\n\n'
         "# Auto-generated from the frozen I artifact. Do not edit by hand.\n"
-        + installer_source(discover_candidate_modules(candidate_ids))
+        + "# Requires the generated sibling bigalpha2026 package.\n"
         + external_helpers_source()
         + elastic_net_runtime_source(candidate_ids)
     )
@@ -132,6 +132,7 @@ def main() -> int:
                 "candidates": candidate_ids,
                 "source": str(output_py.relative_to(ROOT)),
                 "notebook": str(output_nb.relative_to(ROOT)),
+                "package": str(package.relative_to(ROOT)),
             },
             ensure_ascii=False,
             indent=2,

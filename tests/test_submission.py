@@ -72,34 +72,39 @@ class SubmissionTest(unittest.TestCase):
                     source_path.read_text(encoding="utf-8"),
                 )
 
-    def test_embedded_candidate_transforms_execute_in_isolation(self):
+    def test_candidate_submissions_use_normal_sibling_package(self):
         sources = [
             *sorted(SUBMISSIONS.glob("*_candidate.py")),
             *sorted(REMOTE_SUBMISSIONS.glob("*_candidate.py")),
         ]
+        package_directories = set()
+        for source_path in sources:
+            with self.subTest(source=source_path.name):
+                source = source_path.read_text(encoding="utf-8")
+                self.assertNotIn("_install_bigalpha_candidate_modules", source)
+                self.assertNotIn("exec(compile(", source)
+                package = source_path.parent / "bigalpha2026"
+                self.assertTrue((package / "candidate_transforms.py").is_file())
+                package_directories.add(source_path.parent)
+
         smoke = r"""
-import ast
+import importlib
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-path = Path(sys.argv[1])
-tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-installer = next(
-    node
-    for node in tree.body
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    and node.name == "_install_bigalpha_candidate_modules"
-)
-namespace = {}
-exec(
-    compile(ast.Module(body=[installer], type_ignores=[]), str(path), "exec"),
-    namespace,
-)
-namespace["_install_bigalpha_candidate_modules"]()
+package_parent = Path(sys.argv[1])
+sys.path.insert(0, str(package_parent))
 from bigalpha2026.candidate_transforms import daily_median_centered_rank
+
+package_root = package_parent / "bigalpha2026"
+for module_path in sorted(package_root.rglob("*.py")):
+    if module_path.name == "__init__.py":
+        continue
+    module_name = ".".join(module_path.relative_to(package_parent).with_suffix("").parts)
+    importlib.import_module(module_name)
 
 frame = pd.DataFrame(
     {
@@ -108,19 +113,14 @@ frame = pd.DataFrame(
     }
 )
 result = daily_median_centered_rank(frame)
-assert result.tolist() == [-2.0 / 3.0, 0.0, 2.0 / 3.0], result.tolist()
+assert np.allclose(result, [-2.0 / 3.0, 0.0, 2.0 / 3.0]), result.tolist()
 """
-        for source_path in sources:
-            if "_install_bigalpha_candidate_modules" not in source_path.read_text(
-                encoding="utf-8"
-            ):
-                continue
-            with self.subTest(source=source_path.name):
-                subprocess.run(
-                    [sys.executable, "-c", smoke, str(source_path)],
-                    check=True,
-                    cwd=ROOT,
-                )
+        for directory in sorted(package_directories):
+            subprocess.run(
+                [sys.executable, "-c", smoke, str(directory)],
+                check=True,
+                cwd=ROOT,
+            )
 
     def test_current_learned_models_keep_frozen_training_contracts(self):
         enet = (

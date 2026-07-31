@@ -1,4 +1,4 @@
-"""Build a self-contained family-balanced S submission."""
+"""Build a family-balanced S submission."""
 
 from __future__ import annotations
 
@@ -8,9 +8,8 @@ from pathlib import Path
 
 from build_t_orthogonal_submission import external_helpers_source
 from submission_builder_support import (
-    discover_candidate_modules,
-    installer_source,
     submission_runtime_source,
+    write_candidate_package,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -169,10 +168,11 @@ def main() -> int:
     output_stem.parent.mkdir(parents=True, exist_ok=True)
     output_py = output_stem.with_suffix(".py")
     output_nb = output_stem.with_suffix(".ipynb")
+    package = write_candidate_package(candidate_ids, output_stem.parent)
     source = (
         f'"""S-route family-balanced composite with {len(candidate_ids)} factors."""\n\n'
         "# Auto-generated from the frozen S artifact. Do not edit by hand.\n"
-        + installer_source(discover_candidate_modules(candidate_ids))
+        + "# Requires the generated sibling bigalpha2026 package.\n"
         + external_helpers_source()
         + family_runtime_source(candidate_ids)
     )
@@ -185,6 +185,7 @@ def main() -> int:
                 "candidates": candidate_ids,
                 "source": str(output_py.relative_to(ROOT)),
                 "notebook": str(output_nb.relative_to(ROOT)),
+                "package": str(package.relative_to(ROOT)),
             },
             ensure_ascii=False,
             indent=2,

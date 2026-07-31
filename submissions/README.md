@@ -30,3 +30,7 @@ selected path. New, unverified outputs are written to
 prefix/look-ahead probes before promotion into this directory.
 
 Local J is diagnostic and must not be presented as an official platform score.
+
+Candidate notebooks use normal Python imports. Upload the generated sibling
+`bigalpha2026/` directory together with the `.ipynb`; generated notebooks must
+not embed module source strings or install modules through `exec`/`sys.modules`.

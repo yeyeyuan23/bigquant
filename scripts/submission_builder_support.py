@@ -32,7 +32,7 @@ def strip_future_imports(source: str) -> str:
     ) + "\n"
 
 
-def discover_candidate_modules(candidate_ids: list[str]) -> dict[str, str]:
+def discover_candidate_modules(candidate_ids: list[str]) -> tuple[str, ...]:
     needed: set[str] = {"bigalpha2026.candidate_transforms"}
     stack = [module_name_for_candidate(candidate_id) for candidate_id in candidate_ids]
     while stack:
@@ -81,44 +81,16 @@ def discover_candidate_modules(candidate_ids: list[str]) -> dict[str, str]:
             return (6, module_name)
         return (9, module_name)
 
-    pandas_transforms = '''"""Pandas-only transforms for self-contained AIStudio submission."""
-import numpy as np
-import pandas as pd
-
-def daily_median_centered_rank(frame, *, raw_column="factor_raw", date_column="date", orientation=1.0, fill_value=0.0):
-    raw = pd.to_numeric(frame[raw_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
-    dates = pd.to_datetime(frame[date_column], errors="coerce").dt.normalize()
-    med = raw.groupby(dates, sort=False).transform("median")
-    filled = raw.fillna(med).fillna(fill_value)
-    ranks = filled.groupby(dates, sort=False).rank(method="average")
-    counts = filled.groupby(dates, sort=False).transform("count")
-    centered = 2.0 * (ranks - (counts + 1.0) / 2.0) / counts.where(counts.gt(0))
-    return (centered * float(orientation)).fillna(fill_value).replace([np.inf, -np.inf], fill_value).astype(float)
-
-def centered_daily_rank(values, dates, *, orientation=1.0, fill_value=0.0):
-    frame = pd.DataFrame(
-        {
-            "date": pd.to_datetime(dates, errors="coerce").dt.normalize(),
-            "factor_raw": pd.to_numeric(values, errors="coerce").replace([np.inf, -np.inf], np.nan),
-        },
-        index=values.index,
-    )
-    return daily_median_centered_rank(frame, orientation=orientation, fill_value=fill_value)
-'''
-
-    sources: dict[str, str] = {}
-    for module_name in sorted(needed, key=order_key):
-        if module_name == "bigalpha2026.candidate_transforms":
-            sources[module_name] = pandas_transforms
-        else:
-            sources[module_name] = strip_future_imports(
-                path_for_module(module_name).read_text(encoding="utf-8")
-            )
-    return sources
+    return tuple(sorted(needed, key=order_key))
 
 
-def installer_source(module_sources: dict[str, str]) -> str:
-    packages = [
+def write_candidate_package(
+    candidate_ids: list[str],
+    output_directory: Path,
+) -> Path:
+    """Write normal importable candidate modules beside a submission."""
+
+    package_names = (
         "bigalpha2026",
         "bigalpha2026.candidates",
         "bigalpha2026.candidates.fr",
@@ -126,29 +98,24 @@ def installer_source(module_sources: dict[str, str]) -> str:
         "bigalpha2026.candidates.hf",
         "bigalpha2026.candidates.ob",
         "bigalpha2026.candidates.composite",
-    ]
-    return f'''
-def _install_bigalpha_candidate_modules():
-    import sys
-    import types
-    sources = {module_sources!r}
-    for package in {packages!r}:
-        if package not in sys.modules:
-            module = types.ModuleType(package)
-            module.__path__ = []
-            sys.modules[package] = module
-            if "." in package:
-                parent, child = package.rsplit(".", 1)
-                setattr(sys.modules[parent], child, module)
-    for name, source in sources.items():
-        module = types.ModuleType(name)
-        module.__package__ = name.rsplit(".", 1)[0]
-        sys.modules[name] = module
-        parent, child = name.rsplit(".", 1)
-        setattr(sys.modules[parent], child, module)
-    for name, source in sources.items():
-        exec(compile(source, name, "exec"), sys.modules[name].__dict__)  # noqa: S102
-'''
+    )
+    for package_name in package_names:
+        package_directory = output_directory / package_name.replace(".", "/")
+        package_directory.mkdir(parents=True, exist_ok=True)
+        (package_directory / "__init__.py").write_text(
+            f'"""Generated submission package: {package_name}."""\n',
+            encoding="utf-8",
+        )
+
+    module_names = discover_candidate_modules(candidate_ids)
+    for module_name in module_names:
+        module_path = output_directory / (module_name.replace(".", "/") + ".py")
+        module_path.parent.mkdir(parents=True, exist_ok=True)
+        module_path.write_text(
+            path_for_module(module_name).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+    return output_directory / "bigalpha2026"
 
 
 def cicc_helpers_source() -> str:
@@ -544,7 +511,6 @@ def _build_top50_daily_components(
 
 
 def _candidate_factors(selected, financial, factorlib, exposure, daily_features, pool, pd, np):
-    _install_bigalpha_candidate_modules()
     import importlib
     import inspect
 

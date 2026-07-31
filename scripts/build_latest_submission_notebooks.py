@@ -38,7 +38,7 @@ def discover_reports_dir() -> Path:
     )
 
 
-def run_builder(script: str, result: Path) -> tuple[Path, Path, int]:
+def run_builder(script: str, result: Path) -> tuple[Path, Path, Path, int]:
     completed = subprocess.run(
         [
             sys.executable,
@@ -54,10 +54,16 @@ def run_builder(script: str, result: Path) -> tuple[Path, Path, int]:
     payload = json.loads(completed.stdout)
     source = ROOT / payload["source"]
     notebook = ROOT / payload["notebook"]
-    return source, notebook, int(payload["candidate_count"])
+    package = ROOT / payload["package"]
+    return source, notebook, package, int(payload["candidate_count"])
 
 
-def validate_pair(source: Path, notebook: Path, candidate_count: int) -> None:
+def validate_pair(
+    source: Path,
+    notebook: Path,
+    package: Path,
+    candidate_count: int,
+) -> None:
     py_compile.compile(str(source), doraise=True)
     source_text = source.read_text(encoding="utf-8")
     ast.parse(source_text)
@@ -69,6 +75,10 @@ def validate_pair(source: Path, notebook: Path, candidate_count: int) -> None:
         raise ValueError(f"{notebook} must contain exactly one code cell")
     if "".join(code_cells[0]["source"]) != source_text:
         raise ValueError(f"{notebook} code does not match {source}")
+    if "_install_bigalpha_candidate_modules" in source_text or "exec(compile(" in source_text:
+        raise ValueError(f"{source} still embeds candidate module source")
+    if not (package / "candidate_transforms.py").is_file():
+        raise ValueError(f"{source} is missing its sibling bigalpha2026 package")
     if candidate_count < 1:
         raise ValueError(f"{source} contains no frozen candidates")
 
@@ -100,12 +110,13 @@ def main() -> int:
         ),
     ]
     rows = []
-    for source, notebook, candidate_count in builds:
-        validate_pair(source, notebook, candidate_count)
+    for source, notebook, package, candidate_count in builds:
+        validate_pair(source, notebook, package, candidate_count)
         rows.append(
             {
                 "source": str(source.relative_to(ROOT)),
                 "notebook": str(notebook.relative_to(ROOT)),
+                "package": str(package.relative_to(ROOT)),
                 "candidate_count": candidate_count,
                 "validation": "ok",
             }

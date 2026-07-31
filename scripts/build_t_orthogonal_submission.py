@@ -1,4 +1,4 @@
-"""Build a self-contained submission from the latest orthogonal T result."""
+"""Build a submission from the latest orthogonal T result."""
 
 from __future__ import annotations
 
@@ -7,9 +7,8 @@ import json
 from pathlib import Path
 
 from submission_builder_support import (
-    discover_candidate_modules,
-    installer_source,
     submission_runtime_source,
+    write_candidate_package,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,7 +148,7 @@ def main() -> int:
         type=Path,
         help=(
             "output path without .py/.ipynb; defaults to "
-            "submissions/lgbm_t_orthogonal_N_candidate"
+            "remote_submission_notebooks/lgbm_t_orthogonal_N_candidate"
         ),
     )
     parser.add_argument(
@@ -175,7 +174,7 @@ def main() -> int:
 
     output_stem = args.output_stem or (
         ROOT
-        / "submissions"
+        / "remote_submission_notebooks"
         / f"lgbm_t_orthogonal_{len(candidate_ids)}_candidate"
     )
     if not output_stem.is_absolute():
@@ -183,6 +182,7 @@ def main() -> int:
     output_stem.parent.mkdir(parents=True, exist_ok=True)
     output_py = output_stem.with_suffix(".py")
     output_nb = output_stem.with_suffix(".ipynb")
+    package = write_candidate_package(candidate_ids, output_stem.parent)
 
     mode = "no15" if args.screened15_lambda == 0.0 else "add15"
     source = (
@@ -191,7 +191,7 @@ def main() -> int:
             f'{mode}, screened15 lambda={args.screened15_lambda:g}."""\n\n'
         )
         + "# Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.\n"
-        + installer_source(discover_candidate_modules(candidate_ids))
+        + "# Requires the generated sibling bigalpha2026 package.\n"
         + external_helpers_source()
         + submission_runtime_source(
             candidate_ids,
@@ -217,6 +217,7 @@ def main() -> int:
                 "mode": mode,
                 "source": str(output_py.relative_to(ROOT)),
                 "notebook": str(output_nb.relative_to(ROOT)),
+                "package": str(package.relative_to(ROOT)),
             },
             ensure_ascii=False,
             indent=2,
