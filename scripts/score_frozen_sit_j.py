@@ -23,6 +23,7 @@ from bigalpha2026.combinations import (
     walk_forward_elastic_net_with_weights,
     walk_forward_lightgbm,
 )
+from bigalpha2026.research_policy import include_in_j_baseline
 from scripts.run_combinations import (
     DEVELOPMENT_YEARS,
     EVALUATION_YEARS,
@@ -89,6 +90,25 @@ def _validate_funnel(routes: dict[str, tuple[str, ...]]) -> None:
         raise ValueError("frozen T is not a subset of frozen I")
 
 
+def _model_and_baseline_candidate_filter(
+    routes: dict[str, tuple[str, ...]],
+    available_candidate_ids: list[str],
+) -> tuple[str, ...]:
+    """Load frozen model members plus every available latent J baseline."""
+
+    model_members = {
+        member
+        for members in routes.values()
+        for member in members
+    }
+    baseline_members = {
+        f"self__{candidate_id}"
+        for candidate_id in available_candidate_ids
+        if include_in_j_baseline(candidate_id)
+    }
+    return tuple(sorted(model_members | baseline_members))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -128,8 +148,14 @@ def main() -> int:
         ),
     }
     _validate_funnel(routes)
-    requested_candidates = tuple(
-        sorted({member for members in routes.values() for member in members})
+    candidate_manifest = json.loads(
+        (args.data_dir / "manifest_candidate_pool.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    requested_candidates = _model_and_baseline_candidate_filter(
+        routes,
+        list(candidate_manifest.get("candidate_rows", {})),
     )
     input_years = _continuous_input_years(prediction_years)
     direction_calibration_year = DEVELOPMENT_YEARS[-1]

@@ -4,6 +4,7 @@ from scripts.score_frozen_sit_j import (
     J_INCLUDE_EXPOSURES,
     REQUIRED_J_EXPOSURE_COLUMNS,
     _continuous_input_years,
+    _model_and_baseline_candidate_filter,
     _validate_funnel,
     _validated_prediction_years,
 )
@@ -53,6 +54,21 @@ class FrozenSitJContractTest(unittest.TestCase):
                     "T": ("self__B",),
                 }
             )
+
+    def test_frozen_score_loads_latent_baseline_outside_model_routes(self):
+        routes = {
+            "S": ("self__PV-045",),
+            "I": ("self__PV-045",),
+            "T": ("self__PV-045",),
+        }
+        requested = _model_and_baseline_candidate_filter(
+            routes,
+            ["HF-079", "PV-045"],
+        )
+        self.assertEqual(
+            requested,
+            ("self__HF-079", "self__PV-045"),
+        )
 
 
 if __name__ == "__main__":
