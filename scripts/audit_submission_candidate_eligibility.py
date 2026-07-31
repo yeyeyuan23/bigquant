@@ -237,6 +237,61 @@ def filter_candidate_ids(
     return kept, excluded
 
 
+def candidate_pool_availability(
+    candidate_ids: list[str],
+    *,
+    required_candidate_ids: list[str] | None = None,
+) -> dict[str, object]:
+    rows = scan_candidates()
+    active_eligible = {
+        str(row["candidate_id"])
+        for row in rows
+        if bool(row["eligible"])
+    }
+    available = set(candidate_ids)
+    required = (
+        active_eligible
+        if required_candidate_ids is None
+        else set(required_candidate_ids)
+    )
+    return {
+        "schema_version": "candidate-pool-availability-v1",
+        "active_eligible_count": len(active_eligible),
+        "available_candidate_count": len(available),
+        "required_candidate_count": len(required),
+        "missing_required_count": len(required - available),
+        "missing_required_candidates": sorted(required - available),
+        "available_without_active_source": sorted(
+            available - active_eligible - set(RETIRED_CANDIDATES)
+        ),
+        "available_retired_candidates": sorted(
+            available & set(RETIRED_CANDIDATES)
+        ),
+    }
+
+
+def write_candidate_pool_availability_report(
+    path: Path,
+    candidate_ids: list[str],
+    *,
+    required_candidate_ids: list[str] | None = None,
+) -> dict[str, object]:
+    report = candidate_pool_availability(
+        candidate_ids,
+        required_candidate_ids=required_candidate_ids,
+    )
+    report["scanner_source"] = str(Path(__file__).resolve().relative_to(ROOT))
+    report["scanner_sha256"] = hashlib.sha256(
+        Path(__file__).read_bytes()
+    ).hexdigest()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return report
+
+
 def write_eligibility_report(
     json_path: Path,
     csv_path: Path,

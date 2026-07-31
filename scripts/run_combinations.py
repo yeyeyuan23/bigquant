@@ -20,9 +20,13 @@ import polars as pl
 try:
     from scripts.audit_submission_candidate_eligibility import (
         filter_candidate_ids,
+        write_candidate_pool_availability_report,
     )
 except ModuleNotFoundError:
-    from audit_submission_candidate_eligibility import filter_candidate_ids
+    from audit_submission_candidate_eligibility import (
+        filter_candidate_ids,
+        write_candidate_pool_availability_report,
+    )
 from bigalpha2026.combinations import (
     static_lightgbm_feature_importance,
     static_lightgbm_predict,
@@ -764,6 +768,19 @@ def load_dynamic_inputs(
         list(raw_requested_candidate_ids)
     )
     requested_candidate_ids = tuple(eligible_candidate_ids)
+    availability = write_candidate_pool_availability_report(
+        reports_dir / "latest/candidate_pool_availability.json",
+        list(candidate_manifest.get("candidate_rows", {}).keys()),
+        required_candidate_ids=(
+            None if candidate_filter is None else list(requested_candidate_ids)
+        ),
+    )
+    if availability["missing_required_count"]:
+        raise RuntimeError(
+            "candidate source files are missing from the generated candidate "
+            "pool; regenerate candidate_pool.parquet before SITJ: "
+            f"{availability['missing_required_candidates']}"
+        )
     if excluded_candidates:
         print(
             json.dumps(

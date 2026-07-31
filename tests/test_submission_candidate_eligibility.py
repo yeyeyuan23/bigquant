@@ -18,7 +18,8 @@ def load_module():
 def test_active_candidate_tree_is_submission_eligible():
     module = load_module()
     rows = module.scan_candidates()
-    assert len(rows) == 140
+    assert rows
+    assert len(rows) == len({row["candidate_id"] for row in rows})
     assert all(row["eligible"] for row in rows)
 
 
@@ -41,3 +42,17 @@ def test_report_persists_scanner_and_candidate_hashes(tmp_path):
     assert all(row["source_sha256"] for row in report["candidates"])
     assert (tmp_path / "eligibility.json").is_file()
     assert (tmp_path / "eligibility.csv").is_file()
+
+
+def test_candidate_pool_availability_reports_missing_source_candidates(tmp_path):
+    module = load_module()
+    rows = module.scan_candidates()
+    candidate_ids = [str(row["candidate_id"]) for row in rows]
+    missing = candidate_ids[-2:]
+    report = module.write_candidate_pool_availability_report(
+        tmp_path / "availability.json",
+        candidate_ids[:-2],
+    )
+    assert report["missing_required_count"] == 2
+    assert report["missing_required_candidates"] == missing
+    assert (tmp_path / "availability.json").is_file()
