@@ -288,7 +288,11 @@ def _schema_specs(tree: ast.Module, financial_table: str) -> list[tuple[str, tup
     return specs
 
 
-def platform_schema_preflight(source_path: Path, financial_table: str) -> dict[str, Any]:
+def platform_schema_preflight(
+    source_path: Path,
+    financial_table: str,
+    schema_date: str,
+) -> dict[str, Any]:
     try:
         import dai
     except ImportError as exc:
@@ -300,7 +304,11 @@ def platform_schema_preflight(source_path: Path, financial_table: str) -> dict[s
     for table, columns in _schema_specs(tree, financial_table):
         sql = f"SELECT {', '.join(dict.fromkeys(columns))} FROM {table} LIMIT 1"
         try:
-            frame = dai.query(sql, compression=True).df()
+            frame = dai.query(
+                sql,
+                filters={"date": [schema_date, schema_date]},
+                compression=True,
+            ).df()
             missing = sorted(set(columns) - set(frame.columns))
             if missing:
                 raise ValueError(f"query result missing columns: {missing}")
@@ -338,6 +346,11 @@ def main() -> int:
         default="bigalpha_2026_financial",
         help="financial table supplied to submission datasources",
     )
+    parser.add_argument(
+        "--schema-date",
+        default="2023-01-04",
+        help="single partition date used by --platform-schema",
+    )
     args = parser.parse_args()
     report: dict[str, Any] = {"status": "ok"}
     try:
@@ -346,6 +359,7 @@ def main() -> int:
             report["platform_schema"] = platform_schema_preflight(
                 args.submission,
                 args.financial,
+                args.schema_date,
             )
             if report["platform_schema"]["status"] != "ok":
                 report["status"] = "error"

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = (
@@ -52,3 +56,27 @@ def test_current_submission_sources_pass_local_preflight():
         )
         assert completed.returncode == 0, completed.stdout + completed.stderr
         assert '"status": "ok"' in completed.stdout
+
+
+def test_platform_schema_queries_use_a_bounded_date_filter(monkeypatch):
+    preflight = load_preflight()
+    calls = []
+
+    def query(sql, **kwargs):
+        calls.append((sql, kwargs))
+        selected = re.search(r"SELECT (.+) FROM ", sql).group(1)
+        columns = [column.strip() for column in selected.split(",")]
+        return SimpleNamespace(df=lambda: pd.DataFrame(columns=columns))
+
+    monkeypatch.setitem(sys.modules, "dai", SimpleNamespace(query=query))
+    result = preflight.platform_schema_preflight(
+        ROOT / "remote_submission_notebooks" / "enet_i_55_candidate.py",
+        "bigalpha_2026_financial",
+        "2023-01-04",
+    )
+    assert result["status"] == "ok"
+    assert len(calls) == 5
+    for _, kwargs in calls:
+        assert kwargs["filters"] == {
+            "date": ["2023-01-04", "2023-01-04"]
+        }
