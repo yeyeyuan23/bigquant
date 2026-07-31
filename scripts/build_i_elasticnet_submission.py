@@ -29,7 +29,10 @@ ELASTIC_NET_MODEL = (
 
 
 def elastic_net_runtime_source(candidate_ids: list[str]) -> str:
-    runtime = submission_runtime_source(candidate_ids)
+    runtime = submission_runtime_source(
+        candidate_ids,
+        lean_market_runtime=True,
+    )
     runtime = runtime.replace(
         "from lightgbm import LGBMRegressor",
         "from sklearn.linear_model import ElasticNet",

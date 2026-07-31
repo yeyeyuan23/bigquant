@@ -1780,9 +1780,90 @@ def build_factor(
         ["date", "instrument"]
     ).reset_index(drop=True)
 
+_pandas_group_rolling = _group_rolling
+
+
+def _group_rolling(
+    frame,
+    values,
+    *,
+    window,
+    statistic,
+    center=False,
+    min_periods=None,
+):
+    """Equivalent fixed-row grouped rolling without pandas MultiIndex overhead."""
+    if center:
+        return _pandas_group_rolling(
+            frame,
+            values,
+            window=window,
+            statistic=statistic,
+            center=True,
+            min_periods=min_periods,
+        )
+    group_start = (
+        frame["instrument"].ne(frame["instrument"].shift())
+        | frame["trade_date"].ne(frame["trade_date"].shift())
+        | frame["session_id"].ne(frame["session_id"].shift())
+    )
+    group_codes = group_start.cumsum()
+    numeric = pd.to_numeric(values, errors="coerce").reindex(frame.index)
+    valid = numeric.notna().astype("int64")
+    filled = numeric.fillna(0.0)
+    minimum = window if min_periods is None else min_periods
+
+    count_cumulative = valid.groupby(group_codes, sort=False).cumsum()
+    sum_cumulative = filled.groupby(group_codes, sort=False).cumsum()
+    count = count_cumulative - count_cumulative.groupby(
+        group_codes,
+        sort=False,
+    ).shift(window, fill_value=0)
+    total = sum_cumulative - sum_cumulative.groupby(
+        group_codes,
+        sort=False,
+    ).shift(window, fill_value=0)
+
+    if statistic == "sum":
+        result = total
+    elif statistic == "mean":
+        result = total / count.where(count.gt(0))
+    elif statistic == "std":
+        square_cumulative = filled.pow(2).groupby(
+            group_codes,
+            sort=False,
+        ).cumsum()
+        total_square = square_cumulative - square_cumulative.groupby(
+            group_codes,
+            sort=False,
+        ).shift(window, fill_value=0)
+        variance = (
+            total_square - total.pow(2) / count.where(count.gt(0))
+        ) / (count - 1.0).where(count.gt(1))
+        result = np.sqrt(variance.clip(lower=0.0))
+    else:
+        raise ValueError(f"unsupported rolling statistic: {statistic}")
+
+    result = result.where(count.ge(minimum))
+    return result.reindex(frame.index)
+
+
+_LEAN_MARKET_RUNTIME = True
+
 
 def _rank_center(values, dates, np):
     numeric = values.replace([np.inf, -np.inf], np.nan)
+    grouped = numeric.groupby(dates, sort=False)
+    ranks = grouped.rank(method="average")
+    counts = grouped.transform("count")
+    return (2.0 * (ranks / counts - 0.5)).fillna(0.0)
+
+
+def _rank_center_frame(frame, columns, dates, pd, np):
+    numeric = frame.loc[:, list(columns)].apply(
+        pd.to_numeric,
+        errors="coerce",
+    ).replace([np.inf, -np.inf], np.nan)
     grouped = numeric.groupby(dates, sort=False)
     ranks = grouped.rank(method="average")
     counts = grouped.transform("count")
@@ -1803,19 +1884,28 @@ def _apply_financial_effective_dates(financial, pool, pd, np):
 
 
 def _iter_bar5m_parts(dai, pd, history_start, end_ts):
-    sql = """
-        SELECT date, instrument, pre_close, open, high, low, close, amount, volume, deal_number,
-               ask_price1, ask_price2, ask_price3, ask_price4, ask_price5,
-               bid_price1, bid_price2, bid_price3, bid_price4, bid_price5,
-               ask_volume1, ask_volume2, ask_volume3, ask_volume4, ask_volume5,
-               bid_volume1, bid_volume2, bid_volume3, bid_volume4, bid_volume5
-        FROM bigalpha_2026_stock_bar5m
-    """
+    if _LEAN_MARKET_RUNTIME:
+        sql = """
+            SELECT date, instrument, pre_close, open, high, low, close,
+                   amount, volume, deal_number
+            FROM bigalpha_2026_stock_bar5m
+        """
+        chunk_days = 31
+    else:
+        sql = """
+            SELECT date, instrument, pre_close, open, high, low, close, amount, volume, deal_number,
+                   ask_price1, ask_price2, ask_price3, ask_price4, ask_price5,
+                   bid_price1, bid_price2, bid_price3, bid_price4, bid_price5,
+                   ask_volume1, ask_volume2, ask_volume3, ask_volume4, ask_volume5,
+                   bid_volume1, bid_volume2, bid_volume3, bid_volume4, bid_volume5
+            FROM bigalpha_2026_stock_bar5m
+        """
+        chunk_days = 14
     cursor = history_start.normalize()
     final_date = end_ts.normalize()
     found = False
     while cursor <= final_date:
-        chunk_end = min(final_date, cursor + pd.Timedelta(days=13))
+        chunk_end = min(final_date, cursor + pd.Timedelta(days=chunk_days - 1))
         part = dai.query(
             sql,
             filters={
@@ -1848,7 +1938,8 @@ def _canonicalize_bar5m(raw, pd, np):
         "bid_volume1", "bid_volume2", "bid_volume3", "bid_volume4", "bid_volume5",
     ]
     for column in numeric_columns:
-        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        if column in frame.columns:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame = (
         frame.dropna(subset=["timestamp", "trade_date", "instrument"])
         .sort_values(["instrument", "trade_date", "timestamp"])
@@ -1872,6 +1963,59 @@ def _daily_from_bar5m(canonical, pd, np):
         volume=("volume", "sum"),
         deal_number=("deal_number", "sum"),
     ).reset_index().rename(columns={"trade_date": "date"})
+
+    if _LEAN_MARKET_RUNTIME:
+        frame = canonical.loc[
+            :,
+            [
+                "trade_date",
+                "instrument",
+                "session_id",
+                "close",
+                "amount",
+            ],
+        ].copy()
+        previous_close = frame.groupby(
+            ["instrument", "trade_date", "session_id"],
+            sort=False,
+        )["close"].shift(1)
+        valid = (
+            frame["close"].gt(0)
+            & previous_close.gt(0)
+        )
+        frame["minute_log_return"] = np.log(
+            frame["close"] / previous_close.where(previous_close > 0)
+        ).where(valid)
+        frame["return_square"] = frame["minute_log_return"].pow(2)
+        frame["downside_square"] = frame["return_square"].where(
+            frame["minute_log_return"].lt(0)
+        )
+        micro = frame.groupby(
+            ["trade_date", "instrument"],
+            sort=False,
+        ).agg(
+            realized_variance=("return_square", "sum"),
+            downside_variance=("downside_square", "sum"),
+            avg_trade_value=("amount", "mean"),
+        ).reset_index().rename(columns={"trade_date": "date"})
+        micro["realized_volatility"] = np.sqrt(
+            micro.pop("realized_variance").clip(lower=0)
+        )
+        micro["downside_realized_volatility"] = np.sqrt(
+            micro.pop("downside_variance").clip(lower=0)
+        )
+        output = daily.merge(
+            micro,
+            on=["date", "instrument"],
+            how="left",
+            validate="one_to_one",
+        )
+        for column in (
+            "shock_q90_active_count",
+            "shock_q90_recovery_5m_median",
+        ):
+            output[column] = 0.0
+        return output
 
     frame = canonical.copy()
     previous_close = frame.groupby(["instrument", "trade_date", "session_id"], sort=False)["close"].shift(1)
@@ -2047,7 +2191,7 @@ def _build_top50_daily_components(
     )
 
 
-def _candidate_factors(selected, financial, factorlib, exposure, daily_features, pool):
+def _candidate_factors(selected, financial, factorlib, exposure, daily_features, pool, pd, np):
     _install_bigalpha_candidate_modules()
     import importlib
     import inspect
@@ -2086,6 +2230,7 @@ def _candidate_factors(selected, financial, factorlib, exposure, daily_features,
         return builder(*arguments)
 
     results = {}
+    component_specs = {}
     for candidate_id in selected:
         family, number = candidate_id.split("-")
         module_name = "bigalpha2026.candidates." + {"FR": "fr", "HF": "hf", "PV": "pv", "OB": "ob", "INT": "composite"}[family] + "." + family.lower() + "_" + number
@@ -2098,8 +2243,79 @@ def _candidate_factors(selected, financial, factorlib, exposure, daily_features,
                 break
         if builder is None:
             raise ValueError(f"no builder found for {candidate_id}")
+        if (
+            builder.__name__.endswith("_factor_from_daily")
+            and hasattr(module, "COMPONENT_COLUMN")
+            and hasattr(module, "ORIENTATION")
+        ):
+            component_specs[candidate_id] = (
+                str(module.COMPONENT_COLUMN),
+                float(module.ORIENTATION),
+            )
+            continue
         results[candidate_id] = invoke(builder, candidate_id)
-    return results
+
+    pool_keys = (
+        pool.loc[:, ["date", "instrument"]]
+        .drop_duplicates(["date", "instrument"], keep="last")
+        .sort_values(["date", "instrument"])
+        .reset_index(drop=True)
+    )
+    component_wide = pool_keys.copy()
+    if component_specs:
+        component_columns = tuple(
+            dict.fromkeys(
+                component
+                for component, _ in component_specs.values()
+            )
+        )
+        missing = sorted(
+            set(component_columns).difference(daily_features.columns)
+        )
+        if missing:
+            raise ValueError(
+                f"daily_features is missing batched components: {missing}"
+            )
+        component_panel = pool_keys.merge(
+            daily_features[
+                ["date", "instrument", *component_columns]
+            ],
+            on=["date", "instrument"],
+            how="left",
+            validate="one_to_one",
+        )
+        raw = pd.DataFrame(
+            {
+                candidate_id: pd.to_numeric(
+                    component_panel[component],
+                    errors="coerce",
+                )
+                for candidate_id, (component, _) in component_specs.items()
+            },
+            index=component_panel.index,
+        ).replace([np.inf, -np.inf], np.nan)
+        grouped = raw.groupby(component_panel["date"], sort=False)
+        filled = raw.fillna(grouped.transform("median")).fillna(0.0)
+        filled_grouped = filled.groupby(
+            component_panel["date"],
+            sort=False,
+        )
+        ranks = filled_grouped.rank(method="average")
+        counts = filled_grouped.transform("count")
+        centered = 2.0 * (
+            ranks - (counts + 1.0) / 2.0
+        ) / counts.where(counts.gt(0))
+        orientations = pd.Series(
+            {
+                candidate_id: orientation
+                for candidate_id, (_, orientation) in component_specs.items()
+            }
+        )
+        component_wide.loc[
+            :,
+            list(component_specs),
+        ] = centered.mul(orientations, axis=1).fillna(0.0)
+    return results, component_wide
 
 
 def _load_common_inputs(datasources, start_date, end_date, pd, np):
@@ -2167,23 +2383,45 @@ def main(datasources, start_date, end_date):
     screened15_lambda = 1.0
     start_ts, end_ts, model_history_start, public_columns, pool, factorlib, exposure, financial, daily_features = _load_common_inputs(datasources, start_date, end_date, pd, np)
     public_directions = {"amount": -1.0, "atr_14": -1.0, "bias_20": -1.0, "cci_14": -1.0, "float_market_cap": -1.0, "kdj_d_9_3_3": -1.0, "macd_diff_12_26_9": -1.0, "macd_hist_12_26_9": -1.0, "momentum_5": -1.0, "net_profit_rate_ttm": 1.0, "netflow_amount_rate_main": -1.0, "total_market_cap": -1.0, "turn": -1.0, "volatility_5": -1.0, "volume": -1.0}
-    factors = _candidate_factors(self_columns, financial, factorlib, exposure, daily_features, pool)
-    long_parts = []
+    factors, candidate_wide = _candidate_factors(
+        self_columns,
+        financial,
+        factorlib,
+        exposure,
+        daily_features,
+        pool,
+        pd,
+        np,
+    )
     for candidate_id, frame in factors.items():
-        part = frame[["date", "instrument", "factor"]].copy()
-        part["candidate_id"] = candidate_id
-        long_parts.append(part)
-    candidate_wide = pd.concat(long_parts, ignore_index=True).pivot(index=["date", "instrument"], columns="candidate_id", values="factor").reset_index()
+        candidate_wide = candidate_wide.merge(
+            frame[["date", "instrument", "factor"]].rename(
+                columns={"factor": candidate_id}
+            ),
+            on=["date", "instrument"],
+            how="left",
+            validate="one_to_one",
+        )
     panel = pool.merge(factorlib[["date", "instrument", "daily_return", *public_columns]], on=["date", "instrument"], how="left", validate="one_to_one").merge(candidate_wide, on=["date", "instrument"], how="left", validate="one_to_one")
-    for column in public_columns:
-        panel[column] = _rank_center(pd.to_numeric(panel[column], errors="coerce"), panel["date"], np) * public_directions[column]
-    for column in self_columns:
-        panel[column] = _rank_center(pd.to_numeric(panel[column], errors="coerce"), panel["date"], np)
+    panel.loc[:, list(public_columns)] = _rank_center_frame(
+        panel,
+        public_columns,
+        panel["date"],
+        pd,
+        np,
+    ).mul(pd.Series(public_directions), axis=1)
+    panel.loc[:, list(self_columns)] = _rank_center_frame(
+        panel,
+        self_columns,
+        panel["date"],
+        pd,
+        np,
+    )
     # screened15 is a residual-target control only.  It must not enter the
     # submitted model feature vector or be added back to its prediction.
     feature_columns = tuple(self_columns)
     residual_baseline_columns = tuple(public_columns)
-    panel = panel.sort_values(["instrument", "date"]).reset_index(drop=True)
+    panel = panel.sort_values(["date", "instrument"]).reset_index(drop=True)
     panel["stock_return"] = pd.to_numeric(panel["daily_return"], errors="coerce").replace([np.inf, -np.inf], np.nan)
     all_dates = pd.DatetimeIndex(sorted(panel["date"].dropna().unique()))
     label_calendar = pd.DataFrame({"label_observed_date": all_dates[1:], "date": all_dates[:-1]})
@@ -2195,6 +2433,7 @@ def main(datasources, start_date, end_date):
         panel["target"]
         - panel.loc[:, list(residual_baseline_columns)].mean(axis=1)
     )
+    panel = panel.sort_values(["date", "instrument"]).reset_index(drop=True)
     prediction_dates = all_dates[(all_dates >= start_ts) & (all_dates <= end_ts)]
     prediction_dates = pd.DatetimeIndex([
         date
@@ -2209,6 +2448,21 @@ def main(datasources, start_date, end_date):
     ])
     if prediction_dates.empty:
         raise ValueError("no prediction dates have a complete causal 60-day training window")
+    panel_date_values = panel["date"].to_numpy(dtype="datetime64[ns]")
+
+    def date_slice(first_date, last_date):
+        left = np.searchsorted(
+            panel_date_values,
+            np.datetime64(first_date),
+            side="left",
+        )
+        right = np.searchsorted(
+            panel_date_values,
+            np.datetime64(last_date),
+            side="right",
+        )
+        return panel.iloc[left:right]
+
     predictions = []
     for offset in range(0, len(prediction_dates), 20):
         block_dates = prediction_dates[offset:offset + 20]
@@ -2221,11 +2475,12 @@ def main(datasources, start_date, end_date):
         if len(eligible_history) < 60:
             raise ValueError("not enough fully observed pre-block history for model training")
         eligible_history = eligible_history[-60:]
-        train = panel.loc[
-            panel["date"].isin(eligible_history)
-            & panel["target_residual"].notna()
-        ]
-        test = panel.loc[panel["date"].isin(block_dates)]
+        train = date_slice(
+            eligible_history[0],
+            eligible_history[-1],
+        )
+        train = train.loc[train["target_residual"].notna()]
+        test = date_slice(block_dates[0], block_dates[-1])
         if train.empty or test.empty:
             raise ValueError("empty train or prediction sample")
         model = LGBMRegressor(objective="regression", learning_rate=0.03, n_estimators=220, max_depth=3, num_leaves=7, min_child_samples=100, subsample=1.0, colsample_bytree=0.8, reg_lambda=1.0, random_state=20260730, n_jobs=1, deterministic=True, force_col_wise=True, verbosity=-1, monotone_constraints=[1] * len(feature_columns))

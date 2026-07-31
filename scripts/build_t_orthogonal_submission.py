@@ -17,10 +17,80 @@ EXTERNAL_HELPERS_SOURCE = (
     ROOT / "scripts/assets/external_submission_helpers.py.txt"
 )
 
+FAST_GROUP_ROLLING_SOURCE = r'''
+
+_pandas_group_rolling = _group_rolling
+
+
+def _group_rolling(
+    frame,
+    values,
+    *,
+    window,
+    statistic,
+    center=False,
+    min_periods=None,
+):
+    """Equivalent fixed-row grouped rolling without pandas MultiIndex overhead."""
+    if center:
+        return _pandas_group_rolling(
+            frame,
+            values,
+            window=window,
+            statistic=statistic,
+            center=True,
+            min_periods=min_periods,
+        )
+    group_start = (
+        frame["instrument"].ne(frame["instrument"].shift())
+        | frame["trade_date"].ne(frame["trade_date"].shift())
+        | frame["session_id"].ne(frame["session_id"].shift())
+    )
+    group_codes = group_start.cumsum()
+    numeric = pd.to_numeric(values, errors="coerce").reindex(frame.index)
+    valid = numeric.notna().astype("int64")
+    filled = numeric.fillna(0.0)
+    minimum = window if min_periods is None else min_periods
+
+    count_cumulative = valid.groupby(group_codes, sort=False).cumsum()
+    sum_cumulative = filled.groupby(group_codes, sort=False).cumsum()
+    count = count_cumulative - count_cumulative.groupby(
+        group_codes,
+        sort=False,
+    ).shift(window, fill_value=0)
+    total = sum_cumulative - sum_cumulative.groupby(
+        group_codes,
+        sort=False,
+    ).shift(window, fill_value=0)
+
+    if statistic == "sum":
+        result = total
+    elif statistic == "mean":
+        result = total / count.where(count.gt(0))
+    elif statistic == "std":
+        square_cumulative = filled.pow(2).groupby(
+            group_codes,
+            sort=False,
+        ).cumsum()
+        total_square = square_cumulative - square_cumulative.groupby(
+            group_codes,
+            sort=False,
+        ).shift(window, fill_value=0)
+        variance = (
+            total_square - total.pow(2) / count.where(count.gt(0))
+        ) / (count - 1.0).where(count.gt(1))
+        result = np.sqrt(variance.clip(lower=0.0))
+    else:
+        raise ValueError(f"unsupported rolling statistic: {statistic}")
+
+    result = result.where(count.ge(minimum))
+    return result.reindex(frame.index)
+'''
+
 
 def external_helpers_source() -> str:
     source = EXTERNAL_HELPERS_SOURCE.read_text(encoding="utf-8")
-    return "\n" + source.rstrip() + "\n"
+    return "\n" + source.rstrip() + FAST_GROUP_ROLLING_SOURCE
 
 
 def render_notebook(
@@ -126,6 +196,7 @@ def main() -> int:
         + submission_runtime_source(
             candidate_ids,
             screened15_lambda=args.screened15_lambda,
+            lean_market_runtime=True,
         )
     )
     output_py.write_text(source, encoding="utf-8")
