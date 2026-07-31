@@ -55,7 +55,7 @@ def test_exact_remaining_132_manifest_split() -> None:
         GENERATOR_ROOT / "submission_manifest_changjiang_123.csv"
     ).open(encoding="utf-8", newline="") as handle:
         changjiang_rows = list(csv.DictReader(handle))
-    with (GENERATOR_ROOT / "submission_manifest_haitong_12.csv").open(
+    with (GENERATOR_ROOT / "submission_manifest_haitong_11.csv").open(
         encoding="utf-8", newline=""
     ) as handle:
         haitong_rows = list(csv.DictReader(handle))
@@ -63,19 +63,21 @@ def test_exact_remaining_132_manifest_split() -> None:
     changjiang_hf = [
         row for row in changjiang_rows if row["family"] == "HF"
     ]
+    changjiang_pv = [
+        row for row in changjiang_rows if row["candidate_id"] == "PV-219"
+    ]
     haitong_hf = [row for row in haitong_rows if row["family"] == "HF"]
-    haitong_pv = [row for row in haitong_rows if row["family"] == "PV"]
-    remaining = changjiang_hf + haitong_hf + haitong_pv
+    remaining = changjiang_hf + changjiang_pv + haitong_hf
 
     assert len(changjiang_hf) == 120
+    assert len(changjiang_pv) == 1
     assert len(haitong_hf) == 11
-    assert len(haitong_pv) == 1
     assert len(remaining) == 132
     assert len({row["source_id"] for row in remaining}) == 132
     assert len({row["candidate_id"] for row in remaining}) == 132
     assert all(row["semantic_class"] == "LATENT_COMPONENT" for row in remaining)
     assert all(row["include_in_j_baseline"] == "True" for row in remaining)
-    assert haitong_pv[0]["candidate_id"] == "PV-216"
+    assert changjiang_pv[0]["source_id"] == "CJ-G112-V01"
 
 
 def test_haitong_factor_panel_emits_all_12_remaining_components() -> None:
@@ -127,7 +129,7 @@ def test_haitong_factor_panel_emits_all_12_remaining_components() -> None:
         base[column] = np.linspace(1.0, 2.0, 30)
 
     panel, formulas = haitong.build_factor_panel(base)
-    with (GENERATOR_ROOT / "submission_manifest_haitong_12.csv").open(
+    with (GENERATOR_ROOT / "submission_manifest_haitong_11.csv").open(
         encoding="utf-8", newline=""
     ) as handle:
         expected = {row["component_column"] for row in csv.DictReader(handle)}

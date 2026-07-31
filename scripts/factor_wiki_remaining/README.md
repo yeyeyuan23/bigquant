@@ -14,9 +14,9 @@ one-minute files. No minute data or generated Parquet is committed.
   that the 123 submitted component columns in
   `submission_manifest_changjiang_123.csv` are present.
 - `build_haitong_components.py` is the exact implementation used for the
-  Haitong sandbox. It emits 47 frozen Haitong columns and asserts the 12 still
+  Haitong sandbox. It emits 47 frozen Haitong columns and asserts the 11 still
   missing from the current `main` against
-  `submission_manifest_haitong_12.csv`.
+  `submission_manifest_haitong_11.csv`.
 - `build_cicc_remaining_components.py` preserves the exact CICC remaining-batch
   construction.  With `BIGALPHA_CICC_RAW_ONLY=1`, it emits the nine components
   constructed directly from minute close/volume without requiring prior
@@ -33,14 +33,14 @@ Against `origin/main` at `0183338`, the generation gap is exactly:
 
 - 120 Changjiang HF components (`HF-105` through `HF-224`);
 - 11 Haitong HF components (`HF-092` through `HF-102`);
-- one Haitong PV component (`PV-216`, source `HAITONG-0106`).
+- one Changjiang PV component (`PV-219`, source `CJ-G112-V01`).
 
-The Changjiang manifest also contains `PV-217`, `PV-218`, and `PV-219` so the
-generator remains a complete reproduction of its sandbox. Current `main`
-already builds `PV-217` and `PV-218`. `PV-219` is intentionally outside the
-remaining 132 and is separately documented below. Current `main` also already
-contains executable builders for the CICC 13 and the other 14 Haitong PV
-components; the CICC code here is retained as provenance, not counted again.
+The Changjiang manifest also contains `PV-217` and `PV-218`, so the generator
+remains a complete reproduction of its sandbox. Current `main` already builds
+those two. Current `main` also already contains executable builders for the
+CICC 13 and 14 eligible Haitong PV components. `PV-216` is not part of the
+remaining 132 because its 252-day history exceeds the active 126-observation
+submission contract and it has been retired from the candidate tree.
 
 The code resolves the repository and project roots at runtime.  Input/output
 locations can be overridden without editing formulas:

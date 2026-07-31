@@ -10,4 +10,3 @@ HAITONG-0052,HF-099,HF,src/bigalpha2026/candidates/hf/hf_099.py,LATENT_COMPONENT
 HAITONG-0072,HF-100,HF,src/bigalpha2026/candidates/hf/hf_100.py,LATENT_COMPONENT,True,HAITONG-0072,1.0,storage convention only; latent regression determines sign
 HAITONG-0076,HF-101,HF,src/bigalpha2026/candidates/hf/hf_101.py,LATENT_COMPONENT,True,HAITONG-0076,1.0,storage convention only; latent regression determines sign
 HAITONG-0080,HF-102,HF,src/bigalpha2026/candidates/hf/hf_102.py,LATENT_COMPONENT,True,HAITONG-0080,1.0,storage convention only; latent regression determines sign
-HAITONG-0106,PV-216,PV,src/bigalpha2026/candidates/pv/pv_216.py,LATENT_COMPONENT,True,HAITONG-0106,1.0,storage convention only; latent regression determines sign

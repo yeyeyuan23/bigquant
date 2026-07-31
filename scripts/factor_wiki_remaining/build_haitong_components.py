@@ -52,7 +52,7 @@ PANEL_PATH = OUTPUT_DIR / "haitong_raw_panel_2019_2021.parquet"
 RESULT_PATH = OUTPUT_DIR / "haitong_sandbox_results.csv"
 SUMMARY_PATH = OUTPUT_DIR / "haitong_sandbox_summary.json"
 SUBMISSION_MANIFEST = Path(__file__).with_name(
-    "submission_manifest_haitong_12.csv"
+    "submission_manifest_haitong_11.csv"
 )
 
 YEARS = (2019, 2020, 2021)
