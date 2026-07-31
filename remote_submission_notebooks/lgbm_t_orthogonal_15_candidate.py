@@ -1,7 +1,7 @@
-"""I-route screened15 plus residual Elastic Net with 53 factors."""
+"""Orthogonal T LightGBM with 15 factors; add15, screened15 lambda=1."""
 
-# Auto-generated from the frozen I artifact. Do not edit by hand.
-# Requires the generated sibling enet_i_53_candidate_deps.py module.
+# Auto-generated from the frozen orthogonal T artifact. Do not edit by hand.
+# Requires the generated sibling lgbm_t_orthogonal_15_candidate_deps.py module.
 
 # ---- CICC 5m component helpers ----
 """Shared implementation for the first CICC local-direct factor pilot.
@@ -2173,7 +2173,7 @@ def _build_top50_daily_components(
 
 def _candidate_factors(selected, financial, factorlib, exposure, daily_features, pool, pd, np):
     import inspect
-    from enet_i_53_candidate_deps import get_candidate_spec
+    from lgbm_t_orthogonal_15_candidate_deps import get_candidate_spec
 
     available_inputs = {
         "financial": financial,
@@ -2345,9 +2345,9 @@ def _load_common_inputs(datasources, start_date, end_date, pd, np):
 def main(datasources, start_date, end_date):
     import numpy as np
     import pandas as pd
-    from sklearn.linear_model import ElasticNet
+    from lightgbm import LGBMRegressor
 
-    self_columns = ['HF-001', 'HF-003', 'HF-014', 'HF-015', 'HF-017', 'HF-018', 'HF-019', 'HF-023', 'HF-024', 'HF-025', 'HF-032', 'HF-034', 'HF-036', 'HF-039', 'HF-041', 'HF-042', 'HF-043', 'HF-044', 'HF-045', 'HF-046', 'HF-049', 'HF-050', 'HF-053', 'HF-057', 'HF-059', 'HF-062', 'HF-063', 'HF-064', 'HF-065', 'HF-066', 'HF-067', 'HF-068', 'HF-069', 'HF-070', 'HF-071', 'HF-072', 'HF-076', 'HF-077', 'PV-003', 'PV-004', 'PV-014', 'PV-020', 'PV-026', 'PV-027', 'PV-028', 'PV-029', 'PV-031', 'PV-033', 'PV-034', 'PV-036', 'PV-040', 'PV-041', 'PV-042']
+    self_columns = ['HF-044', 'HF-057', 'PV-029', 'HF-001', 'HF-019', 'PV-034', 'HF-025', 'HF-053', 'HF-070', 'PV-004', 'HF-067', 'HF-068', 'HF-049', 'HF-024', 'HF-062']
     screened15_lambda = 1.0
     start_ts, end_ts, model_history_start, public_columns, pool, factorlib, exposure, financial, daily_features = _load_common_inputs(datasources, start_date, end_date, pd, np)
     public_directions = {"amount": -1.0, "atr_14": -1.0, "bias_20": -1.0, "cci_14": -1.0, "float_market_cap": -1.0, "kdj_d_9_3_3": -1.0, "macd_diff_12_26_9": -1.0, "macd_hist_12_26_9": -1.0, "momentum_5": -1.0, "net_profit_rate_ttm": 1.0, "netflow_amount_rate_main": -1.0, "total_market_cap": -1.0, "turn": -1.0, "volatility_5": -1.0, "volume": -1.0}
@@ -2452,7 +2452,7 @@ def main(datasources, start_date, end_date):
         test = date_slice(block_dates[0], block_dates[-1])
         if train.empty or test.empty:
             raise ValueError("empty train or prediction sample")
-        model = ElasticNet(alpha=0.001, l1_ratio=0.5, fit_intercept=True, max_iter=20000, random_state=0, positive=True, selection="cyclic")
+        model = LGBMRegressor(objective="regression", learning_rate=0.03, n_estimators=220, max_depth=3, num_leaves=7, min_child_samples=100, subsample=1.0, colsample_bytree=0.8, reg_lambda=1.0, random_state=20260730, n_jobs=1, deterministic=True, force_col_wise=True, verbosity=-1, monotone_constraints=[1] * len(feature_columns))
         model.fit(
             train.loc[:, list(feature_columns)].to_numpy(dtype=float),
             train["target_residual"].to_numpy(dtype=float),

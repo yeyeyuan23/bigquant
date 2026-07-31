@@ -903,8 +903,9 @@ def main(datasources, start_date, end_date):
         pd,
         np,
     )
-    # screened15 is a residual-target control only.  It must not enter the
-    # submitted model feature vector or be added back to its prediction.
+    # screened15 controls the residual target and is added back after the
+    # self-only model predicts the residual. It never enters the model feature
+    # vector.
     feature_columns = tuple(self_columns)
     residual_baseline_columns = tuple(public_columns)
     panel = panel.sort_values(["date", "instrument"]).reset_index(drop=True)

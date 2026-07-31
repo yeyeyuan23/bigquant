@@ -132,12 +132,12 @@ class SubmissionTest(unittest.TestCase):
                     cwd=ROOT,
                 )
 
-    def test_current_learned_models_keep_frozen_training_contracts(self):
+    def test_current_generated_learned_models_keep_frozen_training_contracts(self):
         enet = (
-            SUBMISSIONS / "enet_i_51_candidate.py"
+            REMOTE_SUBMISSIONS / "enet_i_53_candidate.py"
         ).read_text(encoding="utf-8")
         lgbm = (
-            SUBMISSIONS / "lgbm_t_orthogonal_26_candidate.py"
+            REMOTE_SUBMISSIONS / "lgbm_t_orthogonal_15_candidate.py"
         ).read_text(encoding="utf-8")
         self.assertIn("from sklearn.linear_model import ElasticNet", enet)
         self.assertIn("positive=True", enet)
@@ -159,11 +159,12 @@ class SubmissionTest(unittest.TestCase):
                 "feature_columns = (*public_columns, *self_columns)",
                 source,
             )
-        self.assertIn("screened15_lambda = 0.0", lgbm)
-        self.assertIn(
-            "screened15_lambda * baseline_prediction",
-            lgbm,
-        )
+        for source in (enet, lgbm):
+            self.assertIn("screened15_lambda = 1.0", source)
+            self.assertIn(
+                "screened15_lambda * baseline_prediction",
+                source,
+            )
         self.assertIn("def _iter_bar5m_parts(", lgbm)
         self.assertIn("yield part", lgbm)
         self.assertIn("gc.collect()", lgbm)

@@ -2271,7 +2271,7 @@ def build_experiment_result(
             "promotion": single_factor_result.promotion_summary,
         },
         "learned_model_preprocessing": (
-            "screened15_residual_target_then_self_only_model_output"
+            "screened15_residual_target_then_screened15_plus_self_residual_output"
         ),
         "screened15_role": (
             "residual_target_control_and_prediction_addback_not_model_feature"
