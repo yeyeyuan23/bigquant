@@ -6,8 +6,10 @@ candidate membership, evaluation gates, or combination weights in a notebook.
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from functools import cache
 
 import numpy as np
 import pandas as pd
@@ -291,16 +293,37 @@ def candidate_module_name(candidate_id: str) -> str:
     return f"bigalpha2026.candidates.{family_path}.{module_stem}"
 
 
+@cache
 def include_in_j_baseline(candidate_id: str) -> bool:
     """Return whether a candidate belongs to the local J baseline.
 
-    The local J baseline mirrors the competition factor-library reference only:
-    self-developed candidates are evaluated against the all36 library and are
-    not injected into the baseline reference.
+    Every metadata-declared latent component is part of the J baseline.
+    Anchor components and candidates without semantic metadata are excluded.
     """
 
-    del candidate_id
-    return False
+    module_name = candidate_module_name(candidate_id)
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if exc.name == module_name:
+            return False
+        raise
+    semantic_class = getattr(module, "SEMANTIC_CLASS", None)
+    declared_include = getattr(module, "INCLUDE_IN_J_BASELINE", None)
+    if semantic_class is None and declared_include is None:
+        return False
+    expected_include = semantic_class == "LATENT_COMPONENT"
+    if semantic_class not in {"LATENT_COMPONENT", "ANCHOR_COMPONENT"}:
+        raise ValueError(
+            f"{candidate_id} has invalid SEMANTIC_CLASS={semantic_class!r}"
+        )
+    if declared_include is not expected_include:
+        raise ValueError(
+            f"{candidate_id} has inconsistent J baseline metadata: "
+            f"SEMANTIC_CLASS={semantic_class!r}, "
+            f"INCLUDE_IN_J_BASELINE={declared_include!r}"
+        )
+    return expected_include
 
 
 def j_baseline_candidate_ids(candidate_ids_: Iterable[str]) -> tuple[str, ...]:

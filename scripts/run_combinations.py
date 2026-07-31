@@ -1144,7 +1144,7 @@ def contract_summary(
         "factorlib_reference": {
             "screened_features": list(FROZEN_FACTORLIB_SCREENED_FEATURES),
             "screened_count": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-            "j_reference": "factorlib_all36",
+            "j_reference": "factorlib_all36_plus_latent_candidates",
             "j_public_reference_count": len(FACTORLIB_FEATURE_COLUMNS),
             "j_self_reference_count": len(j_baseline_columns),
             "j_reference_count": len(FACTORLIB_FEATURE_COLUMNS) + len(j_baseline_columns),
@@ -1230,7 +1230,7 @@ def synthetic_contract_summary() -> dict[str, object]:
         "rows": len(panel),
         "factorlib_features": len(public_columns),
         "factorlib_screened_features": len(FROZEN_FACTORLIB_SCREENED_FEATURES),
-        "competition_J_reference": "factorlib_all36",
+        "competition_J_reference": "factorlib_all36_plus_latent_candidates",
         "competition_J_reference_features": len(FACTORLIB_FEATURE_COLUMNS),
         "self_features": len(self_columns),
         "j_baseline_features": len(j_baseline_columns),

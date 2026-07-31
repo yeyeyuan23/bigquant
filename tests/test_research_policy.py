@@ -13,11 +13,17 @@ from bigalpha2026.research_policy import (
     candidate_ids,
     factorlib_pool_incremental_gate,
     fixed_weight_rank_combination,
+    include_in_j_baseline,
     technical_gate,
 )
 
 
 class ResearchPolicyTest(unittest.TestCase):
+    def test_latent_candidates_enter_j_baseline_and_anchors_do_not(self):
+        self.assertTrue(include_in_j_baseline("HF-079"))
+        self.assertFalse(include_in_j_baseline("PV-045"))
+        self.assertFalse(include_in_j_baseline("HF-001"))
+
     def test_incremental_pool_gate_uses_joint_prediction_stability(self):
         passed, reasons = factorlib_pool_incremental_gate(
             {

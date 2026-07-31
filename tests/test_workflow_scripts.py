@@ -464,7 +464,7 @@ class WorkflowScriptTest(unittest.TestCase):
         self.assertEqual(summary["factorlib_screened_features"], 15)
         self.assertEqual(
             summary["competition_J_reference"],
-            "factorlib_all36",
+            "factorlib_all36_plus_latent_candidates",
         )
         self.assertEqual(summary["competition_J_reference_features"], 36)
         self.assertEqual(summary["self_features"], 1)
@@ -487,7 +487,7 @@ class WorkflowScriptTest(unittest.TestCase):
 
         self.assertEqual(
             run_combinations.j_baseline_columns_from_self_columns(columns),
-            (),
+            ("self__HF-043",),
         )
 
     def test_check_mode_reports_missing_inputs_without_training(self):

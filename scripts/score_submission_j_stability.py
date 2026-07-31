@@ -174,7 +174,8 @@ def load_score_reference(
     )
     if not candidate_ids:
         raise ValueError("candidate manifest contains no candidates")
-    # The current J baseline is all36-only, but the shared dynamic loader
+    # The current J baseline is all36 plus metadata-declared latent candidates;
+    # the shared dynamic loader
     # requires at least one candidate column to construct its feature panel.
     loader_filter = (f"self__{candidate_ids[0]}",)
     context_years = tuple(dict.fromkeys((*DEVELOPMENT_YEARS, *years)))
