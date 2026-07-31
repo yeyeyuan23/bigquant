@@ -15,8 +15,10 @@
 https://github.com/yeyeyuan23/bigquant，完整阅读 docs/team_workflow.md，
 并严格按其中权限边界开发候选因子、测试并在 AIStudio 做真实评价。
 有效结果可以直接上传比赛；完成后 push 候选分支并创建 MR/PR。
-如收到数据压缩包，按手册校验和解压；如因子需要新数据，按手册一并交付
-可复现的取数代码、数据合同、manifest 和增量包。
+如收到队内数据压缩包，按手册校验和解压。因子依赖新派生组件时，
+必须在同一活动候选 PR 中交付可复现生成代码和字段合同；双方已约定
+自行下载同一份 E2E 一分钟数据，因此候选 PR 不上传原始分钟数据、
+派生 Parquet 或新的数据 Release。
 ```
 
 ## 0. 首次登录与获取项目
@@ -100,14 +102,14 @@ registry 和公共入口由主仓库负责人统一补齐。
 
 ### Git 协作
 
-每个候选使用独立分支和独立提交：
+本地可以按候选使用独立研究提交；对外仅维护一条活动候选投稿分支：
 
 ```bash
 git switch -c factor/hf-003
 ```
 
-完成后向原仓库提交 MR/PR，不直接修改或合并 `main`。一次提交只处理一个
-候选，避免同时改动其他人的候选文件。不要提交：
+完成后向原仓库提交 MR/PR，不直接修改或合并 `main`。同一批多个已冻结
+候选可以进入同一活动 PR，但不得夹带无关公共流程修改。不要提交：
 
 - 本地原始数据；
 - AIStudio 下载缓存；
@@ -117,9 +119,12 @@ git switch -c factor/hf-003
 
 ### 提交 PR 规则
 
-队友的候选 PR 默认只提交自己认领的候选文件，例如
+队友的候选 PR 默认提交自己认领的候选文件，例如
 `src/bigalpha2026/candidates/hf/hf_003.py`。跨类组合候选可以放在
 `src/bigalpha2026/candidates/composite/`，但不要在同一个 PR 里修改公共流程。
+如候选只是读取派生列的 wrapper，还必须提交生成该列的最小可复现
+脚本、候选到组件的 manifest 和必要的公式配置；不能只在注释中留下
+`method 1`、`local statistic` 之类无法独立执行的简写。
 
 以下内容由主仓库负责人统一接入，队友 PR 不需要改：
 
@@ -128,9 +133,9 @@ git switch -c factor/hf-003
 - `scripts/run_first_round.py`、`scripts/run_combinations.py`；
 - `src/bigalpha2026/evaluation.py`、`combinations.py`、`research_policy.py`。
 
-如果候选依赖当前数据包没有的新字段，PR 说明里必须写清字段来源，并把实际使用的
-Feather/Parquet 数据、SHA-256、字段清单和生成 Notebook/脚本作为 GitHub Release
-asset 交付。数据文件不要 commit 进仓库。
+如果候选依赖当前数据合同没有的新字段，PR 说明里必须写清字段来源、
+频率、单位、可用时点和聚合公式，并交付生成 Notebook/脚本。负责人使用同一份
+E2E 分钟数据本地重建；原始 Feather、派生 Parquet 和数据 Release 不进入候选 PR。
 
 ## 3. 新增一个基础因子
 
@@ -142,7 +147,7 @@ asset 交付。数据文件不要 commit 进仓库。
 
 1. 在群里认领编号；
 2. 在自己的候选分支实现同编号模块；
-3. 如果使用新数据字段，同时交付 Release asset 和字段说明；
+3. 如果使用新派生字段，同时交付生成代码、manifest 和字段说明；
 4. 提交 PR，PR 中不要混入公共流程修改。
 
 文件名和编号必须一致，例如：
@@ -283,24 +288,16 @@ gh release download data-v3-2026-07-27 \
   --dir data/transfers
 ```
 
-如果候选引入当前包中没有的新日级组件，开发者必须同时交付：
+可选数据包只用于队内临时同步已核验快照，不是候选 PR 的标准交付方式。
+如果候选引入当前合同中没有的新日级组件，开发者必须在 PR 中同时交付：
 
 1. 生成组件的 AIStudio 查询、Notebook 或脚本说明；
-2. 实际使用的 Feather/Parquet 数据包；
-3. 字段清单、覆盖年份、`date/instrument` key 说明；
-4. 增量压缩包和 SHA-256。
+2. 候选到派生列的 manifest；
+3. 字段清单、覆盖年份、`date/instrument` key 和可用时点说明；
+4. 未定义简写的可执行公式和防未来信息测试。
 
 `docs/data_contract.md`、manifest 和正式 Parquet 接入由主仓库负责人统一整理。
-
-增量包示例：
-
-```text
-bigalpha_data_delta_HF-003_v1.tar.gz
-bigalpha_data_delta_HF-003_v1.tar.gz.sha256
-```
-
-只打包新增组件，不重新发送完整数据包。队长解压后必须能运行同一评价代码得到
-一致结果。只提供 IC 截图或模型结果、没有聚合代码和增量数据的候选不可复现，
+只提供 IC 截图、模型结果或读列 wrapper，没有聚合代码的候选不可复现，
 不能作为最终版本接收。
 
 ## 6. 评价新因子
@@ -439,14 +436,14 @@ MR/PR 简单说明：
 - 因子机制；
 - 测试和 AIStudio 验收是否通过；
 - 是否已经上传及排名提升；
-- 是否包含新数据依赖和增量包。
+- 是否包含新派生字段，及对应生成代码和 manifest。
 
 不要自行合并 `main`，最终版本由主仓库统一保留。
 
 ## 9. 合并前检查
 
 - 候选编号没有冲突；
-- PR 默认只新增或修改对应候选文件；
+- PR 只新增或修改对应候选、最小生成代码、manifest 和直接合同测试；
 - 没有数据文件、密钥或 Notebook 输出；
-- 新数据依赖已按第 5 节通过 Release asset 交付；
+- 新派生组件已按第 5 节交付可复现生成代码，不上传原始数据；
 - 最终代码已创建 MR/PR。

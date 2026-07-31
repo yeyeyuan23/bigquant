@@ -1,7 +1,8 @@
 r"""PV-219: report-derived candidate, source CJ-G112-V01.
 
 Source research ID: CJ-G112-V01
-Frozen formula: rolling_21d corr(global TS ranks(volume), TS ranks(close)); formalized
+Frozen formula: trailing-21-day Spearman correlation between daily volume and
+adjusted close; ranks are recomputed inside each trailing window.
 Economic logic: Changjiang report-defined high-frequency price/volume state; directionless latent component for J-baseline regression
 Data families: PV
 Semantic class: LATENT_COMPONENT
