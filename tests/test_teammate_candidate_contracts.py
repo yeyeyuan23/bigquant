@@ -10,9 +10,9 @@ import pytest
 CANDIDATE_ROOT = Path(__file__).resolve().parents[1] / "src" / "bigalpha2026" / "candidates"
 TEAMMATE_RANGES = {
     "composite": {f"int_{index:03d}" for index in range(4, 18)},
-    "hf": {f"hf_{index:03d}" for index in range(5, 79)},
-    "ob": {"ob_006"},
-    "pv": {f"pv_{index:03d}" for index in range(24, 45)},
+    "hf": {f"hf_{index:03d}" for index in range(5, 225)},
+    "ob": {f"ob_{index:03d}" for index in range(6, 9)},
+    "pv": {f"pv_{index:03d}" for index in range(24, 220)},
 }
 
 
