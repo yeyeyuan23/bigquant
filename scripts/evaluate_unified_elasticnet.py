@@ -17,9 +17,9 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_unified_temporal import load_labels  # noqa: E402
+from evaluate_unified_temporal import load_labels
 
-from bigalpha2026.alpha_models import (  # noqa: E402
+from bigalpha2026.alpha_models import (
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
     panel_arrays,

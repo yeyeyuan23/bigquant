@@ -7,9 +7,10 @@ produced from the local compressed archive and the AIStudio ``bar1m`` table.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd

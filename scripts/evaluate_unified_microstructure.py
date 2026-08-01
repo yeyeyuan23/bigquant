@@ -19,9 +19,9 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_unified_temporal import correlation_loss, load_labels  # noqa: E402
+from evaluate_unified_temporal import correlation_loss, load_labels
 
-from bigalpha2026.alpha_models import (  # noqa: E402
+from bigalpha2026.alpha_models import (
     MICROSTRUCTURE_CHANNELS,
     MicrostructureConfig,
     ModelFactory,

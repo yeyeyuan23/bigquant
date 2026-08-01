@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from bigalpha2026.alpha_models import (  # noqa: E402
+from bigalpha2026.alpha_models import (
     MICROSTRUCTURE_CHANNELS,
     RAW_MICROSTRUCTURE_COLUMNS,
     build_microstructure_features,
