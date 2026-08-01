@@ -28,6 +28,11 @@ DATA_FAMILIES = ("HF",)
 SOURCE_RESEARCH_ID = "PROJECT-HF-R-013-A"
 SOURCE_FIDELITY = "formalized_from_report"
 COMPONENT_COLUMN = "PROJECT-HF-R-013-A"
+RAW_COMPONENT_COLUMNS = (
+    "tail_60_signed_volume_bvc",
+    "tail_60_volume",
+    "directional_efficiency",
+)
 ORIENTATION = -1.0
 POOL_COLUMNS = ("date", "instrument")
 OUTPUT_COLUMNS = ("date", "instrument", "factor")
@@ -48,26 +53,29 @@ def compute_hf_104_daily(
 ) -> pd.DataFrame:
     """Read the frozen report state without changing its definition."""
 
-    required = (*POOL_COLUMNS, COMPONENT_COLUMN)
+    value_columns = (
+        (COMPONENT_COLUMN,) if COMPONENT_COLUMN in daily_features.columns else RAW_COMPONENT_COLUMNS
+    )
+    required = (*POOL_COLUMNS, *value_columns)
     _require_columns(daily_features, required, "daily_features")
     daily = daily_features.loc[:, required].copy()
-    daily["date"] = pd.to_datetime(
-        daily["date"], errors="coerce"
-    ).dt.normalize()
+    daily["date"] = pd.to_datetime(daily["date"], errors="coerce").dt.normalize()
     daily["instrument"] = daily["instrument"].astype(str)
     if daily.duplicated(list(POOL_COLUMNS)).any():
-        raise ValueError(
-            "daily_features contains duplicate date-instrument keys"
-        )
-    daily["factor_raw"] = pd.to_numeric(
-        daily[COMPONENT_COLUMN], errors="coerce"
+        raise ValueError("daily_features contains duplicate date-instrument keys")
+    if COMPONENT_COLUMN in daily.columns:
+        daily["factor_raw"] = pd.to_numeric(daily[COMPONENT_COLUMN], errors="coerce")
+    else:
+        signed_volume = pd.to_numeric(daily["tail_60_signed_volume_bvc"], errors="coerce")
+        volume = pd.to_numeric(daily["tail_60_volume"], errors="coerce")
+        efficiency = pd.to_numeric(daily["directional_efficiency"], errors="coerce").clip(0.0, 1.0)
+        daily["factor_raw"] = signed_volume.div(volume.where(volume.gt(0))) * (1.0 - efficiency)
+    daily["factor_raw"] = daily["factor_raw"].replace([np.inf, -np.inf], np.nan)
+    return (
+        daily[["date", "instrument", "factor_raw"]]
+        .sort_values(["date", "instrument"])
+        .reset_index(drop=True)
     )
-    daily["factor_raw"] = daily["factor_raw"].replace(
-        [np.inf, -np.inf], np.nan
-    )
-    return daily[["date", "instrument", "factor_raw"]].sort_values(
-        ["date", "instrument"]
-    ).reset_index(drop=True)
 
 
 def build_hf_104_factor_from_daily(
@@ -78,9 +86,7 @@ def build_hf_104_factor_from_daily(
 
     _require_columns(pool, POOL_COLUMNS, "pool")
     panel = pool.loc[:, POOL_COLUMNS].copy()
-    panel["date"] = pd.to_datetime(
-        panel["date"], errors="coerce"
-    ).dt.normalize()
+    panel["date"] = pd.to_datetime(panel["date"], errors="coerce").dt.normalize()
     panel["instrument"] = panel["instrument"].astype(str)
     panel = panel.dropna(subset=list(POOL_COLUMNS))
     if panel.duplicated(list(POOL_COLUMNS)).any():
@@ -94,29 +100,13 @@ def build_hf_104_factor_from_daily(
         validate="one_to_one",
     )
     raw = result["factor_raw"]
-    daily_median = raw.groupby(
-        result["date"], sort=False
-    ).transform("median")
+    daily_median = raw.groupby(result["date"], sort=False).transform("median")
     raw = raw.fillna(daily_median)
-    ranks = raw.groupby(
-        result["date"], sort=False
-    ).rank(method="average")
-    counts = raw.groupby(
-        result["date"], sort=False
-    ).transform("count")
-    centered = (
-        2.0
-        * (ranks - (counts + 1.0) / 2.0)
-        / counts.where(counts.gt(0))
-    )
+    ranks = raw.groupby(result["date"], sort=False).rank(method="average")
+    counts = raw.groupby(result["date"], sort=False).transform("count")
+    centered = 2.0 * (ranks - (counts + 1.0) / 2.0) / counts.where(counts.gt(0))
     result["factor"] = (ORIENTATION * centered).fillna(0.0)
-    result["factor"] = result["factor"].replace(
-        [np.inf, -np.inf], np.nan
-    )
+    result["factor"] = result["factor"].replace([np.inf, -np.inf], np.nan)
     if result["factor"].isna().any():
-        raise ValueError(
-            f"{CANDIDATE_ID} produced non-finite factor values"
-        )
-    return result.loc[:, OUTPUT_COLUMNS].sort_values(
-        ["date", "instrument"]
-    ).reset_index(drop=True)
+        raise ValueError(f"{CANDIDATE_ID} produced non-finite factor values")
+    return result.loc[:, OUTPUT_COLUMNS].sort_values(["date", "instrument"]).reset_index(drop=True)

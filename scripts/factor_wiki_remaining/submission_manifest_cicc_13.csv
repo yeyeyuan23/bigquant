@@ -1,0 +1,14 @@
+source_id,candidate_id,family,target_path,semantic_class,include_in_j_baseline,component_column,orientation
+CICC-011,HF-079,HF,src/bigalpha2026/candidates/hf/hf_079.py,LATENT_COMPONENT,True,CICC-011,1.0
+CICC-012,HF-080,HF,src/bigalpha2026/candidates/hf/hf_080.py,LATENT_COMPONENT,True,CICC-012,1.0
+CICC-013,HF-081,HF,src/bigalpha2026/candidates/hf/hf_081.py,LATENT_COMPONENT,True,CICC-013,1.0
+CICC-014,HF-082,HF,src/bigalpha2026/candidates/hf/hf_082.py,LATENT_COMPONENT,True,CICC-014,1.0
+CICC-018,HF-083,HF,src/bigalpha2026/candidates/hf/hf_083.py,LATENT_COMPONENT,True,CICC-018,1.0
+CICC-019,HF-084,HF,src/bigalpha2026/candidates/hf/hf_084.py,LATENT_COMPONENT,True,CICC-019,1.0
+CICC-020,HF-085,HF,src/bigalpha2026/candidates/hf/hf_085.py,LATENT_COMPONENT,True,CICC-020,1.0
+CICC-024,HF-086,HF,src/bigalpha2026/candidates/hf/hf_086.py,LATENT_COMPONENT,True,CICC-024,1.0
+CICC-027,HF-087,HF,src/bigalpha2026/candidates/hf/hf_087.py,LATENT_COMPONENT,True,CICC-027,1.0
+CICC-042,HF-088,HF,src/bigalpha2026/candidates/hf/hf_088.py,LATENT_COMPONENT,True,CICC-042,1.0
+CICC-076,HF-089,HF,src/bigalpha2026/candidates/hf/hf_089.py,LATENT_COMPONENT,True,CICC-076,1.0
+CICC-078,HF-090,HF,src/bigalpha2026/candidates/hf/hf_090.py,LATENT_COMPONENT,True,CICC-078,1.0
+CICC-079,HF-091,HF,src/bigalpha2026/candidates/hf/hf_091.py,LATENT_COMPONENT,True,CICC-079,1.0
