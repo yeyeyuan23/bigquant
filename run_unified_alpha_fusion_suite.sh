@@ -9,9 +9,16 @@ CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate454_
 MICROSTRUCTURE_STORE="${UNIFIED_MICROSTRUCTURE_STORE:-}"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 RUN_ID="${UNIFIED_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
-RUN_ROOT="$PROJECT_ROOT/reports/unified_alpha_fusion_suite_$RUN_ID"
+RUN_ROOT="${UNIFIED_RUN_ROOT:-$PROJECT_ROOT/reports/unified_alpha_fusion_suite_$RUN_ID}"
 LOG_ROOT="$RUN_ROOT/logs"
 J_REPORT_ROOT="/root/autodl-tmp/projects/bigquant/reports"
+START_STAGE="${UNIFIED_START_STAGE:-all}"
+REUSE_TEMPORAL_BASE_CHECKPOINTS="${UNIFIED_REUSE_TEMPORAL_BASE_CHECKPOINTS:-0}"
+
+if [[ "$START_STAGE" != "all" && "$START_STAGE" != "after_elasticnet" ]]; then
+  echo "unsupported UNIFIED_START_STAGE=$START_STAGE" >&2
+  exit 2
+fi
 
 mkdir -p "$RUN_ROOT" "$LOG_ROOT"
 cd "$PROJECT_ROOT"
@@ -25,19 +32,24 @@ cd "$PROJECT_ROOT"
   --output "$RUN_ROOT/candidate454_preflight.json" \
   2>&1 | tee "$LOG_ROOT/preflight.log"
 
-"$PYTHON_BIN" scripts/evaluate_unified_elasticnet.py \
-  --data-root "$DATA_ROOT" \
-  --output-dir "$RUN_ROOT/elasticnet_baseline" \
-  --years 2023 2024 \
-  --train-start-year 2019 \
-  --candidate-pool "$CANDIDATE_POOL" \
-  --candidate-manifest "$CANDIDATE_MANIFEST" \
-  --expected-candidate-count 454 \
-  --train-days 60 \
-  --prediction-days 20 \
-  --alpha 0.001 \
-  --l1-ratio 0.5 \
-  2>&1 | tee "$LOG_ROOT/elasticnet_baseline.log"
+if [[ "$START_STAGE" == "all" ]]; then
+  "$PYTHON_BIN" scripts/evaluate_unified_elasticnet.py \
+    --data-root "$DATA_ROOT" \
+    --output-dir "$RUN_ROOT/elasticnet_baseline" \
+    --years 2023 2024 \
+    --train-start-year 2019 \
+    --candidate-pool "$CANDIDATE_POOL" \
+    --candidate-manifest "$CANDIDATE_MANIFEST" \
+    --expected-candidate-count 454 \
+    --train-days 60 \
+    --prediction-days 20 \
+    --alpha 0.001 \
+    --l1-ratio 0.5 \
+    2>&1 | tee "$LOG_ROOT/elasticnet_baseline.log"
+elif [[ ! -s "$RUN_ROOT/elasticnet_baseline/candidate454_elasticnet_full_oos.parquet" ]]; then
+  echo "cannot resume: Elastic Net baseline artifact is missing" >&2
+  exit 1
+fi
 
 run_temporal() {
   local tag="$1"
@@ -48,6 +60,10 @@ run_temporal() {
   local stride="$6"
   local max_stocks="$7"
   local route_parts=()
+  local checkpoint_args=()
+  if [[ "$tag" == "temporal_base" && "$REUSE_TEMPORAL_BASE_CHECKPOINTS" == "1" ]]; then
+    checkpoint_args+=(--reuse-checkpoints)
+  fi
   local year
   for year in 2023 2024; do
     local work_dir="$RUN_ROOT/${tag}_${year}"
@@ -68,6 +84,7 @@ run_temporal() {
       --epochs "$epochs" \
       --train-stride "$stride" \
       --max-stocks "$max_stocks" \
+      "${checkpoint_args[@]}" \
       2>&1 | tee "$LOG_ROOT/${tag}_${year}.log"
     route_parts+=("$work_dir/unified_temporal_${year}_full_oos.parquet")
   done

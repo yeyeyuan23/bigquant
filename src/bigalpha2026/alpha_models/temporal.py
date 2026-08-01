@@ -228,7 +228,12 @@ class CandidateTemporalNetwork(nn.Module):
         summarized = self.temporal_summary(sequence, valid_time)
         summarized = summarized.reshape(batch_size, stock_count, -1)
         contextualized = self.cross_section(summarized, stock_mask.bool())
-        scores = self.head(contextualized).squeeze(-1)
+        # Keep the final cross-sectional projection in fp32.  The temporal
+        # backbone may safely use autocast, but trained score differences can
+        # be smaller than one fp16 quantization step.  Casting the head to
+        # fp16 turned valid rankings into a constant daily cross-section.
+        with torch.autocast(device_type=contextualized.device.type, enabled=False):
+            scores = self.head(contextualized.float()).squeeze(-1)
         return scores.masked_fill(~stock_mask.bool(), 0.0)
 
 

@@ -72,6 +72,21 @@ def test_eligible_target_indices_drop_empty_and_single_stock_dates() -> None:
     assert skipped == 2
 
 
+def test_eligible_label_dates_exclude_unscorable_boundary_dates() -> None:
+    labels = pd.DataFrame(
+        {
+            "date": pd.to_datetime(
+                ["2024-12-30", "2024-12-30", "2024-12-31", "2024-12-31"]
+            ),
+            "ret_next_open_to_close": [0.01, -0.02, np.nan, np.nan],
+        }
+    )
+
+    dates = unified_temporal.eligible_label_dates(labels)
+
+    assert dates.tolist() == [pd.Timestamp("2024-12-30")]
+
+
 def test_elasticnet_blocks_use_60_days_with_one_day_label_gap() -> None:
     dates = pd.date_range("2022-09-01", "2023-03-31", freq="B")
     blocks = unified_elasticnet.rolling_blocks(

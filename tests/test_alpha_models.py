@@ -106,6 +106,19 @@ def test_temporal_network_backward() -> None:
     assert any(parameter.grad is not None for parameter in network.parameters())
 
 
+def test_temporal_head_stays_float32_under_autocast() -> None:
+    network = CandidateTemporalNetwork(small_config()).eval()
+    values = torch.randn(1, 4, 8, 6)
+    observed = torch.ones_like(values, dtype=torch.bool)
+    stocks = torch.ones(1, 4, dtype=torch.bool)
+
+    with torch.inference_mode(), torch.autocast("cpu", dtype=torch.bfloat16):
+        scores = network(values, observed, stocks)
+
+    assert scores.dtype == torch.float32
+    assert torch.isfinite(scores).all()
+
+
 def test_candidate_temporal_handles_missing_values() -> None:
     network = CandidateTemporalNetwork(small_config()).eval()
     values = torch.randn(1, 4, 8, 6)

@@ -20,6 +20,7 @@ if str(ROOT / "src") not in sys.path:
 
 from bigalpha2026.alpha_models import (
     CandidateTemporalConfig,
+    CandidateTemporalModel,
     ModelFactory,
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
@@ -70,6 +71,20 @@ def eligible_target_indices(
     return eligible, len(indices) - len(eligible)
 
 
+def eligible_label_dates(
+    labels: pd.DataFrame,
+    *,
+    minimum_stocks: int = 2,
+) -> pd.DatetimeIndex:
+    """Return dates that can support a cross-sectional OOS evaluation."""
+
+    finite = np.isfinite(
+        pd.to_numeric(labels["ret_next_open_to_close"], errors="coerce")
+    )
+    counts = finite.groupby(pd.to_datetime(labels["date"]).dt.normalize()).sum()
+    return pd.DatetimeIndex(counts.index[counts >= minimum_stocks])
+
+
 def load_labels(data_root: Path, start_year: int, end_year: int) -> pd.DataFrame:
     parts = []
     for year in range(start_year, end_year + 1):
@@ -95,6 +110,7 @@ def evaluate_fold(
     max_stocks: int,
     seed: int,
     checkpoint_path: Path | None = None,
+    reuse_checkpoint: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     validation_half = validation_half.lower()
     train_end, validation_start, validation_end = fold_boundaries(year, validation_half)
@@ -140,42 +156,53 @@ def evaluate_fold(
     fold_seed = seed + year * 10 + seed_offset
     torch.manual_seed(fold_seed)
     torch.cuda.manual_seed_all(fold_seed)
-    adapter = ModelFactory.create("unified_temporal", asdict(config))
-    model = adapter.network.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-    scaler = torch.amp.GradScaler("cuda")
+    checkpoint_reused = bool(
+        reuse_checkpoint and checkpoint_path is not None and checkpoint_path.is_file()
+    )
+    if checkpoint_reused:
+        adapter = CandidateTemporalModel.load(checkpoint_path, map_location="cpu")
+        if adapter.config != config:
+            raise ValueError(f"checkpoint config does not match requested config: {checkpoint_path}")
+    else:
+        adapter = ModelFactory.create("unified_temporal", asdict(config))
     rng = np.random.default_rng(fold_seed)
-    model.train()
-    for epoch in range(epochs):
-        rng.shuffle(train_indices)
-        losses = []
-        for day_index in train_indices:
-            active = np.flatnonzero(np.isfinite(targets[day_index]))
-            if active.size > max_stocks:
-                active = rng.choice(active, max_stocks, replace=False)
-            window = values[
-                day_index - config.lookback + 1 : day_index + 1, active
-            ].transpose(1, 0, 2)
-            observed = np.isfinite(window)
-            batch = torch.from_numpy(window).unsqueeze(0).to(device)
-            mask = torch.from_numpy(observed).unsqueeze(0).to(device)
-            stocks = torch.ones(1, len(active), dtype=torch.bool, device=device)
-            target = torch.from_numpy(targets[day_index, active]).to(device)
-            optimizer.zero_grad(set_to_none=True)
-            with torch.amp.autocast("cuda", dtype=torch.float16):
-                prediction = model(batch, mask, stocks).squeeze(0)
-                loss = correlation_loss(prediction.float(), target)
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            scaler.step(optimizer)
-            scaler.update()
-            losses.append(float(loss.detach()))
-        print(
-            f"fold={year}{validation_half.upper()} epoch={epoch + 1} "
-            f"loss={np.mean(losses):.6f}",
-            flush=True,
-        )
+    model = adapter.network.to(device)
+    if checkpoint_reused:
+        print(f"fold={year}{validation_half.upper()} checkpoint=reused", flush=True)
+    else:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+        scaler = torch.amp.GradScaler("cuda")
+        model.train()
+        for epoch in range(epochs):
+            rng.shuffle(train_indices)
+            losses = []
+            for day_index in train_indices:
+                active = np.flatnonzero(np.isfinite(targets[day_index]))
+                if active.size > max_stocks:
+                    active = rng.choice(active, max_stocks, replace=False)
+                window = values[
+                    day_index - config.lookback + 1 : day_index + 1, active
+                ].transpose(1, 0, 2)
+                observed = np.isfinite(window)
+                batch = torch.from_numpy(window).unsqueeze(0).to(device)
+                mask = torch.from_numpy(observed).unsqueeze(0).to(device)
+                stocks = torch.ones(1, len(active), dtype=torch.bool, device=device)
+                target = torch.from_numpy(targets[day_index, active]).to(device)
+                optimizer.zero_grad(set_to_none=True)
+                with torch.amp.autocast("cuda", dtype=torch.float16):
+                    prediction = model(batch, mask, stocks).squeeze(0)
+                    loss = correlation_loss(prediction.float(), target)
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                scaler.step(optimizer)
+                scaler.update()
+                losses.append(float(loss.detach()))
+            print(
+                f"fold={year}{validation_half.upper()} epoch={epoch + 1} "
+                f"loss={np.mean(losses):.6f}",
+                flush=True,
+            )
 
     rows: list[pd.DataFrame] = []
     daily_ic: list[float] = []
@@ -193,6 +220,11 @@ def evaluate_fold(
             with torch.amp.autocast("cuda", dtype=torch.float16):
                 prediction = model(batch, mask, stocks).squeeze(0).float().cpu().numpy()
             factor = pd.Series(prediction).rank(pct=True).to_numpy() * 2.0 - 1.0
+            if not np.isfinite(factor).all() or np.unique(factor).size <= 1:
+                raise RuntimeError(
+                    f"{year}{validation_half.upper()} produced a constant or "
+                    f"non-finite cross-section on {dates[day_index].date()}"
+                )
             daily_ic.append(
                 float(
                     pd.Series(factor).corr(
@@ -238,6 +270,7 @@ def evaluate_fold(
         "skipped_train_days": skipped_train_days,
         "skipped_validation_days": skipped_validation_days,
         "temporal_lookback_days": config.lookback,
+        "checkpoint_reused": checkpoint_reused,
     }
     if checkpoint_path is not None:
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -267,6 +300,7 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=5e-4)
     parser.add_argument("--max-stocks", type=int, default=512)
     parser.add_argument("--seed", type=int, default=20260731)
+    parser.add_argument("--reuse-checkpoints", action="store_true")
     args = parser.parse_args()
     candidate_dim = len(
         candidate_ids_from_manifest(
@@ -306,6 +340,7 @@ def main() -> int:
                     args.output_dir
                     / f"unified_temporal_{year}_{validation_half}_checkpoint.pt"
                 ),
+                reuse_checkpoint=args.reuse_checkpoints,
             )
             half_routes.append(factor)
             metrics.append(fold_metrics)
@@ -317,10 +352,15 @@ def main() -> int:
             full_route = pd.concat(half_routes, ignore_index=True)
             expected = pd.read_parquet(
                 args.data_root / f"labels/year={year}/part-{year}.parquet",
-                columns=["date", "instrument"],
+                columns=["date", "instrument", "ret_next_open_to_close"],
             )
             expected["date"] = pd.to_datetime(expected["date"]).dt.normalize()
             expected["instrument"] = expected["instrument"].astype(str)
+            evaluation_dates = eligible_label_dates(expected)
+            expected = expected.loc[
+                expected["date"].isin(evaluation_dates),
+                ["date", "instrument"],
+            ]
             full_route["instrument"] = full_route["instrument"].astype(str)
             full_route = expected.drop_duplicates().merge(
                 full_route,
