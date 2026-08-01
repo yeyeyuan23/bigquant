@@ -12,7 +12,7 @@
 - OAP 发布版本：v2.0.0（2025-10）
 - 文件 SHA-256：
   `f6c055120bad7afe97c16e23e0f49bce0982269026605a955e8064bd661cf415`
-- 项目字段来源：`docs/data_contract.md` 与
+- 项目字段来源：`docs/unified_alpha_plan.md` 与
   `src/bigalpha2026/feature_contracts.py`
 
 OAP 公式只作为文献机制来源。正式实现必须使用比赛指定数据，在 AIStudio

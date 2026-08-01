@@ -113,8 +113,9 @@ print({
 else:
     print("bash run_unified_alpha_fusion_suite.sh")
     print({
+        "baseline": "candidate462 full-pool Elastic Net, 60d train / 20d predict",
         "routes": ["unified_temporal", "unified_mlp", "unified_lightgbm"],
-        "j_policy": "standalone J + mandatory tree delta-J + ensemble J",
+        "j_policy": "standalone J + paired delta-J over Elastic Net baseline",
         "training_history": "expanding from 2019",
     })"""
         ),

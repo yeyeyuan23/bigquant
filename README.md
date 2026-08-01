@@ -1,218 +1,42 @@
-# BigAlpha 2026 因子研究工程
+# BigAlpha 2026 Unified Alpha
 
-本仓库用于管理可复现的因子研究流程：候选登记、数据合同、单因子评价、公开因子库
-增量评价、组合训练、冻结和比赛提交。README 只保留稳定入口；候选状态和实验结果
-不在这里重复维护。
+当前目标是用 Candidate462 因子工程和原始分钟盘口构建三个彼此互补的 OOS 专家，
+并相对 Candidate462 全池 Elastic Net 基线最大化稳定 Competition Score。
 
-## 从这里开始
+唯一计划文档：[Unified Alpha Plan](docs/unified_alpha_plan.md)。
 
-- 团队开发与交付：[协作手册](docs/team_workflow.md)
-- 研究流程、时间切分和准入门槛：[因子研究与评价流程](docs/factor_research_plan.md)
-- 字段、主键和可用时点：[数据合同](docs/data_contract.md)
-- 报告目录地图和 CSV 字段读法：[Reports 说明](reports/README.md)
-- 候选定义、方向和当前状态：[候选登记表](docs/candidate_registry.md)
-- 当前可执行路由：`reports/latest/factor_pool_admission.csv`
-- 当前三管线结果和成员：`reports/latest/combination_summary.csv` 与
-  `reports/latest/factor_pool_decisions.json`
-- 已提交版本的不可变配置：`artifacts/frozen/`
+## 当前架构
 
-文档职责保持分离：研究规则只在执行计划中定义，数据口径只在数据合同中定义，
-候选状态只在登记表中维护。代码侧的可执行研究配置以
-`src/bigalpha2026/research_policy.py` 为准。
+- `T / Factor Temporal`：Candidate462 的 60 日 CNN + Transformer + DeepSets。
+- `X / Factor Cross-sectional`：当日 Candidate462 的 LightGBM 主模型与 MLP 挑战模型。
+- `M / Raw Microstructure`：待实现的原始分钟价格、成交和盘口 TCN/CNN 双通路专家。
+- `Baseline`：待固化的 Candidate462 全池、60 日训练/20 日预测 Elastic Net OOS 路线。
 
-## 阅读顺序
+不存在 Bar156 或 All618。容量版本只是同一专家内的实验，不能自动视为独立专家或
+默认等权进入最终融合。
 
-如果目的是理解整个工程，按这个顺序读：
-
-1. `README.md`：仓库边界、目录和稳定入口。
-2. `docs/data_contract.md`：比赛允许的数据表、主键、时点和本地落盘格式。
-3. `docs/candidate_registry.md`：候选编号、机制和当前候选池版本。
-4. `docs/factor_research_plan.md`：S/I/T 准入、J 代理、训练窗口、冻结规则。
-5. `reports/README.md`：每个稳定报告文件的目录位置和字段含义。
-6. `docs/team_workflow.md`：实际执行命令、数据同步、AIStudio 验收和提交协作。
-7. `scripts/run_first_round.py`：候选长表和单因子报告生成入口。
-8. `scripts/run_combinations.py`：S/I/T、三条组合管线和最终报告生成入口。
-
-## 固定研究边界
-
-- 本地仓库负责候选和模型代码、评价与组合训练、研究规则、测试及版本控制。
-- AIStudio 负责真实数据查询、字段和快照核验，以及冻结版本的最终短窗验收。
-- 比赛网页只用于提交已经冻结并通过验收的版本，以及记录平台反馈。
-- 正式研究结果必须来自通过数据合同和 manifest 核验的真实快照；合成数据只用于
-  接口和结构检查。
-- 原始比赛数据、分钟数据和队内研究快照不进入 Git。
-- 平台冒烟提交与正式研究准入分开记录，公榜反馈不作为无约束调参数据。
-
-## 固定工程合同
-
-- 基础因子分为 `PV、HF、OB、FR` 四类，跨类方案登记为 `composite`。
-- 候选必须先登记机制、方向、字段和可用时点，再实现和评价。
-- 未登记的候选不进入代码库；失败候选保留状态和原因，避免重复试验。
-- 候选入口 `main()` 只返回 `date、instrument、factor`，且值越大代表预期收益越高。
-- 每个提交 Notebook 只包含一个因子入口，不在平台端临时修改研究规则。
-
-固定流程为：
+## 代码入口
 
 ```text
-登记候选
-→ 实现并测试
-→ 核验真实数据快照
-→ 单因子轻量评价（S）
-→ 相对冻结公开因子库的轻量信息评价（I）
-→ LightGBM 正交准入评价（T）
-→ 按 S/I/T 结果路由到隔离的组合管线
-→ 冻结代码、数据合同、成员、参数和 Git 版本
-→ AIStudio 短窗验收
-→ 比赛提交
+src/bigalpha2026/alpha_models/temporal.py
+src/bigalpha2026/alpha_models/tabular.py
+scripts/evaluate_unified_temporal.py
+scripts/evaluate_unified_mlp.py
+scripts/evaluate_unified_tree.py
+run_unified_alpha_fusion_suite.sh
 ```
 
-组合层只保留三条独立管线：
+候选因子实现仍保存在 `src/bigalpha2026/candidates/`，历史实验、冻结产物和报告保留在
+Git 历史及各自目录中，但不再充当当前架构说明。
 
-- `self_factor_composite`
-- `joint_elastic_net`
-- `joint_lightgbm`
-
-具体时间区间、门槛、模型参数和固定产物清单统一见
-[因子研究与评价流程](docs/factor_research_plan.md)，不在 README 复制。
-
-## 本地执行入口
-
-只检查代码结构和三条组合管线的合成数据合同：
+## 验证
 
 ```bash
-cd /Users/yuanye/Projects/bigquant
-PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
-  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py --check
+python -m ruff check .
+coverage run -m pytest -q
+coverage combine
+coverage report --include="src/*" --fail-under=75
 ```
 
-只检查真实快照文件和 manifest，不训练模型：
-
-```bash
-cd /Users/yuanye/Projects/bigquant
-PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
-  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
-  --data-dir /Users/yuanye/Projects/bigquant/data \
-  --reports-dir /Users/yuanye/Projects/bigquant/reports \
-  --check-files
-```
-
-完整重跑 S/I/T 和三条组合管线：
-
-```bash
-cd /Users/yuanye/Projects/bigquant
-PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
-  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
-  --data-dir /Users/yuanye/Projects/bigquant/data \
-  --reports-dir /Users/yuanye/Projects/bigquant/reports
-```
-
-强制重算 I/T 缓存：
-
-```bash
-cd /Users/yuanye/Projects/bigquant
-PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
-  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
-  --data-dir /Users/yuanye/Projects/bigquant/data \
-  --reports-dir /Users/yuanye/Projects/bigquant/reports \
-  --refresh-incremental-cache \
-  --refresh-tree-cache
-```
-
-只重算某个新增或修改因子的 I/T 缓存：
-
-```bash
-cd /Users/yuanye/Projects/bigquant
-PYTHONPYCACHEPREFIX=/tmp/bigquant-pycache conda run --no-capture-output -n quant \
-  python /Users/yuanye/Projects/bigquant/scripts/run_combinations.py \
-  --data-dir /Users/yuanye/Projects/bigquant/data \
-  --reports-dir /Users/yuanye/Projects/bigquant/reports \
-  --refresh-incremental-candidate CANDIDATE_ID \
-  --refresh-tree-candidate CANDIDATE_ID
-```
-
-其中 `--check-files` 打印真实快照合同后立即退出，不会训练；不带
-`--check-files` 时，打印同一份合同后会继续训练。
-
-## 训练数据包同步
-
-训练数据包不走 Git LFS，也不提交进 Git 历史；`data/transfers/` 和
-`data/**/*.tar.gz` 已被 `.gitignore` 排除。团队同步使用私有 GitHub Release
-资产：
-
-```text
-Release tag: data-transfer-20260728
-data/transfers/bigalpha_research_data_v3.tar.gz
-data/transfers/bigalpha_research_data_v3.tar.gz.sha256
-```
-
-接收方在仓库根目录下载、校验并解压：
-
-```bash
-bash scripts/download_transfer_release.sh data-transfer-20260728
-shasum -a 256 -c data/transfers/bigalpha_research_data_v3.tar.gz.sha256
-tar -xzf data/transfers/bigalpha_research_data_v3.tar.gz -C .
-```
-
-数据包内容、版本规则和增量包交付方式见 [协作手册](docs/team_workflow.md#5-可选本地数据包同步)。
-
-## 工程结构
-
-```text
-src/bigalpha2026/
-├── candidates/           # 已登记的基础因子和跨类方案
-├── evaluation.py         # 评价指标与滚动验证原语
-├── competition_score_proxy.py # 冻结路线后的本地 J 排序、方向选择与联合拥挤检查
-├── single_factor_admission.py  # S 单因子准入
-├── incremental_admission.py    # I Elastic Net 增量准入
-├── tree_admission.py            # T LightGBM 增量准入
-├── combinations.py       # 准入后的最终组合与模型训练
-├── factor_pool.py        # 公开库和自研因子的动态特征池
-├── factorlib.py          # 公开因子库字段合同
-└── research_policy.py    # 可执行研究配置
-
-scripts/
-├── run_first_round.py
-├── run_combinations.py
-└── build_submission_notebook.py
-
-docs/                     # 流程、合同、登记和协作规则
-reports/                  # 可复现的评价结果、当前路由和模型成员
-artifacts/frozen/         # 已提交版本的不可变配置
-tests/                    # 单元、接口和防泄漏测试
-```
-
-## 结果文件读法
-
-- `reports/latest/factor_pool_check.json`：真实快照合同检查结果。
-- `reports/first_round/first_round_*.csv/json`：候选单因子技术、指标和稳定性诊断。
-- `reports/routes/incremental_factorwise_admission.csv`：I 中每个因子的 entry 诊断和
-  冻结状态；准入阶段不跑本地 J。
-- `reports/routes/tree_factorwise_admission.csv`：T 中每个因子的正交 entry 诊断和
-  冻结状态。
-- `reports/routes/tree_factorwise_importance.csv`：最终 LightGBM 的 split/gain
-  importance；逐因子 LightGBM 不再作为 T 准入步骤。
-- `reports/routes/tree_factorwise_promotion.csv`：T 正交通过池的冻结记录。
-- `reports/latest/factor_pool_admission.csv`：每个候选最终进入 S/I/T 哪些路线。
-- `reports/latest/combination_summary.csv`：三条最终路线的验证期表现和排序。
-- `reports/latest/factor_pool_decisions.json`：机器可读的完整路由、模型和评分合同。
-
-字段细节见 [Reports 说明](reports/README.md)。
-
-## 本地环境
-
-项目使用 Python 3.11 及 `quant` Conda 环境。首次 clone 后执行：
-
-```bash
-conda run --no-capture-output -n quant python -m pip install -e .
-conda run --no-capture-output -n quant python -m pytest -q
-```
-
-只检查组合接口和动态列合同：
-
-```bash
-PYTHONPATH=src conda run --no-capture-output -n quant \
-  python scripts/run_combinations.py --check
-```
-
-`--check` 使用合成数据，不产生因子有效性结论。真实评价的运行方式和所需数据包见
-[协作手册](docs/team_workflow.md)。
+本地/AutoDL OOS、AIStudio 真实执行、前缀一致性、提交状态和平台分数是不同证据层。
+只有完成对应验证后才能声明该层通过。

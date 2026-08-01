@@ -1,4 +1,4 @@
-"""Measure the paired J increment from adding the unified tree route."""
+"""Measure paired J increment over the Candidate462 Elastic Net baseline."""
 
 from __future__ import annotations
 
@@ -23,9 +23,10 @@ def daily_rank(frame: pd.DataFrame, column: str) -> pd.Series:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", type=Path, required=True)
-    parser.add_argument("--tree", type=Path, required=True)
-    parser.add_argument("--years", nargs="+", type=int, default=[2023])
-    parser.add_argument("--tree-weights", nargs="+", type=float, default=[0.10, 0.25, 0.50])
+    parser.add_argument("--expert", type=Path, required=True)
+    parser.add_argument("--expert-name", required=True)
+    parser.add_argument("--years", nargs="+", type=int, default=[2023, 2024])
+    parser.add_argument("--expert-weights", nargs="+", type=float, default=[0.10, 0.25, 0.50])
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--reports-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -33,32 +34,33 @@ def main() -> int:
 
     years = tuple(args.years)
     baseline = normalized_route(pd.read_parquet(args.baseline))
-    tree = normalized_route(pd.read_parquet(args.tree))
+    expert = normalized_route(pd.read_parquet(args.expert))
     baseline = baseline.loc[baseline["date"].dt.year.isin(years)]
-    tree = tree.loc[tree["date"].dt.year.isin(years)]
+    expert = expert.loc[expert["date"].dt.year.isin(years)]
     paired = baseline.rename(columns={"factor": "baseline"}).merge(
-        tree.rename(columns={"factor": "tree"}),
+        expert.rename(columns={"factor": "expert"}),
         on=["date", "instrument"],
         how="inner",
         validate="one_to_one",
     )
     if paired.empty:
-        raise ValueError("neural and tree routes have no common OOS rows")
+        raise ValueError("baseline and expert routes have no common OOS rows")
     paired["baseline"] = daily_rank(paired, "baseline")
-    paired["tree"] = daily_rank(paired, "tree")
+    paired["expert"] = daily_rank(paired, "expert")
     baseline_route = paired[["date", "instrument", "baseline"]].rename(
         columns={"baseline": "factor"}
     )
     score_reference = load_score_reference(args.data_dir, args.reports_dir, years)
 
     rows: list[dict[str, object]] = []
-    for tree_weight in args.tree_weights:
-        if not 0.0 < tree_weight <= 1.0:
-            raise ValueError("tree weights must be in (0, 1]")
+    for expert_weight in args.expert_weights:
+        if not 0.0 < expert_weight <= 1.0:
+            raise ValueError("expert weights must be in (0, 1]")
         augmented = paired[["date", "instrument"]].copy()
         augmented["factor"] = daily_rank(
             paired.assign(
-                blended=(1.0 - tree_weight) * paired["baseline"] + tree_weight * paired["tree"]
+                blended=(1.0 - expert_weight) * paired["baseline"]
+                + expert_weight * paired["expert"]
             ),
             "blended",
         )
@@ -67,14 +69,16 @@ def main() -> int:
             augmented,
             include_stability=True,
         )
-        rows.append({"tree_weight": tree_weight, **result})
+        rows.append({"expert_weight": expert_weight, **result})
         print(json.dumps(rows[-1]), flush=True)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "protocol": "paired_tree_increment_over_neural_v1",
+        "protocol": "paired_expert_increment_over_candidate462_elasticnet_v1",
+        "baseline_role": "candidate462_full_pool_elasticnet_oos",
         "baseline": str(args.baseline),
-        "tree": str(args.tree),
+        "expert": str(args.expert),
+        "expert_name": args.expert_name,
         "years": list(years),
         "common_rows": len(paired),
         "common_days": int(paired["date"].nunique()),

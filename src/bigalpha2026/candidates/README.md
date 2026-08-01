@@ -16,7 +16,8 @@
 
 OAP A/B级26个候选的编号、忠实度、窗口、方向和S/I结果见
 [`OAP_CANDIDATES.md`](OAP_CANDIDATES.md)。该表与
-`docs/candidate_registry.md` 一起维护：前者面向实现，后者面向全项目状态。
+候选实现和状态以代码、manifest 与冻结报告为准；当前组合路线见
+`docs/unified_alpha_plan.md`。
 
 ## 队友新增候选
 

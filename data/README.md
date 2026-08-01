@@ -3,7 +3,7 @@
 本目录只保存经 AIStudio 按数据族聚合并通过官方界面下载的研究数据。原始分钟成交、盘口快照和未经筛选的财务全表不保存在本机。
 
 聚合 Parquet 不进入 Git；Git 只保存本目录说明和 manifest。需要在规则允许的
-同队成员之间同步时，按 `docs/team_workflow.md` 的“本地数据包同步”章节生成
+同队成员之间同步时，按 `docs/unified_alpha_plan.md` 的数据边界生成
 带 SHA-256 的本地压缩包。原始平台导出、传输压缩包和临时文件必须放入
 `data/raw/` 或 `data/transfers/`，这些内容不会进入 Git。
 
@@ -22,7 +22,8 @@
 
 `features` 禁止包含未来标签或候选编号绑定的中间量。日频共享数据主键为 `date、instrument`；因子长表主键为 `date、instrument、candidate_id、factor_version`。Parquet 按数据族和年份分区，频率写入元数据而不是作为顶层目录。
 
-各数据族的严格列集合、频率、可用时点、平台实测和财务事件键见 `docs/data_contract.md`；本机写入前使用 `bigalpha2026.feature_contracts.validate_feature_frame` 验收。
+当前统一模型的数据边界见 `docs/unified_alpha_plan.md`；本机写入前使用
+`bigalpha2026.feature_contracts.validate_feature_frame` 验收。
 
 正式年度分区采用 `year=YYYY/part-YYYY.parquet`。每次传输必须附带 `manifest_YYYY.json`，并在本地核对 SHA-256、列、形状、主键、每日股票池数量和跨表键后才能删除传输压缩包。2019—2023 年基础包已经通过该流程；所有 manifest 均为 `evaluation_performed=false`，不得把数据验收解释为因子评价。
 

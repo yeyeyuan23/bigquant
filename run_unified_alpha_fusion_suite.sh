@@ -24,6 +24,20 @@ cd "$PROJECT_ROOT"
   --output "$RUN_ROOT/candidate462_preflight.json" \
   2>&1 | tee "$LOG_ROOT/preflight.log"
 
+"$PYTHON_BIN" scripts/evaluate_unified_elasticnet.py \
+  --data-root "$DATA_ROOT" \
+  --output-dir "$RUN_ROOT/elasticnet_baseline" \
+  --years 2023 2024 \
+  --train-start-year 2019 \
+  --candidate-pool "$CANDIDATE_POOL" \
+  --candidate-manifest "$CANDIDATE_MANIFEST" \
+  --expected-candidate-count 462 \
+  --train-days 60 \
+  --prediction-days 20 \
+  --alpha 0.001 \
+  --l1-ratio 0.5 \
+  2>&1 | tee "$LOG_ROOT/elasticnet_baseline.log"
+
 run_temporal() {
   local tag="$1"
   local model_dim="$2"
@@ -61,8 +75,8 @@ run_temporal() {
 }
 
 # Two genuinely different temporal capacities over Candidate462 histories.
-run_temporal fusion_base 256 4 768 6 2 1024
-run_temporal fusion_deep 384 6 1024 8 2 1200
+run_temporal temporal_base 256 4 768 6 2 1024
+run_temporal temporal_deep 384 6 1024 8 2 1200
 
 "$PYTHON_BIN" scripts/evaluate_unified_mlp.py \
   --data-root "$DATA_ROOT" \
@@ -105,19 +119,16 @@ run_temporal fusion_deep 384 6 1024 8 2 1200
   --n-estimators 800 \
   2>&1 | tee "$LOG_ROOT/lightgbm.log"
 
-FUSION_BASE="$RUN_ROOT/fusion_base_full_oos.parquet"
-FUSION_DEEP="$RUN_ROOT/fusion_deep_full_oos.parquet"
+ELASTICNET_BASELINE="$RUN_ROOT/elasticnet_baseline/candidate462_elasticnet_full_oos.parquet"
+TEMPORAL_BASE="$RUN_ROOT/temporal_base_full_oos.parquet"
+TEMPORAL_DEEP="$RUN_ROOT/temporal_deep_full_oos.parquet"
 MLP_BASE="$RUN_ROOT/mlp_base/unified_mlp_full_oos.parquet"
 MLP_WIDE="$RUN_ROOT/mlp_wide/unified_mlp_full_oos.parquet"
 TREE_ROUTE="$RUN_ROOT/lightgbm/unified_lightgbm_full_oos.parquet"
-ENSEMBLE_ROUTE="$RUN_ROOT/unified_equal_weight_ensemble.parquet"
-
-"$PYTHON_BIN" scripts/ensemble_unified_routes.py \
-  "$FUSION_BASE" "$FUSION_DEEP" "$MLP_BASE" "$MLP_WIDE" "$TREE_ROUTE" \
-  --output "$ENSEMBLE_ROUTE"
 
 "$PYTHON_BIN" scripts/score_submission_j_stability.py \
-  "$FUSION_BASE" "$FUSION_DEEP" "$MLP_BASE" "$MLP_WIDE" "$TREE_ROUTE" "$ENSEMBLE_ROUTE" \
+  "$ELASTICNET_BASELINE" "$TEMPORAL_BASE" "$TEMPORAL_DEEP" \
+  "$MLP_BASE" "$MLP_WIDE" "$TREE_ROUTE" \
   --years 2023 2024 \
   --data-dir "$DATA_ROOT" \
   --reports-dir "$J_REPORT_ROOT" \
@@ -126,17 +137,18 @@ ENSEMBLE_ROUTE="$RUN_ROOT/unified_equal_weight_ensemble.parquet"
   --summary-csv "$RUN_ROOT/j_stability.csv" \
   2>&1 | tee "$LOG_ROOT/j_stability.log"
 
-for baseline in "$FUSION_BASE" "$FUSION_DEEP" "$MLP_BASE" "$MLP_WIDE"; do
-  baseline_name="$(basename "$baseline" .parquet)"
-  "$PYTHON_BIN" scripts/score_unified_tree_increment.py \
-    --baseline "$baseline" \
-    --tree "$TREE_ROUTE" \
+for expert in "$TEMPORAL_BASE" "$TEMPORAL_DEEP" "$MLP_BASE" "$MLP_WIDE" "$TREE_ROUTE"; do
+  expert_name="$(basename "$expert" .parquet)"
+  "$PYTHON_BIN" scripts/score_unified_expert_increment.py \
+    --baseline "$ELASTICNET_BASELINE" \
+    --expert "$expert" \
+    --expert-name "$expert_name" \
     --years 2023 2024 \
-    --tree-weights 0.10 0.25 0.50 \
+    --expert-weights 0.10 0.25 0.50 \
     --data-dir "$DATA_ROOT" \
     --reports-dir "$J_REPORT_ROOT" \
-    --output "$RUN_ROOT/tree_increment_${baseline_name}.json" \
-    2>&1 | tee "$LOG_ROOT/tree_increment_${baseline_name}.log"
+    --output "$RUN_ROOT/expert_increment_${expert_name}.json" \
+    2>&1 | tee "$LOG_ROOT/expert_increment_${expert_name}.log"
 done
 
 ln -sfn "$RUN_ROOT" "$PROJECT_ROOT/reports/unified_alpha_fusion_suite_latest"
