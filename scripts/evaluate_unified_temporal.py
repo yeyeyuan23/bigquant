@@ -1,4 +1,4 @@
-"""Unified H1/H2 strict-OOS training over Candidate462 histories."""
+"""Unified H1/H2 strict-OOS training over Candidate454 histories."""
 
 from __future__ import annotations
 
@@ -218,7 +218,7 @@ def evaluate_fold(
         "rank_ic_std": float(np.nanstd(ic)),
         "rank_ic_ir": float(np.nanmean(ic) / np.nanstd(ic)) if np.nanstd(ic) > 0 else math.nan,
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
-        "feature_bundle": "candidate462",
+        "feature_bundle": "candidate454",
         "candidate_feature_count": config.input_dim,
         "model_dim": config.model_dim,
         "transformer_layers": config.transformer_layers,
@@ -255,7 +255,7 @@ def main() -> int:
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--candidate-pool", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
-    parser.add_argument("--expected-candidate-count", type=int, default=462)
+    parser.add_argument("--expected-candidate-count", type=int, default=454)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--train-stride", type=int, default=3)
     parser.add_argument("--model-dim", type=int, default=128)

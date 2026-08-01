@@ -20,7 +20,7 @@ date, instrument, factor
 ## 2. 数据边界
 
 - 因子工程输入只来自比赛允许的 `bar1m` 和 `financial`；股票池只用于确定日股键。
-- 当前统一因子面板固定为 Candidate462，不存在 Bar156 或 All618。
+- 当前统一因子面板固定为 Candidate454，不存在 Bar156 或 All618。
 - 本地训练数据覆盖 2019—2024；任何日期的标签和特征必须严格按可见时点对齐。
 - 验证/测试数据只在 `start_date` 前提供有限历史缓冲。按正式半年上限设计，不能假设
   验证时能读取 2019 年以来的完整历史。
@@ -32,7 +32,7 @@ date, instrument, factor
 
 ## 3. 因子池是特征工程
 
-Candidate462 是对量价、微观结构与财务信息做过降噪、归一和经济机制表达后的日频
+Candidate454 是对量价、微观结构与财务信息做过降噪、归一和经济机制表达后的日频
 特征面板。它用于 T 和 X 专家，但不替代原始分钟序列：日频聚合会丢失冲击先后、
 持续时间、恢复路径和盘口形状迁移，因此 M 专家必须保留原始日内信息。
 
@@ -41,7 +41,7 @@ Candidate462 是对量价、微观结构与财务信息做过降噪、归一和�
 ### T：Factor Temporal
 
 ```text
-Candidate462 × 过去60日
+Candidate454 × 过去60日
 → 缺失 Mask 与日截面标准化
 → 特征投影
 → 多尺度因果 CNN
@@ -57,7 +57,7 @@ Candidate462 × 过去60日
 
 ### X：Factor Cross-sectional
 
-输入为当日 Candidate462。LightGBM 是主模型，MLP 是挑战模型。二者比较相同日期、
+输入为当日 Candidate454。LightGBM 是主模型，MLP 是挑战模型。二者比较相同日期、
 股票池、标签和 OOS 窗口，先选出一条 X 路线；只有可验证的正增量才允许内部组合。
 
 ### M：Raw Microstructure
@@ -93,11 +93,11 @@ schema v2。
 统一路线的比较基线固定为：
 
 ```text
-Candidate462 全因子池
+Candidate454 全因子池
 → 每日横截面预处理
 → Elastic Net
 → 60个交易日训练 / 20个交易日预测
-→ candidate462_elasticnet_full_oos.parquet
+→ candidate454_elasticnet_full_oos.parquet
 ```
 
 这是 `baseline route`，用于回答新专家相对完整因子池线性组合是否有增量。它与本地
@@ -138,7 +138,7 @@ J 是模型选择和融合的外层评价，不是神经网络或 Elastic Net �
 
 不再默认把所有容量版本等权平均。正式融合顺序为：
 
-1. 先冻结 Candidate462 Elastic Net OOS 基线；
+1. 先冻结 Candidate454 Elastic Net OOS 基线；
 2. T、X、M 各自完成独立训练和 OOS 预测；
 3. 每个专家家族先选一条胜者路线；
 4. 对基线加单个专家做配对 `delta_J`；
@@ -150,10 +150,10 @@ J 是模型选择和融合的外层评价，不是神经网络或 Elastic Net �
 
 ## 8. 实施顺序
 
-- [x] Candidate462-only 数据和模型接口
+- [x] Candidate454-only 数据和模型接口
 - [x] T 专家 CNN + Transformer + DeepSets
 - [x] X 专家 MLP 与 LightGBM 候选
-- [x] Candidate462 全池 Elastic Net OOS 基线实现
+- [x] Candidate454 全池 Elastic Net OOS 基线实现
 - [x] 通用专家相对 Elastic Net 的配对增量评分器
 - [x] M 原始分钟特征、张量合同、双通路网络与严格 OOS 训练入口
 - [x] canonical/E2E 映射、单位转换、SHA 与质量审计实现

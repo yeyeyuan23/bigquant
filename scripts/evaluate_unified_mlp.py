@@ -1,4 +1,4 @@
-"""Strict rolling OOS MLP over Candidate462."""
+"""Strict rolling OOS MLP over Candidate454."""
 
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def fit_predict_fold(
                 )
             )
     metrics = {
-        "feature_bundle": "candidate462",
+        "feature_bundle": "candidate454",
         "candidate_feature_count": config.input_dim,
         "train_start": str(panel.dates[min(train_indices)].date()),
         "train_end": str(panel.dates[max(train_indices)].date()),
@@ -157,7 +157,7 @@ def main() -> int:
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--candidate-pool", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
-    parser.add_argument("--expected-candidate-count", type=int, default=462)
+    parser.add_argument("--expected-candidate-count", type=int, default=454)
     parser.add_argument("--hidden-dims", nargs="+", type=int, default=[512, 256])
     parser.add_argument("--dropout", type=float, default=0.12)
     parser.add_argument("--epochs", type=int, default=8)

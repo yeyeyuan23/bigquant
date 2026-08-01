@@ -22,7 +22,9 @@ from scripts.factor_wiki_remaining.io_utils import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR_ROOT = REPO_ROOT / "scripts" / "factor_wiki_remaining"
 GENERATOR_PATH = GENERATOR_ROOT / "build_changjiang_components.py"
-SPEC = importlib.util.spec_from_file_location("build_changjiang_components", GENERATOR_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "build_changjiang_components", GENERATOR_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 changjiang = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(changjiang)
@@ -37,7 +39,9 @@ HAITONG_SPEC.loader.exec_module(haitong)
 
 
 @pytest.mark.parametrize("suffix", ["parquet", "feather"])
-def test_month_input_helpers_support_both_formats(tmp_path: Path, suffix: str) -> None:
+def test_month_input_helpers_support_both_formats(
+    tmp_path: Path, suffix: str
+) -> None:
     frame = pd.DataFrame({"date": ["2020-01-02"], "close": [123]})
     for month in range(1, 13):
         path = tmp_path / f"2020{month:02d}.0.{suffix}"
@@ -49,7 +53,9 @@ def test_month_input_helpers_support_both_formats(tmp_path: Path, suffix: str) -
     paths = discover_month_paths(tmp_path, (2020,))
     assert len(paths) == 12
     assert paths[0].name == f"202001.0.{suffix}"
-    pd.testing.assert_frame_equal(read_columns(paths[0], ("close",)), frame[["close"]])
+    pd.testing.assert_frame_equal(
+        read_columns(paths[0], ("close",)), frame[["close"]]
+    )
 
 
 def test_month_input_helpers_reject_duplicate_formats(tmp_path: Path) -> None:
@@ -90,22 +96,25 @@ def test_project_components_are_executable_from_raw_daily_primitives() -> None:
     np.testing.assert_allclose(ob_result["factor_raw"], [0.01, -0.005])
 
 
-def test_all_462_candidates_have_source_provenance_classification() -> None:
+def test_all_454_candidates_have_source_provenance_classification() -> None:
     rows = audit_provenance()
 
-    assert len(rows) == 462
-    assert len({row["candidate_id"] for row in rows}) == 462
-    assert not any(str(row["provenance_status"]).startswith("unresolved") for row in rows)
-    assert sum(row["evidence_level"] == "formula_only" for row in rows) == 157
-    assert (
-        sum(
-            row["evidence_level"] not in {"executable_candidate", "executable_upstream_generator"}
-            for row in rows
-        )
-        == 157
+    assert len(rows) == 454
+    assert len({row["candidate_id"] for row in rows}) == 454
+    assert not any(
+        str(row["provenance_status"]).startswith("unresolved") for row in rows
     )
+    assert sum(row["evidence_level"] == "formula_only" for row in rows) == 0
+    assert sum(
+        row["evidence_level"]
+        not in {"executable_candidate", "executable_upstream_generator"}
+        for row in rows
+    ) == 0
     assert all(
-        set(row["traced_sources"]).issubset({"bar1m", "financial", "instruments"}) for row in rows
+        set(row["traced_sources"]).issubset(
+            {"bar1m", "financial", "instruments"}
+        )
+        for row in rows
     )
 
 
@@ -134,17 +143,21 @@ def test_cicc_manifest_maps_all_13_submitted_components() -> None:
 
 
 def test_exact_remaining_132_manifest_split() -> None:
-    with (GENERATOR_ROOT / "submission_manifest_changjiang_123.csv").open(
-        encoding="utf-8", newline=""
-    ) as handle:
+    with (
+        GENERATOR_ROOT / "submission_manifest_changjiang_123.csv"
+    ).open(encoding="utf-8", newline="") as handle:
         changjiang_rows = list(csv.DictReader(handle))
     with (GENERATOR_ROOT / "submission_manifest_haitong_11.csv").open(
         encoding="utf-8", newline=""
     ) as handle:
         haitong_rows = list(csv.DictReader(handle))
 
-    changjiang_hf = [row for row in changjiang_rows if row["family"] == "HF"]
-    changjiang_pv = [row for row in changjiang_rows if row["candidate_id"] == "PV-219"]
+    changjiang_hf = [
+        row for row in changjiang_rows if row["family"] == "HF"
+    ]
+    changjiang_pv = [
+        row for row in changjiang_rows if row["candidate_id"] == "PV-219"
+    ]
     haitong_hf = [row for row in haitong_rows if row["family"] == "HF"]
     remaining = changjiang_hf + changjiang_pv + haitong_hf
 
@@ -160,7 +173,9 @@ def test_exact_remaining_132_manifest_split() -> None:
 
     all_rows = [*changjiang_rows, *haitong_rows]
     remaining_ids = {
-        row["candidate_id"] for row in all_rows if _is_remaining_132(row["candidate_id"])
+        row["candidate_id"]
+        for row in all_rows
+        if _is_remaining_132(row["candidate_id"])
     }
     assert len(remaining_ids) == 132
 
@@ -233,10 +248,14 @@ def test_rolling_spearman_is_causal_under_future_perturbation() -> None:
             "close": np.linspace(10.0, 13.0, 30),
         }
     )
-    original = changjiang._rolling_spearman(base, base["volume"], base["close"], 21)
+    original = changjiang._rolling_spearman(
+        base, base["volume"], base["close"], 21
+    )
     changed = base.copy()
     changed.loc[25:, "volume"] = [1000.0, 5.0, 900.0, 4.0, 800.0]
-    perturbed = changjiang._rolling_spearman(changed, changed["volume"], changed["close"], 21)
+    perturbed = changjiang._rolling_spearman(
+        changed, changed["volume"], changed["close"], 21
+    )
 
     pd.testing.assert_series_equal(original.iloc[:25], perturbed.iloc[:25])
 

@@ -1,4 +1,4 @@
-"""Build the 157 retained GTJA candidates from allowed daily bar inputs."""
+"""Build the 149 retained GTJA candidates from allowed daily bar inputs."""
 
 from __future__ import annotations
 
@@ -53,8 +53,8 @@ def retained_gtja_candidates(candidate_root: Path) -> list[dict[str, object]]:
                 "candidate_module": str(path),
             }
         )
-    if len(rows) != 157:
-        raise RuntimeError(f"expected 157 retained GTJA candidates, found {len(rows)}")
+    if len(rows) != 149:
+        raise RuntimeError(f"expected 149 retained GTJA candidates, found {len(rows)}")
     if len({str(row["candidate_id"]) for row in rows}) != len(rows):
         raise RuntimeError("duplicate retained GTJA candidate ids")
     return rows
@@ -227,9 +227,9 @@ def main() -> int:
     features = keys.with_columns(feature_series).sort(["date", "instrument"])
     availability = keys.with_columns(availability_series).sort(["date", "instrument"])
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    features_path = args.output_dir / "gtja157_features_wide.parquet"
-    availability_path = args.output_dir / "gtja157_availability_wide.parquet"
-    lineage_path = args.output_dir / "gtja157_lineage.json"
+    features_path = args.output_dir / "gtja149_features_wide.parquet"
+    availability_path = args.output_dir / "gtja149_availability_wide.parquet"
+    lineage_path = args.output_dir / "gtja149_lineage.json"
     features.write_parquet(features_path, compression="zstd")
     availability.write_parquet(availability_path, compression="zstd")
     lineage_path.write_text(
@@ -237,7 +237,7 @@ def main() -> int:
         encoding="utf-8",
     )
     report = {
-        "schema_version": "gtja157-feature-matrix-v1",
+        "schema_version": "gtja-feature-matrix-v2",
         "candidate_count": len(candidates),
         "rows": features.height,
         "date_min": str(features["date"].min().date()),
@@ -255,7 +255,7 @@ def main() -> int:
         "feature_sha256": sha256(features_path),
         "availability_sha256": sha256(availability_path),
     }
-    (args.output_dir / "gtja157_report.json").write_text(
+    (args.output_dir / "gtja149_report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )

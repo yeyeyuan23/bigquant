@@ -1,4 +1,4 @@
-"""Masked tabular baseline over Candidate462."""
+"""Masked tabular baseline over Candidate454."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .temporal import masked_cross_sectional_zscore
 
 @dataclass(frozen=True)
 class CandidateMLPConfig:
-    input_dim: int = 462
+    input_dim: int = 454
     hidden_dims: tuple[int, ...] = (512, 256)
     dropout: float = 0.12
 

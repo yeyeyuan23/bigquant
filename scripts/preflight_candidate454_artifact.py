@@ -13,7 +13,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pool", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--expected-count", type=int, default=462)
+    parser.add_argument("--expected-count", type=int, default=454)
     parser.add_argument("--required-start", default="2019-01-02")
     parser.add_argument("--required-end", default="2024-12-31")
     parser.add_argument("--output", type=Path)
@@ -65,7 +65,7 @@ def main() -> int:
     print(rendered, end="")
     if errors:
         raise SystemExit(
-            "candidate462 artifact is incomplete; formal unified training was not started"
+            "candidate454 artifact is incomplete; formal unified training was not started"
         )
     return 0
 

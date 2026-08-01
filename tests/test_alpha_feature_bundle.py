@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from bigalpha2026.alpha_models.feature_bundle import (
-    CANDIDATE462,
+    CANDIDATE454,
     candidate_long_to_wide,
     get_feature_bundle,
 )
@@ -15,8 +15,8 @@ from bigalpha2026.alpha_models.training_data import (
 
 
 def test_named_feature_bundles_have_expected_dimensions() -> None:
-    assert CANDIDATE462.total_feature_count == 462
-    assert get_feature_bundle("candidate462") is CANDIDATE462
+    assert CANDIDATE454.total_feature_count == 454
+    assert get_feature_bundle("candidate454") is CANDIDATE454
 
 
 def test_candidate_long_to_wide_preserves_requested_order() -> None:

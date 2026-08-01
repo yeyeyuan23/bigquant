@@ -1,4 +1,4 @@
-"""Measure paired J increment over the Candidate462 Elastic Net baseline."""
+"""Measure paired J increment over the Candidate454 Elastic Net baseline."""
 
 from __future__ import annotations
 
@@ -74,8 +74,8 @@ def main() -> int:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "protocol": "paired_expert_increment_over_candidate462_elasticnet_v1",
-        "baseline_role": "candidate462_full_pool_elasticnet_oos",
+        "protocol": "paired_expert_increment_over_candidate454_elasticnet_v1",
+        "baseline_role": "candidate454_full_pool_elasticnet_oos",
         "baseline": str(args.baseline),
         "expert": str(args.expert),
         "expert_name": args.expert_name,

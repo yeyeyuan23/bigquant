@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="/root/autodl-tmp/projects/bigquant-candidate462-completion"
+REPO_ROOT="/root/autodl-tmp/projects/bigquant-candidate454-completion"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
-WORK_ROOT="${BIGALPHA_FULL_FACTOR_WORK:-/root/autodl-tmp/candidate462_completion_full_2019_2024}"
+WORK_ROOT="${BIGALPHA_FULL_FACTOR_WORK:-/root/autodl-tmp/candidate454_completion_full_2019_2024}"
 LOG_ROOT="$WORK_ROOT/logs"
 
 mkdir -p "$LOG_ROOT"

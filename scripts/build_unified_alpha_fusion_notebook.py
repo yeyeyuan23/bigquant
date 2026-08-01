@@ -35,7 +35,7 @@ def build_notebook(
             "second model. T uses a fixed 60-day sample sequence; the Elastic Net "
             "baseline and M use 60-day training / one-day label isolation / "
             "20-day prediction blocks. The upstream "
-            "artifact must contain all 462 candidates through 2024 before the "
+            "artifact must contain all 454 candidates through 2024 before the "
             "formal suite starts."
         ),
         nbformat.v4.new_code_cell(
@@ -55,7 +55,7 @@ from bigalpha2026.alpha_models import (
     candidate_ids_from_manifest,
 )
 
-EXPECTED_CANDIDATES = 462
+EXPECTED_CANDIDATES = 454
 CANDIDATE_POOL = Path({str(candidate_pool)!r})
 CANDIDATE_MANIFEST = Path({str(candidate_manifest)!r})
 MICROSTRUCTURE_STORE = Path({str(microstructure_store)!r})
@@ -120,7 +120,7 @@ model = adapter.network
 print({
     "registered_model": "unified_temporal",
     "parameters": sum(parameter.numel() for parameter in model.parameters()),
-    "architecture": "candidate462 temporal CNN+Transformer + DeepSets",
+    "architecture": "candidate454 temporal CNN+Transformer + DeepSets",
 })"""
         ),
         nbformat.v4.new_markdown_cell(
@@ -153,11 +153,11 @@ print({
         nbformat.v4.new_markdown_cell("## Formal unified experiment command"),
         nbformat.v4.new_code_cell(
             """if not candidate_ready:
-    print("BLOCKED: upstream artifact is not candidate462-complete")
+    print("BLOCKED: upstream artifact is not candidate454-complete")
 else:
     print("bash run_unified_alpha_fusion_suite.sh")
     print({
-        "baseline": "candidate462 full-pool Elastic Net, 60d train / 20d predict",
+        "baseline": "candidate454 full-pool Elastic Net, 60d train / 20d predict",
         "routes": [
             "unified_temporal",
             "unified_mlp",

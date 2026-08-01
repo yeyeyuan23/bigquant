@@ -174,7 +174,7 @@ def load_score_reference(
     )
     if not candidate_ids:
         raise ValueError("candidate manifest contains no candidates")
-    # The local J reference pool is distinct from the Candidate462 Elastic Net
+    # The local J reference pool is distinct from the Candidate454 Elastic Net
     # baseline route. The shared dynamic loader
     # requires at least one candidate column to construct its feature panel.
     loader_filter = (f"self__{candidate_ids[0]}",)

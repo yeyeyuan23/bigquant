@@ -30,6 +30,7 @@ GENERATOR_BY_SOURCE_PREFIX = {
     ),
     "CJ": "scripts/factor_wiki_remaining/build_changjiang_components.py",
     "FZ": "scripts/build_fz76_candidate_pool_delta.py",
+    "GTJA": "scripts/build_gtja149_feature_matrix.py",
     "HAITONG": (
         "scripts/build_factor_wiki_latent_pv_delta.py|"
         "scripts/factor_wiki_remaining/build_haitong_components.py"
@@ -40,13 +41,22 @@ IN_REPOSITORY_DAILY_FEATURE_GENERATORS = {
     "HF-002": "src/bigalpha2026/candidates/hf/hf_002.py",
     "HF-003": "src/bigalpha2026/candidates/hf/hf_002.py",
     "HF-004": "src/bigalpha2026/candidates/hf/hf_002.py",
-    "HF-104": ("src/bigalpha2026/candidates/hf/hf_002.py|src/bigalpha2026/candidates/hf/hf_104.py"),
+    "HF-104": (
+        "src/bigalpha2026/candidates/hf/hf_002.py|"
+        "src/bigalpha2026/candidates/hf/hf_104.py"
+    ),
     "OB-001": "src/bigalpha2026/candidates/ob/ob_001.py",
     "OB-002": "src/bigalpha2026/candidates/ob/ob_002.py",
-    "OB-003": ("src/bigalpha2026/candidates/ob/ob_001.py|src/bigalpha2026/candidates/ob/ob_002.py"),
+    "OB-003": (
+        "src/bigalpha2026/candidates/ob/ob_001.py|"
+        "src/bigalpha2026/candidates/ob/ob_002.py"
+    ),
     "OB-004": "src/bigalpha2026/candidates/ob/ob_001.py",
     "OB-005": "src/bigalpha2026/candidates/ob/ob_001.py",
-    "OB-008": ("src/bigalpha2026/candidates/ob/ob_001.py|src/bigalpha2026/candidates/ob/ob_008.py"),
+    "OB-008": (
+        "src/bigalpha2026/candidates/ob/ob_001.py|"
+        "src/bigalpha2026/candidates/ob/ob_008.py"
+    ),
 }
 
 
@@ -117,10 +127,6 @@ def audit_provenance() -> list[dict[str, object]]:
             evidence_level = "executable_upstream_generator"
             generator = GENERATOR_BY_SOURCE_PREFIX[source_prefix]
             traced_sources = sorted(set(direct_sources) | {"bar1m"})
-        elif source_prefix == "GTJA":
-            status = "formula_documented_generator_missing"
-            evidence_level = "formula_only"
-            traced_sources = sorted(set(direct_sources) | {"bar1m"})
         else:
             status = "unresolved_precomputed_daily_features"
             evidence_level = "candidate_wrapper_only"
@@ -182,16 +188,21 @@ def main() -> None:
         "candidate_count": len(rows),
         "status_counts": counts,
         "fully_executable_provenance_count": sum(
-            row["evidence_level"] in {"executable_candidate", "executable_upstream_generator"}
+            row["evidence_level"]
+            in {"executable_candidate", "executable_upstream_generator"}
             for row in rows
         ),
-        "formula_only_count": sum(row["evidence_level"] == "formula_only" for row in rows),
+        "formula_only_count": sum(
+            row["evidence_level"] == "formula_only" for row in rows
+        ),
         "missing_executable_generator_count": sum(
-            row["evidence_level"] not in {"executable_candidate", "executable_upstream_generator"}
+            row["evidence_level"]
+            not in {"executable_candidate", "executable_upstream_generator"}
             for row in rows
         ),
         "unresolved_count": sum(
-            str(row["provenance_status"]).startswith("unresolved") for row in rows
+            str(row["provenance_status"]).startswith("unresolved")
+            for row in rows
         ),
         "candidates": rows,
     }

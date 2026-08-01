@@ -1,4 +1,4 @@
-"""Assemble six disjoint candidate blocks into a verified 462-column store."""
+"""Assemble disjoint candidate blocks into a verified active-factor store."""
 
 from __future__ import annotations
 
@@ -114,20 +114,25 @@ def main() -> int:
     parser.add_argument("--direct-availability", type=Path, required=True)
     parser.add_argument("--direct-report", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--expected-count", type=int, default=454)
+    parser.add_argument("--manifest-name", default="candidate454_manifest.json")
     parser.add_argument("--years", nargs="+", type=int, default=list(range(2019, 2025)))
     args = parser.parse_args()
 
     active_ids = set(pd.read_csv(args.provenance_csv)["candidate_id"].astype(str))
-    blocks = {
+    source_blocks = {
         "base": active_ids & parquet_ids(args.base_pool),
         "remaining132": set(pd.read_csv(args.remaining_lineage)["candidate_id"].astype(str)),
-        "gtja157": {
+        "gtja149": {
             str(row["candidate_id"])
             for row in json.loads(args.gtja_lineage.read_text(encoding="utf-8"))
         },
         "cicc13": parquet_ids(args.cicc13),
         "pv16": parquet_ids(args.pv16),
         "direct6": set(json.loads(args.direct_report.read_text(encoding="utf-8"))["candidate_ids"]),
+    }
+    blocks = {
+        name: ids & active_ids for name, ids in source_blocks.items()
     }
     seen: set[str] = set()
     for name, ids in blocks.items():
@@ -137,7 +142,7 @@ def main() -> int:
         seen.update(ids)
     missing = sorted(active_ids - seen)
     unexpected = sorted(seen - active_ids)
-    if missing or unexpected or len(active_ids) != 462:
+    if missing or unexpected or len(active_ids) != args.expected_count:
         raise ValueError(
             f"invalid candidate coverage: active={len(active_ids)} "
             f"assembled={len(seen)} missing={missing} unexpected={unexpected}"
@@ -161,7 +166,7 @@ def main() -> int:
             elif name == "remaining132":
                 block = read_wide(args.remaining_features, ids, year)
                 block_mask = read_wide(args.remaining_availability, ids, year)
-            elif name == "gtja157":
+            elif name == "gtja149":
                 block = read_wide(args.gtja_features, ids, year)
                 block_mask = read_wide(args.gtja_availability, ids, year)
             elif name == "cicc13":
@@ -213,7 +218,7 @@ def main() -> int:
         print(json.dumps(year_reports[-1]), flush=True)
 
     manifest = {
-        "schema_version": "candidate462-wide-partitioned-v1",
+        "schema_version": "candidate-feature-store-v2",
         "layout": "wide_partitioned",
         "factor_sources": ["bar1m", "financial"],
         "candidate_count": len(active_ids),
@@ -226,7 +231,7 @@ def main() -> int:
         "availability": str(availability_root),
         "years": year_reports,
     }
-    manifest_path = args.output_root / "candidate462_manifest.json"
+    manifest_path = args.output_root / args.manifest_name
     manifest_path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

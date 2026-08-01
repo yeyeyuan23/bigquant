@@ -1,4 +1,4 @@
-"""Shared panel assembly for Candidate462 models."""
+"""Shared panel assembly for Candidate454 models."""
 
 from __future__ import annotations
 

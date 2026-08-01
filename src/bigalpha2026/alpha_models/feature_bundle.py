@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 KEY_COLUMNS = ("date", "instrument")
-CANDIDATE_FEATURE_COUNT = 462
+CANDIDATE_FEATURE_COUNT = 454
 CANDIDATE_PREFIX = "candidate__"
 
 
@@ -31,9 +31,9 @@ class FeatureBundleConfig:
         return self.candidate_feature_count
 
 
-CANDIDATE462 = FeatureBundleConfig("candidate462")
+CANDIDATE454 = FeatureBundleConfig("candidate454")
 
-FEATURE_BUNDLES = {CANDIDATE462.name: CANDIDATE462}
+FEATURE_BUNDLES = {CANDIDATE454.name: CANDIDATE454}
 
 
 def get_feature_bundle(name: str) -> FeatureBundleConfig:

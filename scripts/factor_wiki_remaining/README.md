@@ -121,7 +121,7 @@ python scripts/factor_wiki_remaining/validate_prefix_invariance.py \
   --cutoff 2020-12-31
 ```
 
-`scripts/audit_candidate_source_provenance.py` writes a separate 462-row
+`scripts/audit_candidate_source_provenance.py` writes a separate 454-row
 source-evidence report. Its evidence levels deliberately distinguish an
 executable upstream generator from a formula-only definition; formula-only
 rows must not be described as having passed a real data rebuild.

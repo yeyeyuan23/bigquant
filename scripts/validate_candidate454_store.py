@@ -1,4 +1,4 @@
-"""Validate the assembled 462-factor feature and availability store."""
+"""Validate an assembled factor feature and availability store."""
 
 from __future__ import annotations
 
@@ -25,15 +25,22 @@ def sha256(path: Path) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--store", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--expected-count", type=int)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--column-batch-size", type=int, default=48)
     args = parser.parse_args()
 
-    manifest_path = args.store / "candidate462_manifest.json"
+    manifest_path = args.manifest or args.store / "candidate454_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     candidate_ids = [str(value) for value in manifest["candidate_ids"]]
-    if len(candidate_ids) != 462 or len(set(candidate_ids)) != 462:
-        raise ValueError("manifest does not contain 462 unique candidate IDs")
+    manifest_count = int(manifest["candidate_count"])
+    if len(candidate_ids) != manifest_count or len(set(candidate_ids)) != manifest_count:
+        raise ValueError("manifest candidate IDs are not unique or count is inconsistent")
+    if args.expected_count is not None and manifest_count != args.expected_count:
+        raise ValueError(
+            f"manifest contains {manifest_count} candidates, expected {args.expected_count}"
+        )
 
     expected_columns = [*KEYS, *candidate_ids]
     available_counts = {candidate_id: 0 for candidate_id in candidate_ids}
@@ -117,7 +124,7 @@ def main() -> int:
         )
 
     report = {
-        "schema_version": "candidate462-store-validation-v1",
+        "schema_version": "candidate-store-validation-v2",
         "passed": True,
         "candidate_count": len(candidate_ids),
         "rows": total_rows,
@@ -130,7 +137,7 @@ def main() -> int:
         "constant_candidates": [],
         "years": year_results,
     }
-    output = args.output or args.store / "candidate462_validation.json"
+    output = args.output or args.store / "candidate454_validation.json"
     output.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

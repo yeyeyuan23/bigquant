@@ -1,4 +1,4 @@
-"""Causal temporal model over the Candidate462 factor panel.
+"""Causal temporal model over the Candidate454 factor panel.
 
 Inputs are daily candidate-factor histories shaped
 ``[batch_date, stock, lookback, candidate]``.  The model is independent from
@@ -20,7 +20,7 @@ from .base import AlphaModel, register_model
 
 @dataclass(frozen=True)
 class CandidateTemporalConfig:
-    input_dim: int = 462
+    input_dim: int = 454
     model_dim: int = 128
     lookback: int = 60
     kernels: tuple[int, ...] = (3, 5, 15)
@@ -234,7 +234,7 @@ class CandidateTemporalNetwork(nn.Module):
 
 @register_model("unified_temporal")
 class CandidateTemporalModel(AlphaModel):
-    """Framework adapter for the Candidate462 temporal network."""
+    """Framework adapter for the Candidate454 temporal network."""
 
     def __init__(self, **config: Any) -> None:
         self.config = CandidateTemporalConfig(**config)

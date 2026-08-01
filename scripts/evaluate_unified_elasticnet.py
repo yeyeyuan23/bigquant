@@ -1,4 +1,4 @@
-"""Strict rolling Candidate462 Elastic Net OOS baseline."""
+"""Strict rolling Candidate454 Elastic Net OOS baseline."""
 
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ def main() -> int:
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--candidate-pool", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
-    parser.add_argument("--expected-candidate-count", type=int, default=462)
+    parser.add_argument("--expected-candidate-count", type=int, default=454)
     parser.add_argument("--train-days", type=int, default=60)
     parser.add_argument("--prediction-days", type=int, default=20)
     parser.add_argument("--alpha", type=float, default=0.001)
@@ -217,7 +217,7 @@ def main() -> int:
     route["factor"] = route["factor"].fillna(0.0)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     route.sort_values(["date", "instrument"]).to_parquet(
-        args.output_dir / "candidate462_elasticnet_full_oos.parquet",
+        args.output_dir / "candidate454_elasticnet_full_oos.parquet",
         index=False,
     )
     pd.DataFrame(metric_rows).to_csv(args.output_dir / "oos_metrics.csv", index=False)
@@ -225,8 +225,8 @@ def main() -> int:
         json.dumps(
             {
                 "model": "elastic_net",
-                "role": "candidate462_full_pool_oos_baseline",
-                "feature_bundle": "candidate462",
+                "role": "candidate454_full_pool_oos_baseline",
+                "feature_bundle": "candidate454",
                 "candidate_feature_count": candidate_count,
                 "training_protocol": f"{args.train_days}d_train_{args.prediction_days}d_predict",
                 "label_isolation_gap_days": 1,

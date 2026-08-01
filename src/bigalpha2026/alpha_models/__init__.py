@@ -1,4 +1,4 @@
-"""Candidate462 model-agnostic Alpha generation framework."""
+"""Candidate454 model-agnostic Alpha generation framework."""
 
 from .base import AlphaModel, ModelFactory, register_model
 from .data_contract import (
@@ -7,7 +7,7 @@ from .data_contract import (
     SubmissionDataContract,
 )
 from .feature_bundle import (
-    CANDIDATE462,
+    CANDIDATE454,
     FeatureBundleConfig,
     get_feature_bundle,
 )
@@ -48,7 +48,7 @@ from .training_data import (
 __all__ = [
     "ALLOWED_FACTOR_SOURCES",
     "BOOK_LEVELS",
-    "CANDIDATE462",
+    "CANDIDATE454",
     "DEFAULT_SUBMISSION_DATA_CONTRACT",
     "MICROSTRUCTURE_CHANNELS",
     "PRICE_COLUMNS",

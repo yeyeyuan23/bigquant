@@ -1,4 +1,4 @@
-"""Strict rolling OOS LightGBM over Candidate462."""
+"""Strict rolling OOS LightGBM over Candidate454."""
 
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ def main() -> int:
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--candidate-pool", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
-    parser.add_argument("--expected-candidate-count", type=int, default=462)
+    parser.add_argument("--expected-candidate-count", type=int, default=454)
     parser.add_argument("--num-leaves", type=int, default=31)
     parser.add_argument("--learning-rate", type=float, default=0.03)
     parser.add_argument("--n-estimators", type=int, default=500)
@@ -235,7 +235,7 @@ def main() -> int:
         json.dumps(
             {
                 "model": "lightgbm",
-                "feature_bundle": "candidate462",
+                "feature_bundle": "candidate454",
                 "feature_count": candidate_count,
                 "candidate_feature_count": candidate_count,
                 "validation_protocol": "strict rolling OOS",

@@ -3,9 +3,9 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
-CANDIDATE_STORE="/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate462_store"
+CANDIDATE_STORE="/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store"
 CANDIDATE_POOL="${UNIFIED_CANDIDATE_POOL:-$CANDIDATE_STORE/features}"
-CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate462_manifest.json}"
+CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate454_manifest.json}"
 MICROSTRUCTURE_STORE="${UNIFIED_MICROSTRUCTURE_STORE:-}"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 RUN_ID="${UNIFIED_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
@@ -16,13 +16,13 @@ J_REPORT_ROOT="/root/autodl-tmp/projects/bigquant/reports"
 mkdir -p "$RUN_ROOT" "$LOG_ROOT"
 cd "$PROJECT_ROOT"
 
-"$PYTHON_BIN" scripts/preflight_candidate462_artifact.py \
+"$PYTHON_BIN" scripts/preflight_candidate454_artifact.py \
   --pool "$CANDIDATE_POOL" \
   --manifest "$CANDIDATE_MANIFEST" \
-  --expected-count 462 \
+  --expected-count 454 \
   --required-start 2019-01-02 \
   --required-end 2024-12-31 \
-  --output "$RUN_ROOT/candidate462_preflight.json" \
+  --output "$RUN_ROOT/candidate454_preflight.json" \
   2>&1 | tee "$LOG_ROOT/preflight.log"
 
 "$PYTHON_BIN" scripts/evaluate_unified_elasticnet.py \
@@ -32,7 +32,7 @@ cd "$PROJECT_ROOT"
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
   --candidate-manifest "$CANDIDATE_MANIFEST" \
-  --expected-candidate-count 462 \
+  --expected-candidate-count 454 \
   --train-days 60 \
   --prediction-days 20 \
   --alpha 0.001 \
@@ -60,7 +60,7 @@ run_temporal() {
       --train-start-year 2019 \
       --candidate-pool "$CANDIDATE_POOL" \
       --candidate-manifest "$CANDIDATE_MANIFEST" \
-      --expected-candidate-count 462 \
+      --expected-candidate-count 454 \
       --model-dim "$model_dim" \
       --transformer-layers "$layers" \
       --attention-heads 8 \
@@ -75,7 +75,7 @@ run_temporal() {
     --output "$RUN_ROOT/${tag}_full_oos.parquet"
 }
 
-# Two genuinely different temporal capacities over Candidate462 histories.
+# Two genuinely different temporal capacities over Candidate454 histories.
 run_temporal temporal_base 256 4 768 6 2 1024
 run_temporal temporal_deep 384 6 1024 8 2 1200
 
@@ -86,7 +86,7 @@ run_temporal temporal_deep 384 6 1024 8 2 1200
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
   --candidate-manifest "$CANDIDATE_MANIFEST" \
-  --expected-candidate-count 462 \
+  --expected-candidate-count 454 \
   --hidden-dims 1024 512 256 \
   --epochs 12 \
   --train-stride 2 \
@@ -100,7 +100,7 @@ run_temporal temporal_deep 384 6 1024 8 2 1200
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
   --candidate-manifest "$CANDIDATE_MANIFEST" \
-  --expected-candidate-count 462 \
+  --expected-candidate-count 454 \
   --hidden-dims 1536 768 384 \
   --epochs 15 \
   --train-stride 2 \
@@ -115,12 +115,12 @@ run_temporal temporal_deep 384 6 1024 8 2 1200
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
   --candidate-manifest "$CANDIDATE_MANIFEST" \
-  --expected-candidate-count 462 \
+  --expected-candidate-count 454 \
   --num-leaves 63 \
   --n-estimators 800 \
   2>&1 | tee "$LOG_ROOT/lightgbm.log"
 
-ELASTICNET_BASELINE="$RUN_ROOT/elasticnet_baseline/candidate462_elasticnet_full_oos.parquet"
+ELASTICNET_BASELINE="$RUN_ROOT/elasticnet_baseline/candidate454_elasticnet_full_oos.parquet"
 TEMPORAL_BASE="$RUN_ROOT/temporal_base_full_oos.parquet"
 TEMPORAL_DEEP="$RUN_ROOT/temporal_deep_full_oos.parquet"
 MLP_BASE="$RUN_ROOT/mlp_base/unified_mlp_full_oos.parquet"

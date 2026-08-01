@@ -1,16 +1,16 @@
 # BigAlpha 2026 Unified Alpha
 
-当前目标是用 Candidate462 因子工程和原始分钟盘口构建三个彼此互补的 OOS 专家，
-并相对 Candidate462 全池 Elastic Net 基线最大化稳定 Competition Score。
+当前目标是用 Candidate454 因子工程和原始分钟盘口构建三个彼此互补的 OOS 专家，
+并相对 Candidate454 全池 Elastic Net 基线最大化稳定 Competition Score。
 
 唯一计划文档：[Unified Alpha Plan](docs/unified_alpha_plan.md)。
 
 ## 当前架构
 
-- `T / Factor Temporal`：Candidate462 的 60 日 CNN + Transformer + DeepSets。
-- `X / Factor Cross-sectional`：当日 Candidate462 的 LightGBM 主模型与 MLP 挑战模型。
+- `T / Factor Temporal`：Candidate454 的 60 日 CNN + Transformer + DeepSets。
+- `X / Factor Cross-sectional`：当日 Candidate454 的 LightGBM 主模型与 MLP 挑战模型。
 - `M / Raw Microstructure`：原始分钟价格、成交和前三档盘口的 TCN/CNN + 显式统计双通路专家。
-- `Baseline`：Candidate462 全池、60 日训练/20 日预测 Elastic Net OOS 路线。
+- `Baseline`：Candidate454 全池、60 日训练/20 日预测 Elastic Net OOS 路线。
 
 M 的代码与严格 OOS 入口已经实现，但分钟数据尚未准备，当前没有真实训练结果。
 统一套件只有在显式设置 `UNIFIED_MICROSTRUCTURE_STORE` 且 manifest 存在时才会启动 M；
