@@ -15,6 +15,7 @@ def build_notebook(
     *,
     candidate_pool: Path,
     candidate_manifest: Path,
+    microstructure_store: Path,
 ) -> nbformat.NotebookNode:
     notebook = nbformat.v4.new_notebook()
     notebook["metadata"] = {
@@ -31,8 +32,9 @@ def build_notebook(
             "This notebook is generated from the development repository and "
             "imports the canonical implementation from "
             "`src/bigalpha2026/alpha_models`; it does not contain a handwritten "
-            "second model. Model training uses expanding history from 2019, "
-            "while 60 days is only the temporal sequence length. The upstream "
+            "second model. T uses a fixed 60-day sample sequence; the Elastic Net "
+            "baseline and M use 60-day training / one-day label isolation / "
+            "20-day prediction blocks. The upstream "
             "artifact must contain all 462 candidates through 2024 before the "
             "formal suite starts."
         ),
@@ -48,6 +50,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from bigalpha2026.alpha_models import (
     DEFAULT_SUBMISSION_DATA_CONTRACT,
+    MICROSTRUCTURE_CHANNELS,
     ModelFactory,
     candidate_ids_from_manifest,
 )
@@ -55,6 +58,7 @@ from bigalpha2026.alpha_models import (
 EXPECTED_CANDIDATES = 462
 CANDIDATE_POOL = Path({str(candidate_pool)!r})
 CANDIDATE_MANIFEST = Path({str(candidate_manifest)!r})
+MICROSTRUCTURE_STORE = Path({str(microstructure_store)!r})
 manifest = json.loads(CANDIDATE_MANIFEST.read_text(encoding="utf-8"))
 candidate_ids = candidate_ids_from_manifest(CANDIDATE_MANIFEST)
 date_range = manifest.get("date_range")
@@ -71,6 +75,16 @@ print({{
     "candidate_ready": candidate_ready,
     "date_range": date_range,
     "candidate_pool": str(CANDIDATE_POOL),
+}})
+micro_manifest_path = MICROSTRUCTURE_STORE / "manifest.json"
+micro_ready = False
+if micro_manifest_path.is_file():
+    micro_manifest = json.loads(micro_manifest_path.read_text(encoding="utf-8"))
+    micro_ready = tuple(micro_manifest.get("channels", ())) == MICROSTRUCTURE_CHANNELS
+print({{
+    "microstructure_ready": micro_ready,
+    "microstructure_store": str(MICROSTRUCTURE_STORE),
+    "required_channels": len(MICROSTRUCTURE_CHANNELS),
 }})"""
         ),
         nbformat.v4.new_markdown_cell("## Contracts"),
@@ -84,7 +98,7 @@ print({
     "candidate_feature_count": EXPECTED_CANDIDATES,
 })"""
         ),
-        nbformat.v4.new_markdown_cell("## Canonical model"),
+        nbformat.v4.new_markdown_cell("## T: Factor Temporal"),
         nbformat.v4.new_code_cell(
             """adapter = ModelFactory.create(
     "unified_temporal",
@@ -106,6 +120,27 @@ print({
     "architecture": "candidate462 temporal CNN+Transformer + DeepSets",
 })"""
         ),
+        nbformat.v4.new_markdown_cell("## M: Raw Microstructure"),
+        nbformat.v4.new_code_cell(
+            """micro_adapter = ModelFactory.create(
+    "unified_microstructure",
+    {
+        "model_dim": 96,
+        "max_minutes": 242,
+        "kernels": (3, 15, 60),
+        "tcn_blocks": 3,
+        "tail_minutes": 30,
+        "dropout": 0.1,
+    },
+)
+micro_model = micro_adapter.network
+print({
+    "registered_model": "unified_microstructure",
+    "parameters": sum(parameter.numel() for parameter in micro_model.parameters()),
+    "architecture": "raw minute multi-scale TCN + explicit statistics + DeepSets",
+    "training_status": "not started" if not micro_ready else "data ready; training not run",
+})"""
+        ),
         nbformat.v4.new_markdown_cell("## Formal unified experiment command"),
         nbformat.v4.new_code_cell(
             """if not candidate_ready:
@@ -114,7 +149,13 @@ else:
     print("bash run_unified_alpha_fusion_suite.sh")
     print({
         "baseline": "candidate462 full-pool Elastic Net, 60d train / 20d predict",
-        "routes": ["unified_temporal", "unified_mlp", "unified_lightgbm"],
+        "routes": [
+            "unified_temporal",
+            "unified_mlp",
+            "unified_lightgbm",
+            *( ["unified_microstructure"] if micro_ready else [] ),
+        ],
+        "microstructure": "ready" if micro_ready else "skipped: canonical store missing",
         "j_policy": "standalone J + paired delta-J over Elastic Net baseline",
         "training_history": "expanding from 2019",
     })"""
@@ -130,11 +171,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate-pool", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
+    parser.add_argument(
+        "--microstructure-store",
+        type=Path,
+        default=Path("/root/autodl-tmp/microstructure_store"),
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
     notebook = build_notebook(
         candidate_pool=args.candidate_pool,
         candidate_manifest=args.candidate_manifest,
+        microstructure_store=args.microstructure_store,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     nbformat.write(notebook, args.output)

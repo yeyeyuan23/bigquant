@@ -26,6 +26,38 @@ class PanelArrays:
     candidate_columns: tuple[str, ...]
 
 
+def rolling_oos_blocks(
+    dates: pd.DatetimeIndex,
+    evaluation_years: tuple[int, ...],
+    *,
+    train_days: int,
+    prediction_days: int,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Return fixed rolling blocks with one trading date of label isolation."""
+
+    if train_days <= 0 or prediction_days <= 0:
+        raise ValueError("train_days and prediction_days must be positive")
+    if not dates.is_monotonic_increasing or dates.has_duplicates:
+        raise ValueError("dates must be unique and monotonically increasing")
+    blocks: list[tuple[np.ndarray, np.ndarray]] = []
+    for year in evaluation_years:
+        evaluation_indices = np.flatnonzero(dates.year == year)
+        if evaluation_indices.size == 0:
+            raise ValueError(f"evaluation year {year} contains no dates")
+        for offset in range(0, len(evaluation_indices), prediction_days):
+            prediction = evaluation_indices[offset : offset + prediction_days]
+            first_prediction = int(prediction[0])
+            train_stop = first_prediction - 1
+            train_start = train_stop - train_days
+            if train_start < 0:
+                raise ValueError("not enough pre-evaluation dates for the training window")
+            training = np.arange(train_start, train_stop, dtype=int)
+            if len(training) != train_days or int(training[-1]) >= first_prediction - 1:
+                raise RuntimeError("rolling block violated the label-isolation contract")
+            blocks.append((training, prediction))
+    return blocks
+
+
 def candidate_ids_from_manifest(
     manifest_path: str | Path,
     *,

@@ -17,12 +17,13 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_unified_temporal import load_labels
+from evaluate_unified_temporal import load_labels  # noqa: E402
 
-from bigalpha2026.alpha_models import (
+from bigalpha2026.alpha_models import (  # noqa: E402
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
     panel_arrays,
+    rolling_oos_blocks,
 )
 
 
@@ -33,25 +34,14 @@ def rolling_blocks(
     train_days: int,
     prediction_days: int,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Return rolling blocks with a one-date label-isolation gap."""
+    """Compatibility wrapper around the shared rolling OOS contract."""
 
-    blocks: list[tuple[np.ndarray, np.ndarray]] = []
-    for year in evaluation_years:
-        evaluation_indices = np.flatnonzero(dates.year == year)
-        if evaluation_indices.size == 0:
-            raise ValueError(f"evaluation year {year} contains no dates")
-        for offset in range(0, len(evaluation_indices), prediction_days):
-            prediction = evaluation_indices[offset : offset + prediction_days]
-            first_prediction = int(prediction[0])
-            train_stop = first_prediction - 1
-            train_start = train_stop - train_days
-            if train_start < 0:
-                raise ValueError("not enough pre-evaluation dates for the training window")
-            training = np.arange(train_start, train_stop, dtype=int)
-            if len(training) != train_days or int(training[-1]) >= first_prediction - 1:
-                raise RuntimeError("rolling block violated the label-isolation contract")
-            blocks.append((training, prediction))
-    return blocks
+    return rolling_oos_blocks(
+        dates,
+        evaluation_years,
+        train_days=train_days,
+        prediction_days=prediction_days,
+    )
 
 
 def daily_cross_sectional_zscore(values: np.ndarray) -> np.ndarray:

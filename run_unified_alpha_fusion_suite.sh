@@ -6,6 +6,7 @@ DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
 CANDIDATE_STORE="/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate462_store"
 CANDIDATE_POOL="${UNIFIED_CANDIDATE_POOL:-$CANDIDATE_STORE/features}"
 CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate462_manifest.json}"
+MICROSTRUCTURE_STORE="${UNIFIED_MICROSTRUCTURE_STORE:-}"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 RUN_ID="${UNIFIED_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 RUN_ROOT="$PROJECT_ROOT/reports/unified_alpha_fusion_suite_$RUN_ID"
@@ -125,10 +126,42 @@ TEMPORAL_DEEP="$RUN_ROOT/temporal_deep_full_oos.parquet"
 MLP_BASE="$RUN_ROOT/mlp_base/unified_mlp_full_oos.parquet"
 MLP_WIDE="$RUN_ROOT/mlp_wide/unified_mlp_full_oos.parquet"
 TREE_ROUTE="$RUN_ROOT/lightgbm/unified_lightgbm_full_oos.parquet"
+EXPERT_ROUTES=(
+  "$TEMPORAL_BASE"
+  "$TEMPORAL_DEEP"
+  "$MLP_BASE"
+  "$MLP_WIDE"
+  "$TREE_ROUTE"
+)
+
+if [[ -n "$MICROSTRUCTURE_STORE" && -s "$MICROSTRUCTURE_STORE/manifest.json" ]]; then
+  "$PYTHON_BIN" scripts/evaluate_unified_microstructure.py \
+    --data-root "$DATA_ROOT" \
+    --micro-store "$MICROSTRUCTURE_STORE" \
+    --output-dir "$RUN_ROOT/microstructure" \
+    --years 2023 2024 \
+    --train-start-year 2019 \
+    --train-days 60 \
+    --prediction-days 20 \
+    --epochs 3 \
+    --model-dim 96 \
+    --kernels 3 15 60 \
+    --tcn-blocks 3 \
+    --tail-minutes 30 \
+    --max-minutes 242 \
+    2>&1 | tee "$LOG_ROOT/microstructure.log"
+  MICROSTRUCTURE_ROUTE="$RUN_ROOT/microstructure/unified_microstructure_full_oos.parquet"
+  EXPERT_ROUTES+=("$MICROSTRUCTURE_ROUTE")
+  printf '{"status":"complete","store":"%s"}\n' "$MICROSTRUCTURE_STORE" \
+    > "$RUN_ROOT/microstructure_status.json"
+else
+  printf '{"status":"skipped","reason":"UNIFIED_MICROSTRUCTURE_STORE is not ready"}\n' \
+    > "$RUN_ROOT/microstructure_status.json"
+  echo "microstructure expert skipped: set UNIFIED_MICROSTRUCTURE_STORE after data preparation"
+fi
 
 "$PYTHON_BIN" scripts/score_submission_j_stability.py \
-  "$ELASTICNET_BASELINE" "$TEMPORAL_BASE" "$TEMPORAL_DEEP" \
-  "$MLP_BASE" "$MLP_WIDE" "$TREE_ROUTE" \
+  "$ELASTICNET_BASELINE" "${EXPERT_ROUTES[@]}" \
   --years 2023 2024 \
   --data-dir "$DATA_ROOT" \
   --reports-dir "$J_REPORT_ROOT" \
@@ -137,7 +170,7 @@ TREE_ROUTE="$RUN_ROOT/lightgbm/unified_lightgbm_full_oos.parquet"
   --summary-csv "$RUN_ROOT/j_stability.csv" \
   2>&1 | tee "$LOG_ROOT/j_stability.log"
 
-for expert in "$TEMPORAL_BASE" "$TEMPORAL_DEEP" "$MLP_BASE" "$MLP_WIDE" "$TREE_ROUTE"; do
+for expert in "${EXPERT_ROUTES[@]}"; do
   expert_name="$(basename "$expert" .parquet)"
   "$PYTHON_BIN" scripts/score_unified_expert_increment.py \
     --baseline "$ELASTICNET_BASELINE" \

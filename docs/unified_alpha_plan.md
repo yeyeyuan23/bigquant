@@ -62,13 +62,24 @@ Candidate462 × 过去60日
 
 ### M：Raw Microstructure
 
-输入为当日原始分钟价格、成交和盘口序列。第一版使用双通路：
+输入为当日原始分钟价格、成交和盘口序列。代码固定使用前三档盘口，使本地压缩数据与
+平台 `bar1m` 能生成同一个 canonical schema。任何 instrument 映射和价格/成交单位修复
+必须在入库前显式完成，模型不会猜字段或倍率。第一版使用双通路：
 
 1. 多尺度 TCN/CNN 编码分钟顺序、冲击、持续与恢复；
 2. 小型 MLP 编码尾盘、深度、价差、microprice 和冲击反转等显式统计。
 
 两路合并后加入当日横截面上下文并输出日频分数。第一版不使用大型分钟
 Transformer；它只能在 TCN/CNN 基线通过后作为挑战模型。
+
+每个样本是 `某日 × 某股 × 最多242分钟 × 17通道`。17 个通道覆盖 session-safe
+分钟收益、K 线位置、相对价差、microprice、L1/L3 深度不平衡、盘口形状、成交活跃度、
+单笔成交尺度和日内时钟。上午与下午第一分钟的收益均为空，禁止跨午休连接。网络的
+序列通路使用缺失 mask 和多尺度因果 TCN；统计通路使用全日均值、波动、最新值、尾盘
+均值和通道覆盖率。两路融合后才加入 DeepSets 横截面上下文。
+
+M 的训练器与基线共用 `60日训练 / 隔离1日标签 / 20日预测` 滚动块。数据 store 不存在
+时统一套件必须明确 `skipped`，不得生成全零文件冒充模型输出。
 
 ## 5. 当前 J 基线
 
@@ -135,9 +146,11 @@ J 是模型选择和融合的外层评价，不是神经网络或 Elastic Net �
 - [x] Candidate462-only 数据和模型接口
 - [x] T 专家 CNN + Transformer + DeepSets
 - [x] X 专家 MLP 与 LightGBM 候选
-- [ ] Candidate462 全池 Elastic Net OOS 基线
-- [ ] T 与 X 相对 Elastic Net 的配对增量报告
-- [ ] M 原始分钟盘口专家
+- [x] Candidate462 全池 Elastic Net OOS 基线实现
+- [x] 通用专家相对 Elastic Net 的配对增量评分器
+- [x] M 原始分钟特征、张量合同、双通路网络与严格 OOS 训练入口
+- [ ] 分钟数据 canonical store 准备与 M 真实 OOS 训练
+- [ ] T、X、M 全部真实 OOS 结果及配对增量报告
 - [ ] 三专家静态晚融合
 - [ ] AIStudio `main(datasources, start_date, end_date)` 真实执行
 - [ ] full/cutoff 前缀一致性检查
