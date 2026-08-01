@@ -65,7 +65,7 @@ def main() -> int:
     print(rendered, end="")
     if errors:
         raise SystemExit(
-            "candidate462 artifact is incomplete; formal All618 training was not started"
+            "candidate462 artifact is incomplete; formal unified training was not started"
         )
     return 0
 

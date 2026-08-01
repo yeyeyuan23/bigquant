@@ -1,4 +1,4 @@
-"""Canonical feature-bundle contracts for unified Alpha models."""
+"""Canonical candidate-factor bundle contracts for unified Alpha models."""
 
 from __future__ import annotations
 
@@ -9,44 +9,31 @@ from pathlib import Path
 import pandas as pd
 
 KEY_COLUMNS = ("date", "instrument")
-BAR1M_FEATURE_COUNT = 156
 CANDIDATE_FEATURE_COUNT = 462
 CANDIDATE_PREFIX = "candidate__"
 
 
 @dataclass(frozen=True)
 class FeatureBundleConfig:
-    """Declare model inputs without hard-coding them inside model classes."""
+    """Declare the candidate-factor input without model-specific assumptions."""
 
     name: str
-    bar_feature_count: int = BAR1M_FEATURE_COUNT
-    candidate_feature_count: int = 0
+    candidate_feature_count: int = CANDIDATE_FEATURE_COUNT
 
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ValueError("feature bundle name must be non-empty")
-        if self.bar_feature_count < 0 or self.candidate_feature_count < 0:
-            raise ValueError("feature counts must be non-negative")
-        if self.total_feature_count <= 0:
-            raise ValueError("feature bundle must contain at least one feature")
+        if self.candidate_feature_count <= 0:
+            raise ValueError("candidate_feature_count must be positive")
 
     @property
     def total_feature_count(self) -> int:
-        return self.bar_feature_count + self.candidate_feature_count
+        return self.candidate_feature_count
 
 
-BAR156 = FeatureBundleConfig("bar156")
-CANDIDATE462 = FeatureBundleConfig(
-    "candidate462",
-    bar_feature_count=0,
-    candidate_feature_count=CANDIDATE_FEATURE_COUNT,
-)
-ALL618 = FeatureBundleConfig(
-    "all618",
-    candidate_feature_count=CANDIDATE_FEATURE_COUNT,
-)
+CANDIDATE462 = FeatureBundleConfig("candidate462")
 
-FEATURE_BUNDLES = {bundle.name: bundle for bundle in (BAR156, CANDIDATE462, ALL618)}
+FEATURE_BUNDLES = {CANDIDATE462.name: CANDIDATE462}
 
 
 def get_feature_bundle(name: str) -> FeatureBundleConfig:
@@ -123,30 +110,3 @@ def read_candidate_pool(
     if end_date is not None:
         frame = frame.loc[frame["date"].le(pd.Timestamp(end_date).normalize())]
     return candidate_long_to_wide(frame, candidate_ids=candidate_ids)
-
-
-def merge_feature_bundle(
-    bar_features: pd.DataFrame,
-    candidate_features: pd.DataFrame,
-) -> pd.DataFrame:
-    """One-to-one merge of canonical bar and candidate feature panels."""
-
-    normalized: dict[str, pd.DataFrame] = {}
-    for name, frame in (("bar", bar_features), ("candidate", candidate_features)):
-        missing = sorted(set(KEY_COLUMNS).difference(frame.columns))
-        if missing:
-            raise ValueError(f"{name} features are missing key columns: {missing}")
-        current = frame.copy()
-        current["date"] = pd.to_datetime(current["date"], errors="coerce").dt.normalize()
-        current["instrument"] = current["instrument"].astype(str)
-        if current[list(KEY_COLUMNS)].isna().any().any():
-            raise ValueError(f"{name} features contain null keys")
-        if current.duplicated(list(KEY_COLUMNS)).any():
-            raise ValueError(f"{name} features contain duplicate keys")
-        normalized[name] = current
-    return normalized["bar"].merge(
-        normalized["candidate"],
-        on=list(KEY_COLUMNS),
-        how="left",
-        validate="one_to_one",
-    )

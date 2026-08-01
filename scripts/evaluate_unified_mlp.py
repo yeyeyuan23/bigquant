@@ -1,4 +1,4 @@
-"""Strict rolling OOS MLP on the unified Alpha feature bundle."""
+"""Strict rolling OOS MLP over Candidate462."""
 
 from __future__ import annotations
 
@@ -18,10 +18,10 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_unified_temporal import correlation_loss, daily_bar_features, fold_boundaries
+from evaluate_unified_temporal import correlation_loss, fold_boundaries, load_labels
 
 from bigalpha2026.alpha_models import (
-    All618MLPConfig,
+    CandidateMLPConfig,
     ModelFactory,
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
@@ -30,63 +30,37 @@ from bigalpha2026.alpha_models import (
 
 
 def load_panel(args: argparse.Namespace):
-    years = range(args.train_start_year, max(args.years) + 1)
-    cache_dir = args.bar_cache_dir or args.output_dir / "cache"
-    bar_features = pd.concat(
-        [daily_bar_features(args.data_root, year, cache_dir) for year in years],
-        ignore_index=True,
-    )
-    labels = []
-    for year in years:
-        part = pd.read_parquet(args.data_root / f"labels/year={year}/part-{year}.parquet")
-        part["date"] = pd.to_datetime(part["date"]).dt.normalize()
-        labels.append(part)
-    candidate_features = None
-    candidate_count = 0
-    if args.candidate_pool is not None and args.candidate_manifest is not None:
-        candidate_count = len(
-            candidate_ids_from_manifest(
-                args.candidate_manifest,
-                expected_count=args.expected_candidate_count,
-            )
-        )
-        candidate_features, _ = load_candidate_feature_panel(
-            args.candidate_pool,
+    candidate_count = len(
+        candidate_ids_from_manifest(
             args.candidate_manifest,
-            start_date=f"{args.train_start_year}-01-01",
-            end_date=f"{max(args.years)}-12-31",
             expected_count=args.expected_candidate_count,
         )
-    return panel_arrays(
-        bar_features,
-        pd.concat(labels, ignore_index=True),
-        candidate_features,
-    ), candidate_count
+    )
+    candidate_features, _ = load_candidate_feature_panel(
+        args.candidate_pool,
+        args.candidate_manifest,
+        start_date=f"{args.train_start_year}-01-01",
+        end_date=f"{max(args.years)}-12-31",
+        expected_count=args.expected_candidate_count,
+    )
+    labels = load_labels(args.data_root, args.train_start_year, max(args.years))
+    return panel_arrays(candidate_features, labels), candidate_count
 
 
 def model_inputs(panel, day_index: int, active: np.ndarray, device: torch.device):
-    bars = panel.bar_values[day_index, active]
-    inputs = [
-        torch.from_numpy(bars).unsqueeze(0).to(device),
-        torch.from_numpy(np.isfinite(bars)).unsqueeze(0).to(device),
+    candidates = panel.candidate_values[day_index, active]
+    return (
+        torch.from_numpy(candidates).unsqueeze(0).to(device),
+        torch.from_numpy(np.isfinite(candidates)).unsqueeze(0).to(device),
         torch.ones(1, len(active), dtype=torch.bool, device=device),
-    ]
-    if panel.candidate_values is not None:
-        candidates = panel.candidate_values[day_index, active]
-        inputs.extend(
-            (
-                torch.from_numpy(candidates).unsqueeze(0).to(device),
-                torch.from_numpy(np.isfinite(candidates)).unsqueeze(0).to(device),
-            )
-        )
-    return inputs
+    )
 
 
 def fit_predict_fold(
     panel,
     train_indices: list[int],
     validation_indices: list[int],
-    config: All618MLPConfig,
+    config: CandidateMLPConfig,
     *,
     epochs: int,
     train_stride: int,
@@ -122,10 +96,7 @@ def fit_predict_fold(
             scaler.step(optimizer)
             scaler.update()
             losses.append(float(loss.detach()))
-        print(
-            f"epoch={epoch + 1} loss={np.mean(losses):.6f}",
-            flush=True,
-        )
+        print(f"epoch={epoch + 1} loss={np.mean(losses):.6f}", flush=True)
     rows = []
     daily_ic = []
     model.eval()
@@ -153,6 +124,8 @@ def fit_predict_fold(
                 )
             )
     metrics = {
+        "feature_bundle": "candidate462",
+        "candidate_feature_count": config.input_dim,
         "train_start": str(panel.dates[min(train_indices)].date()),
         "train_end": str(panel.dates[max(train_indices)].date()),
         "validation_start": str(panel.dates[min(validation_indices)].date()),
@@ -170,11 +143,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--bar-cache-dir", type=Path)
     parser.add_argument("--years", nargs="+", type=int, default=[2023, 2024])
     parser.add_argument("--train-start-year", type=int, default=2019)
-    parser.add_argument("--candidate-pool", type=Path)
-    parser.add_argument("--candidate-manifest", type=Path)
+    parser.add_argument("--candidate-pool", type=Path, required=True)
+    parser.add_argument("--candidate-manifest", type=Path, required=True)
     parser.add_argument("--expected-candidate-count", type=int, default=462)
     parser.add_argument("--hidden-dims", nargs="+", type=int, default=[512, 256])
     parser.add_argument("--dropout", type=float, default=0.12)
@@ -184,13 +156,10 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=4e-4)
     parser.add_argument("--seed", type=int, default=20260801)
     args = parser.parse_args()
-    if (args.candidate_pool is None) != (args.candidate_manifest is None):
-        parser.error("--candidate-pool and --candidate-manifest must be supplied together")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     panel, candidate_count = load_panel(args)
-    config = All618MLPConfig(
-        bar_dim=len(panel.bar_columns),
-        candidate_dim=candidate_count,
+    config = CandidateMLPConfig(
+        input_dim=candidate_count,
         hidden_dims=tuple(args.hidden_dims),
         dropout=args.dropout,
     )
@@ -199,13 +168,9 @@ def main() -> int:
     for year in args.years:
         for fold_index, fold in enumerate(("H1", "H2")):
             train_end, validation_start, validation_end = fold_boundaries(year, fold)
-            train_indices = [
-                i for i, day in enumerate(panel.dates) if day <= train_end
-            ]
+            train_indices = [i for i, day in enumerate(panel.dates) if day <= train_end]
             validation_indices = [
-                i
-                for i, day in enumerate(panel.dates)
-                if validation_start <= day <= validation_end
+                i for i, day in enumerate(panel.dates) if validation_start <= day <= validation_end
             ]
             route, fold_metrics = fit_predict_fold(
                 panel,
@@ -222,8 +187,7 @@ def main() -> int:
             metrics.append(fold_metrics)
             routes.append(route)
     output = pd.concat(routes, ignore_index=True).sort_values(["date", "instrument"])
-    output_name = "unified_mlp_full_oos.parquet"
-    output.to_parquet(args.output_dir / output_name, index=False)
+    output.to_parquet(args.output_dir / "unified_mlp_full_oos.parquet", index=False)
     (args.output_dir / "oos_metrics.json").write_text(
         json.dumps(metrics, indent=2) + "\n",
         encoding="utf-8",

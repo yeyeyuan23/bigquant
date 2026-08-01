@@ -1,4 +1,4 @@
-"""Shared panel assembly for bar-only and bar-plus-candidate models."""
+"""Shared panel assembly for Candidate462 models."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from .feature_bundle import (
     CANDIDATE_PREFIX,
     KEY_COLUMNS,
     candidate_columns,
-    merge_feature_bundle,
     read_candidate_pool,
 )
 
@@ -22,10 +21,8 @@ from .feature_bundle import (
 class PanelArrays:
     dates: pd.DatetimeIndex
     instruments: tuple[str, ...]
-    bar_values: np.ndarray
-    candidate_values: np.ndarray | None
+    candidate_values: np.ndarray
     targets: np.ndarray
-    bar_columns: tuple[str, ...]
     candidate_columns: tuple[str, ...]
 
 
@@ -86,17 +83,19 @@ def load_candidate_feature_panel(
 
 
 def panel_arrays(
-    bar_features: pd.DataFrame,
+    candidate_features: pd.DataFrame,
     labels: pd.DataFrame,
-    candidate_features: pd.DataFrame | None = None,
 ) -> PanelArrays:
-    features = (
-        merge_feature_bundle(bar_features, candidate_features)
-        if candidate_features is not None
-        else bar_features.copy()
-    )
+    features = candidate_features.copy()
+    missing_keys = sorted(set(KEY_COLUMNS).difference(features.columns))
+    if missing_keys:
+        raise ValueError(f"candidate features are missing key columns: {missing_keys}")
     features["date"] = pd.to_datetime(features["date"]).dt.normalize()
     features["instrument"] = features["instrument"].astype(str)
+    if features[list(KEY_COLUMNS)].isna().any().any():
+        raise ValueError("candidate features contain null keys")
+    if features.duplicated(list(KEY_COLUMNS)).any():
+        raise ValueError("candidate features contain duplicate keys")
     labels = labels.copy()
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
@@ -105,23 +104,19 @@ def panel_arrays(
     instruments = tuple(sorted(set(features["instrument"]) & set(labels["instrument"])))
     index = pd.MultiIndex.from_product([dates, instruments], names=["date", "instrument"])
     candidate_columns = tuple(column for column in features if column.startswith(CANDIDATE_PREFIX))
-    bar_columns = tuple(
-        column for column in features if column not in {"date", "instrument", *candidate_columns}
+    unexpected = sorted(
+        column for column in features if column not in {*KEY_COLUMNS, *candidate_columns}
     )
-    bar_values = (
-        features.set_index(["date", "instrument"])[list(bar_columns)]
+    if unexpected:
+        raise ValueError(f"candidate panel contains non-candidate columns: {unexpected}")
+    if not candidate_columns:
+        raise ValueError("candidate panel contains no candidate columns")
+    candidate_values = (
+        features.set_index(["date", "instrument"])[list(candidate_columns)]
         .reindex(index)
         .to_numpy(np.float32)
-        .reshape(len(dates), len(instruments), len(bar_columns))
+        .reshape(len(dates), len(instruments), len(candidate_columns))
     )
-    candidate_values = None
-    if candidate_columns:
-        candidate_values = (
-            features.set_index(["date", "instrument"])[list(candidate_columns)]
-            .reindex(index)
-            .to_numpy(np.float32)
-            .reshape(len(dates), len(instruments), len(candidate_columns))
-        )
     labels["target"] = labels.groupby("date")["ret_next_open_to_close"].rank(pct=True) * 2.0 - 1.0
     targets = (
         labels.set_index(["date", "instrument"])["target"]
@@ -132,9 +127,7 @@ def panel_arrays(
     return PanelArrays(
         dates=dates,
         instruments=instruments,
-        bar_values=bar_values,
         candidate_values=candidate_values,
         targets=targets,
-        bar_columns=bar_columns,
         candidate_columns=candidate_columns,
     )

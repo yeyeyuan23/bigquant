@@ -1,4 +1,4 @@
-"""Strict rolling OOS LightGBM for the unified alpha feature bundle."""
+"""Strict rolling OOS LightGBM over Candidate462."""
 
 from __future__ import annotations
 
@@ -16,38 +16,35 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_unified_temporal import daily_bar_features, fold_boundaries
+from evaluate_unified_temporal import fold_boundaries
 
 from bigalpha2026.alpha_models import (
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
-    merge_feature_bundle,
 )
 
 
 def _load_year(
     data_root: Path,
-    cache_dir: Path,
     year: int,
     *,
-    candidate_pool: Path | None,
-    candidate_manifest: Path | None,
-    expected_candidate_count: int | None,
+    candidate_pool: Path,
+    candidate_manifest: Path,
+    expected_candidate_count: int,
 ) -> pd.DataFrame:
-    features = daily_bar_features(data_root, year, cache_dir)
-    if candidate_pool is not None and candidate_manifest is not None:
-        candidates, _ = load_candidate_feature_panel(
-            candidate_pool,
-            candidate_manifest,
-            start_date=f"{year}-01-01",
-            end_date=f"{year}-12-31",
-            expected_count=expected_candidate_count,
-        )
-        features = merge_feature_bundle(features, candidates)
+    features, _ = load_candidate_feature_panel(
+        candidate_pool,
+        candidate_manifest,
+        start_date=f"{year}-01-01",
+        end_date=f"{year}-12-31",
+        expected_count=expected_candidate_count,
+    )
     labels = pd.read_parquet(data_root / f"labels/year={year}/part-{year}.parquet")
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
-    labels["target"] = labels.groupby("date")["ret_next_open_to_close"].rank(pct=True) * 2.0 - 1.0
+    labels["target"] = (
+        labels.groupby("date")["ret_next_open_to_close"].rank(pct=True) * 2.0 - 1.0
+    )
     features["date"] = pd.to_datetime(features["date"]).dt.normalize()
     features["instrument"] = features["instrument"].astype(str)
     return features.merge(
@@ -108,41 +105,32 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--bar-cache-dir", type=Path)
     parser.add_argument("--years", nargs="+", type=int, default=[2023, 2024])
     parser.add_argument("--train-start-year", type=int, default=2019)
-    parser.add_argument("--candidate-pool", type=Path)
-    parser.add_argument("--candidate-manifest", type=Path)
+    parser.add_argument("--candidate-pool", type=Path, required=True)
+    parser.add_argument("--candidate-manifest", type=Path, required=True)
     parser.add_argument("--expected-candidate-count", type=int, default=462)
     parser.add_argument("--num-leaves", type=int, default=31)
     parser.add_argument("--learning-rate", type=float, default=0.03)
     parser.add_argument("--n-estimators", type=int, default=500)
     parser.add_argument("--seed", type=int, default=20260731)
     args = parser.parse_args()
-    if (args.candidate_pool is None) != (args.candidate_manifest is None):
-        parser.error("--candidate-pool and --candidate-manifest must be supplied together")
-    candidate_count = 0
-    if args.candidate_manifest is not None:
-        candidate_count = len(
-            candidate_ids_from_manifest(
-                args.candidate_manifest,
-                expected_count=args.expected_candidate_count,
-            )
-        )
 
+    candidate_count = len(
+        candidate_ids_from_manifest(
+            args.candidate_manifest,
+            expected_count=args.expected_candidate_count,
+        )
+    )
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir = args.bar_cache_dir or args.output_dir / "cache"
     all_years = list(range(args.train_start_year, max(args.years) + 1))
     frames = {
         year: _load_year(
             args.data_root,
-            cache_dir,
             year,
             candidate_pool=args.candidate_pool,
             candidate_manifest=args.candidate_manifest,
-            expected_candidate_count=(
-                args.expected_candidate_count if args.candidate_manifest else None
-            ),
+            expected_candidate_count=args.expected_candidate_count,
         )
         for year in all_years
     }
@@ -151,10 +139,9 @@ def main() -> int:
         for column in frames[all_years[0]].columns
         if column not in {"date", "instrument", "target"}
     ]
-    expected_feature_count = 156 + candidate_count
-    if len(feature_columns) != expected_feature_count:
+    if len(feature_columns) != candidate_count:
         raise RuntimeError(
-            f"expected {expected_feature_count} model features, found {len(feature_columns)}"
+            f"expected {candidate_count} candidate features, found {len(feature_columns)}"
         )
 
     routes: list[pd.DataFrame] = []
@@ -228,8 +215,7 @@ def main() -> int:
     )
     neutral_filled_rows = int(route["factor"].isna().sum())
     route["factor"] = route["factor"].fillna(0.0)
-    route_name = "unified_lightgbm_full_oos.parquet"
-    route.to_parquet(args.output_dir / route_name, index=False)
+    route.to_parquet(args.output_dir / "unified_lightgbm_full_oos.parquet", index=False)
     pd.DataFrame(metric_rows).to_csv(args.output_dir / "oos_metrics.csv", index=False)
     pd.concat(importance_rows, ignore_index=True).to_csv(
         args.output_dir / "feature_importance.csv", index=False
@@ -238,11 +224,9 @@ def main() -> int:
         json.dumps(
             {
                 "model": "lightgbm",
-                "feature_bundle": "unified" if candidate_count else "bar156",
-                "feature_count": expected_feature_count,
-                "bar_feature_count": 156,
+                "feature_bundle": "candidate462",
+                "feature_count": candidate_count,
                 "candidate_feature_count": candidate_count,
-                "factor_sources": ["bar1m", "financial"] if candidate_count else ["bar1m"],
                 "validation_protocol": "strict rolling OOS",
                 "years": args.years,
                 "num_leaves": args.num_leaves,
@@ -251,12 +235,12 @@ def main() -> int:
                 "seed": args.seed,
                 "train_start_year": args.train_start_year,
                 "model_training_window": "expanding history",
-                "temporal_lookback_days": 60,
                 "neutral_filled_rows": neutral_filled_rows,
             },
             indent=2,
         )
-        + "\n"
+        + "\n",
+        encoding="utf-8",
     )
     return 0
 

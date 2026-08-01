@@ -1,7 +1,8 @@
-"""Causal temporal Alpha model for unified feature bundles.
+"""Causal temporal model over the Candidate462 factor panel.
 
-The module is independent from the legacy S/I/T/J admission pipeline.  Inputs
-are daily panels shaped [batch_date, stock, lookback, feature].
+Inputs are daily candidate-factor histories shaped
+``[batch_date, stock, lookback, candidate]``.  The model is independent from
+the retired synthetic bar-feature layer and from the legacy S/I/T/J pipeline.
 """
 
 from __future__ import annotations
@@ -18,8 +19,8 @@ from .base import AlphaModel, register_model
 
 
 @dataclass(frozen=True)
-class All156TemporalConfig:
-    input_dim: int = 156
+class CandidateTemporalConfig:
+    input_dim: int = 462
     model_dim: int = 128
     lookback: int = 60
     kernels: tuple[int, ...] = (3, 5, 15)
@@ -27,14 +28,10 @@ class All156TemporalConfig:
     attention_heads: int = 8
     feedforward_dim: int = 256
     dropout: float = 0.1
-    candidate_dim: int = 0
-    candidate_hidden_dim: int = 256
 
     def __post_init__(self) -> None:
         if self.input_dim <= 0 or self.model_dim <= 0 or self.lookback <= 0:
             raise ValueError("input_dim, model_dim, and lookback must be positive")
-        if self.candidate_dim < 0 or self.candidate_hidden_dim <= 0:
-            raise ValueError("candidate_dim must be non-negative and candidate_hidden_dim positive")
         if not self.kernels or any(kernel <= 0 for kernel in self.kernels):
             raise ValueError("kernels must contain positive integers")
         if self.model_dim % self.attention_heads:
@@ -47,7 +44,7 @@ def masked_cross_sectional_zscore(
     stock_mask: Tensor,
     eps: float = 1e-6,
 ) -> Tensor:
-    """Normalize across stocks separately for every date, lag, and feature."""
+    """Normalize across stocks separately for every date, lag, and factor."""
 
     valid = observed_mask.bool() & stock_mask[:, :, None, None].bool() & torch.isfinite(values)
     clean = torch.where(valid, values, torch.zeros_like(values))
@@ -76,7 +73,7 @@ class CausalDepthwiseConv1d(nn.Module):
 
 
 class MultiScaleCausalCNN(nn.Module):
-    def __init__(self, config: All156TemporalConfig) -> None:
+    def __init__(self, config: CandidateTemporalConfig) -> None:
         super().__init__()
         dim = config.model_dim
         self.branches = nn.ModuleList(
@@ -107,7 +104,7 @@ class MaskedAttentionPool(nn.Module):
 
 
 class TemporalSummary(nn.Module):
-    def __init__(self, config: All156TemporalConfig) -> None:
+    def __init__(self, config: CandidateTemporalConfig) -> None:
         super().__init__()
         self.attention = MaskedAttentionPool(config.model_dim)
         self.merge = nn.Sequential(
@@ -129,7 +126,7 @@ class TemporalSummary(nn.Module):
 
 
 class DeepSetsContext(nn.Module):
-    def __init__(self, config: All156TemporalConfig) -> None:
+    def __init__(self, config: CandidateTemporalConfig) -> None:
         super().__init__()
         dim = config.model_dim
         self.phi = nn.Sequential(nn.Linear(dim, dim), nn.GELU(), nn.LayerNorm(dim))
@@ -159,48 +156,12 @@ class DeepSetsContext(nn.Module):
         return self.rho(context) * valid
 
 
-class CandidateFactorTower(nn.Module):
-    """Masked tabular encoder for the daily candidate-factor vector."""
+class CandidateTemporalNetwork(nn.Module):
+    """Candidate-factor temporal encoder with cross-sectional market context."""
 
-    def __init__(self, config: All156TemporalConfig) -> None:
+    def __init__(self, config: CandidateTemporalConfig | None = None) -> None:
         super().__init__()
-        self.candidate_dim = config.candidate_dim
-        self.encoder = nn.Sequential(
-            nn.Linear(config.candidate_dim * 2, config.candidate_hidden_dim),
-            nn.GELU(),
-            nn.LayerNorm(config.candidate_hidden_dim),
-            nn.Dropout(config.dropout),
-            nn.Linear(config.candidate_hidden_dim, config.model_dim),
-            nn.GELU(),
-            nn.LayerNorm(config.model_dim),
-        )
-
-    def forward(
-        self,
-        values: Tensor,
-        observed_mask: Tensor,
-        stock_mask: Tensor,
-    ) -> Tensor:
-        if values.ndim != 3 or values.shape[-1] != self.candidate_dim:
-            raise ValueError("candidate values have incompatible shape")
-        if observed_mask.shape != values.shape or stock_mask.shape != values.shape[:2]:
-            raise ValueError("candidate mask shapes do not match values")
-        observed = observed_mask.bool() & torch.isfinite(values)
-        normalized = masked_cross_sectional_zscore(
-            values.unsqueeze(2),
-            observed.unsqueeze(2),
-            stock_mask,
-        ).squeeze(2)
-        encoded = self.encoder(torch.cat((normalized, observed.to(normalized.dtype)), dim=-1))
-        return encoded * stock_mask.unsqueeze(-1).to(encoded.dtype)
-
-
-class All156TemporalNetwork(nn.Module):
-    """Temporal bar tower plus optional candidate-factor tower and stock context."""
-
-    def __init__(self, config: All156TemporalConfig | None = None) -> None:
-        super().__init__()
-        self.config = config or All156TemporalConfig()
+        self.config = config or CandidateTemporalConfig()
         cfg = self.config
         self.feature_projection = nn.Sequential(
             nn.Linear(cfg.input_dim * 2, cfg.model_dim),
@@ -219,17 +180,6 @@ class All156TemporalNetwork(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(layer, num_layers=cfg.transformer_layers)
         self.temporal_summary = TemporalSummary(cfg)
-        self.candidate_tower = CandidateFactorTower(cfg) if cfg.candidate_dim else None
-        self.fusion = (
-            nn.Sequential(
-                nn.Linear(cfg.model_dim * 2, cfg.model_dim),
-                nn.GELU(),
-                nn.Dropout(cfg.dropout),
-                nn.LayerNorm(cfg.model_dim),
-            )
-            if cfg.candidate_dim
-            else nn.Identity()
-        )
         self.cross_section = DeepSetsContext(cfg)
         self.head = nn.Sequential(
             nn.Linear(cfg.model_dim, 64),
@@ -243,11 +193,9 @@ class All156TemporalNetwork(nn.Module):
         values: Tensor,
         observed_mask: Tensor,
         stock_mask: Tensor,
-        candidate_values: Tensor | None = None,
-        candidate_observed_mask: Tensor | None = None,
     ) -> Tensor:
         if values.ndim != 4:
-            raise ValueError("values must have shape [batch_date, stock, lookback, feature]")
+            raise ValueError("values must have shape [batch_date, stock, lookback, candidate]")
         batch_size, stock_count, lookback, feature_count = values.shape
         if feature_count != self.config.input_dim or lookback > self.config.lookback:
             raise ValueError("input shape is incompatible with model configuration")
@@ -279,42 +227,25 @@ class All156TemporalNetwork(nn.Module):
         )
         summarized = self.temporal_summary(sequence, valid_time)
         summarized = summarized.reshape(batch_size, stock_count, -1)
-        if self.candidate_tower is not None:
-            if candidate_values is None or candidate_observed_mask is None:
-                raise ValueError("candidate inputs are required by this configuration")
-            candidate_encoded = self.candidate_tower(
-                candidate_values,
-                candidate_observed_mask,
-                stock_mask,
-            )
-            summarized = self.fusion(torch.cat((summarized, candidate_encoded), dim=-1))
-        elif candidate_values is not None or candidate_observed_mask is not None:
-            raise ValueError("candidate inputs were provided to a bar-only configuration")
         contextualized = self.cross_section(summarized, stock_mask.bool())
         scores = self.head(contextualized).squeeze(-1)
         return scores.masked_fill(~stock_mask.bool(), 0.0)
 
 
-@register_model("all156_temporal")
-@register_model("all618_fusion")
 @register_model("unified_temporal")
-class All156TemporalModel(AlphaModel):
-    """Framework adapter around the PyTorch network.
-
-    Training is intentionally delegated to the rolling trainer so ``fit`` does
-    not silently weaken the strict-OOS contract.
-    """
+class CandidateTemporalModel(AlphaModel):
+    """Framework adapter for the Candidate462 temporal network."""
 
     def __init__(self, **config: Any) -> None:
-        self.config = All156TemporalConfig(**config)
-        self.network = All156TemporalNetwork(self.config)
+        self.config = CandidateTemporalConfig(**config)
+        self.network = CandidateTemporalNetwork(self.config)
 
-    def fit(self, train_data: Any, validation_data: Any | None = None) -> All156TemporalModel:
+    def fit(self, train_data: Any, validation_data: Any | None = None) -> CandidateTemporalModel:
         raise NotImplementedError("use the strict rolling trainer to fit neural models")
 
     def predict(self, data: Any) -> Tensor:
-        if len(data) not in {3, 5}:
-            raise ValueError("prediction data must contain 3 bar tensors or 5 fusion tensors")
+        if len(data) != 3:
+            raise ValueError("prediction data must contain values, observations, and stocks")
         self.network.eval()
         with torch.inference_mode():
             return self.network(*data)
@@ -323,7 +254,7 @@ class All156TemporalModel(AlphaModel):
         torch.save({"config": asdict(self.config), "state_dict": self.network.state_dict()}, path)
 
     @classmethod
-    def load(cls, path: str | Path, **kwargs: Any) -> All156TemporalModel:
+    def load(cls, path: str | Path, **kwargs: Any) -> CandidateTemporalModel:
         payload = torch.load(
             path, map_location=kwargs.get("map_location", "cpu"), weights_only=True
         )

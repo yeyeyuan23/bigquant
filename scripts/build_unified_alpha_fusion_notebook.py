@@ -52,7 +52,6 @@ from bigalpha2026.alpha_models import (
     candidate_ids_from_manifest,
 )
 
-EXPECTED_BAR_FEATURES = 156
 EXPECTED_CANDIDATES = 462
 CANDIDATE_POOL = Path({str(candidate_pool)!r})
 CANDIDATE_MANIFEST = Path({str(candidate_manifest)!r})
@@ -82,8 +81,7 @@ print({
     "training_start": str(contract.training_start),
     "training_end": str(contract.training_end),
     "temporal_lookback_days": contract.temporal_lookback_days,
-    "bar_feature_count": EXPECTED_BAR_FEATURES,
-    "unified_feature_count": EXPECTED_BAR_FEATURES + EXPECTED_CANDIDATES,
+    "candidate_feature_count": EXPECTED_CANDIDATES,
 })"""
         ),
         nbformat.v4.new_markdown_cell("## Canonical model"),
@@ -91,9 +89,7 @@ print({
             """adapter = ModelFactory.create(
     "unified_temporal",
     {
-        "input_dim": EXPECTED_BAR_FEATURES,
-        "candidate_dim": EXPECTED_CANDIDATES,
-        "candidate_hidden_dim": 256,
+        "input_dim": EXPECTED_CANDIDATES,
         "model_dim": 256,
         "lookback": 60,
         "kernels": (3, 5, 15),
@@ -107,7 +103,7 @@ model = adapter.network
 print({
     "registered_model": "unified_temporal",
     "parameters": sum(parameter.numel() for parameter in model.parameters()),
-    "architecture": "bar156 temporal tower + candidate462 masked tower + DeepSets",
+    "architecture": "candidate462 temporal CNN+Transformer + DeepSets",
 })"""
         ),
         nbformat.v4.new_markdown_cell("## Formal unified experiment command"),

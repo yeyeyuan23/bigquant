@@ -298,7 +298,7 @@ MLPModel
 ## Input
 
 ```
-Bar156 + Candidate462
+Candidate462
 ```
 
 支持：
@@ -316,7 +316,7 @@ Variable Universe
 ## Projection
 
 ```
-618
+462
 
 ↓
 

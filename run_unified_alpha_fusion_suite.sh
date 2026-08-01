@@ -4,16 +4,15 @@ set -euo pipefail
 PROJECT_ROOT="/root/autodl-tmp/projects/bigquant-all156-temporal"
 DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
 CANDIDATE_STORE="/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate462_store"
-CANDIDATE_POOL="${UNIFIED_CANDIDATE_POOL:-${ALL618_CANDIDATE_POOL:-$CANDIDATE_STORE/features}}"
-CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-${ALL618_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate462_manifest.json}}"
+CANDIDATE_POOL="${UNIFIED_CANDIDATE_POOL:-$CANDIDATE_STORE/features}"
+CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate462_manifest.json}"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
-RUN_ID="${UNIFIED_RUN_ID:-${ALL618_RUN_ID:-$(date +%Y%m%d_%H%M%S)}}"
+RUN_ID="${UNIFIED_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 RUN_ROOT="$PROJECT_ROOT/reports/unified_alpha_fusion_suite_$RUN_ID"
 LOG_ROOT="$RUN_ROOT/logs"
-BAR_CACHE_ROOT="$RUN_ROOT/cache/bar156"
 J_REPORT_ROOT="/root/autodl-tmp/projects/bigquant/reports"
 
-mkdir -p "$RUN_ROOT" "$LOG_ROOT" "$BAR_CACHE_ROOT"
+mkdir -p "$RUN_ROOT" "$LOG_ROOT"
 cd "$PROJECT_ROOT"
 
 "$PYTHON_BIN" scripts/preflight_candidate462_artifact.py \
@@ -41,7 +40,6 @@ run_temporal() {
     "$PYTHON_BIN" scripts/evaluate_unified_temporal.py \
       --data-root "$DATA_ROOT" \
       --output-dir "$work_dir" \
-      --bar-cache-dir "$BAR_CACHE_ROOT" \
       --years "$year" \
       --halves h1 h2 \
       --train-start-year 2019 \
@@ -62,14 +60,13 @@ run_temporal() {
     --output "$RUN_ROOT/${tag}_full_oos.parquet"
 }
 
-# Two genuinely different temporal capacities; both use expanding 2019-history.
+# Two genuinely different temporal capacities over Candidate462 histories.
 run_temporal fusion_base 256 4 768 6 2 1024
 run_temporal fusion_deep 384 6 1024 8 2 1200
 
 "$PYTHON_BIN" scripts/evaluate_unified_mlp.py \
   --data-root "$DATA_ROOT" \
   --output-dir "$RUN_ROOT/mlp_base" \
-  --bar-cache-dir "$BAR_CACHE_ROOT" \
   --years 2023 2024 \
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
@@ -84,7 +81,6 @@ run_temporal fusion_deep 384 6 1024 8 2 1200
 "$PYTHON_BIN" scripts/evaluate_unified_mlp.py \
   --data-root "$DATA_ROOT" \
   --output-dir "$RUN_ROOT/mlp_wide" \
-  --bar-cache-dir "$BAR_CACHE_ROOT" \
   --years 2023 2024 \
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
@@ -100,7 +96,6 @@ run_temporal fusion_deep 384 6 1024 8 2 1200
 "$PYTHON_BIN" scripts/evaluate_unified_tree.py \
   --data-root "$DATA_ROOT" \
   --output-dir "$RUN_ROOT/lightgbm" \
-  --bar-cache-dir "$BAR_CACHE_ROOT" \
   --years 2023 2024 \
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \

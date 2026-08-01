@@ -3,12 +3,12 @@ from __future__ import annotations
 import torch
 
 from bigalpha2026.alpha_models import (
-    All156TemporalConfig,
-    All156TemporalModel,
-    All156TemporalNetwork,
-    All618MLPConfig,
-    All618MLPModel,
-    All618MLPNetwork,
+    CandidateMLPConfig,
+    CandidateMLPModel,
+    CandidateMLPNetwork,
+    CandidateTemporalConfig,
+    CandidateTemporalModel,
+    CandidateTemporalNetwork,
     ModelFactory,
 )
 from bigalpha2026.alpha_models.temporal import (
@@ -18,8 +18,8 @@ from bigalpha2026.alpha_models.temporal import (
 )
 
 
-def small_config() -> All156TemporalConfig:
-    return All156TemporalConfig(
+def small_config() -> CandidateTemporalConfig:
+    return CandidateTemporalConfig(
         input_dim=6,
         model_dim=16,
         lookback=8,
@@ -45,20 +45,19 @@ def test_model_factory_creates_registered_temporal_model() -> None:
             "dropout": 0.0,
         },
     )
-    assert isinstance(model, All156TemporalModel)
+    assert isinstance(model, CandidateTemporalModel)
 
 
 def test_model_factory_creates_registered_mlp_model() -> None:
     model = ModelFactory.create(
         "unified_mlp",
         {
-            "bar_dim": 6,
-            "candidate_dim": 7,
+            "input_dim": 7,
             "hidden_dims": (16, 8),
             "dropout": 0.0,
         },
     )
-    assert isinstance(model, All618MLPModel)
+    assert isinstance(model, CandidateMLPModel)
 
 
 def test_cross_sectional_normalization_excludes_missing_and_padding() -> None:
@@ -81,7 +80,7 @@ def test_causal_convolution_does_not_see_future() -> None:
 
 def test_temporal_network_masks_padding_and_is_stock_permutation_equivariant() -> None:
     torch.manual_seed(7)
-    network = All156TemporalNetwork(small_config()).eval()
+    network = CandidateTemporalNetwork(small_config()).eval()
     values = torch.randn(2, 5, 8, 6)
     observed = torch.rand_like(values) > 0.15
     values = values.masked_fill(~observed, float("nan"))
@@ -98,7 +97,7 @@ def test_temporal_network_masks_padding_and_is_stock_permutation_equivariant() -
 
 
 def test_temporal_network_backward() -> None:
-    network = All156TemporalNetwork(small_config()).train()
+    network = CandidateTemporalNetwork(small_config()).train()
     values = torch.randn(1, 4, 8, 6)
     observed = torch.ones_like(values, dtype=torch.bool)
     stocks = torch.ones(1, 4, dtype=torch.bool)
@@ -107,61 +106,34 @@ def test_temporal_network_backward() -> None:
     assert any(parameter.grad is not None for parameter in network.parameters())
 
 
-def test_unified_temporal_uses_masked_candidate_tower() -> None:
-    config = All156TemporalConfig(
-        input_dim=6,
-        model_dim=16,
-        lookback=8,
-        kernels=(3, 5),
-        transformer_layers=1,
-        attention_heads=4,
-        feedforward_dim=32,
-        dropout=0.0,
-        candidate_dim=7,
-        candidate_hidden_dim=12,
-    )
-    network = All156TemporalNetwork(config).eval()
+def test_candidate_temporal_handles_missing_values() -> None:
+    network = CandidateTemporalNetwork(small_config()).eval()
     values = torch.randn(1, 4, 8, 6)
     observed = torch.ones_like(values, dtype=torch.bool)
     stocks = torch.tensor([[True, True, True, False]])
-    candidates = torch.randn(1, 4, 7)
-    candidate_observed = torch.ones_like(candidates, dtype=torch.bool)
-    candidates[0, 2, 3] = float("nan")
-    candidate_observed[0, 2, 3] = False
+    values[0, 2, 3, 1] = float("nan")
+    observed[0, 2, 3, 1] = False
 
-    scores = network(
-        values,
-        observed,
-        stocks,
-        candidates,
-        candidate_observed,
-    )
+    scores = network(values, observed, stocks)
     assert scores.shape == (1, 4)
     assert torch.isfinite(scores).all()
     assert scores[0, 3] == 0
 
 
-def test_unified_mlp_uses_both_feature_towers() -> None:
-    network = All618MLPNetwork(
-        All618MLPConfig(
-            bar_dim=6,
-            candidate_dim=7,
+def test_candidate_mlp_masks_missing_and_padding() -> None:
+    network = CandidateMLPNetwork(
+        CandidateMLPConfig(
+            input_dim=7,
             hidden_dims=(16, 8),
             dropout=0.0,
         )
     ).eval()
-    bars = torch.randn(1, 4, 6)
-    bar_observed = torch.ones_like(bars, dtype=torch.bool)
     candidates = torch.randn(1, 4, 7)
     candidate_observed = torch.ones_like(candidates, dtype=torch.bool)
+    candidates[0, 2, 3] = float("nan")
+    candidate_observed[0, 2, 3] = False
     stocks = torch.tensor([[True, True, True, False]])
-    scores = network(
-        bars,
-        bar_observed,
-        stocks,
-        candidates,
-        candidate_observed,
-    )
+    scores = network(candidates, candidate_observed, stocks)
     assert scores.shape == (1, 4)
     assert torch.isfinite(scores).all()
     assert scores[0, 3] == 0
