@@ -37,9 +37,9 @@ def build_notebook(
             "formal suite starts."
         ),
         nbformat.v4.new_code_cell(
-            f"""from pathlib import Path
-import json
+            f"""import json
 import sys
+from pathlib import Path
 
 ROOT = Path.cwd()
 if ROOT.name == "notebooks":

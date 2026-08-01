@@ -34,6 +34,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["third_party"]
 
 [tool.ruff.lint.per-file-ignores]
 # Experimental source is assembled from standalone candidate modules, so
