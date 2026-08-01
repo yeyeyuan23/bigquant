@@ -78,6 +78,7 @@ print({{
 }})
 micro_manifest_path = MICROSTRUCTURE_STORE / "manifest.json"
 micro_ready = False
+micro_manifest = {{}}
 if micro_manifest_path.is_file():
     micro_manifest = json.loads(micro_manifest_path.read_text(encoding="utf-8"))
     micro_ready = tuple(micro_manifest.get("channels", ())) == MICROSTRUCTURE_CHANNELS
@@ -85,6 +86,8 @@ print({{
     "microstructure_ready": micro_ready,
     "microstructure_store": str(MICROSTRUCTURE_STORE),
     "required_channels": len(MICROSTRUCTURE_CHANNELS),
+    "source_profile": micro_manifest.get("source_profile"),
+    "schema_version": micro_manifest.get("schema_version"),
 }})"""
         ),
         nbformat.v4.new_markdown_cell("## Contracts"),
@@ -120,7 +123,13 @@ print({
     "architecture": "candidate462 temporal CNN+Transformer + DeepSets",
 })"""
         ),
-        nbformat.v4.new_markdown_cell("## M: Raw Microstructure"),
+        nbformat.v4.new_markdown_cell(
+            "## M: Raw Microstructure\n\n"
+            "The M route accepts only an audited schema-v2 minute store. Local E2E "
+            "archives use the explicit `e2e_compressed` profile (ID mapping, price "
+            "and amount divided by 100); AIStudio-like inputs use `canonical`. "
+            "Missing data keeps this route skipped and never creates a placeholder factor."
+        ),
         nbformat.v4.new_code_cell(
             """micro_adapter = ModelFactory.create(
     "unified_microstructure",

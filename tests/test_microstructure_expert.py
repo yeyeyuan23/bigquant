@@ -7,12 +7,16 @@ import torch
 
 from bigalpha2026.alpha_models import (
     MICROSTRUCTURE_CHANNELS,
+    PRICE_COLUMNS,
     MicrostructureConfig,
     MicrostructureModel,
     MicrostructureNetwork,
+    MicrostructureSourceConfig,
     ModelFactory,
     build_microstructure_features,
+    canonicalize_microstructure_input,
     pack_microstructure_days,
+    validate_instrument_map,
 )
 from bigalpha2026.alpha_models.microstructure import MicrostructureTCNBlock
 from scripts.evaluate_unified_microstructure import (
@@ -67,6 +71,21 @@ def small_config() -> MicrostructureConfig:
     )
 
 
+def compressed_e2e_minutes() -> tuple[pd.DataFrame, pd.DataFrame]:
+    raw = raw_minutes()
+    mapping = pd.DataFrame(
+        {
+            "instrument_id": [11, 22],
+            "instrument": ["000001.SZ", "000002.SZ"],
+        }
+    )
+    ids = {"000001.SZ": 11, "000002.SZ": 22}
+    raw["instrument_id"] = raw.pop("instrument").map(ids)
+    raw[list(PRICE_COLUMNS)] = raw[list(PRICE_COLUMNS)] * 100.0
+    raw["amount"] *= 100.0
+    return raw, mapping
+
+
 def test_raw_feature_builder_sorts_and_resets_return_at_lunch() -> None:
     raw = raw_minutes().sample(frac=1.0, random_state=3)
     features = build_microstructure_features(raw)
@@ -89,6 +108,51 @@ def test_raw_feature_builder_rejects_duplicate_minutes() -> None:
 def test_raw_feature_builder_rejects_missing_contract_columns() -> None:
     with pytest.raises(ValueError, match="missing columns"):
         build_microstructure_features(raw_minutes().drop(columns="bid_volume3"))
+
+
+def test_e2e_profile_maps_ids_and_applies_certified_units() -> None:
+    compressed, mapping = compressed_e2e_minutes()
+    canonical, audit = canonicalize_microstructure_input(
+        compressed,
+        MicrostructureSourceConfig.for_profile("e2e_compressed"),
+        instrument_map=mapping,
+    )
+    expected = raw_minutes().sort_values(["date", "instrument"], kind="stable")
+    expected = expected.reset_index(drop=True)
+    expected["instrument"] = expected["instrument"].astype("string")
+    pd.testing.assert_series_equal(canonical["instrument"], expected["instrument"])
+    np.testing.assert_allclose(canonical["close"], expected["close"])
+    np.testing.assert_allclose(canonical["amount"], expected["amount"])
+    assert audit["source_profile"] == "e2e_compressed"
+    assert audit["unit_transform"]["price_divisor"] == 100.0
+    assert audit["unit_transform"]["amount_divisor"] == 100.0
+
+
+def test_e2e_profile_rejects_missing_mapping_and_unit_mismatch() -> None:
+    compressed, mapping = compressed_e2e_minutes()
+    config = MicrostructureSourceConfig.for_profile("e2e_compressed")
+    with pytest.raises(ValueError, match="missing 1 source IDs"):
+        canonicalize_microstructure_input(
+            compressed,
+            config,
+            instrument_map=mapping.iloc[[0]],
+        )
+    broken = compressed.copy()
+    book_prices = [column for column in PRICE_COLUMNS if "price" in column]
+    broken[book_prices] /= 100.0
+    with pytest.raises(ValueError, match="units are inconsistent"):
+        canonicalize_microstructure_input(broken, config, instrument_map=mapping)
+
+
+def test_instrument_map_must_be_one_to_one() -> None:
+    mapping = pd.DataFrame(
+        {
+            "instrument_id": [1, 2],
+            "instrument": ["000001.SZ", "000001.SZ"],
+        }
+    )
+    with pytest.raises(ValueError, match="not one-to-one"):
+        validate_instrument_map(mapping)
 
 
 def test_future_day_does_not_change_previous_microstructure_features() -> None:
@@ -221,6 +285,25 @@ def test_prepare_store_and_day_loader_use_canonical_manifest(tmp_path) -> None:
         ("000001.SZ",),
         max_minutes=8,
     ) is None
+
+
+def test_prepare_store_records_e2e_mapping_and_unit_evidence(tmp_path) -> None:
+    compressed, mapping = compressed_e2e_minutes()
+    input_path = tmp_path / "e2e.parquet"
+    mapping_path = tmp_path / "instrument_map.csv"
+    compressed.to_parquet(input_path, index=False)
+    mapping.to_csv(mapping_path, index=False)
+    store = tmp_path / "e2e_store"
+    manifest = build_store(
+        [input_path],
+        store,
+        source_config=MicrostructureSourceConfig.for_profile("e2e_compressed"),
+        instrument_map_path=mapping_path,
+    )
+    assert manifest["schema_version"] == 2
+    assert manifest["source_profile"] == "e2e_compressed"
+    assert manifest["instrument_map"]["sha256"]
+    assert manifest["input_files"][0]["audit"]["median_mid_to_close"] == pytest.approx(1.0)
 
 
 def test_prepare_label_panel_ranks_each_day_and_rejects_duplicates() -> None:

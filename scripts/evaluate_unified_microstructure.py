@@ -37,8 +37,23 @@ def validate_micro_store(store: Path) -> dict[str, object]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("layout") != "hive_trade_date":
         raise ValueError("microstructure store must use hive_trade_date layout")
+    if manifest.get("schema_version") != 2:
+        raise ValueError("microstructure store must use audited schema_version=2")
     if tuple(manifest.get("channels", ())) != MICROSTRUCTURE_CHANNELS:
         raise ValueError("microstructure store channels do not match the canonical model contract")
+    source_profile = manifest.get("source_profile")
+    if source_profile not in {"canonical", "e2e_compressed"}:
+        raise ValueError("microstructure store has no recognized source profile")
+    input_files = manifest.get("input_files")
+    if not isinstance(input_files, list) or not input_files:
+        raise ValueError("microstructure store contains no input provenance")
+    for item in input_files:
+        if not isinstance(item, dict) or not item.get("sha256") or not item.get("audit"):
+            raise ValueError("microstructure store input provenance is incomplete")
+    if source_profile == "e2e_compressed":
+        mapping = manifest.get("instrument_map")
+        if not isinstance(mapping, dict) or not mapping.get("sha256"):
+            raise ValueError("E2E microstructure store has no mapping checksum")
     if not (store / "data").is_dir():
         raise FileNotFoundError(f"microstructure data directory does not exist: {store / 'data'}")
     return manifest
@@ -64,7 +79,9 @@ def load_microstructure_day(
     )
 
 
-def prepare_label_panel(labels: pd.DataFrame) -> tuple[pd.DatetimeIndex, dict[pd.Timestamp, pd.Series]]:
+def prepare_label_panel(
+    labels: pd.DataFrame,
+) -> tuple[pd.DatetimeIndex, dict[pd.Timestamp, pd.Series]]:
     required = {"date", "instrument", "ret_next_open_to_close"}
     missing = sorted(required.difference(labels.columns))
     if missing:
