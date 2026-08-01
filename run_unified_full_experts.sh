@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="/root/autodl-tmp/projects/bigquant-unified-integration"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 STORE_ROOT="/root/autodl-tmp/unified_microstructure_store_v2_2019_2024"
@@ -12,8 +12,11 @@ cd "$PROJECT_ROOT"
 mkdir -p "$PROJECT_ROOT/reports"
 
 if [[ ! -s "$STORE_ROOT/manifest.json" ]]; then
-  if [[ -e "$STORE_ROOT" ]]; then
-    echo "incomplete microstructure store already exists: $STORE_ROOT" >&2
+  resume_args=()
+  if [[ -s "$STORE_ROOT/progress.json" ]]; then
+    resume_args+=(--resume)
+  elif [[ -e "$STORE_ROOT" ]]; then
+    echo "incomplete store has no resumable progress file: $STORE_ROOT" >&2
     exit 1
   fi
   inputs=("$DATA_ROOT"/e2e_parquet/bigalpha_2026_e2e_bar1m/*.parquet)
@@ -26,6 +29,7 @@ if [[ ! -s "$STORE_ROOT/manifest.json" ]]; then
     --instrument-map "$DATA_ROOT/e2e_parquet/instrument_id_map_internal_2019_2024.csv" \
     --input "${inputs[@]}" \
     --output-dir "$STORE_ROOT" \
+    "${resume_args[@]}" \
     2>&1 | tee "$MICRO_LOG"
 fi
 

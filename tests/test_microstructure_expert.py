@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 import pytest
 import torch
 
@@ -270,6 +273,41 @@ def test_prepare_store_and_day_loader_use_canonical_manifest(tmp_path) -> None:
     manifest = build_store([first_path, second_path], store)
     assert manifest["trading_days"] == 2
     assert manifest["minute_rows"] == 16
+    assert manifest["storage"] == {
+        "engine": "polars",
+        "value_dtype": "float32",
+        "compression": "zstd",
+        "compression_level": 3,
+        "atomic_day_writes": True,
+        "resumable": True,
+    }
+    progress = json.loads((store / "progress.json").read_text(encoding="utf-8"))
+    assert progress["status"] == "complete"
+    partition = store / "data/trade_date=2024-01-02/part-000.parquet"
+    parquet = pq.ParquetFile(partition)
+    assert {
+        parquet.metadata.row_group(0).column(index).compression
+        for index in range(parquet.metadata.num_columns)
+    } == {"ZSTD"}
+    assert all(
+        str(parquet.schema_arrow.field(channel).type) == "float"
+        for channel in MICROSTRUCTURE_CHANNELS
+    )
+
+    stored = pd.read_parquet(partition)
+    expected = build_microstructure_features(first).drop(columns="trade_date")
+    pd.testing.assert_frame_equal(
+        stored[["instrument", "timestamp"]],
+        expected[["instrument", "timestamp"]],
+        check_dtype=False,
+    )
+    np.testing.assert_allclose(
+        stored[list(MICROSTRUCTURE_CHANNELS)],
+        expected[list(MICROSTRUCTURE_CHANNELS)],
+        rtol=2e-6,
+        atol=2e-6,
+        equal_nan=True,
+    )
     validate_micro_store(store)
     batch = load_microstructure_day(
         store,
@@ -285,6 +323,28 @@ def test_prepare_store_and_day_loader_use_canonical_manifest(tmp_path) -> None:
         ("000001.SZ",),
         max_minutes=8,
     ) is None
+
+
+def test_prepare_store_resumes_from_completed_inputs(tmp_path) -> None:
+    first = raw_minutes()
+    second = first.copy()
+    second["date"] = pd.to_datetime(second["date"]) + pd.Timedelta(days=1)
+    first_path = tmp_path / "first.parquet"
+    second_path = tmp_path / "second.parquet"
+    first.to_parquet(first_path, index=False)
+    second.to_parquet(second_path, index=False)
+    store = tmp_path / "store"
+
+    initial = build_store([first_path], store)
+    resumed = build_store([first_path, second_path], store, resume=True)
+
+    assert initial["trading_days"] == 1
+    assert resumed["trading_days"] == 2
+    progress = json.loads((store / "progress.json").read_text(encoding="utf-8"))
+    assert progress["status"] == "complete"
+    assert len(progress["completed_inputs"]) == 2
+    with pytest.raises(FileExistsError, match="not empty"):
+        build_store([first_path, second_path], store)
 
 
 def test_prepare_store_records_e2e_mapping_and_unit_evidence(tmp_path) -> None:
