@@ -58,6 +58,20 @@ def test_fold_boundaries_reject_unknown_half() -> None:
         unified_temporal.fold_boundaries(2023, "q1")
 
 
+def test_eligible_target_indices_drop_empty_and_single_stock_dates() -> None:
+    targets = np.array(
+        [
+            [np.nan, np.nan, np.nan],
+            [0.1, np.nan, np.nan],
+            [0.1, -0.2, np.nan],
+            [0.1, -0.2, 0.3],
+        ]
+    )
+    eligible, skipped = unified_temporal.eligible_target_indices(targets, [0, 1, 2, 3])
+    assert eligible == [2, 3]
+    assert skipped == 2
+
+
 def test_elasticnet_blocks_use_60_days_with_one_day_label_gap() -> None:
     dates = pd.date_range("2022-09-01", "2023-03-31", freq="B")
     blocks = unified_elasticnet.rolling_blocks(

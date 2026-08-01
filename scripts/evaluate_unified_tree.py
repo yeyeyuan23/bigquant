@@ -68,6 +68,7 @@ def _fit_predict(
     num_leaves: int,
     learning_rate: float,
     n_estimators: int,
+    checkpoint_path: Path | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     train = train.dropna(subset=["target"])
     model = lgb.LGBMRegressor(
@@ -98,6 +99,9 @@ def _fit_predict(
             "split": model.booster_.feature_importance(importance_type="split"),
         }
     ).sort_values(["gain", "split"], ascending=False)
+    if checkpoint_path is not None:
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        model.booster_.save_model(checkpoint_path)
     return output, importance
 
 
@@ -167,6 +171,9 @@ def main() -> int:
                 num_leaves=args.num_leaves,
                 learning_rate=args.learning_rate,
                 n_estimators=args.n_estimators,
+                checkpoint_path=(
+                    args.output_dir / f"unified_lightgbm_{year}_{fold.lower()}_checkpoint.txt"
+                ),
             )
             daily_ic = prediction.groupby("date").apply(
                 lambda block: block["factor"].corr(block["target"], method="spearman"),
@@ -185,6 +192,10 @@ def main() -> int:
                     "validation_rows": len(validation),
                     "rank_ic_mean": float(daily_ic.mean()),
                     "rank_ic_std": float(daily_ic.std(ddof=0)),
+                    "checkpoint": str(
+                        args.output_dir
+                        / f"unified_lightgbm_{year}_{fold.lower()}_checkpoint.txt"
+                    ),
                 }
             )
             importance.insert(0, "fold", fold)

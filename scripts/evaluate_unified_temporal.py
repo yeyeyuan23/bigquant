@@ -54,6 +54,22 @@ def correlation_loss(prediction: torch.Tensor, target: torch.Tensor) -> torch.Te
     return -correlation + 0.05 * F.smooth_l1_loss(prediction, target)
 
 
+def eligible_target_indices(
+    targets: np.ndarray,
+    indices: list[int],
+    *,
+    minimum_stocks: int = 2,
+) -> tuple[list[int], int]:
+    """Drop dates that cannot form a meaningful cross-sectional target."""
+
+    eligible = [
+        index
+        for index in indices
+        if np.count_nonzero(np.isfinite(targets[index])) >= minimum_stocks
+    ]
+    return eligible, len(indices) - len(eligible)
+
+
 def load_labels(data_root: Path, start_year: int, end_year: int) -> pd.DataFrame:
     parts = []
     for year in range(start_year, end_year + 1):
@@ -78,6 +94,7 @@ def evaluate_fold(
     learning_rate: float,
     max_stocks: int,
     seed: int,
+    checkpoint_path: Path | None = None,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     validation_half = validation_half.lower()
     train_end, validation_start, validation_end = fold_boundaries(year, validation_half)
@@ -100,14 +117,22 @@ def evaluate_fold(
             f"candidate feature count {len(panel.candidate_columns)} != config {config.input_dim}"
         )
     train_start = pd.Timestamp(train_start_year, 1, 1)
-    train_indices = [
-        index
-        for index, day in enumerate(dates)
-        if index >= config.lookback - 1 and train_start <= day <= train_end
-    ][::stride]
-    validation_indices = [
-        index for index, day in enumerate(dates) if validation_start <= day <= validation_end
-    ]
+    train_indices, skipped_train_days = eligible_target_indices(
+        targets,
+        [
+            index
+            for index, day in enumerate(dates)
+            if index >= config.lookback - 1 and train_start <= day <= train_end
+        ][::stride],
+    )
+    validation_indices, skipped_validation_days = eligible_target_indices(
+        targets,
+        [
+            index
+            for index, day in enumerate(dates)
+            if validation_start <= day <= validation_end
+        ],
+    )
     if not train_indices or not validation_indices:
         raise RuntimeError("fold contains no train or validation dates")
 
@@ -210,8 +235,14 @@ def evaluate_fold(
         "validation_start": str(validation_start.date()),
         "validation_end": str(validation_end.date()),
         "train_days": len(train_indices),
+        "skipped_train_days": skipped_train_days,
+        "skipped_validation_days": skipped_validation_days,
         "temporal_lookback_days": config.lookback,
     }
+    if checkpoint_path is not None:
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        adapter.save(checkpoint_path)
+        metrics["checkpoint"] = str(checkpoint_path)
     return pd.concat(rows, ignore_index=True), metrics
 
 
@@ -271,6 +302,10 @@ def main() -> int:
                 learning_rate=args.learning_rate,
                 max_stocks=args.max_stocks,
                 seed=args.seed,
+                checkpoint_path=(
+                    args.output_dir
+                    / f"unified_temporal_{year}_{validation_half}_checkpoint.pt"
+                ),
             )
             half_routes.append(factor)
             metrics.append(fold_metrics)

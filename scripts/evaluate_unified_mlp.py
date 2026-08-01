@@ -18,7 +18,12 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_unified_temporal import correlation_loss, fold_boundaries, load_labels
+from evaluate_unified_temporal import (
+    correlation_loss,
+    eligible_target_indices,
+    fold_boundaries,
+    load_labels,
+)
 
 from bigalpha2026.alpha_models import (
     CandidateMLPConfig,
@@ -67,6 +72,7 @@ def fit_predict_fold(
     max_stocks: int,
     learning_rate: float,
     seed: int,
+    checkpoint_path: Path | None = None,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     device = torch.device("cuda")
     torch.manual_seed(seed)
@@ -136,6 +142,10 @@ def fit_predict_fold(
         "rank_ic_std": float(np.nanstd(daily_ic)),
         "parameter_count": sum(value.numel() for value in model.parameters()),
     }
+    if checkpoint_path is not None:
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        adapter.save(checkpoint_path)
+        metrics["checkpoint"] = str(checkpoint_path)
     return pd.concat(rows, ignore_index=True), metrics
 
 
@@ -172,6 +182,16 @@ def main() -> int:
             validation_indices = [
                 i for i, day in enumerate(panel.dates) if validation_start <= day <= validation_end
             ]
+            train_indices, skipped_train_days = eligible_target_indices(
+                panel.targets,
+                train_indices,
+            )
+            validation_indices, skipped_validation_days = eligible_target_indices(
+                panel.targets,
+                validation_indices,
+            )
+            if not train_indices or not validation_indices:
+                raise RuntimeError(f"no eligible target dates for {year}{fold}")
             route, fold_metrics = fit_predict_fold(
                 panel,
                 train_indices,
@@ -182,8 +202,18 @@ def main() -> int:
                 max_stocks=args.max_stocks,
                 learning_rate=args.learning_rate,
                 seed=args.seed + year * 10 + fold_index,
+                checkpoint_path=(
+                    args.output_dir / f"unified_mlp_{year}_{fold.lower()}_checkpoint.pt"
+                ),
             )
-            fold_metrics.update({"year": year, "fold": fold})
+            fold_metrics.update(
+                {
+                    "year": year,
+                    "fold": fold,
+                    "skipped_train_days": skipped_train_days,
+                    "skipped_validation_days": skipped_validation_days,
+                }
+            )
             metrics.append(fold_metrics)
             routes.append(route)
     output = pd.concat(routes, ignore_index=True).sort_values(["date", "instrument"])
