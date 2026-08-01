@@ -1,4 +1,4 @@
-"""Daily-rank ensemble for strict-OOS All156 factor routes."""
+"""Daily-rank ensemble for unified strict-OOS factor routes."""
 
 from __future__ import annotations
 

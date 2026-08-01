@@ -4,15 +4,16 @@ set -euo pipefail
 PROJECT_ROOT="/root/autodl-tmp/projects/bigquant-all156-temporal"
 DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
 CANDIDATE_STORE="/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate462_store"
-CANDIDATE_POOL="${ALL618_CANDIDATE_POOL:-$CANDIDATE_STORE/features}"
-CANDIDATE_MANIFEST="${ALL618_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate462_manifest.json}"
+CANDIDATE_POOL="${UNIFIED_CANDIDATE_POOL:-${ALL618_CANDIDATE_POOL:-$CANDIDATE_STORE/features}}"
+CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-${ALL618_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate462_manifest.json}}"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
-RUN_ID="${ALL618_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
-RUN_ROOT="$PROJECT_ROOT/reports/all618_fusion_suite_$RUN_ID"
+RUN_ID="${UNIFIED_RUN_ID:-${ALL618_RUN_ID:-$(date +%Y%m%d_%H%M%S)}}"
+RUN_ROOT="$PROJECT_ROOT/reports/unified_alpha_fusion_suite_$RUN_ID"
 LOG_ROOT="$RUN_ROOT/logs"
+BAR_CACHE_ROOT="$RUN_ROOT/cache/bar156"
 J_REPORT_ROOT="/root/autodl-tmp/projects/bigquant/reports"
 
-mkdir -p "$RUN_ROOT" "$LOG_ROOT"
+mkdir -p "$RUN_ROOT" "$LOG_ROOT" "$BAR_CACHE_ROOT"
 cd "$PROJECT_ROOT"
 
 "$PYTHON_BIN" scripts/preflight_candidate462_artifact.py \
@@ -37,10 +38,12 @@ run_temporal() {
   for year in 2023 2024; do
     local work_dir="$RUN_ROOT/${tag}_${year}"
     mkdir -p "$work_dir"
-    "$PYTHON_BIN" scripts/evaluate_all156_temporal_bar1m.py \
+    "$PYTHON_BIN" scripts/evaluate_unified_temporal.py \
       --data-root "$DATA_ROOT" \
       --output-dir "$work_dir" \
+      --bar-cache-dir "$BAR_CACHE_ROOT" \
       --years "$year" \
+      --halves h1 h2 \
       --train-start-year 2019 \
       --candidate-pool "$CANDIDATE_POOL" \
       --candidate-manifest "$CANDIDATE_MANIFEST" \
@@ -52,24 +55,8 @@ run_temporal() {
       --epochs "$epochs" \
       --train-stride "$stride" \
       --max-stocks "$max_stocks" \
-      2>&1 | tee "$LOG_ROOT/${tag}_${year}_h2.log"
-    "$PYTHON_BIN" scripts/evaluate_all156_temporal_h1.py \
-      --data-root "$DATA_ROOT" \
-      --work-dir "$work_dir" \
-      --year "$year" \
-      --train-start-year 2019 \
-      --candidate-pool "$CANDIDATE_POOL" \
-      --candidate-manifest "$CANDIDATE_MANIFEST" \
-      --expected-candidate-count 462 \
-      --model-dim "$model_dim" \
-      --transformer-layers "$layers" \
-      --attention-heads 8 \
-      --feedforward-dim "$feedforward_dim" \
-      --epochs "$epochs" \
-      --train-stride "$stride" \
-      --max-stocks "$max_stocks" \
-      2>&1 | tee "$LOG_ROOT/${tag}_${year}_h1.log"
-    route_parts+=("$work_dir/all618_fusion_${year}_full_oos.parquet")
+      2>&1 | tee "$LOG_ROOT/${tag}_${year}.log"
+    route_parts+=("$work_dir/unified_temporal_${year}_full_oos.parquet")
   done
   "$PYTHON_BIN" scripts/combine_oos_routes.py "${route_parts[@]}" \
     --output "$RUN_ROOT/${tag}_full_oos.parquet"
@@ -79,9 +66,10 @@ run_temporal() {
 run_temporal fusion_base 256 4 768 6 2 1024
 run_temporal fusion_deep 384 6 1024 8 2 1200
 
-"$PYTHON_BIN" scripts/evaluate_all618_mlp.py \
+"$PYTHON_BIN" scripts/evaluate_unified_mlp.py \
   --data-root "$DATA_ROOT" \
   --output-dir "$RUN_ROOT/mlp_base" \
+  --bar-cache-dir "$BAR_CACHE_ROOT" \
   --years 2023 2024 \
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
@@ -93,9 +81,10 @@ run_temporal fusion_deep 384 6 1024 8 2 1200
   --max-stocks 1200 \
   2>&1 | tee "$LOG_ROOT/mlp_base.log"
 
-"$PYTHON_BIN" scripts/evaluate_all618_mlp.py \
+"$PYTHON_BIN" scripts/evaluate_unified_mlp.py \
   --data-root "$DATA_ROOT" \
   --output-dir "$RUN_ROOT/mlp_wide" \
+  --bar-cache-dir "$BAR_CACHE_ROOT" \
   --years 2023 2024 \
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
@@ -108,9 +97,10 @@ run_temporal fusion_deep 384 6 1024 8 2 1200
   2>&1 | tee "$LOG_ROOT/mlp_wide.log"
 
 # The tree route is mandatory and is always included in both standalone J and delta-J.
-"$PYTHON_BIN" scripts/evaluate_all156_tree.py \
+"$PYTHON_BIN" scripts/evaluate_unified_tree.py \
   --data-root "$DATA_ROOT" \
   --output-dir "$RUN_ROOT/lightgbm" \
+  --bar-cache-dir "$BAR_CACHE_ROOT" \
   --years 2023 2024 \
   --train-start-year 2019 \
   --candidate-pool "$CANDIDATE_POOL" \
@@ -122,12 +112,12 @@ run_temporal fusion_deep 384 6 1024 8 2 1200
 
 FUSION_BASE="$RUN_ROOT/fusion_base_full_oos.parquet"
 FUSION_DEEP="$RUN_ROOT/fusion_deep_full_oos.parquet"
-MLP_BASE="$RUN_ROOT/mlp_base/all618_mlp_full_oos.parquet"
-MLP_WIDE="$RUN_ROOT/mlp_wide/all618_mlp_full_oos.parquet"
-TREE_ROUTE="$RUN_ROOT/lightgbm/all618_lightgbm_full_oos.parquet"
-ENSEMBLE_ROUTE="$RUN_ROOT/all618_equal_weight_ensemble.parquet"
+MLP_BASE="$RUN_ROOT/mlp_base/unified_mlp_full_oos.parquet"
+MLP_WIDE="$RUN_ROOT/mlp_wide/unified_mlp_full_oos.parquet"
+TREE_ROUTE="$RUN_ROOT/lightgbm/unified_lightgbm_full_oos.parquet"
+ENSEMBLE_ROUTE="$RUN_ROOT/unified_equal_weight_ensemble.parquet"
 
-"$PYTHON_BIN" scripts/ensemble_all156_routes.py \
+"$PYTHON_BIN" scripts/ensemble_unified_routes.py \
   "$FUSION_BASE" "$FUSION_DEEP" "$MLP_BASE" "$MLP_WIDE" "$TREE_ROUTE" \
   --output "$ENSEMBLE_ROUTE"
 
@@ -143,7 +133,7 @@ ENSEMBLE_ROUTE="$RUN_ROOT/all618_equal_weight_ensemble.parquet"
 
 for baseline in "$FUSION_BASE" "$FUSION_DEEP" "$MLP_BASE" "$MLP_WIDE"; do
   baseline_name="$(basename "$baseline" .parquet)"
-  "$PYTHON_BIN" scripts/score_all156_tree_increment.py \
+  "$PYTHON_BIN" scripts/score_unified_tree_increment.py \
     --baseline "$baseline" \
     --tree "$TREE_ROUTE" \
     --years 2023 2024 \
@@ -154,5 +144,5 @@ for baseline in "$FUSION_BASE" "$FUSION_DEEP" "$MLP_BASE" "$MLP_WIDE"; do
     2>&1 | tee "$LOG_ROOT/tree_increment_${baseline_name}.log"
 done
 
-ln -sfn "$RUN_ROOT" "$PROJECT_ROOT/reports/all618_fusion_suite_latest"
-echo "[$(date '+%F %T')] All618 suite complete: $RUN_ROOT"
+ln -sfn "$RUN_ROOT" "$PROJECT_ROOT/reports/unified_alpha_fusion_suite_latest"
+echo "[$(date '+%F %T')] Unified alpha fusion suite complete: $RUN_ROOT"

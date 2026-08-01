@@ -1,10 +1,11 @@
-"""Strict rolling OOS MLP on the canonical bar156 or all618 feature bundle."""
+"""Strict rolling OOS MLP on the unified Alpha feature bundle."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -17,11 +18,11 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_all156_temporal_bar1m import correlation_loss, daily_bar_features
+from evaluate_unified_temporal import correlation_loss, daily_bar_features, fold_boundaries
 
 from bigalpha2026.alpha_models import (
     All618MLPConfig,
-    All618MLPNetwork,
+    ModelFactory,
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
     panel_arrays,
@@ -30,7 +31,7 @@ from bigalpha2026.alpha_models import (
 
 def load_panel(args: argparse.Namespace):
     years = range(args.train_start_year, max(args.years) + 1)
-    cache_dir = args.output_dir / "cache"
+    cache_dir = args.bar_cache_dir or args.output_dir / "cache"
     bar_features = pd.concat(
         [daily_bar_features(args.data_root, year, cache_dir) for year in years],
         ignore_index=True,
@@ -96,7 +97,8 @@ def fit_predict_fold(
     device = torch.device("cuda")
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    model = All618MLPNetwork(config).to(device)
+    adapter = ModelFactory.create("unified_mlp", asdict(config))
+    model = adapter.network.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scaler = torch.amp.GradScaler("cuda")
     rng = np.random.default_rng(seed)
@@ -168,6 +170,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--bar-cache-dir", type=Path)
     parser.add_argument("--years", nargs="+", type=int, default=[2023, 2024])
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--candidate-pool", type=Path)
@@ -194,27 +197,16 @@ def main() -> int:
     routes = []
     metrics = []
     for year in args.years:
-        folds = (
-            (
-                "H1",
-                [i for i, day in enumerate(panel.dates) if day < pd.Timestamp(year, 1, 1)],
-                [
-                    i
-                    for i, day in enumerate(panel.dates)
-                    if pd.Timestamp(year, 1, 1) <= day <= pd.Timestamp(year, 6, 30)
-                ],
-            ),
-            (
-                "H2",
-                [i for i, day in enumerate(panel.dates) if day <= pd.Timestamp(year, 6, 30)],
-                [
-                    i
-                    for i, day in enumerate(panel.dates)
-                    if pd.Timestamp(year, 7, 1) <= day <= pd.Timestamp(year, 12, 31)
-                ],
-            ),
-        )
-        for fold_index, (fold, train_indices, validation_indices) in enumerate(folds):
+        for fold_index, fold in enumerate(("H1", "H2")):
+            train_end, validation_start, validation_end = fold_boundaries(year, fold)
+            train_indices = [
+                i for i, day in enumerate(panel.dates) if day <= train_end
+            ]
+            validation_indices = [
+                i
+                for i, day in enumerate(panel.dates)
+                if validation_start <= day <= validation_end
+            ]
             route, fold_metrics = fit_predict_fold(
                 panel,
                 train_indices,
@@ -230,9 +222,7 @@ def main() -> int:
             metrics.append(fold_metrics)
             routes.append(route)
     output = pd.concat(routes, ignore_index=True).sort_values(["date", "instrument"])
-    output_name = (
-        "all618_mlp_full_oos.parquet" if candidate_count else "all156_mlp_full_oos.parquet"
-    )
+    output_name = "unified_mlp_full_oos.parquet"
     output.to_parquet(args.output_dir / output_name, index=False)
     (args.output_dir / "oos_metrics.json").write_text(
         json.dumps(metrics, indent=2) + "\n",

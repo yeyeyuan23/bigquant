@@ -1,4 +1,4 @@
-"""Strict-OOS training for bar156 and bar156-plus-candidate fusion models."""
+"""Unified H1/H2 strict-OOS training for temporal Alpha models."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import json
 import math
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +21,7 @@ if str(ROOT / "src") not in sys.path:
 from bigalpha2026.alpha_models import (
     BAR1M_BASE_COLUMNS,
     All156TemporalConfig,
-    All156TemporalNetwork,
+    ModelFactory,
     build_bar1m_all156,
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
@@ -28,6 +29,24 @@ from bigalpha2026.alpha_models import (
 )
 
 BASE_COLUMNS = BAR1M_BASE_COLUMNS
+
+
+def fold_boundaries(year: int, validation_half: str) -> tuple[pd.Timestamp, ...]:
+    """Return causal train/validation boundaries for a calendar half."""
+
+    if validation_half.lower() == "h1":
+        return (
+            pd.Timestamp(year=year - 1, month=12, day=31),
+            pd.Timestamp(year=year, month=1, day=1),
+            pd.Timestamp(year=year, month=6, day=30),
+        )
+    if validation_half.lower() == "h2":
+        return (
+            pd.Timestamp(year=year, month=6, day=30),
+            pd.Timestamp(year=year, month=7, day=1),
+            pd.Timestamp(year=year, month=12, day=31),
+        )
+    raise ValueError(f"unsupported validation half: {validation_half}")
 
 
 def daily_bar_features(data_root: Path, year: int, cache_dir: Path) -> pd.DataFrame:
@@ -152,13 +171,17 @@ def evaluate_fold(
     stride: int,
     config: All156TemporalConfig,
     *,
+    validation_half: str,
     candidate_pool: Path | None,
     candidate_manifest: Path | None,
     expected_candidate_count: int | None,
     learning_rate: float,
     max_stocks: int,
     seed: int,
-) -> tuple[pd.DataFrame, dict[str, float]]:
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    validation_half = validation_half.lower()
+    train_end, validation_start, validation_end = fold_boundaries(year, validation_half)
+    seed_offset = 1 if validation_half == "h1" else 2
     input_years = range(train_start_year, year + 1)
     bar_features = pd.concat(
         [daily_bar_features(data_root, input_year, cache_dir) for input_year in input_years],
@@ -176,7 +199,7 @@ def evaluate_fold(
             candidate_pool,
             candidate_manifest,
             start_date=f"{train_start_year}-01-01",
-            end_date=f"{year}-12-31",
+            end_date=str(validation_end.date()),
             expected_count=expected_candidate_count,
         )
     panel = panel_arrays(bar_features, labels, candidate_features)
@@ -194,8 +217,6 @@ def evaluate_fold(
             "candidate feature count "
             f"{len(panel.candidate_columns)} != config {config.candidate_dim}"
         )
-    train_end = pd.Timestamp(year=year, month=6, day=30)
-    validation_start = pd.Timestamp(year=year, month=7, day=1)
     train_start = pd.Timestamp(train_start_year, 1, 1)
     train_indices = [
         index for index, day in enumerate(dates) if index >= 59 and train_start <= day <= train_end
@@ -203,15 +224,17 @@ def evaluate_fold(
     validation_indices = [
         index
         for index, day in enumerate(dates)
-        if validation_start <= day <= pd.Timestamp(year, 12, 31)
+        if validation_start <= day <= validation_end
     ]
     device = torch.device("cuda")
-    torch.manual_seed(seed + year * 10 + 2)
-    torch.cuda.manual_seed_all(seed + year * 10 + 2)
-    model = All156TemporalNetwork(config).to(device)
+    fold_seed = seed + year * 10 + seed_offset
+    torch.manual_seed(fold_seed)
+    torch.cuda.manual_seed_all(fold_seed)
+    adapter = ModelFactory.create("unified_temporal", asdict(config))
+    model = adapter.network.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scaler = torch.amp.GradScaler("cuda")
-    rng = np.random.default_rng(seed + year * 10 + 2)
+    rng = np.random.default_rng(fold_seed)
     model.train()
     for epoch in range(epochs):
         rng.shuffle(train_indices)
@@ -245,7 +268,11 @@ def evaluate_fold(
             scaler.step(optimizer)
             scaler.update()
             losses.append(float(loss.detach()))
-        print(f"fold={year} epoch={epoch + 1} loss={np.mean(losses):.6f}", flush=True)
+        print(
+            f"fold={year}{validation_half.upper()} epoch={epoch + 1} "
+            f"loss={np.mean(losses):.6f}",
+            flush=True,
+        )
     rows: list[pd.DataFrame] = []
     daily_ic: list[float] = []
     model.eval()
@@ -286,12 +313,13 @@ def evaluate_fold(
     ic = np.asarray(daily_ic, dtype=float)
     metrics = {
         "year": year,
+        "fold": validation_half.upper(),
         "days": int(np.isfinite(ic).sum()),
         "rank_ic_mean": float(np.nanmean(ic)),
         "rank_ic_std": float(np.nanstd(ic)),
         "rank_ic_ir": float(np.nanmean(ic) / np.nanstd(ic)) if np.nanstd(ic) > 0 else math.nan,
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
-        "feature_bundle": "all618" if config.candidate_dim else "bar156",
+        "feature_bundle": "unified" if config.candidate_dim else "bar156",
         "bar_feature_count": config.input_dim,
         "candidate_feature_count": config.candidate_dim,
         "model_dim": config.model_dim,
@@ -303,9 +331,11 @@ def evaluate_fold(
         "epochs": epochs,
         "train_stride": stride,
         "max_stocks": max_stocks,
-        "seed": seed,
+        "seed": fold_seed,
         "train_start": str(dates[min(train_indices)].date()),
         "train_end": str(train_end.date()),
+        "validation_start": str(validation_start.date()),
+        "validation_end": str(validation_end.date()),
         "train_days": len(train_indices),
         "temporal_lookback_days": config.lookback,
     }
@@ -316,7 +346,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--bar-cache-dir", type=Path)
     parser.add_argument("--years", nargs="+", type=int, default=[2023, 2024])
+    parser.add_argument(
+        "--halves",
+        nargs="+",
+        choices=("h1", "h2"),
+        default=["h1", "h2"],
+    )
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--candidate-pool", type=Path)
     parser.add_argument("--candidate-manifest", type=Path)
@@ -353,33 +390,55 @@ def main() -> int:
         candidate_dim=candidate_dim,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir = args.output_dir / "cache"
-    factors, metrics = [], []
+    cache_dir = args.bar_cache_dir or args.output_dir / "cache"
+    metrics = []
     for year in args.years:
-        factor, fold_metrics = evaluate_fold(
-            args.data_root,
-            cache_dir,
-            year,
-            args.train_start_year,
-            args.epochs,
-            args.train_stride,
-            config,
-            candidate_pool=args.candidate_pool,
-            candidate_manifest=args.candidate_manifest,
-            expected_candidate_count=(
-                args.expected_candidate_count if args.candidate_manifest else None
-            ),
-            learning_rate=args.learning_rate,
-            max_stocks=args.max_stocks,
-            seed=args.seed,
-        )
-        factors.append(factor)
-        metrics.append(fold_metrics)
-    route = pd.concat(factors, ignore_index=True)
-    route_name = (
-        "all618_fusion_oos.parquet" if candidate_dim else "all156_temporal_bar1m_oos.parquet"
-    )
-    route.to_parquet(args.output_dir / route_name, index=False)
+        half_routes = []
+        for validation_half in dict.fromkeys(args.halves):
+            factor, fold_metrics = evaluate_fold(
+                args.data_root,
+                cache_dir,
+                year,
+                args.train_start_year,
+                args.epochs,
+                args.train_stride,
+                config,
+                validation_half=validation_half,
+                candidate_pool=args.candidate_pool,
+                candidate_manifest=args.candidate_manifest,
+                expected_candidate_count=(
+                    args.expected_candidate_count if args.candidate_manifest else None
+                ),
+                learning_rate=args.learning_rate,
+                max_stocks=args.max_stocks,
+                seed=args.seed,
+            )
+            half_routes.append(factor)
+            metrics.append(fold_metrics)
+            factor.to_parquet(
+                args.output_dir / f"unified_temporal_{year}_{validation_half}_oos.parquet",
+                index=False,
+            )
+        if set(args.halves) == {"h1", "h2"}:
+            full_route = pd.concat(half_routes, ignore_index=True)
+            expected = pd.read_parquet(
+                args.data_root / f"labels/year={year}/part-{year}.parquet",
+                columns=["date", "instrument"],
+            )
+            expected["date"] = pd.to_datetime(expected["date"]).dt.normalize()
+            expected["instrument"] = expected["instrument"].astype(str)
+            full_route["instrument"] = full_route["instrument"].astype(str)
+            full_route = expected.drop_duplicates().merge(
+                full_route,
+                on=["date", "instrument"],
+                how="left",
+                validate="one_to_one",
+            )
+            full_route["factor"] = full_route["factor"].fillna(0.0)
+            full_route.sort_values(["date", "instrument"]).to_parquet(
+                args.output_dir / f"unified_temporal_{year}_full_oos.parquet",
+                index=False,
+            )
     (args.output_dir / "oos_metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
     print(json.dumps(metrics, indent=2), flush=True)
     return 0

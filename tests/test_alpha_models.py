@@ -7,6 +7,7 @@ from bigalpha2026.alpha_models import (
     All156TemporalModel,
     All156TemporalNetwork,
     All618MLPConfig,
+    All618MLPModel,
     All618MLPNetwork,
     ModelFactory,
 )
@@ -32,7 +33,7 @@ def small_config() -> All156TemporalConfig:
 
 def test_model_factory_creates_registered_temporal_model() -> None:
     model = ModelFactory.create(
-        "all156_temporal",
+        "unified_temporal",
         {
             "input_dim": 6,
             "model_dim": 16,
@@ -45,6 +46,19 @@ def test_model_factory_creates_registered_temporal_model() -> None:
         },
     )
     assert isinstance(model, All156TemporalModel)
+
+
+def test_model_factory_creates_registered_mlp_model() -> None:
+    model = ModelFactory.create(
+        "unified_mlp",
+        {
+            "bar_dim": 6,
+            "candidate_dim": 7,
+            "hidden_dims": (16, 8),
+            "dropout": 0.0,
+        },
+    )
+    assert isinstance(model, All618MLPModel)
 
 
 def test_cross_sectional_normalization_excludes_missing_and_padding() -> None:
@@ -93,7 +107,7 @@ def test_temporal_network_backward() -> None:
     assert any(parameter.grad is not None for parameter in network.parameters())
 
 
-def test_all618_fusion_uses_masked_candidate_tower() -> None:
+def test_unified_temporal_uses_masked_candidate_tower() -> None:
     config = All156TemporalConfig(
         input_dim=6,
         model_dim=16,
@@ -127,7 +141,7 @@ def test_all618_fusion_uses_masked_candidate_tower() -> None:
     assert scores[0, 3] == 0
 
 
-def test_all618_mlp_uses_both_feature_towers() -> None:
+def test_unified_mlp_uses_both_feature_towers() -> None:
     network = All618MLPNetwork(
         All618MLPConfig(
             bar_dim=6,

@@ -8,7 +8,7 @@ from pathlib import Path
 import nbformat
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT = ROOT / "notebooks" / "all618_fusion_development.ipynb"
+DEFAULT_OUTPUT = ROOT / "notebooks" / "unified_alpha_fusion_development.ipynb"
 
 
 def build_notebook(
@@ -47,14 +47,13 @@ if ROOT.name == "notebooks":
 sys.path.insert(0, str(ROOT / "src"))
 
 from bigalpha2026.alpha_models import (
-    ALL618,
-    BAR156,
     DEFAULT_SUBMISSION_DATA_CONTRACT,
-    All156TemporalConfig,
-    All156TemporalNetwork,
+    ModelFactory,
     candidate_ids_from_manifest,
 )
 
+EXPECTED_BAR_FEATURES = 156
+EXPECTED_CANDIDATES = 462
 CANDIDATE_POOL = Path({str(candidate_pool)!r})
 CANDIDATE_MANIFEST = Path({str(candidate_manifest)!r})
 manifest = json.loads(CANDIDATE_MANIFEST.read_text(encoding="utf-8"))
@@ -62,14 +61,14 @@ candidate_ids = candidate_ids_from_manifest(CANDIDATE_MANIFEST)
 date_range = manifest.get("date_range")
 candidate_ready = (
     CANDIDATE_POOL.exists()
-    and len(candidate_ids) == ALL618.candidate_feature_count
+    and len(candidate_ids) == EXPECTED_CANDIDATES
     and isinstance(date_range, list)
     and len(date_range) == 2
     and str(date_range[1]) >= "2024-12-31"
 )
 print({{
     "candidate_count": len(candidate_ids),
-    "expected_candidate_count": ALL618.candidate_feature_count,
+    "expected_candidate_count": EXPECTED_CANDIDATES,
     "candidate_ready": candidate_ready,
     "date_range": date_range,
     "candidate_pool": str(CANDIDATE_POOL),
@@ -83,27 +82,30 @@ print({
     "training_start": str(contract.training_start),
     "training_end": str(contract.training_end),
     "temporal_lookback_days": contract.temporal_lookback_days,
-    "bar_feature_count": BAR156.total_feature_count,
-    "all_feature_count": ALL618.total_feature_count,
+    "bar_feature_count": EXPECTED_BAR_FEATURES,
+    "unified_feature_count": EXPECTED_BAR_FEATURES + EXPECTED_CANDIDATES,
 })"""
         ),
         nbformat.v4.new_markdown_cell("## Canonical model"),
         nbformat.v4.new_code_cell(
-            """config = All156TemporalConfig(
-    input_dim=156,
-    candidate_dim=462,
-    candidate_hidden_dim=256,
-    model_dim=256,
-    lookback=60,
-    kernels=(3, 5, 15),
-    transformer_layers=4,
-    attention_heads=8,
-    feedforward_dim=768,
-    dropout=0.12,
+            """adapter = ModelFactory.create(
+    "unified_temporal",
+    {
+        "input_dim": EXPECTED_BAR_FEATURES,
+        "candidate_dim": EXPECTED_CANDIDATES,
+        "candidate_hidden_dim": 256,
+        "model_dim": 256,
+        "lookback": 60,
+        "kernels": (3, 5, 15),
+        "transformer_layers": 4,
+        "attention_heads": 8,
+        "feedforward_dim": 768,
+        "dropout": 0.12,
+    },
 )
-model = All156TemporalNetwork(config)
+model = adapter.network
 print({
-    "registered_model": "all618_fusion",
+    "registered_model": "unified_temporal",
     "parameters": sum(parameter.numel() for parameter in model.parameters()),
     "architecture": "bar156 temporal tower + candidate462 masked tower + DeepSets",
 })"""
@@ -113,14 +115,16 @@ print({
             """if not candidate_ready:
     print("BLOCKED: upstream artifact is not candidate462-complete")
 else:
-    print("bash run_all618_fusion_suite.sh")
+    print("bash run_unified_alpha_fusion_suite.sh")
     print({
-        "routes": ["all618_fusion", "all618_mlp", "all618_lightgbm"],
+        "routes": ["unified_temporal", "unified_mlp", "unified_lightgbm"],
         "j_policy": "standalone J + mandatory tree delta-J + ensemble J",
         "training_history": "expanding from 2019",
     })"""
         ),
     ]
+    for index, cell in enumerate(notebook["cells"]):
+        cell["id"] = f"unified-{index:02d}"
     nbformat.validate(notebook)
     return notebook
 

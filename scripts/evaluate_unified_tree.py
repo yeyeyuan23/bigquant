@@ -1,4 +1,4 @@
-"""Strict rolling OOS LightGBM on bar156 or the unified all618 panel."""
+"""Strict rolling OOS LightGBM for the unified alpha feature bundle."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ if str(ROOT / "src") not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from evaluate_all156_temporal_bar1m import daily_bar_features
+from evaluate_unified_temporal import daily_bar_features, fold_boundaries
 
 from bigalpha2026.alpha_models import (
     candidate_ids_from_manifest,
@@ -108,6 +108,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--bar-cache-dir", type=Path)
     parser.add_argument("--years", nargs="+", type=int, default=[2023, 2024])
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--candidate-pool", type=Path)
@@ -130,7 +131,7 @@ def main() -> int:
         )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir = args.output_dir / "cache"
+    cache_dir = args.bar_cache_dir or args.output_dir / "cache"
     all_years = list(range(args.train_start_year, max(args.years) + 1))
     frames = {
         year: _load_year(
@@ -165,19 +166,12 @@ def main() -> int:
             [frames[input_year] for input_year in range(args.train_start_year, year + 1)],
             ignore_index=True,
         )
-        folds = (
-            (
-                "H1",
-                history.loc[history["date"] < pd.Timestamp(year, 1, 1)],
-                current.loc[current["date"].dt.month <= 6],
-            ),
-            (
-                "H2",
-                history.loc[history["date"] <= pd.Timestamp(year, 6, 30)],
-                current.loc[current["date"].dt.month >= 7],
-            ),
-        )
-        for fold_index, (fold, train, validation) in enumerate(folds):
+        for fold_index, fold in enumerate(("H1", "H2")):
+            train_end, validation_start, validation_end = fold_boundaries(year, fold)
+            train = history.loc[history["date"] <= train_end]
+            validation = current.loc[
+                current["date"].between(validation_start, validation_end)
+            ]
             prediction, importance = _fit_predict(
                 train,
                 validation,
@@ -234,11 +228,7 @@ def main() -> int:
     )
     neutral_filled_rows = int(route["factor"].isna().sum())
     route["factor"] = route["factor"].fillna(0.0)
-    route_name = (
-        "all618_lightgbm_full_oos.parquet"
-        if candidate_count
-        else "all156_lightgbm_full_oos.parquet"
-    )
+    route_name = "unified_lightgbm_full_oos.parquet"
     route.to_parquet(args.output_dir / route_name, index=False)
     pd.DataFrame(metric_rows).to_csv(args.output_dir / "oos_metrics.csv", index=False)
     pd.concat(importance_rows, ignore_index=True).to_csv(
@@ -248,7 +238,7 @@ def main() -> int:
         json.dumps(
             {
                 "model": "lightgbm",
-                "feature_bundle": "all618" if candidate_count else "bar156",
+                "feature_bundle": "unified" if candidate_count else "bar156",
                 "feature_count": expected_feature_count,
                 "bar_feature_count": 156,
                 "candidate_feature_count": candidate_count,

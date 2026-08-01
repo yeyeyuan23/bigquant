@@ -1,4 +1,4 @@
-"""All156 causal temporal Alpha model.
+"""Causal temporal Alpha model for unified feature bundles.
 
 The module is independent from the legacy S/I/T/J admission pipeline.  Inputs
 are daily panels shaped [batch_date, stock, lookback, feature].
@@ -297,6 +297,7 @@ class All156TemporalNetwork(nn.Module):
 
 @register_model("all156_temporal")
 @register_model("all618_fusion")
+@register_model("unified_temporal")
 class All156TemporalModel(AlphaModel):
     """Framework adapter around the PyTorch network.
 

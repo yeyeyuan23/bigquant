@@ -91,6 +91,7 @@ class All618MLPNetwork(nn.Module):
 
 
 @register_model("all618_mlp")
+@register_model("unified_mlp")
 class All618MLPModel(AlphaModel):
     def __init__(self, **config: Any) -> None:
         self.config = All618MLPConfig(**config)
