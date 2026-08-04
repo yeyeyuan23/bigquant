@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-08-04T11:09:19.591415+00:00",
+  "build": "passed",
+  "py_compile": "passed",
+  "notebook_structure": "one_code_cell",
+  "checkpoint_sha256": "e1cc931d4adb4b46ff1a3ec7062a05049e80532eaaf4ceb7e3150efbc937bf1f",
+  "checkpoint_smoke": {
+    "parameter_count": 234657,
+    "output_shape": [
+      1,
+      3
+    ],
+    "finite": true
+  },
+  "online_deep_book_source": "bounded_bar1m_l1_l5_sql",
+  "platform_output_contract": "pending_aistudio",
+  "platform_prefix_probe": "pending_aistudio"
+}

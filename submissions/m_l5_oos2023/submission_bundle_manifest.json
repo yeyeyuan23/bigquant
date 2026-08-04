@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "notebook": "unified_m_l5.ipynb",
+  "notebook_code": "from unified_m_l5 import main  # noqa: F401\n",
+  "upload_file_count": 7,
+  "upload_files": [
+    {
+      "name": "unified_m_l5.ipynb",
+      "bytes": 445,
+      "sha256": "3f08448ba4d8cfbfd9c4f858d7d964dca5f7cf3cb7c857d452a27b0d33e54f6c"
+    },
+    {
+      "name": "unified_m_l5.py",
+      "bytes": 13728,
+      "sha256": "8cb8e9c86c1477f320589c20947fbe28b6a20c0380ad240ad43b9b28df049a2d"
+    },
+    {
+      "name": "unified_m_base.py",
+      "bytes": 2290,
+      "sha256": "a43aac57cc295e602ae61ae31830ec7d3728aba5158f11d3265414e233b6bcf9"
+    },
+    {
+      "name": "unified_m_temporal.py",
+      "bytes": 12979,
+      "sha256": "16dd5d1044871755001dd09c545c3ccc6de975edaaa43b7d69281c9fddaf65a8"
+    },
+    {
+      "name": "unified_m_microstructure.py",
+      "bytes": 19088,
+      "sha256": "d2fd8e235582c9fb5dcb3fb28a93dd78e3a3e8adf4d082f6867c633b2f359428"
+    },
+    {
+      "name": "unified_m_microstructure_v2.py",
+      "bytes": 19495,
+      "sha256": "6d7c8e09c48afd6208c6a435d706ce8c72268e2c83dfee55a7dec26d48ddabf4"
+    },
+    {
+      "name": "unified_m_l5_checkpoint.py",
+      "bytes": 1092868,
+      "sha256": "69a35b42f84cd3a0f4c47b9d799fcaceb35c4d9db6cf594ed596ce0c36172cb0"
+    }
+  ],
+  "checkpoint_manifest": "reports/m_v3_oos2023_seed_20260803/final_checkpoint_manifest.json"
+}

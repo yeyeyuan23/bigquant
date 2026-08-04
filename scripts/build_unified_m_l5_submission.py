@@ -22,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUN_DIR = ROOT / "reports/m_v3_final_2019_2024_seed_20260803"
 DEFAULT_SOURCE_ROOT = ROOT / "src/bigalpha2026/alpha_models"
 DEFAULT_OUTPUT = ROOT / "submissions/m_l5"
+DEFAULT_TRAINING_SCRIPT = ROOT / "scripts/train_unified_microstructure_v3_final.py"
+DEFAULT_ROUTE = "M_l5_seed_20260803_final"
 UPLOAD_FILES = (
     "unified_m_l5.ipynb",
     "unified_m_l5.py",
@@ -544,7 +546,23 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--training-commit", required=True)
     parser.add_argument("--training-tree-dirty", action="store_true")
+    parser.add_argument("--route", default=DEFAULT_ROUTE)
+    parser.add_argument(
+        "--training-script", type=Path, default=DEFAULT_TRAINING_SCRIPT
+    )
+    parser.add_argument("--handoff-title")
+    parser.add_argument(
+        "--evidence-boundary",
+        default=(
+            "Frozen final checkpoint and local static validation only; "
+            "AIStudio execution, prefix evidence, and platform score remain separate."
+        ),
+    )
     args = parser.parse_args()
+    args.run_dir = args.run_dir.resolve()
+    args.source_root = args.source_root.resolve()
+    args.output_dir = args.output_dir.resolve()
+    args.training_script = args.training_script.resolve()
 
     checkpoint = args.run_dir / "unified_microstructure_v3_final_checkpoint.pt"
     checkpoint_manifest_path = args.run_dir / "final_checkpoint_manifest.json"
@@ -563,7 +581,7 @@ def main() -> int:
         zlib.compress(checkpoint.read_bytes(), level=9)
     ).decode("ascii")
     frozen_manifest = {
-        "route": "M_l5_seed_20260803_final",
+        "route": args.route,
         "model": "unified_microstructure_v3",
         "training_commit": args.training_commit,
         "training_tree_dirty": args.training_tree_dirty,
@@ -585,15 +603,28 @@ def main() -> int:
         "bar1m_table": "bigalpha_2026_stock_bar1m",
         "stock_pool_table": "bigalpha_2026_instruments",
         "parameter_count": checkpoint_manifest["parameter_count"],
-        "training_script_sha256": sha256_file(
-            ROOT / "scripts" / "train_unified_microstructure_v3_final.py"
-        ),
+        "training_script_sha256": sha256_file(args.training_script),
         "source_sha256": source_hashes,
-        "evidence_boundary": (
-            "Frozen final checkpoint and local static validation only; "
-            "AIStudio execution, prefix evidence, and platform score remain separate."
-        ),
+        "evidence_boundary": args.evidence_boundary,
     }
+    if checkpoint_manifest.get("prediction_start"):
+        frozen_manifest["local_oos_evidence"] = {
+            key: checkpoint_manifest[key]
+            for key in (
+                "prediction_start",
+                "prediction_end",
+                "prediction_days",
+                "missing_prediction_days",
+                "rank_ic_mean",
+                "candidate454_J",
+                "candidate454_A",
+                "candidate454_B",
+                "candidate454_B_model_score",
+                "candidate454_B_mean_abs_weight",
+                "candidate454_B_std_abs_weight",
+            )
+            if key in checkpoint_manifest
+        }
     module_sources = {
         **rewritten,
         "unified_m_l5_checkpoint.py": (
@@ -660,7 +691,8 @@ def main() -> int:
         json.dumps(validation, indent=2) + "\n",
         encoding="utf-8",
     )
-    handoff = """# M-l5 seed 20260803 final AIStudio handoff
+    handoff_title = args.handoff_title or f"{args.route} AIStudio handoff"
+    handoff = f"""# {handoff_title}
 
 Upload exactly the seven files listed in `submission_bundle_manifest.json`.
 The notebook contains one code cell: `from unified_m_l5 import main`.
