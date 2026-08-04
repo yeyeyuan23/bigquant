@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "route_name": "en454_residual_t_addback",
+  "status": "selected_from_local_proxy",
+  "platform_score_claimed": false,
+  "formula": "daily_rank((1 - expert_weight) * daily_rank(en454_oos) + expert_weight * daily_rank(residual_t_oos))",
+  "selected_expert_weight": 0.1,
+  "selection_rule": "Require delta_J > 0 and delta_B_percentile >= 0 in both 2023 and 2024; among tested weights 0.05, 0.10, 0.20 only 0.10 passes.",
+  "candidate454_baseline": {
+    "expected_candidate_count": 454,
+    "training_protocol": "rolling_oos",
+    "train_days": 60,
+    "label_isolation_gap_days": 1,
+    "prediction_days": 20,
+    "alpha": 0.001,
+    "l1_ratio": 0.5
+  },
+  "residual_t": {
+    "target_mode": "candidate454_residual",
+    "model_dim": 128,
+    "transformer_layers": 2,
+    "attention_heads": 8,
+    "feedforward_dim": 384,
+    "history_mode": "dense",
+    "epochs": 8,
+    "train_stride": 1,
+    "orthogonality_weight": 0.1,
+    "stability_weight": 0.3,
+    "correlation_floor": 0.0,
+    "seed": 20260803
+  },
+  "local_proxy_evidence": {
+    "2023": {
+      "common_rows": 241854,
+      "common_days": 242,
+      "baseline_A": 0.9509911894273129,
+      "augmented_A": 0.9548458149779735,
+      "baseline_B": 0.9912087912087912,
+      "augmented_B": 0.9934065934065934,
+      "baseline_J": 0.9791435106743476,
+      "augmented_J": 0.9818383598780074,
+      "delta_J": 0.0026948492036598104,
+      "baseline_B_model_score": 4.460094560388398,
+      "augmented_B_model_score": 4.6481617825325054,
+      "positive_window_ratio": 0.7142857142857143
+    },
+    "2024": {
+      "common_rows": 240567,
+      "common_days": 241,
+      "baseline_A": 0.7703296703296703,
+      "augmented_A": 0.7708791208791209,
+      "baseline_B": 0.9978021978021978,
+      "augmented_B": 0.9978021978021978,
+      "baseline_J": 0.9295604395604395,
+      "augmented_J": 0.9297252747252747,
+      "delta_J": 0.00016483516483511984,
+      "baseline_B_model_score": 3.246527470815647,
+      "augmented_B_model_score": 3.1596809417951195,
+      "positive_window_ratio": 0.14285714285714285
+    }
+  },
+  "evidence_paths": {
+    "2023": "reports/temporal_incremental_objective_20260803/residual_orth_stable/en454_addback_2023/paired_increment.json",
+    "2024": "reports/temporal_incremental_objective_20260803/residual_orth_stable/audit_2024/en454_addback/paired_increment.json"
+  },
+  "score_contract": "J = 0.3 * A + 0.7 * B",
+  "caveat": "All selection metrics are local score proxies. AIStudio acceptance and official platform scores require separate validation."
+}

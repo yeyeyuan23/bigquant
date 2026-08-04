@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -47,12 +48,192 @@ def fold_boundaries(year: int, validation_half: str) -> tuple[pd.Timestamp, ...]
 
 
 def correlation_loss(prediction: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    prediction = prediction - prediction.mean()
-    target = target - target.mean()
-    correlation = (prediction * target).sum() / (
-        prediction.square().sum().sqrt() * target.square().sum().sqrt()
-    ).clamp_min(1e-6)
+    correlation = centered_correlation(prediction, target)
     return -correlation + 0.05 * F.smooth_l1_loss(prediction, target)
+
+
+def centered_correlation(
+    left: torch.Tensor,
+    right: torch.Tensor,
+) -> torch.Tensor:
+    """Return a finite cross-sectional Pearson correlation."""
+
+    left = left - left.mean()
+    right = right - right.mean()
+    return (left * right).sum() / (
+        left.square().sum().sqrt() * right.square().sum().sqrt()
+    ).clamp_min(1e-6)
+
+
+def incremental_correlation_loss(
+    prediction: torch.Tensor,
+    residual_target: torch.Tensor,
+    baseline_prediction: torch.Tensor,
+    *,
+    orthogonality_weight: float,
+    stability_weight: float,
+    correlation_floor: float,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """Optimize residual IC while discouraging baseline copying and weak days.
+
+    The low-correlation penalty is a memory-safe stability surrogate.  It puts
+    extra gradient on days whose incremental correlation falls below the
+    configured floor without retaining several full temporal graphs in GPU
+    memory merely to compute a cross-day standard deviation.
+    """
+
+    residual_correlation = centered_correlation(prediction, residual_target)
+    baseline_correlation = centered_correlation(prediction, baseline_prediction)
+    smooth_l1 = F.smooth_l1_loss(prediction, residual_target)
+    downside = F.relu(
+        prediction.new_tensor(correlation_floor) - residual_correlation
+    ).square()
+    loss = (
+        -residual_correlation
+        + 0.05 * smooth_l1
+        + orthogonality_weight * baseline_correlation.square()
+        + stability_weight * downside
+    )
+    return loss, {
+        "residual_correlation": residual_correlation,
+        "baseline_correlation": baseline_correlation,
+        "downside_penalty": downside,
+    }
+
+
+def residualize_targets_against_baseline(
+    targets: np.ndarray,
+    baseline_predictions: np.ndarray,
+    *,
+    minimum_stocks: int = 2,
+    epsilon: float = 1e-8,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Remove each day's cross-sectional baseline projection from the target."""
+
+    if targets.shape != baseline_predictions.shape:
+        raise ValueError("target and baseline arrays must have identical shapes")
+    residuals = np.full(targets.shape, np.nan, dtype=np.float32)
+    betas = np.full(targets.shape[0], np.nan, dtype=np.float64)
+    for day_index in range(targets.shape[0]):
+        target = targets[day_index]
+        baseline = baseline_predictions[day_index]
+        valid = np.isfinite(target) & np.isfinite(baseline)
+        if np.count_nonzero(valid) < minimum_stocks:
+            continue
+        centered_target = target[valid] - np.mean(target[valid])
+        centered_baseline = baseline[valid] - np.mean(baseline[valid])
+        denominator = float(np.dot(centered_baseline, centered_baseline))
+        beta = (
+            float(np.dot(centered_target, centered_baseline)) / denominator
+            if denominator > epsilon
+            else 0.0
+        )
+        residuals[day_index, valid] = centered_target - beta * centered_baseline
+        betas[day_index] = beta
+    return residuals, betas
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def validate_residual_baseline_manifest(
+    path: Path,
+    *,
+    required_years: set[int],
+    expected_candidate_count: int,
+) -> dict[str, object]:
+    """Verify that the residual baseline declares the strict OOS contract."""
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "model": "elastic_net",
+        "role": "candidate454_full_pool_oos_baseline",
+        "feature_bundle": "candidate454",
+        "candidate_feature_count": expected_candidate_count,
+        "label_isolation_gap_days": 1,
+        "training_protocol": "60d_train_20d_predict",
+        "alpha": 0.001,
+        "l1_ratio": 0.5,
+        "neutral_filled_rows": 0,
+        "continuous_oos": True,
+    }
+    mismatches = {
+        key: {"expected": value, "actual": payload.get(key)}
+        for key, value in expected.items()
+        if payload.get(key) != value
+    }
+    declared_years = {int(year) for year in payload.get("years", ())}
+    if not required_years.issubset(declared_years):
+        mismatches["years"] = {
+            "expected_to_cover": sorted(required_years),
+            "actual": sorted(declared_years),
+        }
+    if mismatches:
+        raise ValueError(f"residual baseline manifest mismatch: {mismatches}")
+    return {
+        "path": str(path),
+        "sha256": file_sha256(path),
+        "payload": payload,
+    }
+
+
+def load_aligned_baseline_route(
+    path: Path,
+    dates: pd.DatetimeIndex,
+    instruments: tuple[str, ...],
+) -> tuple[np.ndarray, dict[str, object]]:
+    """Load a frozen OOS route and align it to the temporal panel."""
+
+    route = pd.read_parquet(path)
+    if list(route.columns) != ["date", "instrument", "factor"]:
+        raise ValueError(
+            "residual baseline route must have exact columns "
+            "date, instrument, factor"
+        )
+    route["date"] = pd.to_datetime(route["date"], errors="coerce").dt.normalize()
+    route["instrument"] = route["instrument"].astype(str)
+    route["factor"] = pd.to_numeric(route["factor"], errors="coerce")
+    if route[["date", "instrument"]].isna().any().any():
+        raise ValueError("residual baseline route contains null keys")
+    if route.duplicated(["date", "instrument"]).any():
+        raise ValueError("residual baseline route contains duplicate keys")
+    if not np.isfinite(route["factor"]).all():
+        raise ValueError("residual baseline route contains non-finite factors")
+    per_date = route.groupby("date")["factor"].agg(["size", "nunique"])
+    constant_dates = per_date.index[
+        per_date["size"].ge(2) & per_date["nunique"].le(1)
+    ]
+    constant_rows = int(route["date"].isin(constant_dates).sum())
+    route.loc[route["date"].isin(constant_dates), "factor"] = np.nan
+    index = pd.MultiIndex.from_product(
+        [dates, instruments],
+        names=["date", "instrument"],
+    )
+    aligned = (
+        route.set_index(["date", "instrument"])["factor"]
+        .reindex(index)
+        .to_numpy(np.float32)
+        .reshape(len(dates), len(instruments))
+    )
+    matched = int(np.isfinite(aligned).sum())
+    return aligned, {
+        "path": str(path),
+        "sha256": file_sha256(path),
+        "source_rows": len(route),
+        "source_days": int(route["date"].nunique()),
+        "source_date_min": str(route["date"].min().date()),
+        "source_date_max": str(route["date"].max().date()),
+        "aligned_rows": int(aligned.size),
+        "matched_rows": matched,
+        "missing_rows": int(aligned.size - matched),
+        "excluded_constant_days": len(constant_dates),
+        "excluded_constant_rows": constant_rows,
+    }
 
 
 def eligible_target_indices(
@@ -111,6 +292,12 @@ def evaluate_fold(
     seed: int,
     checkpoint_path: Path | None = None,
     reuse_checkpoint: bool = False,
+    target_mode: str = "total",
+    residual_baseline_route: Path | None = None,
+    residual_baseline_manifest: Path | None = None,
+    residual_orthogonality_weight: float = 0.0,
+    residual_stability_weight: float = 0.0,
+    residual_correlation_floor: float = 0.0,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     validation_half = validation_half.lower()
     train_end, validation_start, validation_end = fold_boundaries(year, validation_half)
@@ -128,13 +315,47 @@ def evaluate_fold(
     instruments = panel.instruments
     values = panel.candidate_values
     targets = panel.targets
+    baseline_predictions: np.ndarray | None = None
+    residual_targets: np.ndarray | None = None
+    residual_betas: np.ndarray | None = None
+    residual_baseline_metadata: dict[str, object] | None = None
+    if target_mode not in {"total", "candidate454_residual"}:
+        raise ValueError(f"unsupported target mode: {target_mode}")
+    if target_mode == "candidate454_residual":
+        if residual_baseline_route is None:
+            raise ValueError(
+                "candidate454_residual target mode requires a residual baseline route"
+            )
+        if reuse_checkpoint:
+            raise ValueError(
+                "residual objective checkpoints cannot be reused without objective lineage"
+            )
+        manifest_path = residual_baseline_manifest or residual_baseline_route.with_name(
+            "run_manifest.json"
+        )
+        manifest_metadata = validate_residual_baseline_manifest(
+            manifest_path,
+            required_years=set(range(train_start_year, year + 1)),
+            expected_candidate_count=expected_candidate_count,
+        )
+        baseline_predictions, residual_baseline_metadata = load_aligned_baseline_route(
+            residual_baseline_route,
+            dates,
+            instruments,
+        )
+        residual_baseline_metadata["manifest"] = manifest_metadata
+        residual_targets, residual_betas = residualize_targets_against_baseline(
+            targets,
+            baseline_predictions,
+        )
+    objective_targets = residual_targets if residual_targets is not None else targets
     if len(panel.candidate_columns) != config.input_dim:
         raise RuntimeError(
             f"candidate feature count {len(panel.candidate_columns)} != config {config.input_dim}"
         )
     train_start = pd.Timestamp(train_start_year, 1, 1)
     train_indices, skipped_train_days = eligible_target_indices(
-        targets,
+        objective_targets,
         [
             index
             for index, day in enumerate(dates)
@@ -176,8 +397,11 @@ def evaluate_fold(
         for epoch in range(epochs):
             rng.shuffle(train_indices)
             losses = []
+            residual_correlations = []
+            baseline_correlations = []
+            downside_penalties = []
             for day_index in train_indices:
-                active = np.flatnonzero(np.isfinite(targets[day_index]))
+                active = np.flatnonzero(np.isfinite(objective_targets[day_index]))
                 if active.size > max_stocks:
                     active = rng.choice(active, max_stocks, replace=False)
                 window = values[
@@ -187,25 +411,55 @@ def evaluate_fold(
                 batch = torch.from_numpy(window).unsqueeze(0).to(device)
                 mask = torch.from_numpy(observed).unsqueeze(0).to(device)
                 stocks = torch.ones(1, len(active), dtype=torch.bool, device=device)
-                target = torch.from_numpy(targets[day_index, active]).to(device)
+                target = torch.from_numpy(objective_targets[day_index, active]).to(device)
                 optimizer.zero_grad(set_to_none=True)
                 with torch.amp.autocast("cuda", dtype=torch.float16):
                     prediction = model(batch, mask, stocks).squeeze(0)
-                    loss = correlation_loss(prediction.float(), target)
+                    if baseline_predictions is None:
+                        loss = correlation_loss(prediction.float(), target)
+                    else:
+                        baseline = torch.from_numpy(
+                            baseline_predictions[day_index, active]
+                        ).to(device)
+                        loss, diagnostics = incremental_correlation_loss(
+                            prediction.float(),
+                            target,
+                            baseline,
+                            orthogonality_weight=residual_orthogonality_weight,
+                            stability_weight=residual_stability_weight,
+                            correlation_floor=residual_correlation_floor,
+                        )
+                        residual_correlations.append(
+                            float(diagnostics["residual_correlation"].detach())
+                        )
+                        baseline_correlations.append(
+                            float(diagnostics["baseline_correlation"].detach())
+                        )
+                        downside_penalties.append(
+                            float(diagnostics["downside_penalty"].detach())
+                        )
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 scaler.step(optimizer)
                 scaler.update()
                 losses.append(float(loss.detach()))
-            print(
+            epoch_message = (
                 f"fold={year}{validation_half.upper()} epoch={epoch + 1} "
-                f"loss={np.mean(losses):.6f}",
-                flush=True,
+                f"loss={np.mean(losses):.6f}"
             )
+            if residual_correlations:
+                epoch_message += (
+                    f" residual_corr={np.mean(residual_correlations):.6f}"
+                    f" baseline_corr={np.mean(baseline_correlations):.6f}"
+                    f" downside={np.mean(downside_penalties):.6f}"
+                )
+            print(epoch_message, flush=True)
 
     rows: list[pd.DataFrame] = []
     daily_ic: list[float] = []
+    daily_residual_ic: list[float] = []
+    daily_baseline_correlation: list[float] = []
     model.eval()
     with torch.inference_mode():
         for day_index in validation_indices:
@@ -232,6 +486,26 @@ def evaluate_fold(
                     )
                 )
             )
+            if residual_targets is not None and baseline_predictions is not None:
+                residual_target = residual_targets[day_index, active]
+                baseline = baseline_predictions[day_index, active]
+                residual_valid = np.isfinite(residual_target) & np.isfinite(baseline)
+                daily_residual_ic.append(
+                    float(
+                        pd.Series(factor[residual_valid]).corr(
+                            pd.Series(residual_target[residual_valid]),
+                            method="spearman",
+                        )
+                    )
+                )
+                daily_baseline_correlation.append(
+                    float(
+                        pd.Series(factor[residual_valid]).corr(
+                            pd.Series(baseline[residual_valid]),
+                            method="spearman",
+                        )
+                    )
+                )
             rows.append(
                 pd.DataFrame(
                     {
@@ -271,7 +545,38 @@ def evaluate_fold(
         "skipped_validation_days": skipped_validation_days,
         "temporal_lookback_days": config.lookback,
         "checkpoint_reused": checkpoint_reused,
+        "target_mode": target_mode,
+        "residual_orthogonality_weight": (
+            residual_orthogonality_weight if residual_targets is not None else 0.0
+        ),
+        "residual_stability_weight": (
+            residual_stability_weight if residual_targets is not None else 0.0
+        ),
+        "residual_correlation_floor": (
+            residual_correlation_floor if residual_targets is not None else 0.0
+        ),
     }
+    if residual_targets is not None and residual_betas is not None:
+        residual_ic = np.asarray(daily_residual_ic, dtype=float)
+        baseline_corr = np.asarray(daily_baseline_correlation, dtype=float)
+        finite_betas = residual_betas[np.isfinite(residual_betas)]
+        metrics.update(
+            {
+                "residual_rank_ic_mean": float(np.nanmean(residual_ic)),
+                "residual_rank_ic_std": float(np.nanstd(residual_ic)),
+                "residual_rank_ic_ir": (
+                    float(np.nanmean(residual_ic) / np.nanstd(residual_ic))
+                    if np.nanstd(residual_ic) > 0
+                    else math.nan
+                ),
+                "baseline_output_correlation_mean": float(
+                    np.nanmean(baseline_corr)
+                ),
+                "residual_beta_mean": float(np.mean(finite_betas)),
+                "residual_beta_std": float(np.std(finite_betas)),
+                "residual_baseline": residual_baseline_metadata,
+            }
+        )
     if checkpoint_path is not None:
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         adapter.save(checkpoint_path)
@@ -301,7 +606,39 @@ def main() -> int:
     parser.add_argument("--max-stocks", type=int, default=512)
     parser.add_argument("--seed", type=int, default=20260731)
     parser.add_argument("--reuse-checkpoints", action="store_true")
+    parser.add_argument(
+        "--target-mode",
+        choices=("total", "candidate454_residual"),
+        default="total",
+    )
+    parser.add_argument(
+        "--residual-baseline-route",
+        type=Path,
+        default=None,
+        help=(
+            "frozen strict-OOS Candidate454 baseline route used only when "
+            "target-mode=candidate454_residual"
+        ),
+    )
+    parser.add_argument(
+        "--residual-baseline-manifest",
+        type=Path,
+        default=None,
+        help="defaults to run_manifest.json beside the residual baseline route",
+    )
+    parser.add_argument("--residual-orthogonality-weight", type=float, default=0.10)
+    parser.add_argument("--residual-stability-weight", type=float, default=0.30)
+    parser.add_argument("--residual-correlation-floor", type=float, default=0.0)
     args = parser.parse_args()
+    if args.target_mode == "candidate454_residual" and args.residual_baseline_route is None:
+        parser.error(
+            "--residual-baseline-route is required when "
+            "--target-mode=candidate454_residual"
+        )
+    if args.residual_orthogonality_weight < 0 or args.residual_stability_weight < 0:
+        parser.error("residual objective weights must be non-negative")
+    if not -1.0 <= args.residual_correlation_floor <= 1.0:
+        parser.error("--residual-correlation-floor must be within [-1, 1]")
     candidate_dim = len(
         candidate_ids_from_manifest(
             args.candidate_manifest,
@@ -341,6 +678,12 @@ def main() -> int:
                     / f"unified_temporal_{year}_{validation_half}_checkpoint.pt"
                 ),
                 reuse_checkpoint=args.reuse_checkpoints,
+                target_mode=args.target_mode,
+                residual_baseline_route=args.residual_baseline_route,
+                residual_baseline_manifest=args.residual_baseline_manifest,
+                residual_orthogonality_weight=args.residual_orthogonality_weight,
+                residual_stability_weight=args.residual_stability_weight,
+                residual_correlation_floor=args.residual_correlation_floor,
             )
             half_routes.append(factor)
             metrics.append(fold_metrics)

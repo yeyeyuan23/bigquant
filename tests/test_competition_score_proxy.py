@@ -84,6 +84,22 @@ class CompetitionScoreProxyTest(unittest.TestCase):
         self.assertGreater(increment["oos_rank_ic_increment"], 0)
         self.assertEqual(increment["score_years"], 1.0)
         self.assertGreater(increment["score_windows"], 0)
+        for component in (
+            "rank_ic_mean",
+            "rank_ic_ir",
+            "long_short_sharpe",
+            "stress_ic_ir",
+        ):
+            self.assertIn(f"baseline_a_{component}", increment)
+            self.assertIn(f"augmented_a_{component}", increment)
+            self.assertIn(f"delta_a_{component}", increment)
+            self.assertIn(f"baseline_a_{component}_percentile", increment)
+            self.assertIn(f"augmented_a_{component}_percentile", increment)
+            self.assertIn(f"delta_a_{component}_percentile", increment)
+        self.assertIn("baseline_b_mean_abs_weight", increment)
+        self.assertIn("augmented_b_mean_abs_weight", increment)
+        self.assertIn("baseline_b_std_abs_weight", increment)
+        self.assertIn("augmented_b_std_abs_weight", increment)
 
     def test_best_direction_flips_an_inverted_route_once(self):
         reference, labels, _, augmented = self._synthetic_frames()

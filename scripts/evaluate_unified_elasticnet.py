@@ -44,6 +44,36 @@ def rolling_blocks(
     )
 
 
+def continuous_rolling_blocks(
+    dates: pd.DatetimeIndex,
+    *,
+    train_days: int,
+    prediction_days: int,
+    label_gap_days: int = 1,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Build strict OOS blocks from the first in-sample warmup onward."""
+
+    if train_days <= 0 or prediction_days <= 0 or label_gap_days < 0:
+        raise ValueError("rolling block lengths must be valid")
+    first_prediction = train_days + label_gap_days
+    if first_prediction >= len(dates):
+        raise ValueError("not enough dates for continuous OOS prediction")
+    blocks: list[tuple[np.ndarray, np.ndarray]] = []
+    prediction_start = first_prediction
+    while prediction_start < len(dates):
+        train_stop = prediction_start - label_gap_days
+        train_start = train_stop - train_days
+        prediction_stop = min(prediction_start + prediction_days, len(dates))
+        blocks.append(
+            (
+                np.arange(train_start, train_stop, dtype=int),
+                np.arange(prediction_start, prediction_stop, dtype=int),
+            )
+        )
+        prediction_start = prediction_stop
+    return blocks
+
+
 def daily_cross_sectional_zscore(values: np.ndarray) -> np.ndarray:
     """Normalize each date/feature across stocks and neutral-fill missing values."""
 
@@ -113,6 +143,19 @@ def main() -> int:
     parser.add_argument("--alpha", type=float, default=0.001)
     parser.add_argument("--l1-ratio", type=float, default=0.5)
     parser.add_argument("--max-iter", type=int, default=20_000)
+    parser.add_argument(
+        "--continuous-oos",
+        action="store_true",
+        help=(
+            "start after an in-sample warmup inside the first requested year "
+            "instead of requiring a complete pre-evaluation year"
+        ),
+    )
+    parser.add_argument(
+        "--preserve-missing-oos",
+        action="store_true",
+        help="leave uncovered stock-days absent instead of neutral-filling them",
+    )
     args = parser.parse_args()
 
     candidate_count = len(
@@ -136,12 +179,20 @@ def main() -> int:
             f"manifest has {candidate_count}"
         )
 
-    blocks = rolling_blocks(
-        panel.dates,
-        tuple(args.years),
-        train_days=args.train_days,
-        prediction_days=args.prediction_days,
-    )
+    if args.continuous_oos:
+        blocks = continuous_rolling_blocks(
+            panel.dates,
+            train_days=args.train_days,
+            prediction_days=args.prediction_days,
+            label_gap_days=1,
+        )
+    else:
+        blocks = rolling_blocks(
+            panel.dates,
+            tuple(args.years),
+            train_days=args.train_days,
+            prediction_days=args.prediction_days,
+        )
     instruments = np.asarray(panel.instruments)
     route_rows: list[pd.DataFrame] = []
     metric_rows: list[dict[str, object]] = []
@@ -196,25 +247,27 @@ def main() -> int:
     route = route.loc[pd.to_datetime(route["date"]).dt.year.isin(args.years)]
     if route.duplicated(["date", "instrument"]).any():
         raise RuntimeError("Elastic Net OOS route contains duplicate keys")
-    expected_parts = []
-    for year in args.years:
-        expected = pd.read_parquet(
-            args.data_root / f"labels/year={year}/part-{year}.parquet",
-            columns=["date", "instrument"],
+    neutral_filled_rows = 0
+    if not args.continuous_oos and not args.preserve_missing_oos:
+        expected_parts = []
+        for year in args.years:
+            expected = pd.read_parquet(
+                args.data_root / f"labels/year={year}/part-{year}.parquet",
+                columns=["date", "instrument"],
+            )
+            expected["date"] = pd.to_datetime(expected["date"]).dt.normalize()
+            expected["instrument"] = expected["instrument"].astype(str)
+            expected_parts.append(expected)
+        expected = pd.concat(expected_parts, ignore_index=True).drop_duplicates()
+        route["instrument"] = route["instrument"].astype(str)
+        route = expected.merge(
+            route,
+            on=["date", "instrument"],
+            how="left",
+            validate="one_to_one",
         )
-        expected["date"] = pd.to_datetime(expected["date"]).dt.normalize()
-        expected["instrument"] = expected["instrument"].astype(str)
-        expected_parts.append(expected)
-    expected = pd.concat(expected_parts, ignore_index=True).drop_duplicates()
-    route["instrument"] = route["instrument"].astype(str)
-    route = expected.merge(
-        route,
-        on=["date", "instrument"],
-        how="left",
-        validate="one_to_one",
-    )
-    neutral_filled_rows = int(route["factor"].isna().sum())
-    route["factor"] = route["factor"].fillna(0.0)
+        neutral_filled_rows = int(route["factor"].isna().sum())
+        route["factor"] = route["factor"].fillna(0.0)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     route.sort_values(["date", "instrument"]).to_parquet(
         args.output_dir / "candidate454_elasticnet_full_oos.parquet",
@@ -235,6 +288,11 @@ def main() -> int:
                 "l1_ratio": args.l1_ratio,
                 "train_start_year": args.train_start_year,
                 "neutral_filled_rows": neutral_filled_rows,
+                "continuous_oos": args.continuous_oos,
+                "preserve_missing_oos": args.preserve_missing_oos,
+                "first_prediction_date": str(
+                    pd.to_datetime(route["date"]).min().date()
+                ),
             },
             indent=2,
         )

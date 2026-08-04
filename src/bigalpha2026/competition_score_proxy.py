@@ -751,7 +751,7 @@ def _model_scores(
 
 
 class CompetitionScoreReference:
-    """Fixed all36 base-proxy context shared by S, I and T."""
+    """Fixed reference-pool context shared by competition-score proxies."""
 
     def __init__(
         self,
@@ -1071,7 +1071,7 @@ class CompetitionScoreReference:
         return result
 
     def score(self, factor: pd.DataFrame) -> dict[str, float]:
-        """Score one submission-shaped route output against the all36 base."""
+        """Score one submission-shaped route against the fixed reference pool."""
 
         profile_stages = os.getenv("BIGALPHA_J_PROFILE_STAGES", "0") == "1"
         stage_start = time.perf_counter()
@@ -1344,7 +1344,7 @@ class CompetitionScoreReference:
             if missing_rows:
                 raise ValueError(
                     f"joint_route[{name}] is missing values on scorable "
-                    f"all36 stock-days: {missing_rows}"
+                    f"reference-pool stock-days: {missing_rows}"
                 )
             model_column = f"{ROUTE_COLUMN}_{index}"
             route_columns[name] = model_column
@@ -1489,6 +1489,13 @@ class CompetitionScoreReference:
             output[f"delta_{name}"] = float(
                 augmented_score[name] - baseline_score[name]
             )
+        for component in A_COMPONENT_COLUMNS:
+            for metric in (f"a_{component}", f"a_{component}_percentile"):
+                output[f"baseline_{metric}"] = float(baseline_score[metric])
+                output[f"augmented_{metric}"] = float(augmented_score[metric])
+                output[f"delta_{metric}"] = float(
+                    augmented_score[metric] - baseline_score[metric]
+                )
         output.update(
             {
                 "baseline_b_model_score": float(
@@ -1496,6 +1503,18 @@ class CompetitionScoreReference:
                 ),
                 "augmented_b_model_score": float(
                     augmented_score["b_model_score"]
+                ),
+                "baseline_b_mean_abs_weight": float(
+                    baseline_score["b_mean_abs_weight"]
+                ),
+                "augmented_b_mean_abs_weight": float(
+                    augmented_score["b_mean_abs_weight"]
+                ),
+                "baseline_b_std_abs_weight": float(
+                    baseline_score["b_std_abs_weight"]
+                ),
+                "augmented_b_std_abs_weight": float(
+                    augmented_score["b_std_abs_weight"]
                 ),
                 "baseline_b_nonzero_window_ratio": float(
                     baseline_score["b_nonzero_window_ratio"]
