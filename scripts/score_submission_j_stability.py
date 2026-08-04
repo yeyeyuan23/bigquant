@@ -1,7 +1,7 @@
 """Score submitted route factors with yearly J stability metrics.
 
-This script deliberately sits outside S/I/T admission.  It scores final route
-outputs only, caches every version/year score, and reports:
+This script scores final route outputs, caches every version/year score, and
+reports:
 
     J_mean, J_worst, J_std, J_stable = J_mean - lambda * J_std
 """
@@ -12,7 +12,6 @@ import argparse
 import hashlib
 import json
 import sys
-from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
@@ -31,15 +30,6 @@ from scripts.run_combinations import (
 
 KEY_COLUMNS = ("date", "instrument")
 DEFAULT_YEARS = EVALUATION_YEARS
-RULE_V03_MEMBERS = {
-    "FR": ("FR-002", "FR-005"),
-    "HF": ("HF-001", "HF-003"),
-    "PV": ("PV-010", "PV-011", "PV-014"),
-}
-PLATFORM_TOP_CACHE = (
-    "data/cache/tree_v2/frozen_predictions/"
-    "ab655115e92dce01a6bfbd311b6d5b72c9f2683582ea8a87266556b6992f89e8.parquet"
-)
 CANDIDATE454_STORE_CANDIDATES = (
     Path(
         "/root/autodl-tmp/candidate454_completion_full_2019_2024/"
@@ -63,15 +53,6 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def frame_sha256(frame: pd.DataFrame) -> str:
-    ordered = frame.loc[:, [*KEY_COLUMNS, "factor"]].sort_values(
-        list(KEY_COLUMNS),
-        kind="stable",
-    )
-    hashed = pd.util.hash_pandas_object(ordered, index=False).to_numpy()
-    return hashlib.sha256(hashed.tobytes()).hexdigest()
-
-
 def normalized_route(frame: pd.DataFrame) -> pd.DataFrame:
     missing = sorted({"date", "instrument", "factor"}.difference(frame.columns))
     if missing:
@@ -86,87 +67,12 @@ def normalized_route(frame: pd.DataFrame) -> pd.DataFrame:
     return route.sort_values(list(KEY_COLUMNS), kind="stable").reset_index(drop=True)
 
 
-def daily_rank(values: pd.Series, dates: pd.Series) -> pd.Series:
-    import polars as pl
-
-    work = pd.DataFrame(
-        {
-            "date": pd.to_datetime(dates, errors="coerce").dt.normalize(),
-            "value": pd.to_numeric(values, errors="coerce"),
-        }
-    )
-    ranked = (
-        pl.from_pandas(work)
-        .with_columns(
-            pl.col("date").cast(pl.Datetime("ns")),
-            pl.col("value").cast(pl.Float64, strict=False),
-        )
-        .with_columns(
-            (((pl.col("value").rank("average").over("date") / pl.col("value").count().over("date")) - 0.5) * 2.0).alias("factor")
-        )
-        .get_column("factor")
-        .to_numpy()
-    )
-    return pd.Series(ranked, index=values.index, dtype=float)
-
-
-def build_rule_v03_route(data_dir: Path, years: Iterable[int]) -> pd.DataFrame:
-    members = tuple(
-        candidate for family_members in RULE_V03_MEMBERS.values() for candidate in family_members
-    )
-    candidate_path = data_dir / "factors" / "candidate_pool.parquet"
-    candidate_pool = pd.read_parquet(
-        candidate_path,
-        filters=[
-            ("candidate_id", "in", list(members)),
-        ],
-        columns=["date", "instrument", "candidate_id", "factor"],
-    )
-    candidate_pool["date"] = pd.to_datetime(
-        candidate_pool["date"],
-        errors="coerce",
-    ).dt.normalize()
-    candidate_pool = candidate_pool.loc[
-        candidate_pool["date"].dt.year.isin(tuple(years))
-    ].copy()
-    import polars as pl
-
-    wide = (
-        pl.from_pandas(candidate_pool)
-        .with_columns(
-            pl.col("date").cast(pl.Datetime("ns")),
-            pl.col("instrument").cast(pl.Utf8),
-            pl.col("candidate_id").cast(pl.Utf8),
-            pl.col("factor").cast(pl.Float64, strict=False),
-        )
-        .pivot(
-            values="factor",
-            index=["date", "instrument"],
-            on="candidate_id",
-            aggregate_function="first",
-        )
-        .to_pandas()
-    )
-    missing = sorted(set(members).difference(wide.columns))
-    if missing:
-        raise ValueError(f"candidate_pool is missing rule_v03 members: {missing}")
-    family_scores = []
-    for family_members in RULE_V03_MEMBERS.values():
-        family_scores.append(wide.loc[:, list(family_members)].mean(axis=1))
-    raw = pd.concat(family_scores, axis=1).mean(axis=1)
-    wide["factor"] = daily_rank(raw, wide["date"])
-    return normalized_route(wide[["date", "instrument", "factor"]])
-
-
-def load_route(version: str, data_dir: Path, years: tuple[int, ...]) -> tuple[pd.DataFrame, str]:
-    if version == "rule_v03":
-        route = build_rule_v03_route(data_dir, years)
-        return route, f"candidate_pool:{frame_sha256(route)}"
-    if version == "lgbm_platform_top_v01":
-        source = Path(PLATFORM_TOP_CACHE)
-        route = normalized_route(pd.read_parquet(source))
-        route = route.loc[route["date"].dt.year.isin(years)].reset_index(drop=True)
-        return route, f"{source}:{file_sha256(source)}"
+def load_route(
+    version: str,
+    data_dir: Path,
+    years: tuple[int, ...],
+) -> tuple[pd.DataFrame, str]:
+    del data_dir
     path = Path(version)
     route = normalized_route(pd.read_parquet(path))
     route = route.loc[route["date"].dt.year.isin(years)].reset_index(drop=True)
@@ -382,7 +288,7 @@ def summarize(version: str, rows: list[dict[str, object]], lambda_std: float) ->
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("versions", nargs="+", help="rule_v03, lgbm_platform_top_v01, or parquet paths")
+    parser.add_argument("versions", nargs="+", help="route parquet paths")
     parser.add_argument("--years", nargs="+", type=int, default=list(DEFAULT_YEARS))
     parser.add_argument("--lambda-std", type=float, default=0.5)
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
