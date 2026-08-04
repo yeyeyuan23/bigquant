@@ -1,9 +1,10 @@
-"""Run BigAlpha's full-window versus cutoff-window look-ahead probe.
+"""Run BigAlpha look-ahead probes inside AIStudio.
 
-This script is intended to run inside AIStudio, next to a self-contained
-submission source file.  It calls the submission's ``main`` twice with only
-``end_date`` changed, then requires all factor values through the cutoff to
-match within floating-point tolerance.
+The default mode calls the submission's ``main`` twice with only ``end_date``
+changed.  The physical-table mode mirrors BigAlpha's official self-check more
+closely: it keeps ``start_date`` and ``end_date`` identical while swapping the
+full bar1m table for a physically truncated bar1m table.  In both modes all
+factor values through the cutoff must match within floating-point tolerance.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -25,6 +27,10 @@ def load_submission(path: Path):
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load submission source: {path}")
     module = importlib.util.module_from_spec(spec)
+    # dataclasses resolves postponed annotations through sys.modules while the
+    # module body is executing.  Register first, matching Python's normal
+    # import machinery, or @dataclass fails under Python 3.11.
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     if not hasattr(module, "main"):
         raise AttributeError(f"submission has no main(): {path}")
@@ -200,11 +206,20 @@ def compare_prefixes(
             "_merge",
         ],
     ].copy()
+    finite_pairs = both_finite & merged["_merge"].eq("both").to_numpy()
+    max_abs_diff = (
+        float(np.max(np.abs(full_values[finite_pairs] - cut_values[finite_pairs])))
+        if finite_pairs.any()
+        else 0.0
+    )
+    prefix_invariant = bool(differences.empty)
     return {
-        "status": "ok" if differences.empty else "lookahead_suspected",
+        "status": "ok" if prefix_invariant else "lookahead_suspected",
         "cutoff": cutoff.strftime("%Y-%m-%d"),
         "compared_rows": len(merged),
         "difference_rows": len(differences),
+        "max_abs_diff": max_abs_diff,
+        "prefix_invariant": prefix_invariant,
         "first_difference_date": (
             None
             if differences.empty
@@ -231,31 +246,56 @@ def main() -> int:
     parser.add_argument(
         "--bar1m",
         default="bigalpha_2026_stock_bar1m",
+        help="full/untruncated bar1m table",
+    )
+    parser.add_argument(
+        "--cut-bar1m",
+        default=None,
+        help=(
+            "physically truncated bar1m table; when supplied, both main() calls "
+            "use the same start_date/end_date"
+        ),
     )
     parser.add_argument(
         "--financial",
         default="bigalpha_2026_financial",
     )
+    parser.add_argument(
+        "--cut-financial",
+        default=None,
+        help="optional physically truncated financial table",
+    )
     args = parser.parse_args()
     cutoffs = tuple(pd.Timestamp(value).normalize() for value in args.cutoff)
+    start = pd.Timestamp(args.start).normalize()
+    end = pd.Timestamp(args.end).normalize()
+    physical_table_cutoff = args.cut_bar1m is not None
     if len(set(cutoffs)) != len(cutoffs):
         raise ValueError("cutoffs must be unique")
-    if any(
-        not pd.Timestamp(args.start) <= cutoff < pd.Timestamp(args.end)
-        for cutoff in cutoffs
-    ):
+    if physical_table_cutoff:
+        if len(cutoffs) != 1 or cutoffs[0] != end:
+            raise ValueError(
+                "physical-table mode requires exactly one cutoff equal to end"
+            )
+    elif any(not start <= cutoff < end for cutoff in cutoffs):
         raise ValueError("require start <= every cutoff < end")
 
     submission = load_submission(args.submission)
-    start = pd.Timestamp(args.start).normalize()
-    end = pd.Timestamp(args.end).normalize()
     expected_universe = load_expected_universe(start, end)
-    datasources = {
+    full_datasources = {
         "bar1m": args.bar1m,
         "financial": args.financial,
     }
+    cut_datasources = (
+        {
+            "bar1m": args.cut_bar1m,
+            "financial": args.cut_financial or args.financial,
+        }
+        if physical_table_cutoff
+        else full_datasources
+    )
     started = time.perf_counter()
-    full = submission.main(datasources, args.start, args.end)
+    full = submission.main(full_datasources, args.start, args.end)
     full_seconds = time.perf_counter() - started
     full_contract = validate_output_contract(
         full,
@@ -266,10 +306,11 @@ def main() -> int:
     cutoff_results = []
     for cutoff in cutoffs:
         started = time.perf_counter()
+        cut_end = args.end if physical_table_cutoff else cutoff.strftime("%Y-%m-%d")
         cut = submission.main(
-            datasources,
+            cut_datasources,
             args.start,
-            cutoff.strftime("%Y-%m-%d"),
+            cut_end,
         )
         cut_seconds = time.perf_counter() - started
         result = compare_prefixes(full, cut, cutoff)
@@ -277,7 +318,7 @@ def main() -> int:
             cut,
             expected_universe,
             start,
-            cutoff,
+            end if physical_table_cutoff else cutoff,
         )
         result["cut_seconds"] = round(cut_seconds, 3)
         cutoff_results.append(result)
@@ -289,6 +330,13 @@ def main() -> int:
         )
     )
     summary = {
+        "mode": (
+            "physical_table_cutoff"
+            if physical_table_cutoff
+            else "end_date_prefix"
+        ),
+        "full_datasources": full_datasources,
+        "cut_datasources": cut_datasources,
         "status": (
             "invalid_output_contract"
             if invalid_contract

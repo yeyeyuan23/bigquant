@@ -133,6 +133,39 @@ def test_candidate_temporal_handles_missing_values() -> None:
     assert scores[0, 3] == 0
 
 
+def test_candidate_temporal_excludes_stock_without_any_history() -> None:
+    torch.manual_seed(11)
+    network = CandidateTemporalNetwork(small_config()).eval()
+    values = torch.randn(1, 3, 8, 6)
+    observed = torch.ones_like(values, dtype=torch.bool)
+    values[:, 2] = float("nan")
+    observed[:, 2] = False
+
+    listed_stocks = torch.ones(1, 3, dtype=torch.bool)
+    padded_stocks = torch.tensor([[True, True, False]])
+    listed_scores = network(values, observed, listed_stocks)
+    padded_scores = network(values, observed, padded_stocks)
+
+    assert torch.isfinite(listed_scores).all()
+    assert listed_scores[0, 2] == 0
+    torch.testing.assert_close(listed_scores[:, :2], padded_scores[:, :2])
+
+
+def test_candidate_temporal_handles_leading_missing_history() -> None:
+    torch.manual_seed(12)
+    network = CandidateTemporalNetwork(small_config()).eval()
+    values = torch.randn(1, 3, 8, 6)
+    observed = torch.ones_like(values, dtype=torch.bool)
+    values[:, 1, :4] = float("nan")
+    observed[:, 1, :4] = False
+    values[:, 2, :7] = float("nan")
+    observed[:, 2, :7] = False
+
+    scores = network(values, observed, torch.ones(1, 3, dtype=torch.bool))
+
+    assert torch.isfinite(scores).all()
+
+
 def test_candidate_mlp_masks_missing_and_padding() -> None:
     network = CandidateMLPNetwork(
         CandidateMLPConfig(

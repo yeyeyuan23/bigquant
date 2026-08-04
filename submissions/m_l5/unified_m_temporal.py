@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 """Causal temporal model over the Candidate454 factor panel.
 
 Inputs are daily candidate-factor histories shaped
@@ -15,7 +16,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from .base import AlphaModel, register_model
+from unified_m_base import AlphaModel, register_model
 
 
 @dataclass(frozen=True)

@@ -25,9 +25,8 @@ from bigalpha2026.competition_score_proxy import CompetitionScoreReference
 from scripts.run_combinations import (
     DEVELOPMENT_YEARS,
     EVALUATION_YEARS,
-    j_baseline_columns_from_self_columns,
     load_dynamic_inputs,
-    prepare_experiment_context,
+    orient_j_reference,
 )
 
 KEY_COLUMNS = ("date", "instrument")
@@ -41,6 +40,19 @@ PLATFORM_TOP_CACHE = (
     "data/cache/tree_v2/frozen_predictions/"
     "ab655115e92dce01a6bfbd311b6d5b72c9f2683582ea8a87266556b6992f89e8.parquet"
 )
+CANDIDATE454_STORE_CANDIDATES = (
+    Path(
+        "/root/autodl-tmp/candidate454_completion_full_2019_2024/"
+        "candidate454_store"
+    ),
+    Path(
+        "/root/autodl-tmp/candidate462_completion_full_2019_2024/"
+        "candidate454_store"
+    ),
+)
+CANDIDATE454_MANIFEST = "candidate454_manifest.json"
+CANDIDATE454_EXPECTED_COUNT = 454
+SCORING_PROTOCOL = "candidate454_individual_submission_J_stability_v3"
 
 
 def file_sha256(path: Path) -> str:
@@ -161,10 +173,96 @@ def load_route(version: str, data_dir: Path, years: tuple[int, ...]) -> tuple[pd
     return route, f"{path}:{file_sha256(path)}"
 
 
+def resolve_candidate454_store(candidate454_store: Path | None = None) -> Path:
+    candidates = (
+        (candidate454_store,)
+        if candidate454_store is not None
+        else CANDIDATE454_STORE_CANDIDATES
+    )
+    for candidate in candidates:
+        assert candidate is not None
+        if (candidate / CANDIDATE454_MANIFEST).is_file():
+            return candidate
+    rendered = ", ".join(str(path) for path in candidates)
+    raise FileNotFoundError(
+        "Candidate454 feature store was not found; checked: " + rendered
+    )
+
+
+def load_candidate454_reference_panel(
+    candidate454_store: Path,
+    years: tuple[int, ...],
+) -> tuple[pd.DataFrame, tuple[str, ...], dict[str, object]]:
+    manifest_path = candidate454_store / CANDIDATE454_MANIFEST
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    candidate_ids = tuple(map(str, manifest.get("candidate_ids", ())))
+    declared_count = int(manifest.get("candidate_count", -1))
+    if declared_count != CANDIDATE454_EXPECTED_COUNT:
+        raise ValueError(
+            "Candidate454 manifest count changed: "
+            f"{declared_count} != {CANDIDATE454_EXPECTED_COUNT}"
+        )
+    if len(candidate_ids) != declared_count:
+        raise ValueError(
+            "Candidate454 manifest candidate_ids length does not match "
+            f"candidate_count: {len(candidate_ids)} != {declared_count}"
+        )
+    if len(set(candidate_ids)) != len(candidate_ids):
+        raise ValueError("Candidate454 manifest candidate_ids are not unique")
+
+    frames = []
+    for year in years:
+        feature_path = (
+            candidate454_store
+            / "features"
+            / f"year={year}"
+            / f"part-{year}.parquet"
+        )
+        if not feature_path.is_file():
+            raise FileNotFoundError(
+                f"Candidate454 feature partition is missing: {feature_path}"
+            )
+        frame = pd.read_parquet(
+            feature_path,
+            columns=[*KEY_COLUMNS, *candidate_ids],
+        )
+        frame["date"] = pd.to_datetime(
+            frame["date"], errors="coerce"
+        ).dt.normalize()
+        frame["instrument"] = frame["instrument"].astype(str)
+        frames.append(frame)
+    panel = pd.concat(frames, ignore_index=True)
+    panel = panel.dropna(subset=list(KEY_COLUMNS))
+    if panel.duplicated(list(KEY_COLUMNS)).any():
+        raise ValueError("Candidate454 reference contains duplicate keys")
+    reference_columns = tuple(
+        f"candidate454__{candidate_id}" for candidate_id in candidate_ids
+    )
+    panel = panel.rename(
+        columns=dict(zip(candidate_ids, reference_columns, strict=True))
+    )
+    panel = panel.sort_values(list(KEY_COLUMNS), kind="stable").reset_index(
+        drop=True
+    )
+    metadata = {
+        "store": str(candidate454_store),
+        "manifest": str(manifest_path),
+        "manifest_sha256": file_sha256(manifest_path),
+        "candidate_count": declared_count,
+        "years": list(years),
+        "rows": len(panel),
+        "date_min": str(panel["date"].min().date()),
+        "date_max": str(panel["date"].max().date()),
+    }
+    return panel, reference_columns, metadata
+
+
 def load_score_reference(
     data_dir: Path,
     reports_dir: Path,
     years: tuple[int, ...],
+    *,
+    candidate454_store: Path | None = None,
 ) -> CompetitionScoreReference:
     candidate_manifest = json.loads(
         (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
@@ -174,55 +272,73 @@ def load_score_reference(
     )
     if not candidate_ids:
         raise ValueError("candidate manifest contains no candidates")
-    # The local J reference pool is distinct from the Candidate454 Elastic Net
-    # baseline route. The shared dynamic loader
-    # requires at least one candidate column to construct its feature panel.
+    # The dynamic loader is retained only for labels/exposures. The J reference
+    # itself comes from the complete Candidate454 wide store below.
     loader_filter = (f"self__{candidate_ids[0]}",)
     context_years = tuple(dict.fromkeys((*DEVELOPMENT_YEARS, *years)))
     (
-        panel,
+        _panel,
         labels,
         exposures,
         _coverage,
         _candidate_pool,
-        all36_reference,
-        single_factor_admitted,
+        _all36_reference,
+        _single_factor_admitted,
     ) = load_dynamic_inputs(
         data_dir,
         reports_dir,
         candidate_filter=loader_filter,
         years=context_years,
     )
-    public_columns = tuple(column for column in panel.columns if column.startswith("factorlib__"))
-    self_columns = tuple(column for column in panel.columns if column.startswith("self__"))
-    j_baseline_columns = j_baseline_columns_from_self_columns(self_columns)
-    return prepare_experiment_context(
-        panel,
+    store = resolve_candidate454_store(candidate454_store)
+    reference_panel, reference_columns, metadata = (
+        load_candidate454_reference_panel(store, context_years)
+    )
+    oriented_reference, directions = orient_j_reference(
+        reference_panel,
         labels,
-        exposures,
-        all36_reference,
-        public_columns,
-        self_columns,
-        j_baseline_columns,
-        single_factor_admitted,
-    )[4]
+        reference_columns,
+    )
+    evaluation_mask = oriented_reference["date"].dt.year.isin(years)
+    score_reference = CompetitionScoreReference(
+        oriented_reference.loc[evaluation_mask].reset_index(drop=True),
+        labels.loc[labels["date"].dt.year.isin(years)].reset_index(drop=True),
+        exposures.loc[
+            exposures["date"].dt.year.isin(years)
+        ].reset_index(drop=True),
+        reference_columns,
+    )
+    score_reference.candidate454_metadata = {
+        **metadata,
+        "direction_calibration_years": list(DEVELOPMENT_YEARS),
+        "positive_direction_count": int(
+            directions["frozen_direction"].gt(0).sum()
+        ),
+        "negative_direction_count": int(
+            directions["frozen_direction"].lt(0).sum()
+        ),
+    }
+    return score_reference
 
 
-def score_year(
+def score_individual_year(
     *,
-    version: str,
     year: int,
+    version: str,
     route: pd.DataFrame,
     route_source_digest: str,
     score_reference: CompetitionScoreReference,
     cache_dir: Path,
 ) -> dict[str, object]:
     payload = {
-        "version": version,
+        "protocol": SCORING_PROTOCOL,
         "year": year,
+        "version": version,
         "route_source_digest": route_source_digest,
         "score_reference_digest": score_reference.reference_data_digest,
-        "scoring": "positive_direction_only_current_J",
+        "reference_factor_count": len(score_reference.reference_columns),
+        "candidate_route_count": 1,
+        "scoring": "frozen_direction_candidate454_plus_one_route",
     }
     key = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     cache_path = cache_dir / f"{key}.json"
@@ -232,7 +348,7 @@ def score_year(
         return cached
     year_route = route.loc[route["date"].dt.year.eq(year)].copy()
     if year_route.empty:
-        raise ValueError(f"{version} has no route rows for {year}")
+        raise ValueError(f"route {version} has no rows for {year}")
     score = score_reference.score(year_route)
     result = {
         **payload,
@@ -272,6 +388,12 @@ def main() -> int:
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--reports-dir", type=Path, default=Path("reports"))
     parser.add_argument(
+        "--candidate454-store",
+        type=Path,
+        default=None,
+        help="Candidate454 wide feature-store root",
+    )
+    parser.add_argument(
         "--cache-dir",
         type=Path,
         default=Path("data/cache/submission_j_stability"),
@@ -291,25 +413,52 @@ def main() -> int:
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     years = tuple(args.years)
-    score_reference = load_score_reference(args.data_dir, args.reports_dir, years)
-    summaries = []
+    score_reference = load_score_reference(
+        args.data_dir,
+        args.reports_dir,
+        years,
+        candidate454_store=args.candidate454_store,
+    )
+    routes: dict[str, pd.DataFrame] = {}
+    route_source_digests: dict[str, str] = {}
     for version in args.versions:
         route, route_source_digest = load_route(version, args.data_dir, years)
-        rows = [
-            score_year(
-                version=version,
+        routes[version] = route
+        route_source_digests[version] = route_source_digest
+    individual_years = {
+        version: [
+            score_individual_year(
                 year=year,
-                route=route,
-                route_source_digest=route_source_digest,
+                version=version,
+                route=routes[version],
+                route_source_digest=route_source_digests[version],
                 score_reference=score_reference,
                 cache_dir=args.cache_dir,
             )
             for year in years
         ]
-        summaries.append(summarize(version, rows, args.lambda_std))
+        for version in args.versions
+    }
+    summaries = [
+        summarize(
+            version,
+            individual_years[version],
+            args.lambda_std,
+        )
+        for version in args.versions
+    ]
     output = {
-        "protocol": "yearly_submission_J_stability_v1",
-        "note": "J is the local A/B proxy, not official platform score.",
+        "protocol": SCORING_PROTOCOL,
+        "note": (
+            "J is the local A/B proxy, not official platform score. "
+            "Every route is scored in a separate yearly Elastic Net fit on "
+            "Candidate454 plus exactly that one route. Routes never compete "
+            "with sibling M versions inside the same fit."
+        ),
+        "reference": score_reference.candidate454_metadata,
+        "reference_factor_count": len(score_reference.reference_columns),
+        "scoring_mode": "individual_candidate454_elastic_net",
+        "route_count": len(routes),
         "summaries": summaries,
     }
     args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
@@ -333,6 +482,22 @@ def main() -> int:
                 },
                 **{
                     f"B_{row['year']}": row["B"]
+                    for row in summary["year_scores"]
+                },
+                **{
+                    f"B_model_score_{row['year']}": row["score"]["b_model_score"]
+                    for row in summary["year_scores"]
+                },
+                **{
+                    f"B_mean_abs_weight_{row['year']}": row["score"]["b_mean_abs_weight"]
+                    for row in summary["year_scores"]
+                },
+                **{
+                    f"B_std_abs_weight_{row['year']}": row["score"]["b_std_abs_weight"]
+                    for row in summary["year_scores"]
+                },
+                **{
+                    f"B_nonzero_window_ratio_{row['year']}": row["score"]["b_nonzero_window_ratio"]
                     for row in summary["year_scores"]
                 },
             }
