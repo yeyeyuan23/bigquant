@@ -1,0 +1,18 @@
+{
+  "model": "elastic_net",
+  "role": "candidate454_full_pool_oos_baseline",
+  "feature_bundle": "candidate454",
+  "candidate_feature_count": 454,
+  "training_protocol": "60d_train_20d_predict",
+  "label_isolation_gap_days": 1,
+  "years": [
+    2020
+  ],
+  "alpha": 0.001,
+  "l1_ratio": 0.5,
+  "train_start_year": 2019,
+  "neutral_filled_rows": 0,
+  "continuous_oos": false,
+  "preserve_missing_oos": true,
+  "first_prediction_date": "2020-01-02"
+}

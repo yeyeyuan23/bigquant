@@ -1,0 +1,34 @@
+{
+  "route": "M_raw",
+  "model": "unified_microstructure",
+  "training_commit": "d722e6f09dea57ef9b9c3f43555120dc03c45330",
+  "training_tree_dirty": true,
+  "training_protocol": "expanding_history_2019_2024_e3",
+  "checkpoint_sha256": "252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb",
+  "checkpoint_block": 25,
+  "checkpoint_training_window": [
+    "2019-01-02",
+    "2024-12-26"
+  ],
+  "input_schema": {
+    "profile": "canonical",
+    "max_minutes": 242,
+    "channels": 17,
+    "book_levels": [
+      1,
+      2,
+      3
+    ]
+  },
+  "allowed_sources": [
+    "bar1m",
+    "stock_pool"
+  ],
+  "stock_pool_table": "bigalpha_2026_instruments",
+  "source_sha256": {
+    "frozen_alpha.base": "a43aac57cc295e602ae61ae31830ec7d3728aba5158f11d3265414e233b6bcf9",
+    "frozen_alpha.temporal": "8439caae0d98e3f8c825f75756d6468e65c7ccf19cfc11ece4826c52afc8715a",
+    "frozen_alpha.microstructure": "a32ae781b4021cecc31da4c2ea1236defb4d26bdd9071bc13eb71ccc35f9fcc8"
+  },
+  "evidence_boundary": "Frozen checkpoint and static validation only; AIStudio execution, prefix evidence, and platform score remain separate."
+}

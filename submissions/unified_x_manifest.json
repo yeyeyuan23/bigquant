@@ -1,0 +1,50 @@
+{
+  "allowed_data_sources": [
+    "bar1m",
+    "financial",
+    "stock_pool_keys"
+  ],
+  "entrypoint": "unified_x.py",
+  "files": [
+    {
+      "bytes": 39529,
+      "name": "unified_x.py",
+      "role": "entrypoint",
+      "sha256": "d576fb141f33ba43b93373ec0f9ce8dc81330cbf5b188a34a70e14267b70eea0"
+    },
+    {
+      "bytes": 950,
+      "name": "unified_x.ipynb",
+      "role": "notebook",
+      "sha256": "d3ca8306ed72cdd7a0436d6303092736891abaab640c7aa809c97d0610bccae3"
+    },
+    {
+      "bytes": 8591026,
+      "name": "unified_x_weights.py",
+      "role": "dependency",
+      "sha256": "f86eb3591058284a21214ecc5f4f17aae10b5fbdd35f53ad5a39480e2a576235"
+    },
+    {
+      "bytes": 169738,
+      "name": "unified_candidate454_direct.py",
+      "role": "dependency",
+      "sha256": "1b6448fd936c507b8ac39fe7baaceadc2b64a84b4efd4a2dbe8d821251574f05"
+    },
+    {
+      "bytes": 106296,
+      "name": "unified_candidate454_components.py",
+      "role": "dependency",
+      "sha256": "b3f8a5cfb7c1c17e57706e366721b710addc30b0d14cfa3128726213bf972a2e"
+    },
+    {
+      "bytes": 209962,
+      "name": "unified_candidate454_gtja.py",
+      "role": "dependency",
+      "sha256": "ac977d4bf6f5fdd028371f14d7ea99d0787193cdc4fb5e697cad57fab555a01a"
+    }
+  ],
+  "history_calendar_days": 183,
+  "notebook": "unified_x.ipynb",
+  "notebook_code": "from unified_x import main\n",
+  "schema_version": 1
+}

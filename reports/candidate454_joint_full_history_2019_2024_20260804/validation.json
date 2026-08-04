@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "protocol": "candidate454_joint_v2_frozen_full_history_in_sample_inclusive_v1",
+  "includes_checkpoint_training_period": true,
+  "strict_oos": false,
+  "official_platform_score": false,
+  "route_count": 10,
+  "score_days": 1394,
+  "joint_common_rows": 1391994,
+  "score_weight_windows": 67,
+  "max_abs_j_formula_error": 1.1102230246251565e-16,
+  "j_formula": "J = 0.3 * A + 0.7 * B",
+  "j_stable_present": false,
+  "required_detail_fields_present": true,
+  "exposure_profile": "reduced_available_style_proxy",
+  "exposure_panel_sha256": "2cd890e0f2dfba0c9242728cb55b10d63b31c61801cb31b469317fd10aac2788",
+  "artifact_sha256": {
+    "joint_official_proxy_ab_details.csv": "ba37e9e3107bd497ea7872d118e108838d130ee022102981137cf442d0d11a2f",
+    "joint_official_proxy_summary.csv": "10809d2dab486f72c5f8ae1a9136821b65be02ff22dc01723e8bc27601de9a95",
+    "joint_official_proxy_detailed.json": "bcedc435aabcf353a93136eb9a7b9c17a1fbb33331dc09a633480e274037999c",
+    "routes_manifest.json": "89695d0f1d9a649c6352fd8dc6acf5cb472da5c11862c2efea3682deb9dc8deb",
+    "scripts/run_candidate454_joint_v2_recalc.py": "4d7a7cf8e7143afaf8865be6e64ca3f0b98eb31a0127505a74a17e3bcd1196f4",
+    "scripts/replay_frozen_candidate454_models.py": "82178656b61b5792e47855ebdd19fd2fa9e199528126b3d2581638a03671528d"
+  }
+}

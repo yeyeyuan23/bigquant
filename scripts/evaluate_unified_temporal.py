@@ -531,6 +531,7 @@ def evaluate_fold(
         "attention_heads": config.attention_heads,
         "feedforward_dim": config.feedforward_dim,
         "kernels": list(config.kernels),
+        "history_mode": config.history_mode,
         "dropout": config.dropout,
         "epochs": epochs,
         "train_stride": stride,
@@ -601,6 +602,11 @@ def main() -> int:
     parser.add_argument("--attention-heads", type=int, default=8)
     parser.add_argument("--feedforward-dim", type=int, default=256)
     parser.add_argument("--kernels", nargs="+", type=int, default=[3, 5, 15])
+    parser.add_argument(
+        "--history-mode",
+        choices=("dense", "stride2", "multiscale"),
+        default="dense",
+    )
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--learning-rate", type=float, default=5e-4)
     parser.add_argument("--max-stocks", type=int, default=512)
@@ -652,6 +658,7 @@ def main() -> int:
         attention_heads=args.attention_heads,
         feedforward_dim=args.feedforward_dim,
         kernels=tuple(args.kernels),
+        history_mode=args.history_mode,
         dropout=args.dropout,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)

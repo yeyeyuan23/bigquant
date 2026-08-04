@@ -1,0 +1,7 @@
+py_compile=passed
+checkpoint_decode=passed
+synthetic_inference=passed
+notebook_source_consistency=passed
+aistudio_output_contract=pending
+aistudio_prefix=pending
+platform_score=pending

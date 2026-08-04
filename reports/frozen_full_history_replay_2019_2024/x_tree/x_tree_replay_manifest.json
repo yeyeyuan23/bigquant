@@ -1,0 +1,23 @@
+{
+  "route": "x_tree",
+  "files": [
+    "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2019.parquet",
+    "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2020.parquet",
+    "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2021.parquet",
+    "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2022.parquet",
+    "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2023.parquet",
+    "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2024.parquet"
+  ],
+  "protocol": "frozen_checkpoint_full_history_inference_v1",
+  "training_performed": false,
+  "includes_checkpoint_training_period": true,
+  "candidate454_manifest": "/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/candidate454_manifest.json",
+  "years_requested": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ]
+}

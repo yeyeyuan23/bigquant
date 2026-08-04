@@ -1,8 +1,14 @@
-"""Strict 60-day/20-day rolling OOS trainer for the raw-minute M expert."""
+"""Strict causal OOS trainer for the raw-minute M expert.
+
+Expanding history is the default. A fixed rolling window remains available
+only as an explicit ablation so the final M checkpoint cannot accidentally be
+trained on just the most recent 60 trading days.
+"""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from contextlib import nullcontext
@@ -104,6 +110,33 @@ def prepare_label_panel(
     return dates, targets
 
 
+def apply_training_history(
+    blocks: list[tuple[np.ndarray, np.ndarray]],
+    *,
+    mode: str,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Apply the requested causal history policy to pre-built OOS blocks."""
+
+    if mode == "rolling":
+        return blocks
+    if mode != "expanding":
+        raise ValueError(f"unsupported training history mode: {mode}")
+
+    expanded: list[tuple[np.ndarray, np.ndarray]] = []
+    for _, prediction in blocks:
+        if prediction.size == 0:
+            raise ValueError("prediction block cannot be empty")
+        first_prediction = int(prediction[0])
+        # The label on first_prediction - 1 contains the first prediction
+        # day's return, so stop one full trading date earlier.
+        train_stop = first_prediction - 1
+        training = np.arange(0, train_stop, dtype=int)
+        if training.size == 0 or int(training[-1]) >= first_prediction - 1:
+            raise RuntimeError("expanding block violated the label-isolation contract")
+        expanded.append((training, prediction))
+    return expanded
+
+
 def _device_context(device: torch.device):
     if device.type == "cuda":
         return torch.amp.autocast("cuda", dtype=torch.float16)
@@ -117,6 +150,14 @@ def _tensor_inputs(batch, stock_selection: np.ndarray, device: torch.device):
         torch.from_numpy(batch.minute_mask[:, stock_selection]).to(device),
         torch.from_numpy(batch.stock_mask[:, stock_selection]).to(device),
     )
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def fit_predict_block(
@@ -133,56 +174,74 @@ def fit_predict_block(
     min_train_days: int,
     device: torch.device,
     seed: int,
+    checkpoint_path: Path,
+    reuse_checkpoint: bool,
 ) -> tuple[list[pd.DataFrame], dict[str, object]]:
     torch.manual_seed(seed)
     if device.type == "cuda":
         torch.cuda.manual_seed_all(seed)
     adapter = ModelFactory.create("unified_microstructure", asdict(config))
-    model = adapter.network.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-    scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
     rng = np.random.default_rng(seed)
-    available_train_days: set[pd.Timestamp] = set()
     epoch_losses: list[float] = []
-    model.train()
-    for epoch in range(epochs):
-        shuffled = training.copy()
-        rng.shuffle(shuffled)
-        losses: list[float] = []
-        for day_index in shuffled:
-            day = dates[int(day_index)]
-            day_target = targets[day].dropna()
-            if len(day_target) > max_stocks:
-                selected = rng.choice(len(day_target), max_stocks, replace=False)
-                day_target = day_target.iloc[np.sort(selected)]
-            instruments = tuple(day_target.index.astype(str))
-            batch = load_microstructure_day(
-                store,
-                day,
-                instruments,
-                max_minutes=config.max_minutes,
-            )
-            if batch is None:
-                continue
-            available = np.flatnonzero(batch.stock_mask[0])
-            if len(available) < 2:
-                continue
-            available_train_days.add(day)
-            target = torch.from_numpy(day_target.to_numpy(np.float32)[available]).to(device)
-            optimizer.zero_grad(set_to_none=True)
-            with _device_context(device):
-                prediction = model(*_tensor_inputs(batch, available, device)).squeeze(0)
-                loss = correlation_loss(prediction.float(), target)
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            scaler.step(optimizer)
-            scaler.update()
-            losses.append(float(loss.detach()))
-        if not losses:
-            raise RuntimeError("microstructure training block contains no usable days")
-        epoch_losses.append(float(np.mean(losses)))
-        print(f"epoch={epoch + 1} loss={epoch_losses[-1]:.6f}", flush=True)
+    checkpoint_reused = reuse_checkpoint and checkpoint_path.is_file()
+    if checkpoint_reused:
+        adapter = type(adapter).load(checkpoint_path, map_location=device)
+        model = adapter.network.to(device)
+        available_train_days = {
+            dates[int(day_index)]
+            for day_index in training
+            if (store / "data" / f"trade_date={dates[int(day_index)].date()}").is_dir()
+        }
+        print(f"checkpoint=reused path={checkpoint_path}", flush=True)
+    else:
+        model = adapter.network.to(device)
+        optimizer = torch.optim.AdamW(
+            model.parameters(), learning_rate, weight_decay=1e-4
+        )
+        scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
+        available_train_days: set[pd.Timestamp] = set()
+        model.train()
+        for epoch in range(epochs):
+            shuffled = training.copy()
+            rng.shuffle(shuffled)
+            losses: list[float] = []
+            for day_index in shuffled:
+                day = dates[int(day_index)]
+                day_target = targets[day].dropna()
+                if len(day_target) > max_stocks:
+                    selected = rng.choice(len(day_target), max_stocks, replace=False)
+                    day_target = day_target.iloc[np.sort(selected)]
+                instruments = tuple(day_target.index.astype(str))
+                batch = load_microstructure_day(
+                    store,
+                    day,
+                    instruments,
+                    max_minutes=config.max_minutes,
+                )
+                if batch is None:
+                    continue
+                available = np.flatnonzero(batch.stock_mask[0])
+                if len(available) < 2:
+                    continue
+                available_train_days.add(day)
+                target = torch.from_numpy(day_target.to_numpy(np.float32)[available]).to(device)
+                optimizer.zero_grad(set_to_none=True)
+                with _device_context(device):
+                    prediction = model(*_tensor_inputs(batch, available, device)).squeeze(0)
+                    loss = correlation_loss(prediction.float(), target)
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                scaler.step(optimizer)
+                scaler.update()
+                losses.append(float(loss.detach()))
+            if not losses:
+                raise RuntimeError("microstructure training block contains no usable days")
+            epoch_losses.append(float(np.mean(losses)))
+            print(f"epoch={epoch + 1} loss={epoch_losses[-1]:.6f}", flush=True)
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        adapter.save(checkpoint_path)
+        print(f"checkpoint=saved path={checkpoint_path}", flush=True)
     if len(available_train_days) < min_train_days:
         raise RuntimeError(
             f"microstructure block has only {len(available_train_days)} usable train days; "
@@ -242,6 +301,9 @@ def fit_predict_block(
         "rank_ic_mean": float(np.nanmean(daily_ic)) if daily_ic else None,
         "epoch_losses": epoch_losses,
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
+        "checkpoint": str(checkpoint_path),
+        "checkpoint_sha256": sha256(checkpoint_path),
+        "checkpoint_reused": checkpoint_reused,
     }
     return rows, diagnostics
 
@@ -255,6 +317,15 @@ def main() -> int:
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--train-days", type=int, default=60)
     parser.add_argument("--prediction-days", type=int, default=20)
+    parser.add_argument(
+        "--training-mode",
+        choices=("expanding", "rolling"),
+        default="expanding",
+        help=(
+            "Use all causally available history by default. Select rolling only "
+            "for an explicit fixed-window ablation controlled by --train-days."
+        ),
+    )
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--model-dim", type=int, default=96)
     parser.add_argument("--kernels", nargs="+", type=int, default=[3, 15, 60])
@@ -267,6 +338,13 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=4e-4)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument("--seed", type=int, default=20260801)
+    parser.add_argument("--reuse-checkpoints", action="store_true")
+    parser.add_argument(
+        "--block-indices",
+        nargs="+",
+        type=int,
+        help="Optional original rolling-block indices to train and score.",
+    )
     args = parser.parse_args()
 
     manifest = validate_micro_store(args.micro_store)
@@ -281,6 +359,21 @@ def main() -> int:
         train_days=args.train_days,
         prediction_days=args.prediction_days,
     )
+    blocks = apply_training_history(blocks, mode=args.training_mode)
+    selected_block_indices = (
+        tuple(range(len(blocks)))
+        if args.block_indices is None
+        else tuple(dict.fromkeys(args.block_indices))
+    )
+    invalid_block_indices = sorted(
+        index for index in selected_block_indices if index < 0 or index >= len(blocks)
+    )
+    if invalid_block_indices:
+        raise ValueError(
+            f"block indices are outside 0..{len(blocks) - 1}: {invalid_block_indices}"
+        )
+    if not selected_block_indices:
+        raise ValueError("at least one rolling block must be selected")
     config = MicrostructureConfig(
         model_dim=args.model_dim,
         max_minutes=args.max_minutes,
@@ -291,7 +384,9 @@ def main() -> int:
     )
     route_rows: list[pd.DataFrame] = []
     metric_rows: list[dict[str, object]] = []
-    for block_index, (training, prediction) in enumerate(blocks):
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    for block_index in selected_block_indices:
+        training, prediction = blocks[block_index]
         rows, diagnostics = fit_predict_block(
             args.micro_store,
             dates,
@@ -305,6 +400,11 @@ def main() -> int:
             min_train_days=args.min_train_days,
             device=device,
             seed=args.seed + block_index,
+            checkpoint_path=(
+                args.output_dir
+                / f"unified_microstructure_block_{block_index:02d}_checkpoint.pt"
+            ),
+            reuse_checkpoint=args.reuse_checkpoints,
         )
         route_rows.extend(rows)
         diagnostics["block"] = block_index
@@ -322,6 +422,13 @@ def main() -> int:
     expected["date"] = pd.to_datetime(expected["date"]).dt.normalize()
     expected["instrument"] = expected["instrument"].astype(str)
     expected = expected.drop_duplicates()
+    if args.block_indices is not None:
+        selected_prediction_dates = {
+            dates[int(day_index)]
+            for block_index in selected_block_indices
+            for day_index in blocks[block_index][1]
+        }
+        expected = expected.loc[expected["date"].isin(selected_prediction_dates)].copy()
     route["instrument"] = route["instrument"].astype(str)
     route = expected.merge(route, on=["date", "instrument"], how="left", validate="one_to_one")
     neutral_filled_rows = int(route["factor"].isna().sum())
@@ -343,11 +450,28 @@ def main() -> int:
                 "role": "raw_minute_microstructure_expert",
                 "store_schema_sha256": manifest.get("schema_sha256"),
                 "channels": list(MICROSTRUCTURE_CHANNELS),
-                "training_protocol": f"{args.train_days}d_train_{args.prediction_days}d_predict",
+                "training_protocol": (
+                    f"expanding_history_{args.prediction_days}d_predict"
+                    if args.training_mode == "expanding"
+                    else f"{args.train_days}d_train_{args.prediction_days}d_predict"
+                ),
+                "training_mode": args.training_mode,
+                "rolling_train_days": (
+                    args.train_days if args.training_mode == "rolling" else None
+                ),
                 "label_isolation_gap_days": 1,
                 "years": args.years,
+                "selected_block_indices": list(selected_block_indices),
                 "neutral_filled_rows": neutral_filled_rows,
                 "config": asdict(config),
+                "checkpoints": [
+                    {
+                        "block": row["block"],
+                        "path": row["checkpoint"],
+                        "sha256": row["checkpoint_sha256"],
+                    }
+                    for row in metric_rows
+                ],
             },
             indent=2,
         )

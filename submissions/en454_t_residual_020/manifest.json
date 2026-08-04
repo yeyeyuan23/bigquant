@@ -1,0 +1,32 @@
+{
+  "route": "EN454_T_residual_w020",
+  "formula": "daily_rank(0.80 * Candidate454_ElasticNet + 0.20 * residual_T)",
+  "upload_file_count": 4,
+  "files": [
+    {
+      "name": "unified_candidate454_runtime.py",
+      "bytes": 510190,
+      "sha256": "865f603a4f423fa457009aa7d008c831f36b67222541840d54289e9ce5a14741"
+    },
+    {
+      "name": "unified_en454_t_residual.ipynb",
+      "bytes": 699,
+      "sha256": "f9764c170b0cbd98dc2f1ce00c5f088a06c7512aa209a5c28caca5953c6c7125"
+    },
+    {
+      "name": "unified_en454_t_residual.py",
+      "bytes": 78129,
+      "sha256": "cb03f339c137c755c8c0959d73948b6961c93fd284c057eb0d1ba4b85c32a204"
+    },
+    {
+      "name": "unified_en454_t_residual_weights.py",
+      "bytes": 2983621,
+      "sha256": "c07d00545d464b92251aefae323ccd9c8ce3a62f9ab0f3defc0d92cb2282383e"
+    }
+  ],
+  "checkpoint": "reports/temporal_incremental_objective_20260803/residual_orth_stable/seed_20260803/unified_temporal_2023_h2_checkpoint.pt",
+  "checkpoint_sha256": "f08859257c3b56bbcf2bf226a8982529bfcea708026322cdc953cfa5293f74e8",
+  "checkpoint_training_end": "2023-06-30",
+  "selection_evidence": "2023 strict OOS EN454 addback: w=0.20 maximized A, raw B model score, and J among tested weights",
+  "evidence_boundary": "Local proxy evidence only; official platform score requires an accepted AIStudio run."
+}
