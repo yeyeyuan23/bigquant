@@ -9,7 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from build_unified_m_l5_submission import build_deep_book_sql, build_notebook
+from build_unified_m_l5_submission import (
+    build_deep_book_sql,
+    build_handoff,
+    build_notebook,
+)
 
 
 def test_deep_book_sql_is_bounded_and_uses_all_five_levels() -> None:
@@ -42,3 +46,20 @@ def test_submission_notebook_is_a_single_thin_entrypoint(tmp_path: Path) -> None
     )
     assert notebook.cells[0].id == "unified-m-l5-entrypoint"
     assert path.read_bytes() == second_path.read_bytes()
+
+
+def test_handoff_supports_submission_subdirectory() -> None:
+    handoff = build_handoff("M-l5 test handoff")
+    lines = handoff.splitlines()
+
+    assert 'M_L5_DIR="${M_L5_DIR:-/home/aiuser/work/sub_m_l5}"' in handoff
+    assert 'PYTHONPATH="$M_L5_DIR" python "$M_L5_PROBE"' in handoff
+    assert 'PYTHONPATH="$M_L5_DIR" python "$M_L5_PROBE" \\' in lines
+    assert '  "$M_L5_DIR/unified_m_l5.py" \\' in lines
+    assert '"$M_L5_DIR/unified_m_l5.py"' in handoff
+    assert 'tee "$M_L5_DIR/unified_m_l5_probe.log"' in handoff
+    assert "python -m jupyter nbconvert --to notebook --execute" in handoff
+    assert "--output unified_m_l5_executed.ipynb" in handoff
+    assert "unified_m_l5_notebook.py" not in handoff
+    assert "cd /home/aiuser/work\n" not in handoff
+    assert "/home/aiuser/work/unified_m_l5.py" not in handoff
