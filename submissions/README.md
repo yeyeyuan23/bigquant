@@ -25,9 +25,11 @@ python scripts/build_latest_submission_notebooks.py
 
 Use `--reports-dir PATH` to select a specific completed S/I/T run. Without it,
 the builder chooses the newest compatible reports directory and prints the
-selected path. New, unverified outputs are written to
-`remote_submission_notebooks/`; they must pass real AIStudio execution and
-prefix/look-ahead probes before promotion into this directory.
+selected path. New, unverified outputs are written directly here with
+`*_candidate` names. They must pass real AIStudio execution and
+prefix/look-ahead probes before they are recorded as validated submissions.
+Keep only retained submission artifacts and their required dependency files in
+this directory.
 
 Local J is diagnostic and must not be presented as an official platform score.
 

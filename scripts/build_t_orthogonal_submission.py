@@ -154,7 +154,7 @@ def main() -> int:
         type=Path,
         help=(
             "output path without .py/.ipynb; defaults to "
-            "remote_submission_notebooks/lgbm_t_orthogonal_N_candidate"
+            "submissions/lgbm_t_orthogonal_N_candidate"
         ),
     )
     parser.add_argument(
@@ -185,7 +185,7 @@ def main() -> int:
 
     output_stem = args.output_stem or (
         ROOT
-        / "remote_submission_notebooks"
+        / "submissions"
         / f"lgbm_t_orthogonal_{len(candidate_ids)}_candidate"
     )
     if not output_stem.is_absolute():

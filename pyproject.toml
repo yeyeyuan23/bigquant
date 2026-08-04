@@ -46,8 +46,6 @@ extend-exclude = ["third_party"]
 # are isolated inside the runtime installer and are therefore expected.
 "submissions/*_candidate.py" = ["F811", "I001"]
 "submissions/*_candidate.ipynb" = ["F811", "I001"]
-"remote_submission_notebooks/*_candidate.py" = ["F811", "I001"]
-"remote_submission_notebooks/*_candidate.ipynb" = ["F811", "I001"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

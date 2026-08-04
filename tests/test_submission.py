@@ -9,7 +9,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SUBMISSIONS = ROOT / "submissions"
-REMOTE_SUBMISSIONS = ROOT / "remote_submission_notebooks"
 EXPECTED_FILES = {
     "README.md",
     "smoke_v01.py",
@@ -81,10 +80,7 @@ class SubmissionTest(unittest.TestCase):
                 )
 
     def test_candidate_submissions_use_flat_python_dependency(self):
-        sources = [
-            *sorted(SUBMISSIONS.glob("*_candidate.py")),
-            *sorted(REMOTE_SUBMISSIONS.glob("*_candidate.py")),
-        ]
+        sources = sorted(SUBMISSIONS.glob("*_candidate.py"))
         for source_path in sources:
             with self.subTest(source=source_path.name):
                 source = source_path.read_text(encoding="utf-8")
@@ -133,11 +129,9 @@ class SubmissionTest(unittest.TestCase):
                 )
 
     def test_current_generated_learned_models_keep_frozen_training_contracts(self):
-        enet = (
-            REMOTE_SUBMISSIONS / "enet_i_53_candidate.py"
-        ).read_text(encoding="utf-8")
+        enet = (SUBMISSIONS / "enet_i_51_candidate.py").read_text(encoding="utf-8")
         lgbm = (
-            REMOTE_SUBMISSIONS / "lgbm_t_orthogonal_15_candidate.py"
+            SUBMISSIONS / "lgbm_t_orthogonal_26_add15_candidate.py"
         ).read_text(encoding="utf-8")
         self.assertIn("from sklearn.linear_model import ElasticNet", enet)
         self.assertIn("positive=True", enet)
@@ -159,12 +153,10 @@ class SubmissionTest(unittest.TestCase):
                 "feature_columns = (*public_columns, *self_columns)",
                 source,
             )
+        self.assertIn("screened15_lambda = 0.0", enet)
+        self.assertIn("screened15_lambda = 1.0", lgbm)
         for source in (enet, lgbm):
-            self.assertIn("screened15_lambda = 1.0", source)
-            self.assertIn(
-                "screened15_lambda * baseline_prediction",
-                source,
-            )
+            self.assertIn("screened15_lambda * baseline_prediction", source)
         self.assertIn("def _iter_bar5m_parts(", lgbm)
         self.assertIn("yield part", lgbm)
         self.assertIn("gc.collect()", lgbm)

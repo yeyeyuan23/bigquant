@@ -178,7 +178,7 @@ def main() -> int:
 
     output_stem = args.output_stem or (
         ROOT
-        / "remote_submission_notebooks"
+        / "submissions"
         / f"rule_s_{len(candidate_ids)}_candidate"
     )
     if not output_stem.is_absolute():
