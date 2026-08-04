@@ -1,0 +1,45 @@
+{
+  "selection_status": "winner",
+  "evidence_boundary": "local_proxy_not_platform_score",
+  "winner": "tree_res_s3",
+  "seed": 20260733,
+  "training_code_commit": "b93de3a",
+  "published_code_commit": "22ce859",
+  "route_sha256": "f65aef525de83371e0311cd6e6b3e0abb12c588f7e61e7649e1fb892a32f2f8e",
+  "candidate_feature_count": 454,
+  "label_isolation_gap_days": 1,
+  "unseen_fold": {
+    "delta_rank_ic_mean": 0.026007740964952647,
+    "delta_rank_ic_worst": 0.021787178735724007,
+    "delta_positive_fold_ratio": 1.0,
+    "residual_rank_ic_mean": 0.043311326778162074,
+    "residual_rank_ic_worst": 0.03970168508481921
+  },
+  "standalone": {
+    "j_mean": 0.855024386406545,
+    "j_worst": 0.8356531684174856,
+    "j_stable": 0.8453387774120154
+  },
+  "joint_with_en454": {
+    "2023": {
+      "challenger_nonzero_ratio": 0.9,
+      "en454_nonzero_ratio": 1.0,
+      "challenger_mean_abs_weight": 0.007787746555581725,
+      "challenger_std_abs_weight": 0.00562708408691811,
+      "challenger_j": 0.8298670685524383
+    },
+    "2024": {
+      "challenger_nonzero_ratio": 1.0,
+      "en454_nonzero_ratio": 1.0,
+      "challenger_mean_abs_weight": 0.005930813828510728,
+      "challenger_std_abs_weight": 0.003939992478810853,
+      "challenger_j": 0.8456265664160401
+    }
+  },
+  "checkpoint_sha256": {
+    "2023_h1": "d2069ce2e56dab29067cad9d0402e5a487cdcfc2d33c3f385f12be91865ae05a",
+    "2023_h2": "26d5bd42e068b8da79ed87e090d5f6ff9d2c6ea6f9d076ca866af1d45790de61",
+    "2024_h1": "9da1e9dee54e03852f3773929ebf811e63ffe4254b850f943809b3f00531b662",
+    "2024_h2": "71addcab8ec49d39b2eeb6eb763be3ab1ec9d5f232d73f8256ea15fc502410b7"
+  }
+}
