@@ -5,7 +5,7 @@ repo_root=/root/autodl-tmp/projects/bigquant-unified-integration
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
 data_root=/root/autodl-tmp/projects/bigquant/data
 candidate_root=/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store
-baseline_root="$repo_root/reports/temporal_incremental_objective_20260803/candidate454_elasticnet_oos_2019_2024"
+baseline_root="$repo_root/reports/dependencies/temporal_incremental_objective_20260803/candidate454_elasticnet_oos_2019_2024"
 output_root="$repo_root/reports/x_residual_retrain_v1"
 
 cd "$repo_root"

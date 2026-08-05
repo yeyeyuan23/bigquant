@@ -5,7 +5,7 @@ repo_root=/root/autodl-tmp/projects/bigquant-unified-integration
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
 data_root=/root/autodl-tmp/projects/bigquant/data
 candidate_root=/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store
-suite_root="$repo_root/reports/unified_alpha_fusion_suite_20260801_full_experts_v1"
+suite_root="$repo_root/reports/dependencies/unified_alpha_fusion_suite_20260801_full_experts_v1"
 stage_root="$suite_root/residual_boosting_end_to_end"
 x_route="$suite_root/mlp_base/unified_mlp_full_oos.parquet"
 

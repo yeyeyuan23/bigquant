@@ -23,7 +23,7 @@
       "sha256": "75a2cf0dc5d09d4d48b0121e66a20aa8975227831c1094921a0da437db66f758"
     }
   ],
-  "checkpoint": "reports/xt_protocol_retrain_20260803/t_temporal/screen_2023/d128_l2_dense_s1_e8/seed_20260803/unified_temporal_2023_h2_checkpoint.pt",
+  "checkpoint": "reports/dependencies/xt_protocol_retrain_20260803/t_temporal/screen_2023/d128_l2_dense_s1_e8/seed_20260803/unified_temporal_2023_h2_checkpoint.pt",
   "checkpoint_sha256": "d6d493a693390f59fb7798822f6ac7f419ef21e24d8f375ec14bbd1ab2267352",
   "checkpoint_training_end": "2023-06-30",
   "selection_evidence": "Early-stopped after 6/18 screen configs; selected on 2023 local OOS only"

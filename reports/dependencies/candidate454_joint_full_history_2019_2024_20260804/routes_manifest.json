@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "protocol": "candidate454_joint_v2_frozen_full_history_in_sample_inclusive_v1",
+  "evidence_boundary": "Frozen-code/weight replay over 2019-2024. The period includes checkpoint training dates and is not strict OOS evidence.",
+  "routes": [
+    {
+      "name": "en454_existing_causal",
+      "family": "EN454",
+      "parts": [
+        "reports/dependencies/temporal_incremental_objective_20260803/candidate454_elasticnet_oos_2019_2024/candidate454_elasticnet_full_oos.parquet"
+      ]
+    },
+    {
+      "name": "x_mlp_frozen",
+      "family": "X",
+      "parts": [
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_mlp_current/x_mlp_current_frozen_full_history_2019.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_mlp_current/x_mlp_current_frozen_full_history_2020.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_mlp_current/x_mlp_current_frozen_full_history_2021.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_mlp_current/x_mlp_current_frozen_full_history_2022.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_mlp_current/x_mlp_current_frozen_full_history_2023.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_mlp_current/x_mlp_current_frozen_full_history_2024.parquet"
+      ]
+    },
+    {
+      "name": "x_tree_frozen",
+      "family": "X_tree",
+      "parts": [
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2019.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2020.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2021.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2022.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2023.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2024.parquet"
+      ]
+    },
+    {
+      "name": "t_frozen",
+      "family": "T",
+      "parts": [
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_protocol_best/t_protocol_best_frozen_full_history_2019.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_protocol_best/t_protocol_best_frozen_full_history_2020.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_protocol_best/t_protocol_best_frozen_full_history_2021.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_protocol_best/t_protocol_best_frozen_full_history_2022.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_protocol_best/t_protocol_best_frozen_full_history_2023.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_protocol_best/t_protocol_best_frozen_full_history_2024.parquet"
+      ]
+    },
+    {
+      "name": "t_residual_frozen",
+      "family": "T_res",
+      "parts": [
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_residual_best/t_residual_best_frozen_full_history_2019.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_residual_best/t_residual_best_frozen_full_history_2020.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_residual_best/t_residual_best_frozen_full_history_2021.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_residual_best/t_residual_best_frozen_full_history_2022.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_residual_best/t_residual_best_frozen_full_history_2023.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/t_residual_best/t_residual_best_frozen_full_history_2024.parquet"
+      ]
+    },
+    {
+      "name": "m_raw_frozen",
+      "family": "M",
+      "parts": [
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_raw_expanding_e3/m_raw_expanding_e3_frozen_full_history_2019.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_raw_expanding_e3/m_raw_expanding_e3_frozen_full_history_2020.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_raw_expanding_e3/m_raw_expanding_e3_frozen_full_history_2021.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_raw_expanding_e3/m_raw_expanding_e3_frozen_full_history_2022.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_raw_expanding_e3/m_raw_expanding_e3_frozen_full_history_2023.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_raw_expanding_e3/m_raw_expanding_e3_frozen_full_history_2024.parquet"
+      ]
+    },
+    {
+      "name": "m_l5_frozen",
+      "family": "M_l5",
+      "parts": [
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2019.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2020.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2021.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2022.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2023.parquet",
+        "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2024.parquet"
+      ]
+    },
+    {
+      "name": "x_en_w050",
+      "family": "X_EN",
+      "kind": "weighted_daily_rank",
+      "components": [
+        {"route": "en454_existing_causal", "weight": 0.5},
+        {"route": "x_mlp_frozen", "weight": 0.5}
+      ]
+    },
+    {
+      "name": "x_en_tres_w010",
+      "family": "X_EN_T_res",
+      "kind": "weighted_daily_rank",
+      "components": [
+        {"route": "x_en_w050", "weight": 0.9},
+        {"route": "t_residual_frozen", "weight": 0.1}
+      ]
+    },
+    {
+      "name": "x_en_tres_w020",
+      "family": "X_EN_T_res",
+      "kind": "weighted_daily_rank",
+      "components": [
+        {"route": "x_en_w050", "weight": 0.8},
+        {"route": "t_residual_frozen", "weight": 0.2}
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "full_history_2019_2024_in_sample_inclusive",
+      "purpose": "Rank frozen current submission candidates over one continuous six-year period without retraining.",
+      "years": [2019, 2020, 2021, 2022, 2023, 2024],
+      "routes": [
+        "en454_existing_causal",
+        "x_mlp_frozen",
+        "x_tree_frozen",
+        "t_frozen",
+        "t_residual_frozen",
+        "m_raw_frozen",
+        "m_l5_frozen",
+        "x_en_w050",
+        "x_en_tres_w010",
+        "x_en_tres_w020"
+      ]
+    }
+  ]
+}

@@ -4,9 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
-REPLAY_ROOT = ROOT / "reports/frozen_full_history_replay_2019_2024"
+REPLAY_ROOT = ROOT / "reports/dependencies/frozen_full_history_replay_2019_2024"
 
 
 def _sha256(path: Path) -> str:
@@ -53,16 +52,28 @@ def test_selected_route_training_sources_are_retained() -> None:
         assert (ROOT / relative_path).is_file(), relative_path
 
     required_provenance = (
-        "reports/unified_alpha_fusion_suite_20260801_full_experts_v1/"
-        "lightgbm/run_manifest.json",
-        "reports/xt_protocol_retrain_20260803/t_temporal/screen_2023/"
-        "d128_l2_dense_s1_e8/seed_20260803/command.json",
-        "reports/xt_protocol_retrain_20260803/x_mlp/final_full_history/"
-        "final_checkpoint.json",
-        "reports/m_expanding_history_retrain_20260803/final_full_history_e3/"
-        "run_manifest.json",
-        "reports/m_v3_final_2019_2024_seed_20260803/"
-        "final_checkpoint_manifest.json",
+        (
+            "reports/dependencies/"
+            "unified_alpha_fusion_suite_20260801_full_experts_v1/"
+            "lightgbm/run_manifest.json"
+        ),
+        (
+            "reports/dependencies/xt_protocol_retrain_20260803/"
+            "t_temporal/screen_2023/d128_l2_dense_s1_e8/"
+            "seed_20260803/command.json"
+        ),
+        (
+            "reports/dependencies/xt_protocol_retrain_20260803/"
+            "x_mlp/final_full_history/final_checkpoint.json"
+        ),
+        (
+            "reports/dependencies/m_expanding_history_retrain_20260803/"
+            "final_full_history_e3/run_manifest.json"
+        ),
+        (
+            "reports/dependencies/m_v3_final_2019_2024_seed_20260803/"
+            "final_checkpoint_manifest.json"
+        ),
     )
     for relative_path in required_provenance:
         assert (ROOT / relative_path).is_file(), relative_path

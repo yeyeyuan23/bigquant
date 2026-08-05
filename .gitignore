@@ -11,26 +11,6 @@ dist/
 *.egg-info/
 reports/*.csv
 reports/*.json
-!reports/first_round_technical.csv
-!reports/first_round_metrics.csv
-!reports/first_round_stability.csv
-!reports/first_round_decisions.json
-!reports/factor_pool_check.json
-!reports/factor_pool_screening.csv
-!reports/factor_pool_incremental.csv
-!reports/factor_pool_admission.csv
-!reports/self_factor_composite_metrics.csv
-!reports/joint_elastic_net_metrics.csv
-!reports/joint_elastic_net_weights.csv
-!reports/joint_lightgbm_metrics.csv
-!reports/tree_factor_incremental.csv
-!reports/tree_factor_admission.csv
-!reports/tree_group_increment.csv
-!reports/tree_pool_promotion.csv
-!reports/incremental_pool_promotion.csv
-!reports/incremental_forward_admission.csv
-!reports/factor_pool_decisions.json
-!reports/combination_summary.csv
 .DS_Store
 
 # Competition data and transfer archives remain local. Git only tracks data
@@ -49,12 +29,13 @@ data/**/*.tmp
 data/**/*.partial
 data/screened15.part.*
 data/manifest_candidate_pool_fz76_delta.json
-reports/fz76_delta/development_daily_rank_ic.csv
+reports/archive/legacy_factor_pool/fz76_delta/development_daily_rank_ic.csv
 data/manifest_candidate_pool_cicc34_delta.json
-reports/cicc34_delta/development_daily_rank_ic.csv
+reports/archive/legacy_factor_pool/cicc34_delta/development_daily_rank_ic.csv
 
 # Remote execution outputs are local operational artifacts. Canonical reports
-# remain under reports/latest, reports/routes, and the tracked root reports.
+# remain under reports/latest; reproducibility inputs are under
+# reports/dependencies and old reports are under reports/archive.
 logs/
 reports/current_independent/
 reports/runtime_*/

@@ -21,8 +21,8 @@ from bigalpha2026.evaluation import rank_ic_series
 
 DEFAULT_POOL = ROOT / "data/factors/candidate_pool_fz76_delta.parquet"
 DEFAULT_MANIFEST = ROOT / "data/manifest_candidate_pool_fz76_delta.json"
-DEFAULT_OUTPUT = ROOT / "reports/fz76_delta/development_rank_ic.csv"
-DEFAULT_DAILY_OUTPUT = ROOT / "reports/fz76_delta/development_daily_rank_ic.csv"
+DEFAULT_OUTPUT = ROOT / "reports/archive/legacy_factor_pool/fz76_delta/development_rank_ic.csv"
+DEFAULT_DAILY_OUTPUT = ROOT / "reports/archive/legacy_factor_pool/fz76_delta/development_daily_rank_ic.csv"
 DEFAULT_LABEL_COLUMN = "ret_close_to_close"
 
 

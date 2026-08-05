@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import build_unified_full_boosting_submission as shared
 
-SUITE = ROOT / "reports/unified_alpha_fusion_suite_20260801_full_experts_v1"
+SUITE = ROOT / "reports/dependencies/unified_alpha_fusion_suite_20260801_full_experts_v1"
 OUTPUT = ROOT / "submissions/t"
 T_CHECKPOINT = (
     SUITE / "temporal_deep_2024" / "unified_temporal_2024_h2_checkpoint.pt"

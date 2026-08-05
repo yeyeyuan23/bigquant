@@ -19,7 +19,7 @@ import nbformat
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_RUN_DIR = ROOT / "reports/m_v3_final_2019_2024_seed_20260803"
+DEFAULT_RUN_DIR = ROOT / "reports/dependencies/m_v3_final_2019_2024_seed_20260803"
 DEFAULT_SOURCE_ROOT = ROOT / "src/bigalpha2026/alpha_models"
 DEFAULT_OUTPUT = ROOT / "submissions/m_l5"
 DEFAULT_TRAINING_SCRIPT = ROOT / "scripts/train_unified_microstructure_v3_final.py"

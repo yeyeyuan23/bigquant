@@ -46,7 +46,7 @@ for seed in 20260801 20260802 20260803; do
     2>&1 | tee "$output_dir/train.log"
 done
 
-baseline="$integration_root/reports/m_expanding_history_retrain_20260803/strict_oos_route_2023_2024/unified_microstructure_strict_oos.parquet"
+baseline="$integration_root/reports/dependencies/m_expanding_history_retrain_20260803/strict_oos_route_2023_2024/unified_microstructure_strict_oos.parquet"
 m_v2_ensemble="$run_root/m_dynamic_seed_ensemble.parquet"
 m_v3_ensemble="$run_root/m_l5_seed_ensemble.parquet"
 

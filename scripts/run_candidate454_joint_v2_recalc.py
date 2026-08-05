@@ -49,7 +49,7 @@ A_COMPONENTS = (
     "long_short_sharpe",
     "stress_ic_ir",
 )
-DETAIL_COLUMNS = (
+SCORE_DETAIL_COLUMNS = (
     "score_proxy",
     "a_proxy",
     "b_proxy",
@@ -59,12 +59,16 @@ DETAIL_COLUMNS = (
     "b_mean_abs_weight",
     "b_std_abs_weight",
     "b_nonzero_window_ratio",
+    "score",
+)
+RUN_AUDIT_COLUMNS = (
     "score_days",
     "score_weight_windows",
     "reference_factor_count",
     "joint_route_count",
     "joint_common_rows",
 )
+DETAIL_COLUMNS = (*SCORE_DETAIL_COLUMNS, *RUN_AUDIT_COLUMNS)
 FULL_RESULT_COLUMNS = (
     "group",
     "route",
@@ -420,6 +424,8 @@ def _summarize_period(
         "J": float(score["score_proxy"]),
         "A": float(score["a_proxy"]),
         "B": float(score["b_proxy"]),
+        # Stable display alias requested for every full J table.
+        "score": float(score["score_proxy"]),
     }
     for key in DETAIL_COLUMNS:
         if key in score:

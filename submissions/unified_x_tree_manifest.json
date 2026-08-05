@@ -1,6 +1,6 @@
 {
   "route": "X_tree",
-  "checkpoint": "reports/unified_alpha_fusion_suite_20260801_full_experts_v1/lightgbm/unified_lightgbm_2024_h2_checkpoint.txt",
+  "checkpoint": "reports/dependencies/unified_alpha_fusion_suite_20260801_full_experts_v1/lightgbm/unified_lightgbm_2024_h2_checkpoint.txt",
   "checkpoint_sha256": "62ac2901604b41ecd5953180a928d2a66fccfb3447603324d72c6fbb41eef2a4",
   "checkpoint_training_end": "2024-06-30",
   "candidate_count": 454,

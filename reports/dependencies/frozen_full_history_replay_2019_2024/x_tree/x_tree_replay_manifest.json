@@ -1,0 +1,27 @@
+{
+  "route": "x_tree",
+  "checkpoint_artifact": {
+    "path": "reports/dependencies/unified_alpha_fusion_suite_20260801_full_experts_v1/lightgbm/unified_lightgbm_2024_h2_checkpoint.txt",
+    "sha256": "62ac2901604b41ecd5953180a928d2a66fccfb3447603324d72c6fbb41eef2a4"
+  },
+  "files": [
+    "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2019.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2020.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2021.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2022.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2023.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2024.parquet"
+  ],
+  "protocol": "frozen_checkpoint_full_history_inference_v1",
+  "training_performed": false,
+  "includes_checkpoint_training_period": true,
+  "candidate454_manifest": "/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/candidate454_manifest.json",
+  "years_requested": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ]
+}

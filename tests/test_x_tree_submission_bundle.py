@@ -9,13 +9,12 @@ from pathlib import Path
 
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "submissions/x_tree"
 MANIFEST = ROOT / "submissions/unified_x_tree_manifest.json"
 CHECKPOINT = (
     ROOT
-    / "reports/unified_alpha_fusion_suite_20260801_full_experts_v1/lightgbm"
+    / "reports/dependencies/unified_alpha_fusion_suite_20260801_full_experts_v1/lightgbm"
     / "unified_lightgbm_2024_h2_checkpoint.txt"
 )
 

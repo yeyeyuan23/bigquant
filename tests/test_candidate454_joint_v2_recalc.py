@@ -40,6 +40,7 @@ def test_report_csvs_always_include_full_ab_detail_schema(tmp_path) -> None:
         "A": 0.4,
         "B": 0.2571428571428572,
         **{column: 1.0 for column in DETAIL_COLUMNS},
+        "score": 0.3,
     }
     _write_reports(
         tmp_path,
@@ -53,5 +54,6 @@ def test_report_csvs_always_include_full_ab_detail_schema(tmp_path) -> None:
 
     assert tuple(full.columns) == FULL_RESULT_COLUMNS
     assert tuple(compact.columns) == SUMMARY_RESULT_COLUMNS
+    assert full.loc[0, "score"] == pytest.approx(full.loc[0, "J"])
     assert not full.isna().any().any()
     assert not compact.isna().any().any()

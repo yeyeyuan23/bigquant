@@ -1,10 +1,10 @@
 {
   "status": "pass",
   "canonical_csv": "reports/latest/J_2019_2024_18_ROUTES_FULL.csv",
-  "source_csv": "reports/candidate454_joint_combo_audit_2019_2024_20260805/joint_official_proxy_ab_details.csv",
-  "schema_reference": "reports/candidate454_joint_full_history_2019_2024_20260804/joint_official_proxy_ab_details.csv",
+  "source_csv": "reports/dependencies/candidate454_joint_combo_audit_2019_2024_20260805/joint_official_proxy_ab_details.csv",
+  "schema_reference": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/joint_official_proxy_ab_details.csv",
   "row_count": 18,
-  "column_count": 27,
+  "column_count": 28,
   "schema_exact": true,
   "null_cells": 0,
   "duplicate_routes": 0,
@@ -19,9 +19,10 @@
     "joint_common_rows": 1391994
   },
   "sha256": {
-    "J_2019_2024_18_ROUTES_FULL.csv": "6bec3a443c3a315d94147d34bc897aac5e8a320ce930fe973767cc3199f27ccc",
-    "J_2019_2024_18_ROUTES_DETAILED.json": "9100e4cf0229c3729bd58f8813f289dd9d3f51cd68a82b47fb2b3fbdd6c16eef",
-    "J_2019_2024_18_ROUTES_MANIFEST.json": "585ce37bfd7b3e67d0e508bf05a583b9326d8332022d1531eb69abbfa232b18a"
+    "J_2019_2024_18_ROUTES_FULL.csv": "c32d6f722e6698dceee56cb75104548ad8b866d130a868e804cf2838bc8d41b7",
+    "J_2019_2024_18_ROUTES_DETAILED.json": "84441021a1190a83a888bc5b064f7328f8d890a405ae4100073cca74566ca1cf",
+    "J_2019_2024_18_ROUTES_MANIFEST.json": "d83669fd0cc5268e398518f4d6fb6898ae4cd2ddfdbda30d6e0610b33ca3b8a8"
   },
-  "evidence_boundary": "Includes checkpoint training dates; not strict OOS and not an official platform score."
+  "evidence_boundary": "Includes checkpoint training dates; not strict OOS and not an official platform score.",
+  "score_alias": "score == J"
 }

@@ -1,0 +1,34 @@
+{
+  "route": "m_l5_final",
+  "checkpoint_artifact": {
+    "path": "reports/dependencies/m_v3_final_2019_2024_seed_20260803/unified_microstructure_v3_final_checkpoint.pt",
+    "sha256": "513e7d6aa77a007d029e63d8bd4b2651b86f6c46d20f0f4f07500d2dc0d8eb11"
+  },
+  "device": "cuda",
+  "files": [
+    "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2019.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2020.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2021.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2022.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2023.parquet",
+    "reports/dependencies/frozen_full_history_replay_2019_2024/m_l5_final/m_l5_final_frozen_full_history_2024.parquet"
+  ],
+  "micro_store": "/root/autodl-tmp/unified_microstructure_store_v2_2019_2024",
+  "deep_book_store": "/root/autodl-tmp/m_v3_deep_book_context_2019_2024",
+  "checkpoint_training_window": [
+    "2019-01-02",
+    "2024-12-26"
+  ],
+  "protocol": "frozen_checkpoint_full_history_inference_v1",
+  "training_performed": false,
+  "includes_checkpoint_training_period": true,
+  "candidate454_manifest": "/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/candidate454_manifest.json",
+  "years_requested": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ]
+}
