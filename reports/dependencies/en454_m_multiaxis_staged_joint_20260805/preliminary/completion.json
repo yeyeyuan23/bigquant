@@ -1,0 +1,20 @@
+{
+  "status": "complete",
+  "stage": "preliminary",
+  "route_count": 7,
+  "routes": [
+    "en454_existing_causal",
+    "x_mlp_frozen",
+    "x_tree_frozen",
+    "t_frozen",
+    "t_residual_frozen",
+    "m_raw_frozen",
+    "m_multiaxis_full"
+  ],
+  "top_route": "x_tree_frozen",
+  "formula_max_abs_error": 1.1102230246251565e-16,
+  "summary_sha256": "be44f7b9dc3611328acc1951fd6e5c21f5983f5fabb15b1f6a4781ac67e24940",
+  "m_route_sha256": "f0469b962feda4455d2673cd636cbd9fa40bbc48f753a723e1a2beb3516f7f30",
+  "m_evidence_boundary": "Pure replay of a checkpoint trained on 2019-2024; this route includes training dates and is not strict OOS or an official score.",
+  "en_evidence_boundary": null
+}
