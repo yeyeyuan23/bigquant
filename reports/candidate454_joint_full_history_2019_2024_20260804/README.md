@@ -22,6 +22,10 @@ be presented as expected platform scores.
 - All ten candidate routes are fitted simultaneously with Candidate454, so B
   measures incremental weight in this exact route pool.
 
+The default-branch scorer was rerun on 2026-08-05 without training.  Both CSV
+reports and all ten materialized route parquets were byte-identical to this
+report; the detailed JSON differed only in its temporary output paths.
+
 ## Ranking
 
 | Rank | Route | J | A | B | B ModelScore | B mean | B std | B nonzero |
@@ -57,6 +61,15 @@ audit but excluded from regression because SIZE is present.
 The downloaded ten-style platform exposure panel exists only for 2024 and is
 kept as a separate 2024 diagnostic.  It is not mixed into this six-year table,
 and this six-year neutralization is not described as proprietary BARRA.
+
+## Frozen checkpoint dependencies
+
+Only the checkpoints and checkpoint manifests referenced by the six frozen
+base routes are retained.  Each replay manifest records the repository-relative
+checkpoint path and SHA256; `tests/test_frozen_six_year_artifacts.py` verifies
+that all six files exist, match their declared hashes, and are inference-only.
+The shared Candidate454/exposure and microstructure stores remain external data
+dependencies and must not be deleted as part of branch cleanup.
 
 ## Artifacts
 

@@ -23,7 +23,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.score_submission_j_stability import (
-    daily_rank,
     file_sha256,
     load_score_reference,
     normalized_route,
@@ -66,6 +65,18 @@ DETAIL_COLUMNS = (
     "joint_route_count",
     "joint_common_rows",
 )
+
+
+def daily_rank(values: pd.Series, dates: pd.Series) -> pd.Series:
+    """Map each day's cross-section to the scorer's minus-one-to-one ranks."""
+
+    numeric = pd.to_numeric(values, errors="coerce")
+    normalized_dates = pd.to_datetime(dates, errors="coerce").dt.normalize()
+    grouped = numeric.groupby(normalized_dates, sort=False)
+    counts = grouped.transform("count")
+    ranked = grouped.rank(method="average")
+    result = ((ranked / counts) - 0.5) * 2.0
+    return result.astype(float)
 
 
 def _resolve(path: str, root: Path) -> Path:

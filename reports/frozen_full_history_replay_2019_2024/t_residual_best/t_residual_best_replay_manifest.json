@@ -1,5 +1,9 @@
 {
   "route": "t_residual_best",
+  "checkpoint_artifact": {
+    "path": "reports/temporal_incremental_objective_20260803/residual_orth_stable/seed_20260803/unified_temporal_2023_h2_checkpoint.pt",
+    "sha256": "f08859257c3b56bbcf2bf226a8982529bfcea708026322cdc953cfa5293f74e8"
+  },
   "device": "cuda",
   "files": [
     "reports/frozen_full_history_replay_2019_2024/t_residual_best/t_residual_best_frozen_full_history_2019.parquet",

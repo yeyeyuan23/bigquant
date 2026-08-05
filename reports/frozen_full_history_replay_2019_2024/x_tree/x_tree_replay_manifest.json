@@ -1,5 +1,9 @@
 {
   "route": "x_tree",
+  "checkpoint_artifact": {
+    "path": "reports/unified_alpha_fusion_suite_20260801_full_experts_v1/lightgbm/unified_lightgbm_2024_h2_checkpoint.txt",
+    "sha256": "62ac2901604b41ecd5953180a928d2a66fccfb3447603324d72c6fbb41eef2a4"
+  },
   "files": [
     "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2019.parquet",
     "reports/frozen_full_history_replay_2019_2024/x_tree/x_tree_frozen_full_history_2020.parquet",

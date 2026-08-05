@@ -1,0 +1,18 @@
+{
+  "model": "lightgbm",
+  "feature_bundle": "candidate454",
+  "feature_count": 454,
+  "candidate_feature_count": 454,
+  "validation_protocol": "strict rolling OOS",
+  "years": [
+    2023,
+    2024
+  ],
+  "num_leaves": 63,
+  "learning_rate": 0.03,
+  "n_estimators": 800,
+  "seed": 20260731,
+  "train_start_year": 2019,
+  "model_training_window": "expanding history",
+  "neutral_filled_rows": 0
+}

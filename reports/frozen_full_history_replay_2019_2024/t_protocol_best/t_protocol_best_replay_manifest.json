@@ -1,5 +1,9 @@
 {
   "route": "t_protocol_best",
+  "checkpoint_artifact": {
+    "path": "reports/xt_protocol_retrain_20260803/t_temporal/screen_2023/d128_l2_dense_s1_e8/seed_20260803/unified_temporal_2023_h2_checkpoint.pt",
+    "sha256": "d6d493a693390f59fb7798822f6ac7f419ef21e24d8f375ec14bbd1ab2267352"
+  },
   "device": "cuda",
   "files": [
     "reports/frozen_full_history_replay_2019_2024/t_protocol_best/t_protocol_best_frozen_full_history_2019.parquet",
