@@ -65,6 +65,27 @@ DETAIL_COLUMNS = (
     "joint_route_count",
     "joint_common_rows",
 )
+FULL_RESULT_COLUMNS = (
+    "group",
+    "route",
+    "family",
+    "years",
+    "J",
+    "A",
+    "B",
+    *DETAIL_COLUMNS,
+)
+SUMMARY_RESULT_COLUMNS = (
+    "group",
+    "rank",
+    "route",
+    "family",
+    "years",
+    "J",
+    "A",
+    "B",
+    *DETAIL_COLUMNS,
+)
 
 
 def daily_rank(values: pd.Series, dates: pd.Series) -> pd.Series:
@@ -448,33 +469,18 @@ def _write_reports(
         ["group", "J"], ascending=[True, False]
     )
     summary["rank"] = summary.groupby("group", sort=False).cumcount() + 1
-    summary_columns = [
-        "group",
-        "rank",
-        "route",
-        "family",
-        "years",
-        "J",
-        "A",
-        "B",
-        "b_mean_abs_weight",
-        "b_std_abs_weight",
-        "b_nonzero_window_ratio",
+    missing_full_columns = [
+        column for column in FULL_RESULT_COLUMNS if column not in summary.columns
     ]
-    summary.loc[:, summary_columns].to_csv(
+    if missing_full_columns:
+        raise RuntimeError(
+            "joint result is missing required full-detail columns: "
+            f"{missing_full_columns}"
+        )
+    summary.loc[:, SUMMARY_RESULT_COLUMNS].to_csv(
         output_dir / "joint_official_proxy_summary.csv", index=False
     )
-    detail_columns = [
-        "group",
-        "route",
-        "family",
-        "years",
-        "J",
-        "A",
-        "B",
-        *DETAIL_COLUMNS,
-    ]
-    summary.loc[:, [column for column in detail_columns if column in summary.columns]].to_csv(
+    summary.loc[:, FULL_RESULT_COLUMNS].to_csv(
         output_dir / "joint_official_proxy_ab_details.csv", index=False
     )
 

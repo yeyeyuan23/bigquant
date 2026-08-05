@@ -4,6 +4,18 @@
 正式冻结成员优先看 `latest/factor_pool_decisions.json` 和对应
 `data/cache/*/frozen_state.json`。平台真实分数仍以提交结果为准。
 
+## 当前六年 J 总入口
+
+2019-2024 连续区间、18 路 Candidate454 joint-v2 的当前完整表是：
+
+`latest/J_2019_2024_18_ROUTES_FULL.csv`
+
+该 CSV 每条路线都包含审计表的完整 27 列：J/A/B，A 四项原值及分位数，
+B ModelScore/mean/std/nonzero，以及共同评分天数、窗口数、Candidate454 数量、
+联合路线数和公共行数。配套 manifest、详细 JSON、校验记录和阅读说明也都在
+`latest/`。这一入口取代旧的 10 路 J 表作为当前比较表，但不会删除冻结预测、
+checkpoint 或复算依赖。
+
 ## 目录层级
 
 ```text
@@ -13,7 +25,11 @@ reports/
 │   ├── factor_pool_check.json      # 当前真实快照合同
 │   ├── combination_summary.csv     # 当前三条最终路线排序
 │   ├── factor_pool_decisions.json  # 当前机器可读路线合同
-│   └── factor_pool_admission.csv   # 当前候选进入 S/I/T 的总表
+│   ├── factor_pool_admission.csv   # 当前候选进入 S/I/T 的总表
+│   ├── J_2019_2024_18_ROUTES_FULL.csv       # 当前六年 J 完整 27 列主表
+│   ├── J_2019_2024_18_ROUTES_DETAILED.json  # 完整评分和 exposure 审计
+│   ├── J_2019_2024_18_ROUTES_MANIFEST.json  # 精确 18 路候选池
+│   └── J_2019_2024_18_ROUTES_VALIDATION.json # 表结构和公式校验
 ├── first_round/                    # 候选第一轮单因子诊断
 ├── routes/                         # S/I/T 和最终路线细项
 ├── diagnostics/                    # 一次性研究、探针和覆盖率附件
@@ -22,13 +38,14 @@ reports/
 
 ## 推荐阅读顺序
 
-1. `latest/factor_pool_check.json`：确认数据快照、候选版本、覆盖率和 join 规则。
-2. `latest/combination_summary.csv`：看当前本地 J proxy 排序。
-3. `latest/factor_pool_decisions.json`：看每条 pipeline 的正式成员和完整评分合同。
-4. `latest/factor_pool_admission.csv`：看每个自研候选进入 S/I/T 哪些路线。
-5. `routes/`：需要排查具体 S/I/T 准入时再看。
-6. `first_round/`：需要看候选单因子技术、IC、稳定性、相关性时再看。
-7. `diagnostics/` 和 `archive/`：只用于追溯。
+1. `latest/J_2019_2024_18_ROUTES_FULL.csv`：看当前六年 18 路完整 J/A/B 排名。
+2. `latest/factor_pool_check.json`：确认数据快照、候选版本、覆盖率和 join 规则。
+3. `latest/combination_summary.csv`：看原组合流程的本地 J proxy 排序。
+4. `latest/factor_pool_decisions.json`：看每条 pipeline 的正式成员和完整评分合同。
+5. `latest/factor_pool_admission.csv`：看每个自研候选进入 S/I/T 哪些路线。
+6. `routes/`：需要排查具体 S/I/T 准入时再看。
+7. `first_round/`：需要看候选单因子技术、IC、稳定性、相关性时再看。
+8. `diagnostics/` 和 `archive/`：只用于追溯。
 
 ## latest/ 当前入口
 
