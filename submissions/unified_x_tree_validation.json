@@ -1,0 +1,25 @@
+{
+  "status": "passed_local_package_validation",
+  "date": "2026-08-05",
+  "route": "x_tree_frozen",
+  "selection_context": "continuous_2019_2024_candidate454_joint_v2_proxy_rank_1",
+  "upload_directory": "submissions/x_tree",
+  "upload_file_count": 6,
+  "notebook": "unified_x_tree.ipynb",
+  "notebook_executes_top_to_bottom": true,
+  "python_compile_passed": true,
+  "candidate_count": 454,
+  "checkpoint_sha256": "62ac2901604b41ecd5953180a928d2a66fccfb3447603324d72c6fbb41eef2a4",
+  "embedded_checkpoint_matches_raw_checkpoint": true,
+  "bundle_hashes_match_manifest": true,
+  "frozen_2024_replay_sha256": "aed3c061c25699bf95859ea8f2361771e20ce48625ea42ef6b54ce6e245473f3",
+  "frozen_2024_replay_byte_identical": true,
+  "training_performed": false,
+  "local_j_is_official_platform_score": false,
+  "aistudio_prefix_probe": {
+    "status": "pending_real_aistudio_execution",
+    "required_output_contract_status": "ok",
+    "required_difference_rows": 0,
+    "required_prefix_invariant": true
+  }
+}
