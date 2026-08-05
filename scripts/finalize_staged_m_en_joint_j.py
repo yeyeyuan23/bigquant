@@ -43,6 +43,27 @@ def require_complete(path: Path) -> dict[str, object]:
     return payload
 
 
+def resolve_score_roots(repo: Path) -> tuple[Path, Path]:
+    """Use the worktree data when complete, otherwise the sibling shared checkout."""
+
+    candidates = (repo, repo.parent / "bigquant")
+    missing = []
+    for candidate in candidates:
+        data_dir = candidate / "data"
+        reports_dir = candidate / "reports"
+        required = (
+            data_dir / "factors" / "candidate_pool.parquet",
+            reports_dir / "first_round" / "first_round_decisions.json",
+        )
+        if all(path.is_file() for path in required):
+            return data_dir, reports_dir
+        missing.extend(map(str, required))
+    raise FileNotFoundError(
+        "joint J score roots are incomplete; checked required files: "
+        + ", ".join(missing)
+    )
+
+
 def run(args: argparse.Namespace) -> None:
     m_manifest = require_complete(args.m_route.with_suffix(".manifest.json"))
     en_manifest = None
@@ -123,6 +144,7 @@ def run(args: argparse.Namespace) -> None:
     manifest_path = stage_dir / "joint_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     joint_dir = stage_dir / "joint_j"
+    score_data_dir, score_reports_dir = resolve_score_roots(args.repo)
     subprocess.run(
         [
             str(args.python),
@@ -132,9 +154,9 @@ def run(args: argparse.Namespace) -> None:
             "--output-dir",
             str(joint_dir),
             "--data-dir",
-            str(args.repo / "data"),
+            str(score_data_dir),
             "--reports-dir",
-            str(args.repo / "reports"),
+            str(score_reports_dir),
             "--candidate454-store",
             str(args.candidate454_store),
         ],

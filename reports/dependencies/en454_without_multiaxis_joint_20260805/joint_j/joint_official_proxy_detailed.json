@@ -1,0 +1,930 @@
+{
+  "evidence_boundary": "Local joint Candidate454 proxy. EN454 routes are continuous causal OOS after a 60-day warmup; frozen X/T/M raw routes include checkpoint training dates. This is not an official platform score.",
+  "groups": [
+    {
+      "exposure_preprocessing": {
+        "all_columns": [
+          "date",
+          "instrument",
+          "SIZE",
+          "LIQUIDTY",
+          "industry_level1_code",
+          "float_market_cap"
+        ],
+        "date_max": "2024-12-31",
+        "date_min": "2019-01-02",
+        "days": 1456,
+        "dropped_redundant_numeric_columns": [
+          "float_market_cap"
+        ],
+        "evidence_boundary": "Local available-style proxy, not a complete proprietary BARRA model.",
+        "excluded_source_columns": [],
+        "exposure_columns": [
+          "SIZE",
+          "LIQUIDTY",
+          "industry_level1_code",
+          "float_market_cap"
+        ],
+        "includes_intercept": true,
+        "instruments": 2075,
+        "method": "daily_ols_residual_after_daily_1pct_99pct_winsor_and_zscore",
+        "panel_sha256": "2cd890e0f2dfba0c9242728cb55b10d63b31c61801cb31b469317fd10aac2788",
+        "per_column": {
+          "LIQUIDTY": {
+            "dtype": "float64",
+            "missing_ratio": 0.0009869505494505494,
+            "missing_rows": 1437,
+            "nonmissing_rows": 1454563
+          },
+          "SIZE": {
+            "dtype": "float64",
+            "missing_ratio": 0.0009869505494505494,
+            "missing_rows": 1437,
+            "nonmissing_rows": 1454563
+          },
+          "float_market_cap": {
+            "dtype": "float64",
+            "missing_ratio": 0.0009869505494505494,
+            "missing_rows": 1437,
+            "nonmissing_rows": 1454563
+          },
+          "industry_level1_code": {
+            "dtype": "category",
+            "missing_ratio": 0.0009869505494505494,
+            "missing_rows": 1437,
+            "nonmissing_rows": 1454563
+          }
+        },
+        "profile": "reduced_available_style_proxy",
+        "regression_categorical_columns": [
+          "industry_level1_code"
+        ],
+        "regression_numeric_columns": [
+          "SIZE",
+          "LIQUIDTY"
+        ],
+        "rows": 1456000,
+        "source_all_columns": [
+          "date",
+          "instrument",
+          "SIZE",
+          "LIQUIDTY",
+          "industry_level1_code",
+          "float_market_cap"
+        ],
+        "source_files": [
+          {
+            "bytes": 6104191,
+            "path": "/root/autodl-tmp/projects/bigquant/data/exposures/year=2019/part-2019.parquet",
+            "sha256": "08981c69d95df5d6ab67be2c203cf45d8a072c651516339c6db4e2237bba0746",
+            "year": 2019
+          },
+          {
+            "bytes": 6114750,
+            "path": "/root/autodl-tmp/projects/bigquant/data/exposures/year=2020/part-2020.parquet",
+            "sha256": "36a2f90b81d1892e9eeaf1793636b505c5b8eafc014a870e2b0948b58adb62dc",
+            "year": 2020
+          },
+          {
+            "bytes": 6126389,
+            "path": "/root/autodl-tmp/projects/bigquant/data/exposures/year=2021/part-2021.parquet",
+            "sha256": "48e625378921322edd993ecae59aace0722abd277fce4cc365d677ff1aa32322",
+            "year": 2021
+          },
+          {
+            "bytes": 6147362,
+            "path": "/root/autodl-tmp/projects/bigquant/data/exposures/year=2022/part-2022.parquet",
+            "sha256": "a93ef777be65d6cc4684638919abfe35b7cc0adf41aa731e66b96b29efe6f3ab",
+            "year": 2022
+          },
+          {
+            "bytes": 6078608,
+            "path": "/root/autodl-tmp/projects/bigquant/data/exposures/year=2023/part-2023.parquet",
+            "sha256": "d9ba4dfe8e6b648668e5b7a2ff70c2839814e6dcb2224f01220f5f11631912f5",
+            "year": 2023
+          },
+          {
+            "bytes": 4730265,
+            "path": "/root/autodl-tmp/projects/bigquant/data/exposures/year=2024/part-2024.parquet",
+            "sha256": "38ca1eaeb7348f535be0c9379aa0e30fa596f11e7b682eec74385802e19e77fa",
+            "year": 2024
+          }
+        ]
+      },
+      "name": "en454_without_m_multiaxis_2019_2024",
+      "period_scores": {
+        "clean_pema": {
+          "a_long_short_sharpe": 3.5044134962360123,
+          "a_long_short_sharpe_percentile": 0.9538461538461539,
+          "a_proxy": 0.9192307692307693,
+          "a_rank_ic_ir": 0.5350179983191875,
+          "a_rank_ic_ir_percentile": 0.9054945054945055,
+          "a_rank_ic_mean": 0.041043066653450186,
+          "a_rank_ic_mean_percentile": 0.9736263736263736,
+          "a_stress_ic_ir": 0.2919239625770127,
+          "a_stress_ic_ir_percentile": 0.843956043956044,
+          "b_mean_abs_weight": 0.008097060819043914,
+          "b_model_score": 0.6765257096093741,
+          "b_nonzero_window_ratio": 0.582089552238806,
+          "b_proxy": 0.06926406926406926,
+          "b_std_abs_weight": 0.011968592920204956,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 0.32425407925407923,
+          "score_weight_windows": 67.0
+        },
+        "en454_existing_causal": {
+          "a_long_short_sharpe": 5.062684125159467,
+          "a_long_short_sharpe_percentile": 0.9758241758241758,
+          "a_proxy": 0.9538461538461538,
+          "a_rank_ic_ir": 0.5830822038602654,
+          "a_rank_ic_ir_percentile": 0.9406593406593406,
+          "a_rank_ic_mean": 0.04023308797019246,
+          "a_rank_ic_mean_percentile": 0.9714285714285714,
+          "a_stress_ic_ir": 0.40538096068282353,
+          "a_stress_ic_ir_percentile": 0.9274725274725275,
+          "b_mean_abs_weight": 0.02872093573737741,
+          "b_model_score": 2.8376248226706493,
+          "b_nonzero_window_ratio": 1.0,
+          "b_proxy": 0.9913419913419913,
+          "b_std_abs_weight": 0.010121470430156754,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 0.9800932400932401,
+          "score_weight_windows": 67.0
+        },
+        "m_raw_frozen": {
+          "a_long_short_sharpe": 13.814225990214029,
+          "a_long_short_sharpe_percentile": 1.0,
+          "a_proxy": 1.0,
+          "a_rank_ic_ir": 1.3773730467737393,
+          "a_rank_ic_ir_percentile": 1.0,
+          "a_rank_ic_mean": 0.07495695735685957,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 1.1125766367001606,
+          "a_stress_ic_ir_percentile": 1.0,
+          "b_mean_abs_weight": 0.018386634578866533,
+          "b_model_score": 1.8761847191003476,
+          "b_nonzero_window_ratio": 0.9850746268656716,
+          "b_proxy": 0.9783549783549783,
+          "b_std_abs_weight": 0.00980001296770339,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 0.9848484848484849,
+          "score_weight_windows": 67.0
+        },
+        "pema_full454": {
+          "a_long_short_sharpe": 3.783227677814801,
+          "a_long_short_sharpe_percentile": 0.9648351648351648,
+          "a_proxy": 0.9247252747252748,
+          "a_rank_ic_ir": 0.5362668264680149,
+          "a_rank_ic_ir_percentile": 0.9076923076923077,
+          "a_rank_ic_mean": 0.04052046047980977,
+          "a_rank_ic_mean_percentile": 0.9736263736263736,
+          "a_stress_ic_ir": 0.3068223002411373,
+          "a_stress_ic_ir_percentile": 0.8527472527472527,
+          "b_mean_abs_weight": 0.009473125569258613,
+          "b_model_score": 0.8168423144096408,
+          "b_nonzero_window_ratio": 0.6716417910447762,
+          "b_proxy": 0.21645021645021645,
+          "b_std_abs_weight": 0.011597251270324205,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 0.4289327339327339,
+          "score_weight_windows": 67.0
+        },
+        "t_frozen": {
+          "a_long_short_sharpe": 7.332432678212561,
+          "a_long_short_sharpe_percentile": 0.989010989010989,
+          "a_proxy": 0.9950549450549451,
+          "a_rank_ic_ir": 1.0287909907042763,
+          "a_rank_ic_ir_percentile": 0.9956043956043956,
+          "a_rank_ic_mean": 0.07969642686981787,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 0.7363526012939515,
+          "a_stress_ic_ir_percentile": 0.9956043956043956,
+          "b_mean_abs_weight": 0.03311886729144954,
+          "b_model_score": 2.4469950860149656,
+          "b_nonzero_window_ratio": 1.0,
+          "b_proxy": 0.987012987012987,
+          "b_std_abs_weight": 0.013534505025483323,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 0.9894255744255744,
+          "score_weight_windows": 67.0
+        },
+        "t_residual_frozen": {
+          "a_long_short_sharpe": 1.9623999151448746,
+          "a_long_short_sharpe_percentile": 0.8153846153846154,
+          "a_proxy": 0.8824175824175824,
+          "a_rank_ic_ir": 0.4489715840419952,
+          "a_rank_ic_ir_percentile": 0.8593406593406593,
+          "a_rank_ic_mean": 0.03686749960827583,
+          "a_rank_ic_mean_percentile": 0.9538461538461539,
+          "a_stress_ic_ir": 0.3573823965196094,
+          "a_stress_ic_ir_percentile": 0.9010989010989011,
+          "b_mean_abs_weight": 0.00538938793614411,
+          "b_model_score": 1.0252276917189327,
+          "b_nonzero_window_ratio": 0.7611940298507462,
+          "b_proxy": 0.5281385281385281,
+          "b_std_abs_weight": 0.005256771718761171,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 0.6344222444222444,
+          "score_weight_windows": 67.0
+        },
+        "x_mlp_frozen": {
+          "a_long_short_sharpe": 7.4403378449534445,
+          "a_long_short_sharpe_percentile": 0.989010989010989,
+          "a_proxy": 0.9950549450549451,
+          "a_rank_ic_ir": 1.1076856629608935,
+          "a_rank_ic_ir_percentile": 0.9956043956043956,
+          "a_rank_ic_mean": 0.07454817507917803,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 0.7622605143119059,
+          "a_stress_ic_ir_percentile": 0.9956043956043956,
+          "b_mean_abs_weight": 0.12814119183890713,
+          "b_model_score": 3.370687068332761,
+          "b_nonzero_window_ratio": 0.9701492537313433,
+          "b_proxy": 0.9978354978354979,
+          "b_std_abs_weight": 0.03801634184300555,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 0.997001332001332,
+          "score_weight_windows": 67.0
+        },
+        "x_tree_frozen": {
+          "a_long_short_sharpe": 30.696820176195832,
+          "a_long_short_sharpe_percentile": 1.0,
+          "a_proxy": 1.0,
+          "a_rank_ic_ir": 2.566561982162636,
+          "a_rank_ic_ir_percentile": 1.0,
+          "a_rank_ic_mean": 0.22943435885395483,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 2.2396110838149665,
+          "a_stress_ic_ir_percentile": 1.0,
+          "b_mean_abs_weight": 0.3766864494484142,
+          "b_model_score": 3.888254120041265,
+          "b_nonzero_window_ratio": 1.0,
+          "b_proxy": 1.0,
+          "b_std_abs_weight": 0.09687804289924555,
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "score_days": 1394.0,
+          "score_proxy": 1.0,
+          "score_weight_windows": 67.0
+        }
+      },
+      "purpose": "Early comparison of existing EN454 versus P-EMA and Clean-P-EMA in the retained core pool before M-multiaxis completion.",
+      "reference_factor_count": 454,
+      "route_count": 8,
+      "summaries": [
+        {
+          "A": 1.0,
+          "B": 1.0,
+          "J": 1.0,
+          "a_long_short_sharpe": 30.696820176195832,
+          "a_long_short_sharpe_percentile": 1.0,
+          "a_proxy": 1.0,
+          "a_rank_ic_ir": 2.566561982162636,
+          "a_rank_ic_ir_percentile": 1.0,
+          "a_rank_ic_mean": 0.22943435885395483,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 2.2396110838149665,
+          "a_stress_ic_ir_percentile": 1.0,
+          "b_mean_abs_weight": 0.3766864494484142,
+          "b_model_score": 3.888254120041265,
+          "b_nonzero_window_ratio": 1.0,
+          "b_proxy": 1.0,
+          "b_std_abs_weight": 0.09687804289924555,
+          "family": "X_tree",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "x_tree_frozen",
+          "score": 1.0,
+          "score_days": 1394.0,
+          "score_proxy": 1.0,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        },
+        {
+          "A": 0.9950549450549451,
+          "B": 0.9978354978354979,
+          "J": 0.997001332001332,
+          "a_long_short_sharpe": 7.4403378449534445,
+          "a_long_short_sharpe_percentile": 0.989010989010989,
+          "a_proxy": 0.9950549450549451,
+          "a_rank_ic_ir": 1.1076856629608935,
+          "a_rank_ic_ir_percentile": 0.9956043956043956,
+          "a_rank_ic_mean": 0.07454817507917803,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 0.7622605143119059,
+          "a_stress_ic_ir_percentile": 0.9956043956043956,
+          "b_mean_abs_weight": 0.12814119183890713,
+          "b_model_score": 3.370687068332761,
+          "b_nonzero_window_ratio": 0.9701492537313433,
+          "b_proxy": 0.9978354978354979,
+          "b_std_abs_weight": 0.03801634184300555,
+          "family": "X",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "x_mlp_frozen",
+          "score": 0.997001332001332,
+          "score_days": 1394.0,
+          "score_proxy": 0.997001332001332,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        },
+        {
+          "A": 0.9950549450549451,
+          "B": 0.987012987012987,
+          "J": 0.9894255744255744,
+          "a_long_short_sharpe": 7.332432678212561,
+          "a_long_short_sharpe_percentile": 0.989010989010989,
+          "a_proxy": 0.9950549450549451,
+          "a_rank_ic_ir": 1.0287909907042763,
+          "a_rank_ic_ir_percentile": 0.9956043956043956,
+          "a_rank_ic_mean": 0.07969642686981787,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 0.7363526012939515,
+          "a_stress_ic_ir_percentile": 0.9956043956043956,
+          "b_mean_abs_weight": 0.03311886729144954,
+          "b_model_score": 2.4469950860149656,
+          "b_nonzero_window_ratio": 1.0,
+          "b_proxy": 0.987012987012987,
+          "b_std_abs_weight": 0.013534505025483323,
+          "family": "T",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "t_frozen",
+          "score": 0.9894255744255744,
+          "score_days": 1394.0,
+          "score_proxy": 0.9894255744255744,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        },
+        {
+          "A": 1.0,
+          "B": 0.9783549783549783,
+          "J": 0.9848484848484849,
+          "a_long_short_sharpe": 13.814225990214029,
+          "a_long_short_sharpe_percentile": 1.0,
+          "a_proxy": 1.0,
+          "a_rank_ic_ir": 1.3773730467737393,
+          "a_rank_ic_ir_percentile": 1.0,
+          "a_rank_ic_mean": 0.07495695735685957,
+          "a_rank_ic_mean_percentile": 1.0,
+          "a_stress_ic_ir": 1.1125766367001606,
+          "a_stress_ic_ir_percentile": 1.0,
+          "b_mean_abs_weight": 0.018386634578866533,
+          "b_model_score": 1.8761847191003476,
+          "b_nonzero_window_ratio": 0.9850746268656716,
+          "b_proxy": 0.9783549783549783,
+          "b_std_abs_weight": 0.00980001296770339,
+          "family": "M_raw",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "m_raw_frozen",
+          "score": 0.9848484848484849,
+          "score_days": 1394.0,
+          "score_proxy": 0.9848484848484849,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        },
+        {
+          "A": 0.9538461538461538,
+          "B": 0.9913419913419913,
+          "J": 0.9800932400932401,
+          "a_long_short_sharpe": 5.062684125159467,
+          "a_long_short_sharpe_percentile": 0.9758241758241758,
+          "a_proxy": 0.9538461538461538,
+          "a_rank_ic_ir": 0.5830822038602654,
+          "a_rank_ic_ir_percentile": 0.9406593406593406,
+          "a_rank_ic_mean": 0.04023308797019246,
+          "a_rank_ic_mean_percentile": 0.9714285714285714,
+          "a_stress_ic_ir": 0.40538096068282353,
+          "a_stress_ic_ir_percentile": 0.9274725274725275,
+          "b_mean_abs_weight": 0.02872093573737741,
+          "b_model_score": 2.8376248226706493,
+          "b_nonzero_window_ratio": 1.0,
+          "b_proxy": 0.9913419913419913,
+          "b_std_abs_weight": 0.010121470430156754,
+          "family": "EN454",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "en454_existing_causal",
+          "score": 0.9800932400932401,
+          "score_days": 1394.0,
+          "score_proxy": 0.9800932400932401,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        },
+        {
+          "A": 0.8824175824175824,
+          "B": 0.5281385281385281,
+          "J": 0.6344222444222444,
+          "a_long_short_sharpe": 1.9623999151448746,
+          "a_long_short_sharpe_percentile": 0.8153846153846154,
+          "a_proxy": 0.8824175824175824,
+          "a_rank_ic_ir": 0.4489715840419952,
+          "a_rank_ic_ir_percentile": 0.8593406593406593,
+          "a_rank_ic_mean": 0.03686749960827583,
+          "a_rank_ic_mean_percentile": 0.9538461538461539,
+          "a_stress_ic_ir": 0.3573823965196094,
+          "a_stress_ic_ir_percentile": 0.9010989010989011,
+          "b_mean_abs_weight": 0.00538938793614411,
+          "b_model_score": 1.0252276917189327,
+          "b_nonzero_window_ratio": 0.7611940298507462,
+          "b_proxy": 0.5281385281385281,
+          "b_std_abs_weight": 0.005256771718761171,
+          "family": "T_res",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "t_residual_frozen",
+          "score": 0.6344222444222444,
+          "score_days": 1394.0,
+          "score_proxy": 0.6344222444222444,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        },
+        {
+          "A": 0.9247252747252748,
+          "B": 0.21645021645021645,
+          "J": 0.4289327339327339,
+          "a_long_short_sharpe": 3.783227677814801,
+          "a_long_short_sharpe_percentile": 0.9648351648351648,
+          "a_proxy": 0.9247252747252748,
+          "a_rank_ic_ir": 0.5362668264680149,
+          "a_rank_ic_ir_percentile": 0.9076923076923077,
+          "a_rank_ic_mean": 0.04052046047980977,
+          "a_rank_ic_mean_percentile": 0.9736263736263736,
+          "a_stress_ic_ir": 0.3068223002411373,
+          "a_stress_ic_ir_percentile": 0.8527472527472527,
+          "b_mean_abs_weight": 0.009473125569258613,
+          "b_model_score": 0.8168423144096408,
+          "b_nonzero_window_ratio": 0.6716417910447762,
+          "b_proxy": 0.21645021645021645,
+          "b_std_abs_weight": 0.011597251270324205,
+          "family": "EN454_positive_ema",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "pema_full454",
+          "score": 0.4289327339327339,
+          "score_days": 1394.0,
+          "score_proxy": 0.4289327339327339,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        },
+        {
+          "A": 0.9192307692307693,
+          "B": 0.06926406926406926,
+          "J": 0.32425407925407923,
+          "a_long_short_sharpe": 3.5044134962360123,
+          "a_long_short_sharpe_percentile": 0.9538461538461539,
+          "a_proxy": 0.9192307692307693,
+          "a_rank_ic_ir": 0.5350179983191875,
+          "a_rank_ic_ir_percentile": 0.9054945054945055,
+          "a_rank_ic_mean": 0.041043066653450186,
+          "a_rank_ic_mean_percentile": 0.9736263736263736,
+          "a_stress_ic_ir": 0.2919239625770127,
+          "a_stress_ic_ir_percentile": 0.843956043956044,
+          "b_mean_abs_weight": 0.008097060819043914,
+          "b_model_score": 0.6765257096093741,
+          "b_nonzero_window_ratio": 0.582089552238806,
+          "b_proxy": 0.06926406926406926,
+          "b_std_abs_weight": 0.011968592920204956,
+          "family": "EN454_clean_positive_ema",
+          "joint_common_rows": 1391994.0,
+          "joint_route_count": 8.0,
+          "reference_factor_count": 454.0,
+          "route": "clean_pema",
+          "score": 0.32425407925407923,
+          "score_days": 1394.0,
+          "score_proxy": 0.32425407925407923,
+          "score_weight_windows": 67.0,
+          "years": [
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "years": [
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024
+      ]
+    }
+  ],
+  "includes_checkpoint_training_period": false,
+  "manifest": {
+    "evidence_boundary": "Local joint Candidate454 proxy. EN454 routes are continuous causal OOS after a 60-day warmup; frozen X/T/M raw routes include checkpoint training dates. This is not an official platform score.",
+    "groups": [
+      {
+        "name": "en454_without_m_multiaxis_2019_2024",
+        "purpose": "Early comparison of existing EN454 versus P-EMA and Clean-P-EMA in the retained core pool before M-multiaxis completion.",
+        "routes": [
+          "en454_existing_causal",
+          "x_mlp_frozen",
+          "x_tree_frozen",
+          "t_frozen",
+          "t_residual_frozen",
+          "m_raw_frozen",
+          "pema_full454",
+          "clean_pema"
+        ],
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      }
+    ],
+    "old_m_policy": "Only m_raw_frozen is retained among old M routes; M-L5, M residual, and old M blends are excluded. The unfinished m_multiaxis_full route is excluded from this early EN comparison.",
+    "protocol": "en454_stability_without_m_multiaxis_joint_j_20260805_v1",
+    "routes": [
+      {
+        "family": "EN454",
+        "name": "en454_existing_causal",
+        "parts": [
+          "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/en454_existing_causal.parquet"
+        ]
+      },
+      {
+        "family": "X",
+        "name": "x_mlp_frozen",
+        "parts": [
+          "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/x_mlp_frozen.parquet"
+        ]
+      },
+      {
+        "family": "X_tree",
+        "name": "x_tree_frozen",
+        "parts": [
+          "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/x_tree_frozen.parquet"
+        ]
+      },
+      {
+        "family": "T",
+        "name": "t_frozen",
+        "parts": [
+          "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/t_frozen.parquet"
+        ]
+      },
+      {
+        "family": "T_res",
+        "name": "t_residual_frozen",
+        "parts": [
+          "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/t_residual_frozen.parquet"
+        ]
+      },
+      {
+        "family": "M_raw",
+        "name": "m_raw_frozen",
+        "parts": [
+          "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/m_raw_frozen.parquet"
+        ]
+      },
+      {
+        "family": "EN454_positive_ema",
+        "name": "pema_full454",
+        "parts": [
+          "/root/autodl-tmp/en454_stability_experiments_20260805/formal/pema_full454.parquet"
+        ]
+      },
+      {
+        "family": "EN454_clean_positive_ema",
+        "name": "clean_pema",
+        "parts": [
+          "/root/autodl-tmp/en454_stability_experiments_20260805/formal/clean_pema.parquet"
+        ]
+      }
+    ],
+    "schema_version": 1
+  },
+  "note": "Every group is scored once over its complete continuous period in one shared Elastic Net fit containing Candidate454 and every route declared in that group. A/B/J are local proxies, not platform scores.",
+  "protocol": "en454_stability_without_m_multiaxis_joint_j_20260805_v1",
+  "report_schema_version": 4,
+  "routes": {
+    "clean_pema": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-30",
+        "date_min": "2019-04-04",
+        "days": 1394,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1391995,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "EN454_clean_positive_ema",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/clean_pema.parquet",
+      "materialized_sha256": "509018552d7270a5c538b21d455914dcedae772fc26b1f3b917c605e71e12c4b",
+      "name": "clean_pema",
+      "sources": [
+        {
+          "path": "/root/autodl-tmp/en454_stability_experiments_20260805/formal/clean_pema.parquet",
+          "sha256": "509018552d7270a5c538b21d455914dcedae772fc26b1f3b917c605e71e12c4b"
+        }
+      ]
+    },
+    "en454_existing_causal": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-30",
+        "date_min": "2019-04-04",
+        "days": 1394,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1391995,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "EN454",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/en454_existing_causal.parquet",
+      "materialized_sha256": "43b592f59bd01e8e93231796f47158c4fe81c9143c827e5bf36dae57126c3e22",
+      "name": "en454_existing_causal",
+      "sources": [
+        {
+          "path": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/en454_existing_causal.parquet",
+          "sha256": "43b592f59bd01e8e93231796f47158c4fe81c9143c827e5bf36dae57126c3e22"
+        }
+      ]
+    },
+    "m_raw_frozen": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-31",
+        "date_min": "2019-01-02",
+        "days": 1456,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1456000,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "M_raw",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/m_raw_frozen.parquet",
+      "materialized_sha256": "dd5bc8b2ff0d63936e3198572c4aedf84a949c732d80fb4a60b72de78e29f5d6",
+      "name": "m_raw_frozen",
+      "sources": [
+        {
+          "path": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/m_raw_frozen.parquet",
+          "sha256": "dd5bc8b2ff0d63936e3198572c4aedf84a949c732d80fb4a60b72de78e29f5d6"
+        }
+      ]
+    },
+    "pema_full454": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-30",
+        "date_min": "2019-04-04",
+        "days": 1394,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1391995,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "EN454_positive_ema",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/pema_full454.parquet",
+      "materialized_sha256": "374fda98fcfc8754aacaa4577136634145f92858121ad26fe455090498fca560",
+      "name": "pema_full454",
+      "sources": [
+        {
+          "path": "/root/autodl-tmp/en454_stability_experiments_20260805/formal/pema_full454.parquet",
+          "sha256": "374fda98fcfc8754aacaa4577136634145f92858121ad26fe455090498fca560"
+        }
+      ]
+    },
+    "t_frozen": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-31",
+        "date_min": "2019-04-02",
+        "days": 1397,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1397000,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "T",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/t_frozen.parquet",
+      "materialized_sha256": "f91cd54ea09368d8c478d976f202cca95461b928f8fde8e0fb26ba33124c212f",
+      "name": "t_frozen",
+      "sources": [
+        {
+          "path": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/t_frozen.parquet",
+          "sha256": "f91cd54ea09368d8c478d976f202cca95461b928f8fde8e0fb26ba33124c212f"
+        }
+      ]
+    },
+    "t_residual_frozen": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-31",
+        "date_min": "2019-04-02",
+        "days": 1397,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1397000,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "T_res",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/t_residual_frozen.parquet",
+      "materialized_sha256": "33a04e9fafb4a39565bf7936e6f43ede3cf0e323c7463b9e38734e46b8806870",
+      "name": "t_residual_frozen",
+      "sources": [
+        {
+          "path": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/t_residual_frozen.parquet",
+          "sha256": "33a04e9fafb4a39565bf7936e6f43ede3cf0e323c7463b9e38734e46b8806870"
+        }
+      ]
+    },
+    "x_mlp_frozen": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-31",
+        "date_min": "2019-01-02",
+        "days": 1456,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1456000,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "X",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/x_mlp_frozen.parquet",
+      "materialized_sha256": "5700218659e913dd7b4c00cfa8bb1d5f54a785c116a234cfa7cc6242758a998b",
+      "name": "x_mlp_frozen",
+      "sources": [
+        {
+          "path": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/x_mlp_frozen.parquet",
+          "sha256": "5700218659e913dd7b4c00cfa8bb1d5f54a785c116a234cfa7cc6242758a998b"
+        }
+      ]
+    },
+    "x_tree_frozen": {
+      "audit": {
+        "constant_days": 0,
+        "date_max": "2024-12-31",
+        "date_min": "2019-01-02",
+        "days": 1456,
+        "duplicate_keys": 0,
+        "nonfinite_factor_rows": 0,
+        "rows": 1456000,
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "family": "X_tree",
+      "kind": "parquet",
+      "materialized_path": "reports/dependencies/en454_without_multiaxis_joint_20260805/joint_j/route_batch/x_tree_frozen.parquet",
+      "materialized_sha256": "23b336ff2010c363e4b897edab1c108a5f0497ba30bb991a1e662f88e968b2b5",
+      "name": "x_tree_frozen",
+      "sources": [
+        {
+          "path": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch/x_tree_frozen.parquet",
+          "sha256": "23b336ff2010c363e4b897edab1c108a5f0497ba30bb991a1e662f88e968b2b5"
+        }
+      ]
+    }
+  }
+}
