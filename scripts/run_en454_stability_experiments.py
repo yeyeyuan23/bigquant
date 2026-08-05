@@ -354,6 +354,8 @@ def run(args: argparse.Namespace) -> None:
         raise RuntimeError("Candidate454 feature ordering does not match the manifest")
     blocks = continuous_blocks(panel.dates)
     instruments = np.asarray(panel.instruments)
+    if args.reuse_baseline_reference and args.baseline_reference is None:
+        raise ValueError("--reuse-baseline-reference requires --baseline-reference")
     rows = {name: [] for name in ROUTE_NAMES}
     metrics = []
     previous_pema_coef = None
@@ -366,9 +368,14 @@ def run(args: argparse.Namespace) -> None:
         raw_train = panel.candidate_values[training]
         ztrain = daily_cross_sectional_zscore(raw_train)
         train_targets = panel.targets[training]
-        baseline_coef, baseline_intercept, baseline_diag = fit_model(
-            ztrain, train_targets, all_columns, positive=False
-        )
+        if args.reuse_baseline_reference:
+            baseline_coef = None
+            baseline_intercept = None
+            baseline_diag = {"reused_frozen_reference": True}
+        else:
+            baseline_coef, baseline_intercept, baseline_diag = fit_model(
+                ztrain, train_targets, all_columns, positive=False
+            )
         positive_coef, positive_intercept, positive_diag = fit_model(
             ztrain, train_targets, all_columns, positive=True
         )
@@ -400,9 +407,6 @@ def run(args: argparse.Namespace) -> None:
         zprediction = daily_cross_sectional_zscore(panel.candidate_values[prediction])
         flat = zprediction.reshape(-1, len(candidate_ids)).astype(np.float64, copy=False)
         raw_by_route = {
-            "b0_full454": (flat @ baseline_coef + baseline_intercept).reshape(
-                len(prediction), len(instruments)
-            ),
             "pema_full454": (flat @ pema_coef + pema_intercept).reshape(
                 len(prediction), len(instruments)
             ),
@@ -410,6 +414,11 @@ def run(args: argparse.Namespace) -> None:
                 len(prediction), len(instruments)
             ),
         }
+        if not args.reuse_baseline_reference:
+            assert baseline_coef is not None and baseline_intercept is not None
+            raw_by_route["b0_full454"] = (
+                flat @ baseline_coef + baseline_intercept
+            ).reshape(len(prediction), len(instruments))
         for name, raw_prediction in raw_by_route.items():
             rows[name].extend(
                 ranked_rows(
@@ -441,7 +450,21 @@ def run(args: argparse.Namespace) -> None:
     route_audits = {}
     route_frames = {}
     for name in ROUTE_NAMES:
-        route = pd.concat(rows[name], ignore_index=True).sort_values(list(KEY_COLUMNS))
+        if name == "b0_full454" and args.reuse_baseline_reference:
+            route = pd.read_parquet(args.baseline_reference).loc[
+                :, [*KEY_COLUMNS, "factor"]
+            ].copy()
+            route["date"] = pd.to_datetime(route["date"]).dt.normalize()
+            route["instrument"] = route["instrument"].astype(str)
+            first_oos_date = panel.dates[blocks[0][1][0]]
+            last_oos_date = panel.dates[blocks[-1][1][-1]]
+            route = route.loc[
+                route["date"].between(first_oos_date, last_oos_date)
+            ].sort_values(list(KEY_COLUMNS))
+        else:
+            route = pd.concat(rows[name], ignore_index=True).sort_values(
+                list(KEY_COLUMNS)
+            )
         if route.empty or route.duplicated(list(KEY_COLUMNS)).any():
             raise RuntimeError(f"route {name} violates the unique nonempty contract")
         if not np.isfinite(route["factor"].to_numpy()).all():
@@ -480,6 +503,7 @@ def run(args: argparse.Namespace) -> None:
             "alpha": ALPHA,
             "l1_ratio": L1_RATIO,
             "ema_retention": EMA_RETENTION,
+            "baseline_reused": bool(args.reuse_baseline_reference),
         },
         "screen": {
             "minimum_coverage": MIN_COVERAGE,
@@ -503,6 +527,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--labels-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--baseline-reference", type=Path)
+    parser.add_argument(
+        "--reuse-baseline-reference",
+        action="store_true",
+        help="copy the frozen causal B0 route instead of refitting it in every block",
+    )
     parser.add_argument("--start-year", type=int, default=2019)
     parser.add_argument("--end-year", type=int, default=2024)
     return parser
