@@ -1,0 +1,46 @@
+epoch=1/3 updates=25 days=100 mean_ic=0.013946 std_ic=0.146974
+epoch=1/3 updates=50 days=200 mean_ic=0.055611 std_ic=0.175354
+epoch=1/3 updates=75 days=300 mean_ic=0.019020 std_ic=0.134637
+epoch=1/3 updates=100 days=400 mean_ic=0.019082 std_ic=0.160105
+epoch=1/3 updates=125 days=500 mean_ic=0.008547 std_ic=0.161170
+epoch=1/3 updates=150 days=600 mean_ic=0.025084 std_ic=0.113598
+epoch=1/3 updates=175 days=700 mean_ic=0.007284 std_ic=0.163589
+epoch=1/3 updates=200 days=800 mean_ic=0.012827 std_ic=0.094889
+epoch=1/3 updates=225 days=900 mean_ic=0.015199 std_ic=0.083064
+epoch=1/3 updates=250 days=1000 mean_ic=0.031621 std_ic=0.106858
+epoch=1/3 updates=275 days=1100 mean_ic=0.054822 std_ic=0.159778
+epoch=1/3 updates=300 days=1200 mean_ic=0.057518 std_ic=0.141986
+epoch=1/3 updates=325 days=1300 mean_ic=0.025323 std_ic=0.154645
+epoch=1/3 updates=350 days=1400 mean_ic=0.027204 std_ic=0.145593
+epoch=1 summary={"loss": -0.01026535189913242, "mean_ic": 0.02660255171669818, "std_ic": 0.1416096978128174}
+epoch=2/3 updates=25 days=100 mean_ic=0.015222 std_ic=0.081061
+epoch=2/3 updates=50 days=200 mean_ic=0.039864 std_ic=0.142797
+epoch=2/3 updates=75 days=300 mean_ic=0.052384 std_ic=0.135009
+epoch=2/3 updates=100 days=400 mean_ic=0.028714 std_ic=0.108105
+epoch=2/3 updates=125 days=500 mean_ic=0.024904 std_ic=0.099884
+epoch=2/3 updates=150 days=600 mean_ic=0.032567 std_ic=0.131981
+epoch=2/3 updates=175 days=700 mean_ic=0.032095 std_ic=0.123737
+epoch=2/3 updates=200 days=800 mean_ic=0.032264 std_ic=0.119602
+epoch=2/3 updates=225 days=900 mean_ic=0.024487 std_ic=0.118447
+epoch=2/3 updates=250 days=1000 mean_ic=0.027400 std_ic=0.108964
+epoch=2/3 updates=275 days=1100 mean_ic=0.044151 std_ic=0.133733
+epoch=2/3 updates=300 days=1200 mean_ic=0.044576 std_ic=0.119243
+epoch=2/3 updates=325 days=1300 mean_ic=0.043980 std_ic=0.148338
+epoch=2/3 updates=350 days=1400 mean_ic=0.023059 std_ic=0.155147
+epoch=2 summary={"loss": -0.018153696672441873, "mean_ic": 0.032950710401178876, "std_ic": 0.12563116772720911}
+epoch=3/3 updates=25 days=100 mean_ic=0.041475 std_ic=0.108640
+epoch=3/3 updates=50 days=200 mean_ic=0.040401 std_ic=0.150068
+epoch=3/3 updates=75 days=300 mean_ic=0.035163 std_ic=0.132244
+epoch=3/3 updates=100 days=400 mean_ic=0.028370 std_ic=0.081252
+epoch=3/3 updates=125 days=500 mean_ic=0.016048 std_ic=0.085372
+epoch=3/3 updates=150 days=600 mean_ic=0.034389 std_ic=0.099049
+epoch=3/3 updates=175 days=700 mean_ic=0.023794 std_ic=0.153893
+epoch=3/3 updates=200 days=800 mean_ic=0.043392 std_ic=0.088267
+epoch=3/3 updates=225 days=900 mean_ic=0.049631 std_ic=0.110952
+epoch=3/3 updates=250 days=1000 mean_ic=0.043460 std_ic=0.093295
+epoch=3/3 updates=275 days=1100 mean_ic=0.062513 std_ic=0.097249
+epoch=3/3 updates=300 days=1200 mean_ic=0.038833 std_ic=0.136147
+epoch=3/3 updates=325 days=1300 mean_ic=0.053437 std_ic=0.149119
+epoch=3/3 updates=350 days=1400 mean_ic=0.034434 std_ic=0.117020
+epoch=3 summary={"loss": -0.025776510289806064, "mean_ic": 0.039349634800555956, "std_ic": 0.11640960125914748}
+{"status": "complete", "checkpoint": "/root/autodl-tmp/m_multiaxis_full_20260804/formal_seed20260804/m_multiaxis_checkpoint.pt", "checkpoint_sha256": "4bfcba4a5d3b0d9e02380b234c0521dacb416000d94ee103260698c2777e48d5", "raw_fields": ["open", "high", "low", "close", "ask_price1", "ask_price2", "ask_price3", "bid_price1", "bid_price2", "bid_price3", "amount", "volume", "deal_number", "ask_volume1", "ask_volume2", "ask_volume3", "bid_volume1", "bid_volume2", "bid_volume3"], "axes": ["tail60_1m", "time_24x10m", "equal_volatility_24", "equal_turnover_24"], "training": {"protocol": "full_history_tail60_three_axis_multiday_ic", "start": "2019-01-02", "end": "2024-12-26", "epochs_requested": 3, "epochs_completed": 3, "learning_rate": 0.0003, "max_stocks": 700, "days_per_step": 4, "stability_weight": 0.15, "parameter_count": 542338, "epoch_records": [{"loss": -0.01026535189913242, "mean_ic": 0.02660255171669818, "std_ic": 0.1416096978128174}, {"loss": -0.018153696672441873, "mean_ic": 0.032950710401178876, "std_ic": 0.12563116772720911}, {"loss": -0.025776510289806064, "mean_ic": 0.039349634800555956, "std_ic": 0.11640960125914748}], "elapsed_seconds": 8348.005, "store_manifest_sha256": "77b1d80f3a725114970a05cc9a0ef2161a7ec28b0c2e2b788de5fe965cc2af4b"}}
