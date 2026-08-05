@@ -1,0 +1,56 @@
+{
+  "status": "complete",
+  "protocol": "en454_compressed_stability_experiment_v1",
+  "evidence_boundary": "Continuous causal OOS after a 60-day warmup; local metrics and J are not official platform scores.",
+  "candidate_count": 454,
+  "training": {
+    "train_days": 60,
+    "label_gap_days": 1,
+    "prediction_days": 20,
+    "alpha": 0.001,
+    "l1_ratio": 0.5,
+    "ema_retention": 0.5,
+    "baseline_reused": true
+  },
+  "screen": {
+    "minimum_coverage": 0.9,
+    "persistent_bad_positive_share": 0.4,
+    "cluster_abs_correlation": 0.95,
+    "scope": "training_window_only"
+  },
+  "routes": {
+    "b0_full454": {
+      "path": "/root/autodl-tmp/en454_stability_experiments_20260805/formal/b0_full454.parquet",
+      "sha256": "43b592f59bd01e8e93231796f47158c4fe81c9143c827e5bf36dae57126c3e22",
+      "rows": 1391995,
+      "days": 1394,
+      "date_min": "2019-04-04",
+      "date_max": "2024-12-30"
+    },
+    "pema_full454": {
+      "path": "/root/autodl-tmp/en454_stability_experiments_20260805/formal/pema_full454.parquet",
+      "sha256": "374fda98fcfc8754aacaa4577136634145f92858121ad26fe455090498fca560",
+      "rows": 1391995,
+      "days": 1394,
+      "date_min": "2019-04-04",
+      "date_max": "2024-12-30"
+    },
+    "clean_pema": {
+      "path": "/root/autodl-tmp/en454_stability_experiments_20260805/formal/clean_pema.parquet",
+      "sha256": "509018552d7270a5c538b21d455914dcedae772fc26b1f3b917c605e71e12c4b",
+      "rows": 1391995,
+      "days": 1394,
+      "date_min": "2019-04-04",
+      "date_max": "2024-12-30"
+    }
+  },
+  "baseline_replay_audit": {
+    "status": "ok",
+    "common_rows": 1391995,
+    "common_days": 1394,
+    "daily_spearman_mean": 1.0,
+    "daily_spearman_min": 0.9999999999999998
+  },
+  "rolling_metrics_sha256": "12707b310bf588fa7bf53b5fde38d4c7e0697dc83520f30c21afc9a03d03d314",
+  "elapsed_seconds": 2161.355
+}
