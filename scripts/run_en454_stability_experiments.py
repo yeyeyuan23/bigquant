@@ -156,7 +156,17 @@ def select_clean_features(
     zvalues: np.ndarray,
     targets: np.ndarray,
 ) -> tuple[np.ndarray, dict[str, object]]:
-    coverage = np.isfinite(raw_values).mean(axis=(0, 1))
+    # The panel is a date-by-global-instrument Cartesian product.  Rows without
+    # a target are outside the actual training cross-section and must not count
+    # as missing feature observations.  Fit uses this same finite-target mask.
+    valid_target = np.isfinite(targets)
+    coverage_denominator = int(valid_target.sum())
+    if coverage_denominator == 0:
+        raise RuntimeError("causal screen has no finite training targets")
+    coverage = (
+        np.isfinite(raw_values)
+        & valid_target[:, :, None]
+    ).sum(axis=(0, 1)) / coverage_denominator
     daily_ic = daily_feature_ic(zvalues, targets)
     finite_ic = np.isfinite(daily_ic)
     valid_days = finite_ic.sum(axis=0)
@@ -185,6 +195,7 @@ def select_clean_features(
         raise RuntimeError(f"causal screen retained only {len(selected)} features")
     audit = {
         "input_features": int(raw_values.shape[2]),
+        "coverage_denominator_rows": coverage_denominator,
         "coverage_pass": int(np.sum(coverage >= MIN_COVERAGE)),
         "persistent_bad": int(np.sum(persistent_bad)),
         "eligible_before_clustering": int(len(eligible)),

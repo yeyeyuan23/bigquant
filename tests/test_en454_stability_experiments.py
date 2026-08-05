@@ -47,6 +47,23 @@ def test_clean_screen_drops_low_coverage_and_persistent_reverse_signal() -> None
     assert audit["selected_features"] >= MODULE.MIN_SELECTED_FEATURES
 
 
+def test_clean_coverage_ignores_rows_without_training_targets() -> None:
+    rng = np.random.default_rng(9)
+    days, stocks, features = 60, 80, 70
+    targets = rng.normal(size=(days, stocks)).astype(np.float32)
+    targets[:, 60:] = np.nan
+    raw = rng.normal(size=(days, stocks, features)).astype(np.float32)
+    raw[:, 60:] = np.nan
+    raw[:, :, 0] = np.nan
+    raw[:, :60, 1] = targets[:, :60]
+    zvalues = MODULE.daily_cross_sectional_zscore(raw)
+    selected, audit = MODULE.select_clean_features(raw, zvalues, targets)
+    assert 0 not in selected
+    assert 1 in selected
+    assert audit["coverage_denominator_rows"] == days * 60
+    assert audit["coverage_pass"] == features - 1
+
+
 def test_positive_elasticnet_has_no_negative_coefficients() -> None:
     rng = np.random.default_rng(11)
     values = rng.normal(size=(8, 60, 6)).astype(np.float32)
