@@ -16,6 +16,18 @@ import os
 import pandas as pd
 import warnings
 
+
+def read_columns(path: Path, columns: Iterable[str]) -> pd.DataFrame:
+    """Read selected columns for the bundled offline component helpers."""
+
+    selected = list(columns)
+    if path.suffix == ".parquet":
+        return pd.read_parquet(path, columns=selected)
+    if path.suffix == ".feather":
+        return pd.read_feather(path, columns=selected)
+    raise ValueError(f"unsupported component input format: {path}")
+
+
 # ---- build_changjiang_components.py (_cj_) ----
 _cj_EPS = 1e-12
 
