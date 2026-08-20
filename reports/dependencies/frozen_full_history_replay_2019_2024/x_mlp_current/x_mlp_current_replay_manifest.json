@@ -1,7 +1,7 @@
 {
   "route": "x_mlp_current",
   "checkpoint_artifact": {
-    "path": "reports/dependencies/xt_protocol_retrain_20260803/x_mlp/final_full_history/unified_x_final_checkpoint.pt",
+    "path": "reports/dependencies/xt_retrain/x_mlp/final_full_history/unified_x_final_checkpoint.pt",
     "sha256": "b574e84293dfae5c3a2a81fcf96acb9e99726e9b28c6449074b7c634a942e835"
   },
   "device": "cuda",

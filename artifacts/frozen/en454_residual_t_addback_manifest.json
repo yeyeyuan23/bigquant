@@ -60,8 +60,8 @@
     }
   },
   "evidence_paths": {
-    "2023": "reports/dependencies/temporal_incremental_objective_20260803/residual_orth_stable/en454_addback_2023/paired_increment.json",
-    "2024": "reports/dependencies/temporal_incremental_objective_20260803/residual_orth_stable/audit_2024/en454_addback/paired_increment.json"
+    "2023": "reports/dependencies/en454_baseline/residual_orth_stable/en454_addback_2023/paired_increment.json",
+    "2024": "reports/dependencies/en454_baseline/residual_orth_stable/audit_2024/en454_addback/paired_increment.json"
   },
   "score_contract": "J = 0.3 * A + 0.7 * B",
   "caveat": "All selection metrics are local score proxies. AIStudio acceptance and official platform scores require separate validation."

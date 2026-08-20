@@ -9,7 +9,7 @@ pool_manifest=/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate4
 exp=$project_root/experiments/finals_pre_20260819/e7_incremental_score
 out=$project_root/reports/dependencies/finals_pre_20260819/e7_incremental_score
 mraw=$project_root/reports/dependencies/finals_pre_20260819/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet
-en454=$project_root/reports/dependencies/temporal_incremental_objective_20260803/baseline_partitions/year2024/candidate454_elasticnet_full_oos.parquet
+en454=$project_root/reports/dependencies/en454_baseline/baseline_partitions/year2024/candidate454_elasticnet_full_oos.parquet
 mkdir -p "$out"
 cd "$project_root"
 

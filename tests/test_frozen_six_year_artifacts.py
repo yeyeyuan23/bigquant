@@ -54,24 +54,24 @@ def test_selected_route_training_sources_are_retained() -> None:
     required_provenance = (
         (
             "reports/dependencies/"
-            "unified_alpha_fusion_suite_20260801_full_experts_v1/"
+            "unified_alpha_fusion_suite_full_experts_v1/"
             "lightgbm/run_manifest.json"
         ),
         (
-            "reports/dependencies/xt_protocol_retrain_20260803/"
+            "reports/dependencies/xt_retrain/"
             "t_temporal/screen_2023/d128_l2_dense_s1_e8/"
             "seed_20260803/command.json"
         ),
         (
-            "reports/dependencies/xt_protocol_retrain_20260803/"
+            "reports/dependencies/xt_retrain/"
             "x_mlp/final_full_history/final_checkpoint.json"
         ),
         (
-            "reports/dependencies/m_expanding_history_retrain_20260803/"
+            "reports/dependencies/m_raw_final_checkpoint/"
             "final_full_history_e3/run_manifest.json"
         ),
         (
-            "reports/dependencies/m_v3_final_2019_2024_seed_20260803/"
+            "reports/dependencies/m_v3_final/"
             "final_checkpoint_manifest.json"
         ),
     )

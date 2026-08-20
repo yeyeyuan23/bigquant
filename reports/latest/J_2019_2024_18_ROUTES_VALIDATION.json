@@ -1,8 +1,8 @@
 {
   "status": "pass",
   "canonical_csv": "reports/latest/J_2019_2024_18_ROUTES_FULL.csv",
-  "source_csv": "reports/dependencies/candidate454_joint_combo_audit_2019_2024_20260805/joint_official_proxy_ab_details.csv",
-  "schema_reference": "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/joint_official_proxy_ab_details.csv",
+  "source_csv": "reports/dependencies/candidate454_joint_combo_audit/joint_official_proxy_ab_details.csv",
+  "schema_reference": "reports/dependencies/candidate454_joint_full_history/joint_official_proxy_ab_details.csv",
   "row_count": 18,
   "column_count": 28,
   "schema_exact": true,

@@ -1,7 +1,7 @@
 {
   "route": "m_raw_expanding_e3",
   "checkpoint_artifact": {
-    "path": "reports/dependencies/m_expanding_history_retrain_20260803/final_full_history_e3/unified_microstructure_block_25_checkpoint.pt",
+    "path": "reports/dependencies/m_raw_final_checkpoint/final_full_history_e3/unified_microstructure_block_25_checkpoint.pt",
     "sha256": "252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb"
   },
   "device": "cuda",

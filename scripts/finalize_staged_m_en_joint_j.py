@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 CORE_ROUTE_ROOT = Path(
-    "reports/dependencies/candidate454_joint_full_history_2019_2024_20260804/route_batch"
+    "reports/dependencies/candidate454_joint_full_history/route_batch"
 )
 CORE_ROUTES = {
     "en454_existing_causal": "EN454",
@@ -219,7 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--en-dir", type=Path)
     parser.add_argument("--candidate454-store", type=Path, required=True)
     parser.add_argument(
-        "--report-name", default="en454_m_multiaxis_staged_joint_20260805"
+        "--report-name", default="en454_m_multiaxis_staged_joint"
     )
     return parser
 

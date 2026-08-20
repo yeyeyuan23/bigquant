@@ -1,7 +1,7 @@
 {
   "route": "m_l5_final",
   "checkpoint_artifact": {
-    "path": "reports/dependencies/m_v3_final_2019_2024_seed_20260803/unified_microstructure_v3_final_checkpoint.pt",
+    "path": "reports/dependencies/m_v3_final/unified_microstructure_v3_final_checkpoint.pt",
     "sha256": "513e7d6aa77a007d029e63d8bd4b2651b86f6c46d20f0f4f07500d2dc0d8eb11"
   },
   "device": "cuda",

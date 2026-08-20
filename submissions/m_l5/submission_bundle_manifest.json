@@ -40,5 +40,5 @@
       "sha256": "145d89f681678e2ed400eea1d779afdeababd1cbbf2f56a7db9f679746fa05c3"
     }
   ],
-  "checkpoint_manifest": "reports/dependencies/m_v3_final_2019_2024_seed_20260803/final_checkpoint_manifest.json"
+  "checkpoint_manifest": "reports/dependencies/m_v3_final/final_checkpoint_manifest.json"
 }

@@ -83,7 +83,7 @@ def import_submission(repo_root: Path, route: str, submission_package: Path | No
         package = repo_root / "submissions"
         module_name = "unified_x"
     elif route == "m_raw_expanding_e3":
-        package = repo_root / "submissions" / "m_expanding_history_e3_20260803"
+        package = repo_root / "submissions" / "m_raw"
         module_name = "unified_m_raw"
     elif route == "t_residual_best":
         package = repo_root / "submissions" / "en454_t_residual_020"

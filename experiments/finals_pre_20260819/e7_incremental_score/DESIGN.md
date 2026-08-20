@@ -76,7 +76,7 @@ X_tree 控制组是这个系统的招牌演示：同一对因子，B 的排序�
 
 ## 5. 实施（编号 E7）
 
-1. **基座**：优先复用已有的 X 路线 LGBM 产物做 ŷ_pool（`xt_protocol_retrain_20260803` /
+1. **基座**：优先复用已有的 X 路线 LGBM 产物做 ŷ_pool（`xt_retrain` /
    x_tree 相关 OOS 序列，若覆盖 2024）；没有现成的就补训：454 特征、2024 年季度 refit
    expanding walk-forward，CPU（1TB 内存机器，LGBM 每折分钟级）。
 2. **第一层脚本**：读 ŷ_pool + 候选序列 + labels → 日度 RIC 序列与聚合，四个候选一起跑。

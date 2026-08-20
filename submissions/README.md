@@ -5,9 +5,9 @@
 
 | 目录 | 角色 |
 |---|---|
-| `m_expanding_history_e3_20260803/` | **正式冠军**：M_raw 扩窗 e3（公榜 0.9548 / 私榜 0.8874，提交 id `6d0fe02c-…`） |
+| `m_raw/` | **正式冠军**：M_raw 扩窗 e3（公榜 0.9548 / 私榜 0.8874，提交 id `6d0fe02c-…`） |
 | `m_l5/`, `m_l5_oos2023/` | M 五档挑战线提交包（未超越冠军，保留证据） |
-| `m_multiaxis_full_20260804/` | M multiaxis 挑战线提交包 |
+| `m_multiaxis/` | M multiaxis 挑战线提交包 |
 | `elasticnet454_formal/` | EN454 基线正式包 |
 | `en454_t_residual_020/` | EN454 + T 残差 0.20 路线 |
 | `t_protocol_best/` | T 协议最优路线 |

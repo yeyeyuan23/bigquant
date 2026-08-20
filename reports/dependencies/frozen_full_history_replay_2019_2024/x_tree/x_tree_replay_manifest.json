@@ -1,7 +1,7 @@
 {
   "route": "x_tree",
   "checkpoint_artifact": {
-    "path": "reports/dependencies/unified_alpha_fusion_suite_20260801_full_experts_v1/lightgbm/unified_lightgbm_2024_h2_checkpoint.txt",
+    "path": "reports/dependencies/unified_alpha_fusion_suite_full_experts_v1/lightgbm/unified_lightgbm_2024_h2_checkpoint.txt",
     "sha256": "62ac2901604b41ecd5953180a928d2a66fccfb3447603324d72c6fbb41eef2a4"
   },
   "files": [

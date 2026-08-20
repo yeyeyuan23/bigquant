@@ -1,0 +1,31 @@
+{
+  "schema_version": "candidate-pool-availability-v1",
+  "active_eligible_count": 454,
+  "available_candidate_count": 46,
+  "required_candidate_count": 1,
+  "missing_required_count": 0,
+  "missing_required_candidates": [],
+  "available_without_active_source": [],
+  "available_retired_candidates": [
+    "FR-005",
+    "FR-008",
+    "FR-009",
+    "FR-011",
+    "FR-012",
+    "FR-014",
+    "INT-003",
+    "PV-008",
+    "PV-009",
+    "PV-010",
+    "PV-011",
+    "PV-013",
+    "PV-015",
+    "PV-016",
+    "PV-017",
+    "PV-018",
+    "PV-019",
+    "PV-022"
+  ],
+  "scanner_source": "scripts/audit_submission_candidate_eligibility.py",
+  "scanner_sha256": "19af59afb50439c0185007cd871f4557e82828300c945418fdde318628478660"
+}

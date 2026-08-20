@@ -42,7 +42,7 @@ def main() -> int:
         "--source-dir",
         type=Path,
         default=Path(
-            "reports/dependencies/m_expanding_history_retrain_20260803/combinations_v1/"
+            "reports/dependencies/m_raw_final_checkpoint/combinations_v1/"
             "moe/txm_rolling_unseen_routes"
         ),
     )

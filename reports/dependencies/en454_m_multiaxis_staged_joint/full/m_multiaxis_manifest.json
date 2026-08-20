@@ -1,0 +1,14 @@
+{
+  "status": "complete",
+  "route": "/root/autodl-tmp/en454_stability_experiments_20260805/m_multiaxis_full.parquet",
+  "route_sha256": "f0469b962feda4455d2673cd636cbd9fa40bbc48f753a723e1a2beb3516f7f30",
+  "checkpoint": "reports/dependencies/m_multiaxis/formal_seed20260804/m_multiaxis_checkpoint.pt",
+  "checkpoint_sha256": "4bfcba4a5d3b0d9e02380b234c0521dacb416000d94ee103260698c2777e48d5",
+  "store_manifest_sha256": "77b1d80f3a725114970a05cc9a0ef2161a7ec28b0c2e2b788de5fe965cc2af4b",
+  "rows": 1451627,
+  "days": 1455,
+  "date_min": "2019-01-02",
+  "date_max": "2024-12-30",
+  "elapsed_seconds": 5944.611,
+  "evidence_boundary": "Pure replay of a checkpoint trained on 2019-2024; this route includes training dates and is not strict OOS or an official score."
+}

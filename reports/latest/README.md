@@ -52,6 +52,6 @@ are scored over a period that includes checkpoint training dates. The result
 is not strict OOS evidence and is not an official platform score.
 
 The reproducibility source remains under
-`reports/dependencies/candidate454_joint_combo_audit_2019_2024_20260805/`; frozen replay and
+`reports/dependencies/candidate454_joint_combo_audit/`; frozen replay and
 checkpoint dependencies remain under `reports/dependencies/` and must not be
 removed merely to simplify the report view.
