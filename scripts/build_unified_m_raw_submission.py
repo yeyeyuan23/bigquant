@@ -9,7 +9,7 @@ import json
 import py_compile
 import tempfile
 import zlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -344,7 +344,7 @@ def main() -> int:
     report_path = args.output_dir / "unified_m_raw_validation.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     report = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "entrypoint": str(module_paths["unified_m_raw.py"]),
         "modules": {
             filename: {

@@ -198,8 +198,8 @@ def select_clean_features(
         "coverage_denominator_rows": coverage_denominator,
         "coverage_pass": int(np.sum(coverage >= MIN_COVERAGE)),
         "persistent_bad": int(np.sum(persistent_bad)),
-        "eligible_before_clustering": int(len(eligible)),
-        "selected_features": int(len(selected)),
+        "eligible_before_clustering": len(eligible),
+        "selected_features": len(selected),
         "cluster_fallback": fallback,
         "coverage_min_selected": float(coverage[selected].min()),
         "median_ic_median_selected": float(np.nanmedian(median_ic[selected])),
@@ -231,7 +231,7 @@ def fit_model(
     )
     model.fit(matrix, target)
     diagnostics = {
-        "train_rows": int(len(target)),
+        "train_rows": len(target),
         "nonzero_features": int(np.count_nonzero(np.abs(model.coef_) > 1e-12)),
         "coefficient_l1": float(np.abs(model.coef_).sum()),
         "iterations": int(model.n_iter_),
@@ -323,7 +323,7 @@ def baseline_replay_audit(route: pd.DataFrame, reference_path: Path) -> dict[str
     )
     return {
         "status": "ok",
-        "common_rows": int(len(merged)),
+        "common_rows": len(merged),
         "common_days": int(merged["date"].nunique()),
         "daily_spearman_mean": float(daily.mean()),
         "daily_spearman_min": float(daily.min()),
@@ -475,7 +475,7 @@ def run(args: argparse.Namespace) -> None:
         route_audits[name] = {
             "path": str(path),
             "sha256": sha256(path),
-            "rows": int(len(route)),
+            "rows": len(route),
             "days": int(route["date"].nunique()),
             "date_min": str(route["date"].min().date()),
             "date_max": str(route["date"].max().date()),

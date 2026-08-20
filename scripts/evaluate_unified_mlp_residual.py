@@ -20,6 +20,7 @@ if str(ROOT / "scripts") not in sys.path:
 
 from evaluate_unified_mlp import load_panel, model_inputs
 from evaluate_unified_temporal import (
+    centered_correlation,
     eligible_target_indices,
     file_sha256,
     fold_boundaries,
@@ -27,7 +28,6 @@ from evaluate_unified_temporal import (
     residualize_targets_against_baseline,
     validate_residual_baseline_manifest,
 )
-from evaluate_unified_temporal import centered_correlation
 
 from bigalpha2026.alpha_models import CandidateMLPConfig, ModelFactory
 

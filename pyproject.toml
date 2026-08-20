@@ -34,7 +34,9 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-extend-exclude = ["third_party"]
+# Frozen platform submission bundles and concluded experiment staging are
+# generated artifacts; they are archived as-is and excluded from linting.
+extend-exclude = ["third_party", "submissions", "remote_submission_notebooks", "work"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

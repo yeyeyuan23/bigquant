@@ -18,7 +18,7 @@ MODEL_ROOT = ROOT / "work" / "m_multiaxis"
 if str(MODEL_ROOT) not in sys.path:
     sys.path.insert(0, str(MODEL_ROOT))
 
-from unified_m_multiaxis_model import (  # noqa: E402
+from unified_m_multiaxis_model import (
     RAW_FIELDS,
     load_checkpoint,
     pack_multiaxis_day,
@@ -135,7 +135,7 @@ def run(args: argparse.Namespace) -> None:
             {
                 "date": str(day.date()),
                 "store_keys": len(keys),
-                "available_keys": int(len(available)),
+                "available_keys": len(available),
             }
         )
         if index % 25 == 0 or index == len(days):
@@ -160,7 +160,7 @@ def run(args: argparse.Namespace) -> None:
         "checkpoint": str(args.checkpoint),
         "checkpoint_sha256": sha256(args.checkpoint),
         "store_manifest_sha256": sha256(args.store / "manifest.json"),
-        "rows": int(len(route)),
+        "rows": len(route),
         "days": int(route["date"].nunique()),
         "date_min": str(route["date"].min().date()),
         "date_max": str(route["date"].max().date()),
