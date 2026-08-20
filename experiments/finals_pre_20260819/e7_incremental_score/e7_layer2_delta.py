@@ -27,8 +27,8 @@ for entry in (ROOT / "src", ROOT / "scripts"):
         sys.path.insert(0, str(entry))
 
 import lightgbm as lgb
-
 from evaluate_unified_temporal import load_labels
+
 from bigalpha2026.alpha_models.training_data import (
     load_candidate_feature_panel,
     panel_arrays,
@@ -167,7 +167,7 @@ def main() -> int:
         mean_delta = float(per_day.mean())
         std_delta = float(per_day.std())
         summaries[name] = {
-            "days": int(len(per_day)),
+            "days": len(per_day),
             "delta_ic_mean": mean_delta,
             "delta_ic_tstat": mean_delta / std_delta * np.sqrt(len(per_day))
             if std_delta > 0

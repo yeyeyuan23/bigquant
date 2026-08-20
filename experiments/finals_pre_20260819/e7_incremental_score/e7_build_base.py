@@ -21,8 +21,8 @@ for entry in (ROOT / "src", ROOT / "scripts"):
         sys.path.insert(0, str(entry))
 
 import lightgbm as lgb
-
 from evaluate_unified_temporal import load_labels
+
 from bigalpha2026.alpha_models.training_data import (
     load_candidate_feature_panel,
     panel_arrays,
@@ -59,6 +59,12 @@ def main() -> int:
     parser.add_argument("--colsample", type=float, default=0.8)
     parser.add_argument("--seed", type=int, default=20260801)
     parser.add_argument("--n-jobs", type=int, default=64)
+    parser.add_argument(
+        "--exclude-candidate",
+        type=str,
+        default=None,
+        help="candidate id to drop from the pool (true leave-one-out base)",
+    )
     args = parser.parse_args()
 
     labels = load_labels(args.data_root, args.train_start_year, max(args.years))
@@ -73,6 +79,18 @@ def main() -> int:
     dates = arrays.dates
     instruments = np.asarray(arrays.instruments)
     X = arrays.candidate_values
+    if args.exclude_candidate:
+        matches = [
+            index
+            for index, column in enumerate(arrays.candidate_columns)
+            if column.endswith(args.exclude_candidate)
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"--exclude-candidate {args.exclude_candidate} matched {len(matches)} columns"
+            )
+        X = np.delete(X, matches[0], axis=2)
+        print(f"excluded {args.exclude_candidate}; features={X.shape[2]}", flush=True)
     y = arrays.targets
     day_count, stock_count, feature_count = X.shape
     print(f"panel days={day_count} stocks={stock_count} features={feature_count}", flush=True)
@@ -127,7 +145,7 @@ def main() -> int:
         block_meta.append(
             {
                 "block": block_index,
-                "train_days": int(len(training)),
+                "train_days": len(training),
                 "prediction_start": str(dates[int(prediction[0])].date()),
                 "prediction_end": str(dates[int(prediction[-1])].date()),
                 "rank_ic_mean": float(np.nanmean(daily_ic)) if daily_ic else None,

@@ -116,7 +116,7 @@ def main() -> int:
         ric_std = float(frame_series["ric"].std())
         stress_part = frame_series.loc[frame_series["stress"], "ric"]
         summaries[name] = {
-            "days": int(len(frame_series)),
+            "days": len(frame_series),
             "ric_mean": ric_mean,
             "ric_ir": ric_mean / ric_std if ric_std > 0 else None,
             "ric_tstat": ric_mean / ric_std * np.sqrt(len(frame_series))
