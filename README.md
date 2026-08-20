@@ -60,8 +60,7 @@ artifacts/                 # 冻结与传输清单
 | `/root/autodl-tmp/data/` | 运行时数据合同：`labels/`、`universe/`、`exposures/`、`factors/`（candidate_pool）、`features/`（FACTORLIB / ALL36 / MICRO_DAILY_FULL 等）、pool manifest |
 | `/root/autodl-tmp/data/e2e_maps/` | e2e instrument 映射表与审计 report |
 | `/root/autodl-tmp/unified_microstructure_store_v2_2019_2024/` | M 训练用 17 通道分钟 store（schema v2，1456 交易日） |
-| `/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store/` | Candidate454 特征 store |
-| `/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/` | 462 补全版 store（E7 使用） |
+| `/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/` | Candidate454 特征 store（462 补全版，E7 与评分使用） |
 | `/root/autodl-tmp/m_v3_deep_book_context_2019_2024/` | L5 日级 deep-book context（v2/L5 挑战线用） |
 | `/root/autodl-tmp/m_e2e_raw_store/` | e2e 压缩原始分钟数据 |
 | `/root/autodl-tmp/conda-envs/quant/bin/python` | 运行环境（torch 2.6.0+cu124） |
