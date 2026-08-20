@@ -1,0 +1,112 @@
+{
+  "model": "lightgbm_candidate454_base",
+  "protocol": "expanding_history_20d_predict",
+  "label_isolation_gap_days": 1,
+  "years": [
+    2024
+  ],
+  "candidate_count": 454,
+  "params": {
+    "num_leaves": 63,
+    "n_estimators": 400,
+    "learning_rate": 0.05,
+    "min_child_samples": 200,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "seed": 20260801
+  },
+  "rank_ic_mean_overall": 0.06343167472109175,
+  "blocks": [
+    {
+      "block": 0,
+      "train_days": 1213,
+      "prediction_start": "2024-01-02",
+      "prediction_end": "2024-01-29",
+      "rank_ic_mean": 0.09532289968083818
+    },
+    {
+      "block": 1,
+      "train_days": 1233,
+      "prediction_start": "2024-01-30",
+      "prediction_end": "2024-03-05",
+      "rank_ic_mean": -0.017073324812796536
+    },
+    {
+      "block": 2,
+      "train_days": 1253,
+      "prediction_start": "2024-03-06",
+      "prediction_end": "2024-04-02",
+      "rank_ic_mean": 0.080137898886064
+    },
+    {
+      "block": 3,
+      "train_days": 1273,
+      "prediction_start": "2024-04-03",
+      "prediction_end": "2024-05-07",
+      "rank_ic_mean": 0.020014968627988055
+    },
+    {
+      "block": 4,
+      "train_days": 1293,
+      "prediction_start": "2024-05-08",
+      "prediction_end": "2024-06-04",
+      "rank_ic_mean": 0.04906589646699337
+    },
+    {
+      "block": 5,
+      "train_days": 1313,
+      "prediction_start": "2024-06-05",
+      "prediction_end": "2024-07-03",
+      "rank_ic_mean": 0.04319446910998724
+    },
+    {
+      "block": 6,
+      "train_days": 1333,
+      "prediction_start": "2024-07-04",
+      "prediction_end": "2024-07-31",
+      "rank_ic_mean": 0.023994972819742503
+    },
+    {
+      "block": 7,
+      "train_days": 1353,
+      "prediction_start": "2024-08-01",
+      "prediction_end": "2024-08-28",
+      "rank_ic_mean": 0.06768255103102969
+    },
+    {
+      "block": 8,
+      "train_days": 1373,
+      "prediction_start": "2024-08-29",
+      "prediction_end": "2024-09-27",
+      "rank_ic_mean": -0.004933582881073216
+    },
+    {
+      "block": 9,
+      "train_days": 1393,
+      "prediction_start": "2024-09-30",
+      "prediction_end": "2024-11-01",
+      "rank_ic_mean": 0.03743026977344244
+    },
+    {
+      "block": 10,
+      "train_days": 1413,
+      "prediction_start": "2024-11-04",
+      "prediction_end": "2024-11-29",
+      "rank_ic_mean": 0.055936728988873585
+    },
+    {
+      "block": 11,
+      "train_days": 1433,
+      "prediction_start": "2024-12-02",
+      "prediction_end": "2024-12-27",
+      "rank_ic_mean": 0.08078061592444123
+    },
+    {
+      "block": 12,
+      "train_days": 1453,
+      "prediction_start": "2024-12-30",
+      "prediction_end": "2024-12-31",
+      "rank_ic_mean": 0.2930574077586622
+    }
+  ]
+}

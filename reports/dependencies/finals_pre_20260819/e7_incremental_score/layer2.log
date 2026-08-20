@@ -1,0 +1,29 @@
+panel days=484 stocks=1396 features=454
+mraw block=0 done
+mraw block=1 done
+mraw block=2 done
+mraw block=3 done
+mraw block=4 done
+mraw block=5 done
+mraw block=6 done
+mraw block=7 done
+mraw block=8 done
+mraw block=9 done
+mraw block=10 done
+mraw block=11 done
+mraw block=12 done
+noise_control block=0 done
+noise_control block=1 done
+noise_control block=2 done
+noise_control block=3 done
+noise_control block=4 done
+noise_control block=5 done
+noise_control block=6 done
+noise_control block=7 done
+noise_control block=8 done
+noise_control block=9 done
+noise_control block=10 done
+noise_control block=11 done
+noise_control block=12 done
+mraw {"days": 241, "delta_ic_mean": 0.0026028495055865734, "delta_ic_tstat": 1.8554295251932071, "ic_base_mean": 0.01739503487995183, "ic_aug_mean": 0.019997884385538404}
+noise_control {"days": 241, "delta_ic_mean": 0.001957361077380762, "delta_ic_tstat": 1.4304090325356134, "ic_base_mean": 0.01739503487995183, "ic_aug_mean": 0.019352395957332597}
