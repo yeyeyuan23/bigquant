@@ -2,7 +2,7 @@
 set -uo pipefail
 project_root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
-data_root=/root/autodl-tmp/projects/bigquant/data
+data_root=/root/autodl-tmp/data
 out_root=$project_root/reports/dependencies/finals_pre_20260819
 cd "$project_root"
 "$python_bin" scripts/score_submission_j_stability.py \

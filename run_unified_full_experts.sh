@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
+DATA_ROOT="/root/autodl-tmp/data"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 STORE_ROOT="/root/autodl-tmp/unified_microstructure_store_v2_2019_2024"
 RUN_ID="${UNIFIED_RUN_ID:-20260801_full_experts_v1}"

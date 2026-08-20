@@ -3,7 +3,7 @@
 set -uo pipefail
 project_root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
-data_root=/root/autodl-tmp/projects/bigquant/data
+data_root=/root/autodl-tmp/data
 pool_path=/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/features
 pool_manifest=/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/candidate454_manifest.json
 exp=$project_root/experiments/finals_pre_20260819/e7_incremental_score

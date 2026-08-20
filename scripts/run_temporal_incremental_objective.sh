@@ -2,9 +2,9 @@
 set -euo pipefail
 
 variant=${1:-residual_orth_stable}
-repo_root=/root/autodl-tmp/projects/bigquant-unified-integration
+repo_root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
-data_root=/root/autodl-tmp/projects/bigquant/data
+data_root=/root/autodl-tmp/data
 candidate_root=/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store
 run_root="$repo_root/reports/dependencies/temporal_incremental_objective_20260803"
 baseline_root="$run_root/candidate454_elasticnet_oos_2019_2024"

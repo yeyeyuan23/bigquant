@@ -15,7 +15,7 @@ from pathlib import Path
 
 import torch
 
-ROOT = Path("/root/autodl-tmp/projects/bigquant-unified-integration")
+ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

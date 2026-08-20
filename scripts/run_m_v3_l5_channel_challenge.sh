@@ -2,10 +2,10 @@
 set -euo pipefail
 
 project_root=/root/autodl-tmp/projects/bigquant-m-v3-l5-channels-20260803
-integration_root=/root/autodl-tmp/projects/bigquant-unified-integration
+integration_root=/root/autodl-tmp/projects/bigquant-default
 m_v2_root=/root/autodl-tmp/projects/bigquant-m-v2-l5-gated-20260803/reports/m_v2_flow_gated_20260803
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
-data_root=/root/autodl-tmp/projects/bigquant/data
+data_root=/root/autodl-tmp/data
 micro_store=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
 deep_book_dir=/root/autodl-tmp/m_v3_deep_book_context_2019_2024
 run_root="$project_root/reports/m_v3_l5_channels_20260803"

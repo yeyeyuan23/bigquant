@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-project_root=/root/autodl-tmp/projects/bigquant-unified-integration
+project_root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
-data_root=/root/autodl-tmp/projects/bigquant/data
+data_root=/root/autodl-tmp/data
 micro_store=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
 run_root="$project_root/reports/dependencies/m_expanding_history_retrain_20260803"
 
@@ -59,7 +59,7 @@ best_epochs=$(
 import json
 from pathlib import Path
 
-path = Path("/root/autodl-tmp/projects/bigquant-unified-integration/reports/dependencies/m_expanding_history_retrain_20260803/holdout_j_scores.json")
+path = Path("/root/autodl-tmp/projects/bigquant-default/reports/dependencies/m_expanding_history_retrain_20260803/holdout_j_scores.json")
 summaries = json.loads(path.read_text())["summaries"]
 winner = max(summaries, key=lambda row: (row["J_stable"], row["J_worst"]))
 print(6 if "_e6/" in winner["version"] else 3)
@@ -70,7 +70,7 @@ print(6 if "_e6/" in winner["version"] else 3)
 import json
 from pathlib import Path
 
-run_root = Path("/root/autodl-tmp/projects/bigquant-unified-integration/reports/dependencies/m_expanding_history_retrain_20260803")
+run_root = Path("/root/autodl-tmp/projects/bigquant-default/reports/dependencies/m_expanding_history_retrain_20260803")
 scores = json.loads((run_root / "holdout_j_scores.json").read_text())
 winner = max(scores["summaries"], key=lambda row: (row["J_stable"], row["J_worst"]))
 payload = {
@@ -108,7 +108,7 @@ import hashlib
 import json
 from pathlib import Path
 
-run_root = Path("/root/autodl-tmp/projects/bigquant-unified-integration/reports/dependencies/m_expanding_history_retrain_20260803")
+run_root = Path("/root/autodl-tmp/projects/bigquant-default/reports/dependencies/m_expanding_history_retrain_20260803")
 selection = json.loads((run_root / "selection.json").read_text())
 epochs = selection["selected_epochs"]
 output_dir = run_root / f"final_full_history_e{epochs}"

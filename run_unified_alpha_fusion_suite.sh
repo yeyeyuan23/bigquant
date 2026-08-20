@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
+DATA_ROOT="/root/autodl-tmp/data"
 CANDIDATE_STORE="/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store"
 CANDIDATE_POOL="${UNIFIED_CANDIDATE_POOL:-$CANDIDATE_STORE/features}"
 CANDIDATE_MANIFEST="${UNIFIED_CANDIDATE_MANIFEST:-$CANDIDATE_STORE/candidate454_manifest.json}"
@@ -11,7 +11,7 @@ PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 RUN_ID="${UNIFIED_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 RUN_ROOT="${UNIFIED_RUN_ROOT:-$PROJECT_ROOT/reports/unified_alpha_fusion_suite_$RUN_ID}"
 LOG_ROOT="$RUN_ROOT/logs"
-J_REPORT_ROOT="/root/autodl-tmp/projects/bigquant/reports"
+J_REPORT_ROOT="/root/autodl-tmp/projects/bigquant-default/reports"
 START_STAGE="${UNIFIED_START_STAGE:-all}"
 REUSE_TEMPORAL_BASE_CHECKPOINTS="${UNIFIED_REUSE_TEMPORAL_BASE_CHECKPOINTS:-0}"
 

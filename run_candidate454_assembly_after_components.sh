@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="/root/autodl-tmp/projects/bigquant-candidate454-completion"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
-DATA_ROOT="/root/autodl-tmp/projects/bigquant/data"
+DATA_ROOT="/root/autodl-tmp/data"
 WORK_ROOT="/root/autodl-tmp/candidate454_completion_full_2019_2024"
 LOG_ROOT="$WORK_ROOT/logs"
 MAX_POLLS="${CANDIDATE454_MAX_POLLS:-360}"

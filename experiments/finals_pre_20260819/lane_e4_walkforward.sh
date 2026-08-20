@@ -3,7 +3,7 @@
 set -uo pipefail
 project_root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
-data_root=/root/autodl-tmp/projects/bigquant/data
+data_root=/root/autodl-tmp/data
 micro_store=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
 out_root=$project_root/reports/dependencies/finals_pre_20260819/e4_walkforward
 mkdir -p "$out_root"

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root=/root/autodl-tmp/projects/bigquant-unified-integration
+repo_root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
-data_root=/root/autodl-tmp/projects/bigquant/data
+data_root=/root/autodl-tmp/data
 candidate_root=/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store
 suite_root="$repo_root/reports/dependencies/unified_alpha_fusion_suite_20260801_full_experts_v1"
 stage_root="$suite_root/residual_boosting_end_to_end"
