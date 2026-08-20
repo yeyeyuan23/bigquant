@@ -1,0 +1,135 @@
+{
+  "note": "J is the local A/B proxy, not official platform score. Every route is scored in a separate yearly Elastic Net fit on Candidate454 plus exactly that one route. Routes never compete with sibling M versions inside the same fit.",
+  "protocol": "candidate454_individual_submission_J_stability_v3",
+  "reference": {
+    "candidate_count": 454,
+    "date_max": "2024-12-31",
+    "date_min": "2019-01-02",
+    "direction_calibration_years": [
+      2019,
+      2020,
+      2021,
+      2022
+    ],
+    "manifest": "/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store/candidate454_manifest.json",
+    "manifest_sha256": "e0a7ba56a07f681c858064110a99c8710d1e76a7a509ff96fe0a8cd66bd4042b",
+    "negative_direction_count": 43,
+    "positive_direction_count": 411,
+    "rows": 1214000,
+    "store": "/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store",
+    "years": [
+      2019,
+      2020,
+      2021,
+      2022,
+      2024
+    ]
+  },
+  "reference_factor_count": 454,
+  "route_count": 2,
+  "scoring_mode": "individual_candidate454_elastic_net",
+  "summaries": [
+    {
+      "J_mean": 0.9338461538461538,
+      "J_stable": 0.9338461538461538,
+      "J_std": 0.0,
+      "J_worst": 0.9338461538461538,
+      "lambda_std": 0.5,
+      "version": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet",
+      "year_scores": [
+        {
+          "A": 1.0,
+          "B": 0.9054945054945055,
+          "J": 0.9338461538461538,
+          "cache_hit": false,
+          "cache_key": "88d85412fba554c6bebab486e7ce929c05d9f36a4e8058d56b916b05c8d76c9e",
+          "candidate_route_count": 1,
+          "date_max": "2024-12-31",
+          "date_min": "2024-01-02",
+          "protocol": "candidate454_individual_submission_J_stability_v3",
+          "reference_factor_count": 454,
+          "route_source_digest": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet:e7564faa40e43e1fc2036e5393025531cc32ab27f99e95eb5c4b2c7d1fc5e475",
+          "rows": 242000,
+          "score": {
+            "a_long_short_sharpe": 6.975853458170818,
+            "a_long_short_sharpe_percentile": 1.0,
+            "a_proxy": 1.0,
+            "a_rank_ic_ir": 0.9100733331112935,
+            "a_rank_ic_ir_percentile": 1.0,
+            "a_rank_ic_mean": 0.052276913369226845,
+            "a_rank_ic_mean_percentile": 1.0,
+            "a_stress_ic_ir": 0.5302950873026239,
+            "a_stress_ic_ir_percentile": 1.0,
+            "b_mean_abs_weight": 0.01673881937186961,
+            "b_model_score": 1.652338888763835,
+            "b_nonzero_window_ratio": 1.0,
+            "b_proxy": 0.9054945054945055,
+            "b_std_abs_weight": 0.010130379115352112,
+            "reference_factor_count": 454.0,
+            "score_days": 241.0,
+            "score_proxy": 0.9338461538461538,
+            "score_weight_windows": 10.0
+          },
+          "score_reference_digest": "6c2b21fb874b34878c29042de923689816c9c9760c62b05870bf8ff81d119091",
+          "scoring": "frozen_direction_candidate454_plus_one_route",
+          "version": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet",
+          "year": 2024
+        }
+      ],
+      "years": [
+        2024
+      ]
+    },
+    {
+      "J_mean": 0.9868681318681318,
+      "J_stable": 0.9868681318681318,
+      "J_std": 0.0,
+      "J_worst": 0.9868681318681318,
+      "lambda_std": 0.5,
+      "version": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e0_holdout_2024_e6/unified_microstructure_full_oos.parquet",
+      "year_scores": [
+        {
+          "A": 0.9972527472527473,
+          "B": 0.9824175824175824,
+          "J": 0.9868681318681318,
+          "cache_hit": false,
+          "cache_key": "46f934e796ba864138d821574be6b97c1a350e823bf7c9e4720923318dad9b09",
+          "candidate_route_count": 1,
+          "date_max": "2024-12-31",
+          "date_min": "2024-01-02",
+          "protocol": "candidate454_individual_submission_J_stability_v3",
+          "reference_factor_count": 454,
+          "route_source_digest": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e0_holdout_2024_e6/unified_microstructure_full_oos.parquet:5b9b04da241118bce1d0327510e7c5e611a73d0f5df9c5369e0ec635e5708a17",
+          "rows": 242000,
+          "score": {
+            "a_long_short_sharpe": 7.097070735540499,
+            "a_long_short_sharpe_percentile": 1.0,
+            "a_proxy": 0.9972527472527473,
+            "a_rank_ic_ir": 0.891115984591946,
+            "a_rank_ic_ir_percentile": 1.0,
+            "a_rank_ic_mean": 0.047939699277590474,
+            "a_rank_ic_mean_percentile": 0.9956043956043956,
+            "a_stress_ic_ir": 0.4708025134116817,
+            "a_stress_ic_ir_percentile": 0.9934065934065934,
+            "b_mean_abs_weight": 0.01216202891293695,
+            "b_model_score": 2.204544375278989,
+            "b_nonzero_window_ratio": 1.0,
+            "b_proxy": 0.9824175824175824,
+            "b_std_abs_weight": 0.005516799320128577,
+            "reference_factor_count": 454.0,
+            "score_days": 241.0,
+            "score_proxy": 0.9868681318681318,
+            "score_weight_windows": 10.0
+          },
+          "score_reference_digest": "6c2b21fb874b34878c29042de923689816c9c9760c62b05870bf8ff81d119091",
+          "scoring": "frozen_direction_candidate454_plus_one_route",
+          "version": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e0_holdout_2024_e6/unified_microstructure_full_oos.parquet",
+          "year": 2024
+        }
+      ],
+      "years": [
+        2024
+      ]
+    }
+  ]
+}
