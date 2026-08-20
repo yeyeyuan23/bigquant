@@ -1,0 +1,84 @@
+{
+  "selection_status": "winner",
+  "scope": "candidate454_nonlinear_residual_retrain_v1",
+  "evidence_boundary": "local_proxy_not_platform_score",
+  "training_code_commit": "b93de3a",
+  "published_code_commit": "22ce859",
+  "winner": {
+    "name": "tree_res_s3",
+    "model": "lightgbm_residual",
+    "seed": 20260733,
+    "artifact_directory": "reports/x_residual_retrain_v1/tree_seed_20260733",
+    "route": "reports/x_residual_retrain_v1/tree_seed_20260733/unified_tree_residual_full_oos.parquet",
+    "route_sha256": "f65aef525de83371e0311cd6e6b3e0abb12c588f7e61e7649e1fb892a32f2f8e",
+    "manifest_sha256": "84ed92d3943c63a73bb1a2ceb07548268656f007cbffbc62abee81f2559cde33",
+    "oos_metrics_sha256": "3438d5320ae5071146c4f2f164c3e9e7037533a15b67201d3cd747574a2d9573",
+    "feature_importance_sha256": "ae1e92e20087a2ab08fe6816a619fb3c2ef57082c623de65e3829d26d6b71f33",
+    "checkpoint_sha256": {
+      "2023_h1": "d2069ce2e56dab29067cad9d0402e5a487cdcfc2d33c3f385f12be91865ae05a",
+      "2023_h2": "26d5bd42e068b8da79ed87e090d5f6ff9d2c6ea6f9d076ca866af1d45790de61",
+      "2024_h1": "9da1e9dee54e03852f3773929ebf811e63ffe4254b850f943809b3f00531b662",
+      "2024_h2": "71addcab8ec49d39b2eeb6eb763be3ab1ec9d5f232d73f8256ea15fc502410b7"
+    }
+  },
+  "contract": {
+    "candidate_feature_count": 454,
+    "target": "daily_cross_sectional_residual_of_frozen_en454_oos",
+    "validation_protocol": "strict expanding-history half-year OOS",
+    "label_isolation_gap_days": 1,
+    "oos_years": [2023, 2024],
+    "output_schema": ["date", "instrument", "factor"],
+    "artifact_validation": "passed"
+  },
+  "unseen_fold_metrics": {
+    "candidate_rank_ic_mean": 0.047733943870835405,
+    "residual_rank_ic_mean": 0.043311326778162074,
+    "residual_rank_ic_worst": 0.03970168508481921,
+    "residual_positive_fold_ratio": 1.0,
+    "delta_rank_ic_mean": 0.026007740964952647,
+    "delta_rank_ic_worst": 0.021787178735724007,
+    "delta_positive_fold_ratio": 1.0,
+    "daily_spearman_with_en454_mean": 0.22918172483150687
+  },
+  "standalone_local_score": {
+    "j_mean": 0.855024386406545,
+    "j_worst": 0.8356531684174856,
+    "j_std": 0.01937121798905933,
+    "j_stable": 0.8453387774120154
+  },
+  "joint_with_en454": {
+    "2023": {
+      "challenger_j": 0.8298670685524383,
+      "challenger_a": 0.9906387665198239,
+      "challenger_b": 0.7609649122807017,
+      "challenger_model_score": 1.383975507368508,
+      "challenger_mean_abs_weight": 0.007787746555581725,
+      "challenger_std_abs_weight": 0.00562708408691811,
+      "challenger_nonzero_ratio": 0.9,
+      "en454_nonzero_ratio": 1.0
+    },
+    "2024": {
+      "challenger_j": 0.8456265664160401,
+      "challenger_a": 0.9357142857142857,
+      "challenger_b": 0.8070175438596491,
+      "challenger_model_score": 1.5052855706961776,
+      "challenger_mean_abs_weight": 0.005930813828510728,
+      "challenger_std_abs_weight": 0.003939992478810853,
+      "challenger_nonzero_ratio": 1.0,
+      "en454_nonzero_ratio": 1.0
+    }
+  },
+  "selection_reason": "Tree residual seed 20260733 had positive unseen-fold delta RankIC in all folds, the strongest worst-fold delta among new residual routes, the highest J_stable among new residual routes, and stable joint EN nonzero weights in both years.",
+  "retained_evidence": [
+    "artifact_validation.json",
+    "artifact_validation.csv",
+    "frozen_comparison/summary.json",
+    "frozen_comparison/summary.csv",
+    "j_stability.json",
+    "j_stability.csv",
+    "joint_en_pairs.json",
+    "joint_en_pairs.csv",
+    "logs",
+    "tree_seed_20260733"
+  ]
+}
