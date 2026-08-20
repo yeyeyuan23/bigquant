@@ -18,7 +18,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from bigalpha2026.factor_pool import CANDIDATE_POOL_VERSION
+# Frozen pool version stamp; the SITJ factor_pool module that owned it retired.
+CANDIDATE_POOL_VERSION = "literature_round4_v1_2026-07-27"
 
 KEYS = ["date", "instrument"]
 

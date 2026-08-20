@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from bigalpha2026.competition_score_proxy import CompetitionScoreReference
-from scripts.run_combinations import (
+from scripts.j_reference_inputs import (
     DEVELOPMENT_YEARS,
     EVALUATION_YEARS,
     load_dynamic_inputs,

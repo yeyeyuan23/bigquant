@@ -19,11 +19,237 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .evaluation import (
-    long_short_returns,
-    preprocess_factor,
-    rank_ic_series,
-)
+# Daily metric primitives, self-contained since the SITJ evaluation module retired.
+
+def preprocess_factor(
+    factor: pd.DataFrame,
+    exposures: pd.DataFrame | None = None,
+    lower_quantile: float = 0.01,
+    upper_quantile: float = 0.99,
+) -> pd.DataFrame:
+    """Daily winsorization, z-score and optional BARRA-style neutralization."""
+
+    import polars as pl
+
+    base = factor[["date", "instrument", "factor"]].copy()
+    base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
+    base["instrument"] = base["instrument"].astype(str)
+    work = pl.from_pandas(base).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")).alias("date"),
+        pl.col("instrument").cast(pl.Utf8),
+        pl.col("factor").cast(pl.Float64, strict=False),
+    )
+    value = pl.col("factor")
+    lower = value.quantile(lower_quantile).over("date")
+    upper = value.quantile(upper_quantile).over("date")
+    winsorized = (
+        pl.when(value < lower)
+        .then(lower)
+        .when(value > upper)
+        .then(upper)
+        .otherwise(value)
+    )
+    mean = winsorized.mean().over("date")
+    std = winsorized.std().over("date")
+    frame = work.with_columns(
+        pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+        .then((winsorized - mean) / std)
+        .otherwise(None)
+        .alias("factor")
+    ).to_pandas()
+
+    if exposures is None or exposures.empty:
+        return frame
+    exp = exposures.copy()
+    exp["date"] = pd.to_datetime(exp["date"], errors="coerce").dt.normalize()
+    frame = frame.merge(exp, on=["date", "instrument"], how="left")
+    numeric_columns = [
+        column
+        for column in exp.columns
+        if column not in {"date", "instrument"}
+        and pd.api.types.is_numeric_dtype(exp[column])
+    ]
+    if "SIZE" in numeric_columns and "float_market_cap" in numeric_columns:
+        numeric_columns.remove("float_market_cap")
+    categorical_columns = [
+        column
+        for column in exp.columns
+        if column not in {"date", "instrument"}
+        and (
+            isinstance(exp[column].dtype, pd.CategoricalDtype)
+            or pd.api.types.is_object_dtype(exp[column])
+            or pd.api.types.is_string_dtype(exp[column])
+        )
+    ]
+    if not numeric_columns and not categorical_columns:
+        return frame[["date", "instrument", "factor"]]
+
+    residuals = pd.Series(np.nan, index=frame.index, dtype=float)
+    for indices in frame.groupby("date", sort=False).groups.values():
+        block = frame.loc[indices]
+        valid = block["factor"].notna()
+        if numeric_columns:
+            valid &= block[numeric_columns].notna().all(axis=1)
+        if categorical_columns:
+            valid &= block[categorical_columns].notna().all(axis=1)
+        if not valid.any():
+            residuals.loc[indices] = block["factor"]
+            continue
+        design_parts: list[np.ndarray] = []
+        if numeric_columns:
+            design_parts.append(block.loc[valid, numeric_columns].to_numpy(dtype=float))
+        if categorical_columns:
+            dummies = pd.get_dummies(
+                block.loc[valid, categorical_columns].astype("string"),
+                drop_first=True,
+                dtype=float,
+            )
+            if not dummies.empty:
+                design_parts.append(dummies.to_numpy(dtype=float))
+        x = (
+            np.column_stack(design_parts)
+            if design_parts
+            else np.empty((int(valid.sum()), 0))
+        )
+        if valid.sum() <= x.shape[1] + 1:
+            residuals.loc[indices] = block["factor"]
+            continue
+        x = np.column_stack([np.ones(len(x)), x])
+        y = block.loc[valid, "factor"].to_numpy(dtype=float)
+        beta, *_ = np.linalg.lstsq(x, y, rcond=None)
+        residuals.loc[block.index[valid]] = y - x @ beta
+    frame["factor"] = residuals
+    return frame[["date", "instrument", "factor"]]
+
+
+def cross_section_zscore(
+    frame: pd.DataFrame,
+    columns: Sequence[str],
+) -> pd.DataFrame:
+    if not columns:
+        return frame.copy()
+    import polars as pl
+
+    work = pl.from_pandas(frame.copy()).with_columns(pl.col("date").cast(pl.Datetime("ns")))
+    exprs = []
+    for column in columns:
+        values = pl.col(column).cast(pl.Float64, strict=False)
+        mean = values.mean().over("date")
+        std = values.std().over("date")
+        exprs.append(
+            pl.when(std.is_not_null() & std.is_finite() & (std > 0))
+            .then((values - mean) / std)
+            .otherwise(None)
+            .alias(column)
+        )
+    return work.with_columns(exprs).to_pandas()
+
+
+def cross_section_rank_scale(
+    frame: pd.DataFrame,
+    columns: Sequence[str],
+) -> pd.DataFrame:
+    """Map each daily cross-section to centered percentile ranks.
+
+    Uses polars for the date-partitioned rank transform; returns pandas to keep
+    the public contract unchanged for model code.
+    """
+
+    if not columns:
+        return frame.copy()
+    import polars as pl
+
+    result = frame.copy()
+    work = pl.from_pandas(result).with_columns(pl.col("date").cast(pl.Datetime("ns")))
+    exprs = []
+    for column in columns:
+        numeric = pl.col(column).cast(pl.Float64, strict=False)
+        valid = numeric.is_not_null() & numeric.is_finite()
+        ranks = numeric.rank("average").over("date")
+        counts = numeric.count().over("date")
+        scaled = 2.0 * (ranks - (counts + 1.0) / 2.0) / counts
+        exprs.append(pl.when(valid).then(scaled).otherwise(None).alias(column))
+    return work.with_columns(exprs).to_pandas()
+
+
+def rank_ic_series(
+    merged: pd.DataFrame,
+    factor_column: str = "factor",
+    label_column: str = "ret_close_to_close",
+) -> pd.Series:
+    if merged.empty:
+        return pd.Series(dtype=float, name="rank_ic")
+    import polars as pl
+
+    base = merged[["date", factor_column, label_column]].copy()
+    base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
+    work = pl.from_pandas(base).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
+        pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+    ).drop_nulls(["date", "_factor", "_label"])
+    if work.is_empty():
+        return pd.Series(dtype=float, name="rank_ic")
+    ranked = work.with_columns(
+        pl.len().over("date").alias("_n"),
+        pl.col("_factor").rank("average").over("date").alias("_factor_rank"),
+        pl.col("_label").rank("average").over("date").alias("_label_rank"),
+    )
+    result = (
+        ranked.group_by("date")
+        .agg(
+            pl.len().alias("_n"),
+            pl.corr("_factor_rank", "_label_rank").alias("rank_ic"),
+        )
+        .with_columns(pl.when(pl.col("_n") >= 5).then(pl.col("rank_ic")).otherwise(None).alias("rank_ic"))
+        .sort("date")
+        .to_pandas()
+    )
+    series = pd.Series(result["rank_ic"].to_numpy(dtype=float), index=pd.to_datetime(result["date"]), name="rank_ic")
+    return series
+
+
+def long_short_returns(
+    merged: pd.DataFrame,
+    factor_column: str = "factor",
+    label_column: str = "ret_close_to_close",
+    quantiles: int = 5,
+) -> pd.Series:
+    if merged.empty:
+        return pd.Series(dtype=float, name="long_short_return")
+    import polars as pl
+
+    base = merged[["date", factor_column, label_column]].copy()
+    base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
+    work = pl.from_pandas(base).with_columns(
+        pl.col("date").cast(pl.Datetime("ns")),
+        pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
+        pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+    ).drop_nulls(["date", "_factor", "_label"])
+    if work.is_empty():
+        return pd.Series(dtype=float, name="long_short_return")
+    threshold = 1.0 / float(quantiles)
+    ranked = work.with_columns(
+        pl.len().over("date").alias("_n"),
+        (pl.col("_factor").rank("average").over("date") / pl.len().over("date")).alias("_rank_pct"),
+    )
+    result = (
+        ranked.group_by("date")
+        .agg(
+            pl.first("_n").alias("_n"),
+            pl.when(pl.col("_rank_pct") > 1.0 - threshold).then(pl.col("_label")).otherwise(None).mean().alias("_top"),
+            pl.when(pl.col("_rank_pct") <= threshold).then(pl.col("_label")).otherwise(None).mean().alias("_bottom"),
+        )
+        .with_columns(
+            pl.when(pl.col("_n") >= quantiles * 2)
+            .then(pl.col("_top") - pl.col("_bottom"))
+            .otherwise(None)
+            .alias("long_short_return")
+        )
+        .sort("date")
+        .to_pandas()
+    )
+    return pd.Series(result["long_short_return"].to_numpy(dtype=float), index=pd.to_datetime(result["date"]), name="long_short_return")
 
 A_COMPONENT_COLUMNS = (
     "rank_ic_mean",
