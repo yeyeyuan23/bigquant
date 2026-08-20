@@ -1,10 +1,16 @@
 # BigAlpha 2026 — Unified Alpha（M_raw 冠军线）
 
 用原始分钟盘口和 Candidate454 因子工程构建互补的 OOS 专家，最终以 M 专家
-（原始微观结构）单因子作为正式提交并进入决赛。
+（原始微观结构）单因子作为正式提交并进入决赛。平台正式成绩（提交
+`6d0fe02c-1b61-41bd-9de9-fe9ac0774ffd`，checkpoint sha256 `252c39ba…`）：
 
-本仓库公开。平台分数、submission id、答辩材料等比赛敏感记录一律不入库，
-以本地 `BigAlpha2026_Pre/`（Mac 端）为权威。
+| 口径 | 总分 | A | B |
+|---|---:|---:|---:|
+| 公榜 | **0.95480** | 0.95106 | 0.95641 |
+| 私榜 merge | **0.88736** | 0.95788 | 0.85714 |
+
+`总分 = 0.3 × A + 0.7 × B`。逐时段读数与答辩材料以 Mac 端
+`BigAlpha2026_Pre/final_platform_scores.md` 为权威（本仓库为私有仓库）。
 
 ## 我们干了什么
 
@@ -21,7 +27,7 @@
 3. **提交演进**：EN454 → X-tree → T/M 残差链 → **M_raw expanding-history e3**
    （2019→2024 扩窗训练，最终 checkpoint 见
    `reports/dependencies/m_expanding_history_retrain_20260803/final_full_history_e3/`）。
-   高相关变体清库后只保留低相关组合，B 项显著回升。
+   高相关变体清库后只保留低相关组合，B 项从中游回升至 0.956。
 4. **决赛复盘实验（8 月 19 日起，进行中）**：`experiments/finals_pre_20260819/`，
    E0 重建 holdout、E2/E2b/E2c 卷积核与 seed 消融、E4 多折 walk-forward、
    E7 N-score 增量贡献体系，为答辩提供证据页。见该目录 README。
@@ -94,4 +100,4 @@ coverage run -m pytest -q && coverage combine && coverage report --include="src/
   tag `archive/main-sitj-20260731`；工作树中不再保留。
 - M multiaxis / v2 / v3 挑战线：结果与冻结产物在 `reports/` 与 `submissions/`，
   实验分支见 tag `archive/feat-m-multiaxis-full-20260804`。
-- 决赛演示与平台记录维护在仓库外（本仓库公开）。
+- 决赛演示与平台分数记录在 Mac 端 `~/Projects/bigquant/BigAlpha2026_Pre/`。

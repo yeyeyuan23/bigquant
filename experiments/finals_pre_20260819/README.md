@@ -18,5 +18,5 @@ checkpoint sha256 is recorded in the sibling `oos_metrics.json`.
 | E5 | EN blend dose-response vs EN454 | not started | — |
 
 Presentation-side documents (deck, speaker notes, red-team audit, N-score
-design, final platform scores) are maintained OUTSIDE this repo on purpose
-(local `BigAlpha2026_Pre/`) — this repository is public.
+design, final platform scores) are maintained in the local
+`BigAlpha2026_Pre/` workspace (repo is now private; scores live in the root README).

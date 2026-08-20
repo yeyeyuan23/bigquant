@@ -5,7 +5,7 @@
 
 | 目录 | 角色 |
 |---|---|
-| `m_expanding_history_e3_20260803/` | **正式冠军**：M_raw 扩窗 e3（平台分数与提交 id 记录在仓库外） |
+| `m_expanding_history_e3_20260803/` | **正式冠军**：M_raw 扩窗 e3（公榜 0.9548 / 私榜 0.8874，提交 id `6d0fe02c-…`） |
 | `m_l5/`, `m_l5_oos2023/` | M 五档挑战线提交包（未超越冠军，保留证据） |
 | `m_multiaxis_full_20260804/` | M multiaxis 挑战线提交包 |
 | `elasticnet454_formal/` | EN454 基线正式包 |
