@@ -28,7 +28,7 @@
    （2019→2024 扩窗训练，最终 checkpoint 见
    `reports/dependencies/m_raw_final_checkpoint/final_full_history_e3/`）。
    高相关变体清库后只保留低相关组合，B 项从中游回升至 0.956。
-4. **决赛复盘实验（8 月 19 日起，进行中）**：`experiments/finals_pre_20260819/`，
+4. **决赛复盘实验（8 月 19 日起，进行中）**：`experiments/finals_pre/`，
    E0 重建 holdout、E2/E2b/E2c 卷积核与 seed 消融、E4 多折 walk-forward、
    E7 N-score 增量贡献体系，为答辩提供证据页。见该目录 README。
 
@@ -45,7 +45,7 @@ src/bigalpha2026/
 └── competition_score_proxy.py   # 本地 J 评分器（自包含日频指标原语）
 scripts/                   # 数据装配、专家训练评估、提交构建、审计
 scripts/j_reference_inputs.py    # J 评分的参考输入装载（从退役管线中抽取的现役闭包）
-experiments/finals_pre_20260819/   # 决赛实验 lane（见其 README）
+experiments/finals_pre/   # 决赛实验 lane（见其 README）
 submissions/               # 冻结提交包（见其 README；冠军 = m_raw）
 reports/{latest,dependencies,archive}/   # 见 reports/README.md
 artifacts/                 # 冻结与传输清单

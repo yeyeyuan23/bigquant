@@ -1,0 +1,22 @@
+[
+  {
+    "train_start":"2019-01-02",
+    "train_end":"2024-07-30",
+    "prediction_start":"2024-08-01",
+    "prediction_end":"2024-08-28",
+    "usable_train_days":1353,
+    "prediction_days":20,
+    "missing_prediction_days":0,
+    "rank_ic_mean":0.0766715264,
+    "epoch_losses":[
+      -0.0310975151,
+      -0.043531517,
+      -0.0486174381
+    ],
+    "parameter_count":217953,
+    "checkpoint":"\/root\/autodl-tmp\/projects\/bigquant-default\/reports\/dependencies\/finals_pre\/e4_walkforward\/block_20\/unified_microstructure_block_20_checkpoint.pt",
+    "checkpoint_sha256":"acec7a76cdb1153dc69efdf6a9f9f411f5a50a67b3db6349da5051204b53f631",
+    "checkpoint_reused":false,
+    "block":20
+  }
+]
