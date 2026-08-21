@@ -39,3 +39,4 @@ reports/archive/legacy_factor_pool/cicc34_delta/development_daily_rank_ic.csv
 logs/
 reports/current_independent/
 reports/runtime_*/
+reports/dependencies/**/daily85_features.parquet

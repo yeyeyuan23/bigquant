@@ -1,0 +1,41 @@
+computing 85 stats for 1456 days
+  200/1456
+  400/1456
+  600/1456
+  800/1456
+  1000/1456
+  1200/1456
+  1400/1456
+features written: 1452626 rows
+Traceback (most recent call last):
+  File "/root/autodl-tmp/projects/bigquant-default/experiments/finals_pre_20260819/e1_pathway_ablation/linear85_baseline.py", line 140, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/root/autodl-tmp/projects/bigquant-default/experiments/finals_pre_20260819/e1_pathway_ablation/linear85_baseline.py", line 111, in main
+    model.fit(train[feature_columns].to_numpy(np.float32), train["target"].to_numpy(np.float32))
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/base.py", line 1403, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/linear_model/_ridge.py", line 1253, in fit
+    X, y = validate_data(
+           ^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/utils/validation.py", line 3055, in validate_data
+    X, y = check_X_y(X, y, **check_params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/utils/validation.py", line 1344, in check_X_y
+    y = _check_y(y, multi_output=multi_output, y_numeric=y_numeric, estimator=estimator)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/utils/validation.py", line 1354, in _check_y
+    y = check_array(
+        ^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/utils/validation.py", line 1087, in check_array
+    _assert_all_finite(
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/utils/validation.py", line 137, in _assert_all_finite
+    _assert_all_finite_element_wise(
+  File "/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/utils/validation.py", line 186, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input y contains NaN.
+features reused: 1452626 rows
+/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/linear_model/_ridge.py:227: LinAlgWarning: An ill-conditioned matrix detected: slice 0 has rcond = 3.662822578576197e-08.
+  return linalg.solve(A, Xy, assume_a="pos", overwrite_a=True).T
+{"model": "linear85_ridge_baseline", "ridge_alpha": 1.0, "train_rows": 1209473, "predict_days": 242, "rank_ic_mean": 0.0433470075816071, "rank_ic_ir": 0.27336506578647135}

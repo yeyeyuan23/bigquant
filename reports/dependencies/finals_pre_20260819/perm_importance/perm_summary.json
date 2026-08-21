@@ -1,0 +1,138 @@
+{
+  "baseline_ic": 0.04549873514565996,
+  "days": 61,
+  "rows": [
+    {
+      "config": "baseline",
+      "ic_mean": 0.04549873514565996,
+      "delta_vs_baseline": 0.0,
+      "drop_pct": 0.0
+    },
+    {
+      "config": "minute_log_return",
+      "ic_mean": 0.03788774622479795,
+      "delta_vs_baseline": -0.007610988920862011,
+      "drop_pct": 16.727913196918855
+    },
+    {
+      "config": "bar_range",
+      "ic_mean": 0.04329618903314639,
+      "delta_vs_baseline": -0.0022025461125135745,
+      "drop_pct": 4.840895258873303
+    },
+    {
+      "config": "close_location",
+      "ic_mean": 0.04499163986063778,
+      "delta_vs_baseline": -0.0005070952850221785,
+      "drop_pct": 1.114526114624418
+    },
+    {
+      "config": "relative_spread",
+      "ic_mean": 0.0407206579201159,
+      "delta_vs_baseline": -0.004778077225544061,
+      "drop_pct": 10.501560560414465
+    },
+    {
+      "config": "microprice_gap",
+      "ic_mean": 0.047213731232096275,
+      "delta_vs_baseline": 0.0017149960864363128,
+      "drop_pct": -3.7693269514985692
+    },
+    {
+      "config": "depth_imbalance_l1",
+      "ic_mean": 0.04620782324589126,
+      "delta_vs_baseline": 0.000709088100231299,
+      "drop_pct": -1.558478709267894
+    },
+    {
+      "config": "depth_imbalance_l3",
+      "ic_mean": 0.04080785798872501,
+      "delta_vs_baseline": -0.004690877156934954,
+      "drop_pct": 10.309906730192713
+    },
+    {
+      "config": "depth_shape",
+      "ic_mean": 0.04573284103390331,
+      "delta_vs_baseline": 0.00023410588824334527,
+      "drop_pct": -0.5145327391934679
+    },
+    {
+      "config": "log_amount",
+      "ic_mean": 0.04332646393055214,
+      "delta_vs_baseline": -0.002172271215107824,
+      "drop_pct": 4.774355173069098
+    },
+    {
+      "config": "log_volume",
+      "ic_mean": 0.044822524656640106,
+      "delta_vs_baseline": -0.0006762104890198559,
+      "drop_pct": 1.4862182143196532
+    },
+    {
+      "config": "log_deal_number",
+      "ic_mean": 0.04282404455406931,
+      "delta_vs_baseline": -0.002674690591590652,
+      "drop_pct": 5.878604279938506
+    },
+    {
+      "config": "log_amount_per_deal",
+      "ic_mean": 0.0429438294368874,
+      "delta_vs_baseline": -0.0025549057087725646,
+      "drop_pct": 5.615333482553464
+    },
+    {
+      "config": "log_volume_per_deal",
+      "ic_mean": 0.04537645035198588,
+      "delta_vs_baseline": -0.00012228479367408507,
+      "drop_pct": 0.26876525969920195
+    },
+    {
+      "config": "signed_log_amount",
+      "ic_mean": 0.04431534654940791,
+      "delta_vs_baseline": -0.0011833885962520552,
+      "drop_pct": 2.6009263608395856
+    },
+    {
+      "config": "time_sin",
+      "ic_mean": 0.04549873514565996,
+      "delta_vs_baseline": 0.0,
+      "drop_pct": 0.0
+    },
+    {
+      "config": "time_cos",
+      "ic_mean": 0.04549873514565996,
+      "delta_vs_baseline": 0.0,
+      "drop_pct": 0.0
+    },
+    {
+      "config": "pm_session",
+      "ic_mean": 0.04549873514565996,
+      "delta_vs_baseline": 0.0,
+      "drop_pct": 0.0
+    },
+    {
+      "config": "group_price(3)",
+      "ic_mean": 0.03078687339628553,
+      "delta_vs_baseline": -0.01471186174937443,
+      "drop_pct": 32.334660957663495
+    },
+    {
+      "config": "group_book(5)",
+      "ic_mean": 0.03386162462810212,
+      "delta_vs_baseline": -0.011637110517557843,
+      "drop_pct": 25.576778080319635
+    },
+    {
+      "config": "group_trade(6)",
+      "ic_mean": 0.02895496978799358,
+      "delta_vs_baseline": -0.01654376535766638,
+      "drop_pct": 36.360934660497826
+    },
+    {
+      "config": "group_clock(3)",
+      "ic_mean": 0.04549873514565996,
+      "delta_vs_baseline": 0.0,
+      "drop_pct": 0.0
+    }
+  ]
+}

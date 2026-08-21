@@ -1,0 +1,5 @@
+epoch=1 loss=-0.030111
+epoch=2 loss=-0.045762
+epoch=3 loss=-0.049744
+checkpoint=saved path=/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e4_walkforward/block_21/unified_microstructure_block_21_checkpoint.pt
+{"train_start": "2019-01-02", "train_end": "2024-08-27", "prediction_start": "2024-08-29", "prediction_end": "2024-09-27", "usable_train_days": 1373, "prediction_days": 20, "missing_prediction_days": 0, "rank_ic_mean": 0.033561054180031295, "epoch_losses": [-0.030110594103599845, -0.04576193857856654, -0.04974430535790407], "parameter_count": 217953, "checkpoint": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre_20260819/e4_walkforward/block_21/unified_microstructure_block_21_checkpoint.pt", "checkpoint_sha256": "b595e25b9cfbf219f654ba9cb58b0b8a4145955b372e677eb911a6c86217511f", "checkpoint_reused": false, "block": 21}
