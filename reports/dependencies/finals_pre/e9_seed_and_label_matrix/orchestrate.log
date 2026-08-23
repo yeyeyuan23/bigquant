@@ -1,2 +1,16 @@
 [E9 START] 2026-08-23T23:52:18+08:00  27 jobs / 3 workers
 [E9 START] 2026-08-23T23:59:11+08:00  27 jobs / 3 workers
+[SUPERVISE START] 2026-08-24T00:06:41+08:00 target=6
+[topup] worker -> 4  (running=6 claimed=6) 2026-08-24T00:06:41+08:00
+[topup] worker -> 5  (running=7 claimed=7) 2026-08-24T00:07:41+08:00
+[topup] worker -> 6  (running=8 claimed=8) 2026-08-24T00:08:41+08:00
+[SUPERVISE START] 2026-08-24T00:09:49+08:00 target=6
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 18: [: 0
+0: integer expression expected
+[QUEUE DRAINED] 2026-08-24T02:09:52+08:00
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 31: [: 0
+0: integer expression expected
+[retry pass 1] 无缺口
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 46: [: 0
+0: integer expression expected
+[E9 END] 2026-08-24T02:09:52+08:00 done=24 fail=0

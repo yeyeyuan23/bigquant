@@ -1,19 +1,4 @@
-usage: evaluate_ablation.py [-h] --data-root DATA_ROOT --micro-store
-                            MICRO_STORE --output-dir OUTPUT_DIR
-                            [--years YEARS [YEARS ...]]
-                            [--train-start-year TRAIN_START_YEAR]
-                            [--prediction-days PREDICTION_DAYS]
-                            [--epochs EPOCHS] [--model-dim MODEL_DIM]
-                            [--kernels KERNELS [KERNELS ...]]
-                            [--tcn-blocks TCN_BLOCKS]
-                            [--tail-minutes TAIL_MINUTES]
-                            [--max-minutes MAX_MINUTES] [--dropout DROPOUT]
-                            [--max-stocks MAX_STOCKS]
-                            [--min-train-days MIN_TRAIN_DAYS]
-                            [--learning-rate LEARNING_RATE] [--seed SEED]
-                            [--label-column LABEL_COLUMN]
-                            [--extra-labels EXTRA_LABELS]
-                            [--disable-sequence-path]
-                            [--disable-statistics-path]
-                            [--disable-cross-section]
-evaluate_ablation.py: error: unrecognized arguments: --fast-pack
+epoch=1 loss=-0.057635
+epoch=2 loss=-0.074646
+epoch=3 loss=-0.079940
+{"model": "unified_microstructure_ablation", "use_sequence_path": true, "use_statistics_path": true, "use_cross_section": false, "train_start": "2019-01-02", "train_end": "2023-12-28", "prediction_days": 240, "rank_ic_mean": 0.065165097401022, "epoch_losses": [-0.05763506552170707, -0.07464592775824401, -0.07994042203384655], "parameter_count": 171297, "checkpoint_sha256": "54838d2f93511243cf49e4f18b2f572751272766802d936591f5da6de2954405", "seed": 20260801}

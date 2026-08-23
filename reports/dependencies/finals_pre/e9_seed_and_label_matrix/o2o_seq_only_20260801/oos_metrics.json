@@ -1,0 +1,20 @@
+[
+  {
+    "model": "unified_microstructure_ablation",
+    "use_sequence_path": true,
+    "use_statistics_path": false,
+    "use_cross_section": true,
+    "train_start": "2019-01-02",
+    "train_end": "2023-12-28",
+    "prediction_days": 240,
+    "rank_ic_mean": 0.06459622538499316,
+    "epoch_losses": [
+      -0.0581335877797736,
+      -0.07391175525132429,
+      -0.08002930148854016
+    ],
+    "parameter_count": 200289,
+    "checkpoint_sha256": "e50c0b22cba3110c9f1607baa570ab7e51dacb9d8042de464e67751f12976de0",
+    "seed": 20260801
+  }
+]
