@@ -22,9 +22,9 @@ for entry in (ROOT / "src", ROOT / "scripts"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
+from evaluate_unified_temporal import load_labels
 from sklearn.linear_model import Ridge
 
-from evaluate_unified_temporal import load_labels
 from bigalpha2026.alpha_models.microstructure import MICROSTRUCTURE_CHANNELS
 
 TAIL = 30
@@ -125,7 +125,7 @@ def main() -> int:
     metrics = {
         "model": "linear85_ridge_baseline",
         "ridge_alpha": args.ridge_alpha,
-        "train_rows": int(len(train)),
+        "train_rows": len(train),
         "predict_days": int(daily_ic.shape[0]),
         "rank_ic_mean": float(daily_ic.mean()),
         "rank_ic_ir": float(daily_ic.mean() / daily_ic.std()),

@@ -22,9 +22,10 @@ for entry in (ROOT / "src", ROOT / "scripts"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from bigalpha2026.competition_score_proxy import preprocess_factor, rank_ic_series
 from evaluate_unified_temporal import load_labels
 from score_submission_j_stability import load_score_reference
+
+from bigalpha2026.competition_score_proxy import preprocess_factor, rank_ic_series
 
 
 def main() -> int:
@@ -103,13 +104,13 @@ def main() -> int:
     summary = {
         "official_proxy": {k: (float(v) if isinstance(v, (int, float, np.floating)) else v) for k, v in official.items()},
         "neutralized_daily": {
-            "days": int(len(ics)),
+            "days": len(ics),
             "rank_ic_mean": float(ics.mean()),
             "rank_ic_ir": float(ics.mean() / ics.std()),
             "rank_ic_tstat": float(ics.mean() / ics.std() * np.sqrt(len(ics))),
             "calm_ic_mean": float(calm.mean()),
             "calm_ic_ir": float(calm.mean() / calm.std()),
-            "stress_days": int(len(stress)),
+            "stress_days": len(stress),
             "stress_ic_mean": float(stress.mean()),
             "stress_ic_ir": float(stress.mean() / stress.std()),
             "long_short_sharpe_deciles": ls_sharpe,

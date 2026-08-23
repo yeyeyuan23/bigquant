@@ -23,8 +23,9 @@ for entry in (ROOT / "src", ROOT / "scripts"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from evaluate_unified_temporal import load_labels
 from evaluate_unified_microstructure import load_microstructure_day, prepare_label_panel
+from evaluate_unified_temporal import load_labels
+
 from bigalpha2026.alpha_models import MICROSTRUCTURE_CHANNELS
 from bigalpha2026.alpha_models.microstructure import MicrostructureModel
 

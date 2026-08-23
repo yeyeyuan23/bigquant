@@ -173,7 +173,7 @@ class AblationModel:
         torch.save({"config": asdict(self.config), "state_dict": self.network.state_dict()}, path)
 
     @classmethod
-    def load(cls, path: str | Path, **kwargs: Any) -> "AblationModel":
+    def load(cls, path: str | Path, **kwargs: Any) -> AblationModel:
         payload = torch.load(
             path, map_location=kwargs.get("map_location", "cpu"), weights_only=True
         )
