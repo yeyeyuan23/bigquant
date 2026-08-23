@@ -57,6 +57,17 @@ def main() -> int:
         help="repeatable; parquet with date, instrument and one value column",
     )
     parser.add_argument("--noise-seed", type=int, default=20260820)
+    parser.add_argument(
+        "--label-column",
+        default="ret_next_open_to_close",
+        help="return convention to score against; open-to-open lives in --extra-labels",
+    )
+    parser.add_argument(
+        "--extra-labels",
+        type=Path,
+        default=None,
+        help="parquet with date/instrument plus a label column not in the label store",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 
@@ -64,8 +75,14 @@ def main() -> int:
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
     labels = labels.loc[labels["date"].dt.year.isin(args.years)].copy()
-    labels["y_rank"] = labels.groupby("date")["ret_next_open_to_close"].transform(daily_rank)
-    day_std = labels.groupby("date")["ret_next_open_to_close"].std()
+    if args.extra_labels is not None:
+        extra = pd.read_parquet(args.extra_labels)
+        extra["date"] = pd.to_datetime(extra["date"]).dt.normalize()
+        extra["instrument"] = extra["instrument"].astype(str)
+        labels = labels.merge(extra, on=["date", "instrument"], how="left")
+    labels = labels.dropna(subset=[args.label_column])
+    labels["y_rank"] = labels.groupby("date")[args.label_column].transform(daily_rank)
+    day_std = labels.groupby("date")[args.label_column].std()
     stress_days = set(day_std[day_std >= day_std.quantile(0.75)].index)
 
     base = load_factor(args.base, "y_pool").rename(columns={"value": "y_pool"})

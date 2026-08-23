@@ -87,8 +87,9 @@ def load_microstructure_day(
 
 def prepare_label_panel(
     labels: pd.DataFrame,
+    label_column: str = "ret_next_open_to_close",
 ) -> tuple[pd.DatetimeIndex, dict[pd.Timestamp, pd.Series]]:
-    required = {"date", "instrument", "ret_next_open_to_close"}
+    required = {"date", "instrument", label_column}
     missing = sorted(required.difference(labels.columns))
     if missing:
         raise ValueError(f"labels are missing columns: {missing}")
@@ -99,8 +100,9 @@ def prepare_label_panel(
         raise ValueError("label keys contain null values")
     if frame.duplicated(["date", "instrument"]).any():
         raise ValueError("labels contain duplicate date/instrument keys")
+    frame = frame.dropna(subset=[label_column])
     frame["target"] = (
-        frame.groupby("date")["ret_next_open_to_close"].rank(pct=True) * 2.0 - 1.0
+        frame.groupby("date")[label_column].rank(pct=True) * 2.0 - 1.0
     )
     dates = pd.DatetimeIndex(sorted(frame["date"].unique()))
     targets = {
@@ -143,13 +145,22 @@ def _device_context(device: torch.device):
     return nullcontext()
 
 
-def _tensor_inputs(batch, stock_selection: np.ndarray, device: torch.device):
-    return (
+def _tensor_inputs(
+    batch,
+    stock_selection: np.ndarray,
+    device: torch.device,
+    industry: np.ndarray | None = None,
+):
+    tensors = (
         torch.from_numpy(batch.values[:, stock_selection]).to(device),
         torch.from_numpy(batch.observed_mask[:, stock_selection]).to(device),
         torch.from_numpy(batch.minute_mask[:, stock_selection]).to(device),
         torch.from_numpy(batch.stock_mask[:, stock_selection]).to(device),
     )
+    if industry is None:
+        return tensors
+    codes = torch.from_numpy(industry[stock_selection][None, :]).to(device)
+    return (*tensors, codes)
 
 
 def sha256(path: Path) -> str:
@@ -169,6 +180,7 @@ def _score_prediction_block(
     config: MicrostructureConfig,
     device: torch.device,
     loader,
+    industry_lookup=None,
 ) -> tuple[list[pd.DataFrame], list[float], int]:
     """Score one prediction block with the current weights.
 
@@ -198,9 +210,14 @@ def _score_prediction_block(
             if len(available) < 2:
                 missing_prediction_days += 1
                 continue
+            codes = (
+                None
+                if industry_lookup is None
+                else industry_lookup.codes_for(day, instruments)
+            )
             with _device_context(device):
                 prediction = (
-                    model(*_tensor_inputs(batch, available, device))
+                    model(*_tensor_inputs(batch, available, device, codes))
                     .squeeze(0)
                     .float()
                     .cpu()
@@ -240,6 +257,7 @@ def fit_predict_block(
     reuse_checkpoint: bool,
     loader=load_microstructure_day,
     eval_every_epoch: bool = False,
+    industry_lookup=None,
 ) -> tuple[list[pd.DataFrame], dict[str, object]]:
     torch.manual_seed(seed)
     if device.type == "cuda":
@@ -291,8 +309,15 @@ def fit_predict_block(
                 available_train_days.add(day)
                 target = torch.from_numpy(day_target.to_numpy(np.float32)[available]).to(device)
                 optimizer.zero_grad(set_to_none=True)
+                codes = (
+                    None
+                    if industry_lookup is None
+                    else industry_lookup.codes_for(day, instruments)
+                )
                 with _device_context(device):
-                    prediction = model(*_tensor_inputs(batch, available, device)).squeeze(0)
+                    prediction = model(
+                        *_tensor_inputs(batch, available, device, codes)
+                    ).squeeze(0)
                     loss = correlation_loss(prediction.float(), target)
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
@@ -306,7 +331,15 @@ def fit_predict_block(
             print(f"epoch={epoch + 1} loss={epoch_losses[-1]:.6f}", flush=True)
             if eval_every_epoch:
                 _, epoch_ic, _ = _score_prediction_block(
-                    model, store, dates, targets, prediction_days, config, device, loader
+                    model,
+                    store,
+                    dates,
+                    targets,
+                    prediction_days,
+                    config,
+                    device,
+                    loader,
+                    industry_lookup,
                 )
                 mean_ic = float(np.nanmean(epoch_ic)) if epoch_ic else None
                 epoch_oos_ic.append(mean_ic)
@@ -331,7 +364,15 @@ def fit_predict_block(
         )
 
     rows, daily_ic, missing_prediction_days = _score_prediction_block(
-        model, store, dates, targets, prediction_days, config, device, loader
+        model,
+        store,
+        dates,
+        targets,
+        prediction_days,
+        config,
+        device,
+        loader,
+        industry_lookup,
     )
     diagnostics: dict[str, object] = {
         "train_start": str(dates[int(training[0])].date()),
@@ -382,6 +423,23 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=4e-4)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument("--seed", type=int, default=20260801)
+    parser.add_argument(
+        "--industry-context",
+        action="store_true",
+        help="E3b: add per-industry mean/std to the DeepSets context (needs --data-root exposures)",
+    )
+    parser.add_argument("--industry-shrinkage", type=float, default=10.0)
+    parser.add_argument(
+        "--label-column",
+        default="ret_next_open_to_close",
+        help="E6b: training target convention; open-to-open needs --extra-labels",
+    )
+    parser.add_argument(
+        "--extra-labels",
+        type=Path,
+        default=None,
+        help="parquet with date/instrument plus a label column absent from the store",
+    )
     parser.add_argument("--reuse-checkpoints", action="store_true")
     parser.add_argument(
         "--eval-every-epoch",
@@ -418,7 +476,13 @@ def main() -> int:
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is unavailable")
     labels = load_labels(args.data_root, args.train_start_year, max(args.years))
-    dates, targets = prepare_label_panel(labels)
+    if args.extra_labels is not None:
+        extra = pd.read_parquet(args.extra_labels)
+        extra["date"] = pd.to_datetime(extra["date"]).dt.normalize()
+        extra["instrument"] = extra["instrument"].astype(str)
+        labels["instrument"] = labels["instrument"].astype(str)
+        labels = labels.merge(extra, on=["date", "instrument"], how="left")
+    dates, targets = prepare_label_panel(labels, args.label_column)
     blocks = rolling_oos_blocks(
         dates,
         tuple(args.years),
@@ -440,6 +504,16 @@ def main() -> int:
         )
     if not selected_block_indices:
         raise ValueError("at least one rolling block must be selected")
+    industry_lookup = None
+    if args.industry_context:
+        from finals_pre.common.industry import IndustryLookup
+
+        industry_lookup = IndustryLookup(args.data_root, args.train_start_year, max(args.years))
+        print(
+            f"industry_context=on buckets={industry_lookup.buckets}"
+            f" shrinkage={args.industry_shrinkage}",
+            flush=True,
+        )
     config = MicrostructureConfig(
         model_dim=args.model_dim,
         max_minutes=args.max_minutes,
@@ -447,6 +521,9 @@ def main() -> int:
         tcn_blocks=args.tcn_blocks,
         tail_minutes=args.tail_minutes,
         dropout=args.dropout,
+        industry_context=args.industry_context,
+        industry_buckets=(32 if industry_lookup is None else industry_lookup.buckets),
+        industry_shrinkage=args.industry_shrinkage,
     )
     route_rows: list[pd.DataFrame] = []
     metric_rows: list[dict[str, object]] = []
@@ -473,6 +550,7 @@ def main() -> int:
             reuse_checkpoint=args.reuse_checkpoints,
             loader=day_loader,
             eval_every_epoch=args.eval_every_epoch,
+            industry_lookup=industry_lookup,
         )
         route_rows.extend(rows)
         diagnostics["block"] = block_index

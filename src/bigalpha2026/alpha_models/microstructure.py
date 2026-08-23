@@ -253,6 +253,9 @@ class MicrostructureConfig:
     tcn_blocks: int = 3
     tail_minutes: int = 30
     dropout: float = 0.1
+    industry_context: bool = False
+    industry_buckets: int = 32
+    industry_shrinkage: float = 10.0
 
     def __post_init__(self) -> None:
         if self.input_dim != len(MICROSTRUCTURE_CHANNELS):
@@ -265,6 +268,79 @@ class MicrostructureConfig:
             raise ValueError("kernels must contain positive integers")
         if self.tail_minutes <= 0 or self.tail_minutes > self.max_minutes:
             raise ValueError("tail_minutes must be within the minute window")
+        if self.industry_buckets <= 0 or self.industry_shrinkage < 0:
+            raise ValueError("industry_buckets must be positive and shrinkage non-negative")
+
+
+
+class IndustryDeepSetsContext(nn.Module):
+    """DeepSets context that adds per-industry moments next to the market-wide ones.
+
+    Grouping by industry is O(N) -- one scatter-mean per day, the same order of work
+    as the market moments it sits beside, and nothing like the O(N^2) of letting every
+    stock attend to every other. Industries are thin in the tail (the 1st percentile of
+    daily group sizes is 2 stocks), so each group's moments are shrunk toward the market
+    with weight n / (n + shrinkage), and log1p(n) is passed through so the head can tell
+    how much the group moment is worth.
+    """
+
+    def __init__(self, config: MicrostructureConfig) -> None:
+        super().__init__()
+        dim = config.model_dim
+        self.buckets = config.industry_buckets
+        self.shrinkage = float(config.industry_shrinkage)
+        self.phi = nn.Sequential(nn.Linear(dim, dim), nn.GELU(), nn.LayerNorm(dim))
+        self.rho = nn.Sequential(
+            nn.Linear(dim * 7 + 1, dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.LayerNorm(dim),
+        )
+
+    def forward(self, values: Tensor, stock_mask: Tensor, industry: Tensor) -> Tensor:
+        encoded = self.phi(values)
+        valid = stock_mask.unsqueeze(-1).to(encoded.dtype)
+        count = valid.sum(dim=1, keepdim=True).clamp_min(1)
+        market_mean = (encoded * valid).sum(dim=1, keepdim=True) / count
+        centered = (encoded - market_mean) * valid
+        market_std = (centered.square().sum(dim=1, keepdim=True) / count).sqrt()
+
+        # Padded stocks are zeroed out of the one-hot, so they join no group.
+        one_hot = nn.functional.one_hot(
+            industry.clamp(0, self.buckets - 1), self.buckets
+        ).to(encoded.dtype) * valid
+        group_count = one_hot.sum(dim=1)
+        safe = group_count.clamp_min(1).unsqueeze(-1)
+        group_mean = one_hot.transpose(1, 2) @ encoded / safe
+        # Two-pass variance: the one-pass form cancels badly under fp16 autocast.
+        group_centered = (encoded - one_hot @ group_mean) * valid
+        # Empty buckets (absent industries, the unused unknown slot) have exactly zero
+        # variance, and d(sqrt)/dx is infinite there -- the 0 * inf makes every gradient
+        # NaN even though the forward value never reaches a stock. Floor before the sqrt.
+        group_var = one_hot.transpose(1, 2) @ group_centered.square() / safe
+        group_std = group_var.clamp_min(1e-12).sqrt()
+
+        weight = group_count.unsqueeze(-1) / (group_count.unsqueeze(-1) + self.shrinkage)
+        group_mean = weight * group_mean + (1.0 - weight) * market_mean
+        group_std = weight * group_std + (1.0 - weight) * market_std
+
+        industry_mean = one_hot @ group_mean
+        industry_std = one_hot @ group_std
+        own_count = (one_hot * group_count.unsqueeze(1)).sum(dim=-1, keepdim=True)
+        context = torch.cat(
+            (
+                encoded,
+                market_mean.expand_as(encoded),
+                market_std.expand_as(encoded),
+                encoded - market_mean,
+                industry_mean,
+                industry_std,
+                encoded - industry_mean,
+                torch.log1p(own_count),
+            ),
+            dim=-1,
+        )
+        return self.rho(context) * valid
 
 
 class MicrostructureTCNBlock(nn.Module):
@@ -348,7 +424,11 @@ class MicrostructureNetwork(nn.Module):
             nn.Dropout(cfg.dropout),
             nn.LayerNorm(cfg.model_dim),
         )
-        self.cross_section = DeepSetsContext(cfg)  # type: ignore[arg-type]
+        self.cross_section = (
+            IndustryDeepSetsContext(cfg)
+            if cfg.industry_context
+            else DeepSetsContext(cfg)  # type: ignore[arg-type]
+        )
         self.head = nn.Sequential(
             nn.Linear(cfg.model_dim, 64),
             nn.GELU(),
@@ -362,6 +442,7 @@ class MicrostructureNetwork(nn.Module):
         observed_mask: Tensor,
         minute_mask: Tensor,
         stock_mask: Tensor,
+        industry: Tensor | None = None,
     ) -> Tensor:
         if values.ndim != 4:
             raise ValueError("values must have shape [batch_date, stock, minute, channel]")
@@ -411,7 +492,12 @@ class MicrostructureNetwork(nn.Module):
         statistics_summary = self.statistics_path(statistics)
         fused = self.path_fusion(torch.cat((sequence_summary, statistics_summary), dim=-1))
         fused = fused.reshape(batch_size, stock_count, -1)
-        contextualized = self.cross_section(fused, stock_mask.bool())
+        if self.config.industry_context:
+            if industry is None:
+                raise ValueError("industry_context=True requires an industry index tensor")
+            contextualized = self.cross_section(fused, stock_mask.bool(), industry)
+        else:
+            contextualized = self.cross_section(fused, stock_mask.bool())
         scores = self.head(contextualized).squeeze(-1)
         return scores.masked_fill(~stock_mask.bool(), 0.0)
 
@@ -426,9 +512,10 @@ class MicrostructureModel(AlphaModel):
         raise NotImplementedError("use the strict rolling trainer to fit neural models")
 
     def predict(self, data: Any) -> Tensor:
-        if len(data) != 4:
+        if len(data) not in (4, 5):
             raise ValueError(
-                "prediction data must contain values, observations, minutes, and stocks"
+                "prediction data must contain values, observations, minutes, stocks,"
+                " and optionally industry"
             )
         self.network.eval()
         with torch.inference_mode():
