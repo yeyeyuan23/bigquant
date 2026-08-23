@@ -31,18 +31,18 @@ run_variant() {
   fi
 }
 
-run_variant e0_holdout_2024_e3 --epochs 3 --kernels 3 15 60
-run_variant e0_holdout_2024_e6 --epochs 6 --kernels 3 15 60
-run_variant e2_kernel_k3  --epochs 3 --kernels 3
-run_variant e2_kernel_k15 --epochs 3 --kernels 15
-run_variant e2_kernel_k60 --epochs 3 --kernels 60
+run_variant e5_reference_e3 --epochs 3 --kernels 3 15 60
+run_variant e5_reference_e6 --epochs 6 --kernels 3 15 60
+run_variant e2a_kernel_k3  --epochs 3 --kernels 3
+run_variant e2a_kernel_k15 --epochs 3 --kernels 15
+run_variant e2a_kernel_k60 --epochs 3 --kernels 60
 
 echo "[train phase complete] $(date -Is)"
 
 # Best-effort scoring: reproduce the original e3-vs-e6 holdout selection evidence.
 "$python_bin" scripts/score_submission_j_stability.py \
-  "$out_root/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet" \
-  "$out_root/e0_holdout_2024_e6/unified_microstructure_full_oos.parquet" \
+  "$out_root/e5_reference_e3/unified_microstructure_full_oos.parquet" \
+  "$out_root/e5_reference_e6/unified_microstructure_full_oos.parquet" \
   --years 2024 --data-dir "$data_root" --reports-dir "$project_root/reports" \
   --cache-dir "$out_root/score_cache" \
   --output "$out_root/holdout_j_scores.json" \
@@ -51,11 +51,11 @@ echo "[train phase complete] $(date -Is)"
 
 # Extended scoring across all five variants (kernel comparison table).
 "$python_bin" scripts/score_submission_j_stability.py \
-  "$out_root/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet" \
-  "$out_root/e0_holdout_2024_e6/unified_microstructure_full_oos.parquet" \
-  "$out_root/e2_kernel_k3/unified_microstructure_full_oos.parquet" \
-  "$out_root/e2_kernel_k15/unified_microstructure_full_oos.parquet" \
-  "$out_root/e2_kernel_k60/unified_microstructure_full_oos.parquet" \
+  "$out_root/e5_reference_e3/unified_microstructure_full_oos.parquet" \
+  "$out_root/e5_reference_e6/unified_microstructure_full_oos.parquet" \
+  "$out_root/e2a_kernel_k3/unified_microstructure_full_oos.parquet" \
+  "$out_root/e2a_kernel_k15/unified_microstructure_full_oos.parquet" \
+  "$out_root/e2a_kernel_k60/unified_microstructure_full_oos.parquet" \
   --years 2024 --data-dir "$data_root" --reports-dir "$project_root/reports" \
   --cache-dir "$out_root/score_cache" \
   --output "$out_root/all_variants_j_scores.json" \

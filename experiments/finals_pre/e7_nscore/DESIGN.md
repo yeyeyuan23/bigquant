@@ -81,8 +81,8 @@ X_tree 控制组是这个系统的招牌演示：同一对因子，B 的排序�
    expanding walk-forward，CPU（1TB 内存机器，LGBM 每折分钟级）。
 2. **第一层脚本**：读 ŷ_pool + 候选序列 + labels → 日度 RIC 序列与聚合，四个候选一起跑。
 3. **第二层脚本**：配对 LGBM base/aug × 3 种子 × walk-forward，输出配对 ΔIC。
-4. 产物落 `reports/dependencies/finals_pre/e7_incremental_score/`，代码在
-   `experiments/finals_pre/e7_incremental_score/`，git 提交。
+4. 产物落 `reports/dependencies/finals_pre/e7_nscore/`，代码在
+   `experiments/finals_pre/e7_nscore/`，git 提交。
 
 **成本**：全 CPU，不占 GPU（GPU 留给 E1/种子/E4）。第一层 ≈ 小时级；第二层 ≈ 1–3h。
 

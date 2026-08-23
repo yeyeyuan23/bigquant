@@ -22,7 +22,7 @@ run_variant() {
 run_variant e2b_kernel_5_30_120 --kernels 5 30 120
 run_variant e2b_kernel_2_10_45 --kernels 2 10 45
 "$python_bin" scripts/score_submission_j_stability.py \
-  "$out_root/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet" \
+  "$out_root/e5_reference_e3/unified_microstructure_full_oos.parquet" \
   "$out_root/e2b_kernel_5_30_120/unified_microstructure_full_oos.parquet" \
   "$out_root/e2b_kernel_2_10_45/unified_microstructure_full_oos.parquet" \
   --years 2024 --data-dir "$data_root" --reports-dir "$project_root/reports" \

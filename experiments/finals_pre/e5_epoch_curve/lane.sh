@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# E8 (redone): the epoch curve, produced by the E0 trainer itself with
-# --eval-every-epoch. No second implementation -- the only difference from E0
-# is how often the untouched holdout year gets scored.
+# E0: the epoch curve. Produced by the mainline trainer itself with
+# --eval-every-epoch, so mid-training and final scoring share one code path
+# and no second implementation can drift.
 set -uo pipefail
 YEAR=$1
 P=/root/autodl-tmp/projects/bigquant-default
 PY=/root/autodl-tmp/conda-envs/quant/bin/python
-OUT=$P/reports/dependencies/finals_pre/e0_epoch_curve
+OUT=$P/reports/dependencies/finals_pre/e5_epoch_curve
 cd "$P"
 for SEED in 20260801 20260812 20260823; do
   DIR=$OUT/y${YEAR}_seed${SEED}

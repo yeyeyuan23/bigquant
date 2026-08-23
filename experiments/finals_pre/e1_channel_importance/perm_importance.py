@@ -109,7 +109,7 @@ def main() -> int:
             }
         )
     table = pd.DataFrame(rows).sort_values("delta_vs_baseline")
-    table.to_csv(args.output_dir / "perm_importance.csv", index=False)
+    table.to_csv(args.output_dir / "e1_channel_importance.csv", index=False)
     (args.output_dir / "perm_summary.json").write_text(
         json.dumps(
             {"baseline_ic": baseline, "days": len(sums["baseline"]), "rows": rows},

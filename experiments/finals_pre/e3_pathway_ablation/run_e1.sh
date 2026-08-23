@@ -6,8 +6,8 @@ project_root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
 data_root=/root/autodl-tmp/projects/bigquant/data
 micro_store=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
-exp=$project_root/experiments/finals_pre/e1_pathway_ablation
-out=$project_root/reports/dependencies/finals_pre/e1_pathway_ablation
+exp=$project_root/experiments/finals_pre/e3_pathway_ablation
+out=$project_root/reports/dependencies/finals_pre/e3_pathway_ablation
 e4=$project_root/reports/dependencies/finals_pre/e4_walkforward
 mkdir -p "$out"
 cd "$project_root"
@@ -38,7 +38,7 @@ wait $lin_pid && echo "[done ] linear85 $(date -Is)" || echo "[FAIL ] linear85 $
 
 echo "[start] e1 scoring $(date -Is)"
 "$python_bin" scripts/score_submission_j_stability.py \
-  "$project_root/reports/dependencies/finals_pre/e0_holdout_2024_e3/unified_microstructure_full_oos.parquet" \
+  "$project_root/reports/dependencies/finals_pre/e5_reference_e3/unified_microstructure_full_oos.parquet" \
   "$out/seq_only/unified_microstructure_full_oos.parquet" \
   "$out/stats_only/unified_microstructure_full_oos.parquet" \
   "$out/no_deepsets/unified_microstructure_full_oos.parquet" \
