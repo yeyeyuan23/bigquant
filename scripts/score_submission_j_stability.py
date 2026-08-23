@@ -20,7 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from bigalpha2026.competition_score_proxy import CompetitionScoreReference
+from bigalpha2026.competition_score_proxy import (
+    CompetitionScoreConfig,
+    CompetitionScoreReference,
+)
 from scripts.j_reference_inputs import (
     DEVELOPMENT_YEARS,
     EVALUATION_YEARS,
@@ -169,6 +172,8 @@ def load_score_reference(
     years: tuple[int, ...],
     *,
     candidate454_store: Path | None = None,
+    label_column: str = "ret_close_to_close",
+    extra_labels: Path | None = None,
 ) -> CompetitionScoreReference:
     candidate_manifest = json.loads(
         (data_dir / "manifest_candidate_pool.json").read_text(encoding="utf-8")
@@ -196,6 +201,17 @@ def load_score_reference(
         candidate_filter=loader_filter,
         years=context_years,
     )
+    if extra_labels is not None:
+        # The platform scores open-to-open; that column is not in the label store,
+        # so it is merged in here rather than duplicated into a second scorer.
+        extra = pd.read_parquet(extra_labels)
+        extra["date"] = pd.to_datetime(extra["date"]).dt.normalize()
+        extra["instrument"] = extra["instrument"].astype(str)
+        labels["instrument"] = labels["instrument"].astype(str)
+        labels = labels.merge(extra, on=["date", "instrument"], how="left")
+    if label_column not in labels.columns:
+        raise ValueError(f"labels lack the requested column {label_column!r}")
+    labels = labels.dropna(subset=[label_column])
     store = resolve_candidate454_store(candidate454_store)
     reference_panel, reference_columns, metadata = (
         load_candidate454_reference_panel(store, context_years)
@@ -204,6 +220,7 @@ def load_score_reference(
         reference_panel,
         labels,
         reference_columns,
+        label_column,
     )
     evaluation_mask = oriented_reference["date"].dt.year.isin(years)
     score_reference = CompetitionScoreReference(
@@ -213,6 +230,7 @@ def load_score_reference(
             exposures["date"].dt.year.isin(years)
         ].reset_index(drop=True),
         reference_columns,
+        config=CompetitionScoreConfig(primary_label=label_column),
     )
     score_reference.candidate454_metadata = {
         **metadata,
@@ -291,6 +309,8 @@ def main() -> int:
     parser.add_argument("versions", nargs="+", help="route parquet paths")
     parser.add_argument("--years", nargs="+", type=int, default=list(DEFAULT_YEARS))
     parser.add_argument("--lambda-std", type=float, default=0.5)
+    parser.add_argument("--label-column", default="ret_close_to_close")
+    parser.add_argument("--extra-labels", type=Path, default=None)
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--reports-dir", type=Path, default=Path("reports"))
     parser.add_argument(
@@ -324,6 +344,8 @@ def main() -> int:
         args.reports_dir,
         years,
         candidate454_store=args.candidate454_store,
+        label_column=args.label_column,
+        extra_labels=args.extra_labels,
     )
     routes: dict[str, pd.DataFrame] = {}
     route_source_digests: dict[str, str] = {}

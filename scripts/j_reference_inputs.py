@@ -881,6 +881,7 @@ def orient_j_reference(
     reference_panel: pd.DataFrame,
     labels: pd.DataFrame,
     reference_columns: Sequence[str],
+    label_column: str = "ret_close_to_close",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Freeze high-is-good all36 directions on development data only."""
 
@@ -893,7 +894,6 @@ def orient_j_reference(
             pl.col("instrument").cast(pl.Utf8),
         )
     )
-    label_column = "ret_close_to_close"
     labels_pl = (
         pl.from_pandas(labels.loc[:, [*KEY_COLUMNS, label_column]])
         .with_columns(

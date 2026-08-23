@@ -46,6 +46,8 @@ def main() -> int:
     parser.add_argument("--day-stride", type=int, default=4)
     parser.add_argument("--seed", type=int, default=20260821)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--label-column", default="ret_next_open_to_close")
+    parser.add_argument("--extra-labels", type=Path, default=None)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -54,7 +56,14 @@ def main() -> int:
     network = model.network.to(device).eval()
 
     labels = load_labels(args.data_root, args.year, args.year)
-    dates, targets = prepare_label_panel(labels)
+    if args.extra_labels is not None:
+        extra = pd.read_parquet(args.extra_labels)
+        extra["date"] = pd.to_datetime(extra["date"]).dt.normalize()
+        extra["instrument"] = extra["instrument"].astype(str)
+        labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
+        labels["instrument"] = labels["instrument"].astype(str)
+        labels = labels.merge(extra, on=["date", "instrument"], how="left")
+    dates, targets = prepare_label_panel(labels, args.label_column)
     year_dates = [d for d in dates if d.year == args.year][:: args.day_stride]
     print(f"evaluating {len(year_dates)} days (stride {args.day_stride})", flush=True)
 
