@@ -1,0 +1,14 @@
+epoch=1 loss=-0.032685
+{"epoch": 1, "train_loss": -0.03268526328738352, "oos_rank_ic": 0.042558688110625326, "oos_days": 241}
+epoch=2 loss=-0.046734
+{"epoch": 2, "train_loss": -0.04673413277787186, "oos_rank_ic": 0.03787336568049708, "oos_days": 241}
+epoch=3 loss=-0.052678
+{"epoch": 3, "train_loss": -0.05267800710579382, "oos_rank_ic": 0.04163894310579408, "oos_days": 241}
+epoch=4 loss=-0.056828
+{"epoch": 4, "train_loss": -0.05682760732661494, "oos_rank_ic": 0.03778096410062258, "oos_days": 241}
+epoch=5 loss=-0.062538
+{"epoch": 5, "train_loss": -0.06253817612581686, "oos_rank_ic": 0.04145092148619949, "oos_days": 241}
+epoch=6 loss=-0.068192
+{"epoch": 6, "train_loss": -0.06819172033591707, "oos_rank_ic": 0.04309318536409495, "oos_days": 241}
+checkpoint=saved path=/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e8_epoch_curve/y2024_seed20260823/unified_microstructure_block_00_checkpoint.pt
+{"train_start": "2019-01-02", "train_end": "2023-12-28", "prediction_start": "2024-01-02", "prediction_end": "2024-12-31", "usable_train_days": 1213, "prediction_days": 242, "missing_prediction_days": 1, "rank_ic_mean": 0.04309318536409495, "epoch_losses": [-0.03268526328738352, -0.04673413277787186, -0.05267800710579382, -0.05682760732661494, -0.06253817612581686, -0.06819172033591707], "epoch_oos_rank_ic": [0.042558688110625326, 0.03787336568049708, 0.04163894310579408, 0.03778096410062258, 0.04145092148619949, 0.04309318536409495], "parameter_count": 217953, "checkpoint": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e8_epoch_curve/y2024_seed20260823/unified_microstructure_block_00_checkpoint.pt", "checkpoint_sha256": "4f2bbebb2da0c6b28adf2136e1de1e28add19ef75783246825ac0d8466671917", "checkpoint_reused": false, "block": 0}
