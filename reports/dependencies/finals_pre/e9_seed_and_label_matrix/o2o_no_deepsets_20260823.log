@@ -1,0 +1,19 @@
+usage: evaluate_ablation.py [-h] --data-root DATA_ROOT --micro-store
+                            MICRO_STORE --output-dir OUTPUT_DIR
+                            [--years YEARS [YEARS ...]]
+                            [--train-start-year TRAIN_START_YEAR]
+                            [--prediction-days PREDICTION_DAYS]
+                            [--epochs EPOCHS] [--model-dim MODEL_DIM]
+                            [--kernels KERNELS [KERNELS ...]]
+                            [--tcn-blocks TCN_BLOCKS]
+                            [--tail-minutes TAIL_MINUTES]
+                            [--max-minutes MAX_MINUTES] [--dropout DROPOUT]
+                            [--max-stocks MAX_STOCKS]
+                            [--min-train-days MIN_TRAIN_DAYS]
+                            [--learning-rate LEARNING_RATE] [--seed SEED]
+                            [--label-column LABEL_COLUMN]
+                            [--extra-labels EXTRA_LABELS]
+                            [--disable-sequence-path]
+                            [--disable-statistics-path]
+                            [--disable-cross-section]
+evaluate_ablation.py: error: unrecognized arguments: --fast-pack

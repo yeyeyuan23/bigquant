@@ -76,6 +76,13 @@ def main() -> int:
     parser.add_argument("--min-train-days", type=int, default=900)
     parser.add_argument("--learning-rate", type=float, default=4e-4)
     parser.add_argument("--seed", type=int, default=20260801)
+    parser.add_argument(
+        "--fast-pack",
+        action="store_true",
+        help="use the polars day packer (byte-identical to the pandas reference, ~4x faster)",
+    )
+    parser.add_argument("--label-column", default="ret_next_open_to_close")
+    parser.add_argument("--extra-labels", type=Path, default=None)
     parser.add_argument("--disable-sequence-path", action="store_true")
     parser.add_argument("--disable-statistics-path", action="store_true")
     parser.add_argument("--disable-cross-section", action="store_true")
@@ -83,8 +90,21 @@ def main() -> int:
 
     validate_micro_store(args.micro_store)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    day_loader = load_microstructure_day
+    if args.fast_pack:
+        sys.path.insert(0, str(ROOT / "experiments"))
+        from finals_pre.common.fastpack import load_microstructure_day_fast
+
+        day_loader = load_microstructure_day_fast
     labels = load_labels(args.data_root, args.train_start_year, max(args.years))
-    dates, targets = prepare_label_panel(labels)
+    if args.extra_labels is not None:
+        extra = pd.read_parquet(args.extra_labels)
+        extra["date"] = pd.to_datetime(extra["date"]).dt.normalize()
+        extra["instrument"] = extra["instrument"].astype(str)
+        labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
+        labels["instrument"] = labels["instrument"].astype(str)
+        labels = labels.merge(extra, on=["date", "instrument"], how="left")
+    dates, targets = prepare_label_panel(labels, args.label_column)
     blocks = apply_training_history(
         rolling_oos_blocks(
             dates, tuple(args.years), train_days=60, prediction_days=args.prediction_days
@@ -125,7 +145,7 @@ def main() -> int:
                 selected = rng.choice(len(day_target), args.max_stocks, replace=False)
                 day_target = day_target.iloc[np.sort(selected)]
             instruments = tuple(day_target.index.astype(str))
-            batch = load_microstructure_day(
+            batch = day_loader(
                 args.micro_store, day, instruments, max_minutes=config.max_minutes
             )
             if batch is None:
@@ -165,7 +185,7 @@ def main() -> int:
             day = dates[int(day_index)]
             day_target = targets[day].dropna()
             instruments = tuple(day_target.index.astype(str))
-            batch = load_microstructure_day(
+            batch = day_loader(
                 args.micro_store, day, instruments, max_minutes=config.max_minutes
             )
             if batch is None:
