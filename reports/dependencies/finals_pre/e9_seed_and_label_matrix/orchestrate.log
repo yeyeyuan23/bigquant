@@ -28,3 +28,37 @@ experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 46: [: 0
 [E9 END] 2026-08-24T11:47:08+08:00 done=24 fail=0
 [push ok] 11f9abb 2026-08-24T11:47:12+08:00
 [shutdown] 2026-08-24T11:47:12+08:00
+[SUPERVISE START] 2026-08-24T11:52:33+08:00 target=6
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 19: [: 0
+0: integer expression expected
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 19: [: 0
+0: integer expression expected
+[QUEUE DRAINED] 2026-08-24T11:52:33+08:00
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 32: [: 0
+0: integer expression expected
+[retry pass 1] 释放 1 个失败任务重跑 2026-08-24T11:52:33+08:00
+[SUPERVISE START] 2026-08-24T11:56:02+08:00 target=6
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:06:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:07:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:08:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:09:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:10:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:11:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:12:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:13:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:14:04+08:00
+[topup] worker -> 5  (running=4 claimed=16) 2026-08-24T13:15:04+08:00
+[topup] worker -> 3  (running=2 claimed=16) 2026-08-24T13:16:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:17:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:18:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:19:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:20:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:21:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:22:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:23:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:24:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:25:04+08:00
+[topup] worker -> 2  (running=1 claimed=16) 2026-08-24T13:26:04+08:00
+[QUEUE DRAINED] 2026-08-24T13:27:04+08:00
+[retry pass 1] 无缺口
+[E9 END] 2026-08-24T13:27:04+08:00 done=40 fail=0
