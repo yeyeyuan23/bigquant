@@ -1,46 +1,84 @@
-"""Add open-to-open to the label decomposition for every variant."""
-import sys, json
-from pathlib import Path
-import numpy as np, pandas as pd
+"""Score saved factor files against the open-to-open convention.
 
-ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
-for e in (ROOT/"src", ROOT/"scripts"):
-    sys.path.insert(0, str(e))
+Lives in the repo rather than /tmp because the throwaway version read a stale
+label file left behind in /tmp, which silently put the whole ablation table on a
+different label basis from the headline result for half a day.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[3]
+for entry in (ROOT / "src", ROOT / "scripts"):
+    if str(entry) not in sys.path:
+        sys.path.insert(0, str(entry))
+
 from bigalpha2026.competition_score_proxy import preprocess_factor
 
 DATA = Path("/root/autodl-tmp/data")
-o2o = pd.read_parquet(ROOT / "reports/dependencies/finals_pre/o2o_labels.parquet")
-o2o["date"] = pd.to_datetime(o2o["date"]).dt.normalize()
-o2o["instrument"] = o2o["instrument"].astype(str)
-o2o = o2o[o2o["date"].dt.year == 2024]
-exposures = pd.read_parquet(DATA/"exposures"/"year=2024"/"part-2024.parquet")
-exposures["date"] = pd.to_datetime(exposures["date"]).dt.normalize()
-exposures["instrument"] = exposures["instrument"].astype(str)
+LABEL = "ret_open_to_open"
 
-rows = []
-for name, path in json.loads(sys.argv[1]).items():
-    f = pd.read_parquet(path)
-    col = "factor" if "factor" in f.columns else "value"
-    f = f.rename(columns={col: "factor"})[["date","instrument","factor"]]
-    f["date"] = pd.to_datetime(f["date"]).dt.normalize()
-    f["instrument"] = f["instrument"].astype(str)
-    f = f[f["date"].dt.year == 2024]
-    neut = preprocess_factor(f, exposures).rename(columns={"factor":"neut"})
-    m = f.merge(neut[["date","instrument","neut"]], on=["date","instrument"]) \
-         .merge(o2o, on=["date","instrument"]).dropna(subset=["ret_open_to_open"])
-    r = {"variant": name}
-    for fc, tag in (("factor","raw"), ("neut","neut")):
-        ics = m.dropna(subset=[fc]).groupby("date").apply(
-            lambda g: g[fc].corr(g["ret_open_to_open"], method="spearman")
-            if len(g) >= 50 else np.nan, include_groups=False).dropna()
-        r[f"{tag}_open_to_open"] = float(ics.mean())
-        if tag == "neut":
-            r["neut_open_to_open_ir"] = float(ics.mean()/ics.std())
-            r["neut_open_to_open_t"] = float(ics.mean()/ics.std()*np.sqrt(len(ics)))
-            r["days"] = int(len(ics))
-    rows.append(r); print(name, "ok", flush=True)
 
-out = pd.DataFrame(rows).set_index("variant")
-out.to_csv(ROOT/"reports/dependencies/finals_pre/o2o_decomposition.csv")
-pd.set_option("display.width", 200)
-print(out.round(4).to_string())
+def daily_ic(frame: pd.DataFrame, factor_column: str) -> pd.Series:
+    values = []
+    for _, group in frame.groupby("date", sort=True):
+        if len(group) < 50:
+            continue
+        ic = group[factor_column].corr(group[LABEL], method="spearman")
+        if pd.notna(ic):
+            values.append(float(ic))
+    return pd.Series(values, dtype=float)
+
+
+def main() -> int:
+    labels = pd.read_parquet(ROOT / "reports/dependencies/finals_pre/o2o_labels.parquet")
+    labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
+    labels["instrument"] = labels["instrument"].astype(str)
+    labels = labels[labels["date"].dt.year == 2024].dropna(subset=[LABEL])
+
+    exposures = pd.read_parquet(DATA / "exposures/year=2024/part-2024.parquet")
+    exposures["date"] = pd.to_datetime(exposures["date"]).dt.normalize()
+    exposures["instrument"] = exposures["instrument"].astype(str)
+
+    rows = []
+    for name, path in json.loads(sys.argv[1]).items():
+        factor = pd.read_parquet(path)
+        column = "factor" if "factor" in factor.columns else "value"
+        factor = factor.rename(columns={column: "factor"})[["date", "instrument", "factor"]]
+        factor["date"] = pd.to_datetime(factor["date"]).dt.normalize()
+        factor["instrument"] = factor["instrument"].astype(str)
+        factor = factor[factor["date"].dt.year == 2024]
+
+        neutral = preprocess_factor(factor, exposures).rename(columns={"factor": "neut"})
+        merged = (
+            factor.merge(neutral[["date", "instrument", "neut"]], on=["date", "instrument"])
+            .merge(labels, on=["date", "instrument"])
+            .dropna(subset=[LABEL])
+        )
+        raw = daily_ic(merged.dropna(subset=["factor"]), "factor")
+        neut = daily_ic(merged.dropna(subset=["neut"]), "neut")
+        rows.append({
+            "variant": name,
+            "raw_open_to_open": raw.mean(),
+            "neut_open_to_open": neut.mean(),
+            "neut_open_to_open_ir": neut.mean() / neut.std(),
+            "neut_open_to_open_t": neut.mean() / neut.std() * np.sqrt(len(neut)),
+            "days": len(neut),
+        })
+        print(name, "ok", flush=True)
+
+    table = pd.DataFrame(rows).set_index("variant")
+    table.to_csv(ROOT / "reports/dependencies/finals_pre/o2o_decomposition.csv")
+    pd.set_option("display.width", 200)
+    print(table.round(4).to_string())
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
