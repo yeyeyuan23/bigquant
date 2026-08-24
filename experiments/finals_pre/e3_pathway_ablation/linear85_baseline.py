@@ -58,6 +58,8 @@ def main() -> int:
     parser.add_argument("--train-start-year", type=int, default=2019)
     parser.add_argument("--predict-year", type=int, default=2024)
     parser.add_argument("--ridge-alpha", type=float, default=1.0)
+    parser.add_argument("--label-column", default="ret_next_open_to_close")
+    parser.add_argument("--extra-labels", type=Path, default=None)
     parser.add_argument("--workers", type=int, default=24)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -85,9 +87,17 @@ def main() -> int:
         print(f"features written: {len(table)} rows", flush=True)
 
     labels = load_labels(args.data_root, args.train_start_year, args.predict_year)
+    if args.extra_labels is not None:
+        extra = pd.read_parquet(args.extra_labels)
+        extra["date"] = pd.to_datetime(extra["date"]).dt.normalize()
+        extra["instrument"] = extra["instrument"].astype(str)
+        labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
+        labels["instrument"] = labels["instrument"].astype(str)
+        labels = labels.merge(extra, on=["date", "instrument"], how="left")
+    labels = labels.dropna(subset=[args.label_column])
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
-    labels["target"] = labels.groupby("date")["ret_next_open_to_close"].rank(pct=True) * 2.0 - 1.0
+    labels["target"] = labels.groupby("date")[args.label_column].rank(pct=True) * 2.0 - 1.0
     table["date"] = pd.to_datetime(table["date"]).dt.normalize()
     table["instrument"] = table["instrument"].astype(str)
     merged = table.merge(

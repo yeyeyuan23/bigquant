@@ -1,0 +1,12 @@
+computing 85 stats for 1456 days
+  200/1456
+  400/1456
+  600/1456
+  800/1456
+  1000/1456
+  1200/1456
+  1400/1456
+features written: 1452626 rows
+/root/autodl-tmp/conda-envs/quant/lib/python3.11/site-packages/sklearn/linear_model/_ridge.py:227: LinAlgWarning: An ill-conditioned matrix detected: slice 0 has rcond = 2.128894005526405e-10.
+  return linalg.solve(A, Xy, assume_a="pos", overwrite_a=True).T
+{"model": "linear85_ridge_baseline", "ridge_alpha": 1.0, "train_rows": 1208223, "predict_days": 240, "rank_ic_mean": 0.06798382265842537, "rank_ic_ir": 0.39926424657064336}

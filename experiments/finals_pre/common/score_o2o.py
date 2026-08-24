@@ -36,6 +36,25 @@ def daily_ic(frame: pd.DataFrame, factor_column: str) -> pd.Series:
     return pd.Series(values, dtype=float)
 
 
+def long_short_sharpe(frame: pd.DataFrame, factor_column: str, quantiles: int = 5) -> float:
+    """Annualised Sharpe of the top-minus-bottom quantile spread."""
+    work = frame.dropna(subset=[factor_column, LABEL]).copy()
+    work["bucket"] = work.groupby("date")[factor_column].transform(
+        lambda s: pd.qcut(s.rank(method="first"), quantiles, labels=False, duplicates="drop"))
+    top = work[work["bucket"] == quantiles - 1].groupby("date")[LABEL].mean()
+    bottom = work[work["bucket"] == 0].groupby("date")[LABEL].mean()
+    spread = (top - bottom).dropna()
+    if len(spread) < 2 or spread.std() == 0:
+        return float("nan")
+    return float(spread.mean() / spread.std() * np.sqrt(252))
+
+
+def stress_days(labels: pd.DataFrame) -> set:
+    """Top quartile of daily cross-sectional dispersion -- the days stocks pull apart."""
+    spread = labels.groupby("date")[LABEL].std()
+    return set(spread[spread >= spread.quantile(0.75)].index)
+
+
 def main() -> int:
     labels = pd.read_parquet(ROOT / "reports/dependencies/finals_pre/o2o_labels.parquet")
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
@@ -46,6 +65,7 @@ def main() -> int:
     exposures["date"] = pd.to_datetime(exposures["date"]).dt.normalize()
     exposures["instrument"] = exposures["instrument"].astype(str)
 
+    stress = stress_days(labels)
     rows = []
     for name, path in json.loads(sys.argv[1]).items():
         factor = pd.read_parquet(path)
@@ -63,12 +83,18 @@ def main() -> int:
         )
         raw = daily_ic(merged.dropna(subset=["factor"]), "factor")
         neut = daily_ic(merged.dropna(subset=["neut"]), "neut")
+        hot = merged[merged["date"].isin(stress)]
+        neut_stress = daily_ic(hot.dropna(subset=["neut"]), "neut")
         rows.append({
             "variant": name,
             "raw_open_to_open": raw.mean(),
             "neut_open_to_open": neut.mean(),
             "neut_open_to_open_ir": neut.mean() / neut.std(),
             "neut_open_to_open_t": neut.mean() / neut.std() * np.sqrt(len(neut)),
+            "neut_sharpe_q5": long_short_sharpe(merged, "neut"),
+            "neut_stress_ic": neut_stress.mean(),
+            "neut_stress_ir": neut_stress.mean() / neut_stress.std(),
+            "stress_days": len(neut_stress),
             "days": len(neut),
         })
         print(name, "ok", flush=True)
