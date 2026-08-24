@@ -14,3 +14,15 @@ experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 31: [: 0
 experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 46: [: 0
 0: integer expression expected
 [E9 END] 2026-08-24T02:09:52+08:00 done=24 fail=0
+[push ok] 69d5e88 2026-08-24T02:10:09+08:00
+[shutdown] 2026-08-24T02:10:09+08:00
+[SUPERVISE START] 2026-08-24T11:47:08+08:00 target=6
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 18: [: 0
+0: integer expression expected
+[QUEUE DRAINED] 2026-08-24T11:47:08+08:00
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 31: [: 0
+0: integer expression expected
+[retry pass 1] 无缺口
+experiments/finals_pre/e9_seed_and_label_matrix/supervise.sh: line 46: [: 0
+0: integer expression expected
+[E9 END] 2026-08-24T11:47:08+08:00 done=24 fail=0
