@@ -54,11 +54,10 @@ NEW = _f[[c for c in _f.columns if c not in DROP]].copy()
 print(f"完整 exposures：{NEW.shape[1] - 2} 个风格/行业列", flush=True)
 
 
-def quintile_sharpe(g):
-    """多空五分位夏普，年化。与 score_o2o 同口径。"""
-    q = g["neut"].rank(pct=True)
-    lo, hi = g[q <= 0.2][LABEL].mean(), g[q >= 0.8][LABEL].mean()
-    return hi - lo
+# 夏普不要自己实现：第一版用百分位阈值分桶，和 score_o2o 的 pd.qcut 等频分桶
+# 在并列值上归属不同，算出来差最多 1.5%。直接 import 他们的函数，保证逐位一致。
+sys.path.insert(0, str(ROOT / "experiments/finals_pre/common"))
+from score_o2o import long_short_sharpe  # noqa: E402
 
 
 def score(factor: pd.DataFrame, exposures: pd.DataFrame) -> dict:
@@ -67,12 +66,12 @@ def score(factor: pd.DataFrame, exposures: pd.DataFrame) -> dict:
     ic = m.groupby("date").apply(
         lambda g: g["neut"].corr(g[LABEL], method="spearman"),
         include_groups=False).dropna()
-    ls = m.groupby("date").apply(quintile_sharpe, include_groups=False).dropna()
+
     s_ic = ic.reindex(sorted(STRESS & set(ic.index))).dropna()
     return {
         "ic": float(ic.mean()),
         "ir": float(ic.mean() / ic.std()),
-        "sharpe": float(ls.mean() / ls.std() * np.sqrt(252)),
+        "sharpe": float(long_short_sharpe(m, "neut")),
         "stress_ic": float(s_ic.mean()),
         "stress_ir": float(s_ic.mean() / s_ic.std()),
         "days": int(len(ic)),
