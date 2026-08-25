@@ -9,17 +9,15 @@
   weights 是市值权重，preprocess_factor 做的是普通 OLS，
           喂进去会被当成一个普通风格因子
 """
-import json
 import re
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
 sys.path.insert(0, str(ROOT / "src"))
-from bigalpha2026.competition_score_proxy import preprocess_factor  # noqa: E402
+from bigalpha2026.competition_score_proxy import preprocess_factor
 
 FP = ROOT / "reports/dependencies/finals_pre"
 LABEL = "ret_open_to_open"
@@ -57,7 +55,7 @@ print(f"完整 exposures：{NEW.shape[1] - 2} 个风格/行业列", flush=True)
 # 夏普不要自己实现：第一版用百分位阈值分桶，和 score_o2o 的 pd.qcut 等频分桶
 # 在并列值上归属不同，算出来差最多 1.5%。直接 import 他们的函数，保证逐位一致。
 sys.path.insert(0, str(ROOT / "experiments/finals_pre/common"))
-from score_o2o import long_short_sharpe  # noqa: E402
+from score_o2o import long_short_sharpe
 
 
 def score(factor: pd.DataFrame, exposures: pd.DataFrame) -> dict:
@@ -74,35 +72,48 @@ def score(factor: pd.DataFrame, exposures: pd.DataFrame) -> dict:
         "sharpe": float(long_short_sharpe(m, "neut")),
         "stress_ic": float(s_ic.mean()),
         "stress_ir": float(s_ic.mean() / s_ic.std()),
-        "days": int(len(ic)),
+        "days": len(ic),
     }
 
 
-runs = pd.read_csv(sys.argv[1])
-runs = runs[runs.train_label == "o2o"]
-out = []
-for r in runs.itertuples():
-    p = path_for(r.run)
-    if p is None or not p.exists():
-        print(f"跳过 {r.run}：{'无路径规则' if p is None else '文件不存在'}", flush=True)
-        continue
-    f = pd.read_parquet(p)
-    col = "factor" if "factor" in f.columns else "value"
-    f = f.rename(columns={col: "factor"})[["date", "instrument", "factor"]]
-    f["date"] = pd.to_datetime(f["date"]).dt.normalize()
-    f["instrument"] = f["instrument"].astype(str)
-    f = f[f["date"].dt.year == 2024]
+OUT_CSV = "/root/autodl-tmp/rescore_full_exposure.csv"
 
-    o, n = score(f, OLD), score(f, NEW)
-    # 复现判据：旧口径重算的 IC 要和 CSV 里的对得上（4 位小数容差 2e-4）
-    ok = abs(o["ic"] - r.neut_ic_o2o) < 2e-4
-    print(f"{r.run:26s} 旧 {o['ic']:.4f}(表 {r.neut_ic_o2o:.4f}) "
-          f"{'✓' if ok else '✗ 复现失败'}   新 {n['ic']:.4f} IR {n['ir']:.3f}", flush=True)
-    out.append({"run": r.run, "config": r.config, "seed": r.seed, "reproduced": ok,
-                **{f"old_{k}": v for k, v in o.items()},
-                **{f"new_{k}": v for k, v in n.items()}})
 
-d = pd.DataFrame(out)
-d.to_csv("/root/autodl-tmp/rescore_full_exposure.csv", index=False)
-print(f"\n{len(d)} 个臂，复现成功 {int(d.reproduced.sum())}")
-print("写出 /root/autodl-tmp/rescore_full_exposure.csv")
+def load_factor(path: Path) -> pd.DataFrame:
+    """因子文件的列名在两代产物里不一致，统一成 factor，并截到 2024。"""
+    frame = pd.read_parquet(path)
+    col = "factor" if "factor" in frame.columns else "value"
+    frame = frame.rename(columns={col: "factor"})[["date", "instrument", "factor"]]
+    frame["date"] = pd.to_datetime(frame["date"]).dt.normalize()
+    frame["instrument"] = frame["instrument"].astype(str)
+    return frame[frame["date"].dt.year == 2024]
+
+
+def main() -> None:
+    runs = pd.read_csv(sys.argv[1])
+    runs = runs[runs.train_label == "o2o"]
+    out = []
+    for r in runs.itertuples():
+        path = path_for(r.run)
+        if path is None or not path.exists():
+            print(f"跳过 {r.run}：{'无路径规则' if path is None else '文件不存在'}", flush=True)
+            continue
+        f = load_factor(path)
+
+        o, n = score(f, OLD), score(f, NEW)
+        # 复现判据：旧口径重算的 IC 要和 CSV 里的对得上（4 位小数容差 2e-4）
+        ok = abs(o["ic"] - r.neut_ic_o2o) < 2e-4
+        print(f"{r.run:26s} 旧 {o['ic']:.4f}(表 {r.neut_ic_o2o:.4f}) "
+              f"{'✓' if ok else '✗ 复现失败'}   新 {n['ic']:.4f} IR {n['ir']:.3f}", flush=True)
+        out.append({"run": r.run, "config": r.config, "seed": r.seed, "reproduced": ok,
+                    **{f"old_{k}": v for k, v in o.items()},
+                    **{f"new_{k}": v for k, v in n.items()}})
+
+    d = pd.DataFrame(out)
+    d.to_csv(OUT_CSV, index=False)
+    print(f"\n{len(d)} 个臂，复现成功 {int(d.reproduced.sum())}")
+    print(f"写出 {OUT_CSV}")
+
+
+if __name__ == "__main__":
+    main()
