@@ -379,3 +379,43 @@ def test_prepare_label_panel_ranks_each_day_and_rejects_duplicates() -> None:
     np.testing.assert_allclose(targets[dates[0]].to_numpy(), [-1 / 3, 1 / 3, 1.0])
     with pytest.raises(ValueError, match="duplicate"):
         prepare_label_panel(pd.concat([labels, labels.iloc[[0]]], ignore_index=True))
+
+
+def test_daily_statistics_survive_a_constant_channel() -> None:
+    """整条通道当天恒定（一字板）时，日级 std 是 0，反向不得产生 NaN。
+
+    sqrt 在 0 处导数无穷，直接 (x).sqrt() 会得到 inf x 0 = NaN。今天这条路
+    不会被走到（统计量算自输入，上游没有参数），但只要有人对输入求梯度就会踩上。
+    修法必须保持前向逐位不变——clamp_min 会把 std 从 0 抬到非零，改变冻结路径。
+    """
+    from bigalpha2026.alpha_models.microstructure import _masked_channel_statistics
+
+    minutes, channels = 242, len(MICROSTRUCTURE_CHANNELS)
+    values = torch.zeros(2, minutes, channels, requires_grad=True)
+    observed = torch.ones(2, minutes, channels, dtype=torch.bool)
+    minute_mask = torch.ones(2, minutes, dtype=torch.bool)
+
+    stats = _masked_channel_statistics(values, observed, minute_mask, 30)
+    assert not torch.isnan(stats).any()
+
+    std = stats[:, channels : 2 * channels]
+    assert torch.equal(std, torch.zeros_like(std)), "恒定通道的日级 std 必须仍然是 0"
+
+    stats.sum().backward()
+    assert not torch.isnan(values.grad).any(), "恒定通道不得产生 NaN 梯度"
+
+
+def test_daily_statistics_match_plain_sqrt_when_variance_is_positive() -> None:
+    """方差为正时，修复不得改变任何数值。"""
+    from bigalpha2026.alpha_models.microstructure import _masked_channel_statistics
+
+    minutes, channels = 242, len(MICROSTRUCTURE_CHANNELS)
+    generator = torch.Generator().manual_seed(20260826)
+    values = torch.randn(4, minutes, channels, generator=generator)
+    observed = torch.ones(4, minutes, channels, dtype=torch.bool)
+    minute_mask = torch.ones(4, minutes, dtype=torch.bool)
+
+    stats = _masked_channel_statistics(values, observed, minute_mask, 30)
+    centered = values - values.mean(dim=1, keepdim=True)
+    expected = (centered.square().sum(dim=1) / minutes).sqrt()
+    assert torch.equal(stats[:, channels : 2 * channels], expected)

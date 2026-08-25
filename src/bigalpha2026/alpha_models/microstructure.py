@@ -379,7 +379,17 @@ def _masked_channel_statistics(
     count = valid.sum(dim=1).clamp_min(1)
     mean = clean.sum(dim=1) / count
     centered = torch.where(valid, clean - mean[:, None, :], torch.zeros_like(clean))
-    std = (centered.square().sum(dim=1) / count).sqrt()
+    variance = centered.square().sum(dim=1) / count
+    # sqrt 在 0 处导数无穷：整条通道恒定（一字板）或整通道缺失时 variance 恰为 0，
+    # 反向会得到 inf x 0 = NaN。喂给 sqrt 的假分支换成 1.0，使其局部导数有限，
+    # 再由 where 把该支梯度归零。前向逐位不变 —— clamp_min 做不到这一点，
+    # 它会把 std 从 0 抬到非零，改变冻结路径的输出。
+    positive = variance > 0
+    std = torch.where(
+        positive,
+        torch.where(positive, variance, torch.ones_like(variance)).sqrt(),
+        torch.zeros_like(variance),
+    )
     positions = torch.arange(values.shape[1], device=values.device)
     last_index = torch.where(valid, positions[None, :, None], -1).amax(dim=1).clamp_min(0)
     last = torch.gather(clean, 1, last_index[:, None, :]).squeeze(1)
