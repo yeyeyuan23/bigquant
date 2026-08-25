@@ -32,6 +32,7 @@ from evaluate_unified_temporal import correlation_loss, load_labels
 from microstructure_ablation import AblationConfig, AblationModel
 
 from bigalpha2026.alpha_models import rolling_oos_blocks
+from bigalpha2026.alpha_models.microstructure import MICROSTRUCTURE_CHANNELS
 
 
 def _device_context(device: torch.device):
@@ -55,6 +56,15 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+# 幻灯片上的四组，下标对应 MICROSTRUCTURE_CHANNELS 的顺序
+CHANNEL_GROUPS = {
+    "price": (0, 1, 2),                     # 价格路径
+    "book": (3, 4, 5, 6, 7),                # 盘口状态
+    "trade": (8, 9, 10, 11, 12, 13),        # 成交结构
+    "clock": (14, 15, 16),                  # 日内时钟
+}
 
 
 def main() -> int:
@@ -86,6 +96,12 @@ def main() -> int:
     parser.add_argument("--disable-sequence-path", action="store_true")
     parser.add_argument("--disable-statistics-path", action="store_true")
     parser.add_argument("--disable-cross-section", action="store_true")
+    parser.add_argument(
+        "--drop-channel-group", nargs="+", default=[],
+        choices=sorted(CHANNEL_GROUPS),
+        help="删掉整组通道后从零重训。置换重要性是冻结模型的依赖度，"
+             "这个才是「拿掉之后模型重新学还能不能补回来」。",
+    )
     args = parser.parse_args()
 
     validate_micro_store(args.micro_store)
@@ -112,7 +128,16 @@ def main() -> int:
         mode="expanding",
     )
     training, prediction_days = blocks[0]
+    dropped = {i for g in args.drop_channel_group for i in CHANNEL_GROUPS[g]}
+    keep = tuple(i for i in range(len(MICROSTRUCTURE_CHANNELS)) if i not in dropped)
+    if args.drop_channel_group:
+        if not keep:
+            raise SystemExit("不能把所有通道都删掉")
+        print(f"drop_channel_group={sorted(args.drop_channel_group)} "
+              f"kept={len(keep)}/{len(MICROSTRUCTURE_CHANNELS)} "
+              f"channels={[MICROSTRUCTURE_CHANNELS[i] for i in keep]}", flush=True)
     config = AblationConfig(
+        keep_channels=() if len(keep) == len(MICROSTRUCTURE_CHANNELS) else keep,
         model_dim=args.model_dim,
         max_minutes=args.max_minutes,
         kernels=tuple(args.kernels),

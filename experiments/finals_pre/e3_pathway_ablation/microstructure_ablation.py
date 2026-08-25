@@ -26,6 +26,10 @@ from bigalpha2026.alpha_models.temporal import DeepSetsContext, MaskedAttentionP
 @dataclass(frozen=True)
 class AblationConfig:
     input_dim: int = len(MICROSTRUCTURE_CHANNELS)
+    # 通道消融：要保留的通道下标（空 = 全用）。在 forward 最前面按下标切，
+    # 两条通路自然都只看到保留的通道。不用置零 —— 置零会让日级统计量的 std
+    # 变成 0，E3b 那次全网络 NaN 就是 sqrt(0) 引起的。
+    keep_channels: tuple[int, ...] = ()
     model_dim: int = 96
     max_minutes: int = 242
     kernels: tuple[int, ...] = (3, 15, 60)
@@ -37,7 +41,13 @@ class AblationConfig:
     use_cross_section: bool = True
 
     def __post_init__(self) -> None:
-        if self.input_dim != len(MICROSTRUCTURE_CHANNELS):
+        if self.keep_channels:
+            if not set(self.keep_channels) <= set(range(len(MICROSTRUCTURE_CHANNELS))):
+                raise ValueError("keep_channels has an out-of-range index")
+            if len(set(self.keep_channels)) != len(self.keep_channels):
+                raise ValueError("keep_channels has duplicates")
+            object.__setattr__(self, "input_dim", len(self.keep_channels))
+        elif self.input_dim != len(MICROSTRUCTURE_CHANNELS):
             raise ValueError("input_dim must match the canonical channels")
         if not (self.use_sequence_path or self.use_statistics_path):
             raise ValueError("at least one pathway must stay enabled")
@@ -102,6 +112,10 @@ class AblationNetwork(nn.Module):
     ) -> Tensor:
         if values.ndim != 4:
             raise ValueError("values must have shape [batch_date, stock, minute, channel]")
+        if self.config.keep_channels:
+            idx = torch.as_tensor(self.config.keep_channels, device=values.device)
+            values = values.index_select(-1, idx)
+            observed_mask = observed_mask.index_select(-1, idx)
         batch_size, stock_count, minute_count, feature_count = values.shape
         if feature_count != self.config.input_dim or minute_count > self.config.max_minutes:
             raise ValueError("input shape is incompatible with model configuration")
