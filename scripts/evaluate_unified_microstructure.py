@@ -13,6 +13,7 @@ import json
 import sys
 from contextlib import nullcontext
 from dataclasses import asdict
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -440,6 +441,12 @@ def main() -> int:
         default=None,
         help="parquet with date/instrument plus a label column absent from the store",
     )
+    parser.add_argument(
+        "--sidecar",
+        type=Path,
+        default=None,
+        help="E11 额外通道的 sidecar 根目录；给了就在 17 个通道之后追加 4 个（需 --fast-pack）",
+    )
     parser.add_argument("--reuse-checkpoints", action="store_true")
     parser.add_argument(
         "--eval-every-epoch",
@@ -467,11 +474,17 @@ def main() -> int:
 
     manifest = validate_micro_store(args.micro_store)
     day_loader = load_microstructure_day
+    extra_channels = 0
     if args.fast_pack:
         sys.path.insert(0, str(ROOT / "experiments" / "finals_pre" / "common"))
-        from fastpack import load_microstructure_day_fast
+        from fastpack import SIDECAR_CHANNELS, load_microstructure_day_fast
 
         day_loader = load_microstructure_day_fast
+        if args.sidecar is not None:
+            day_loader = partial(load_microstructure_day_fast, sidecar=args.sidecar)
+            extra_channels = len(SIDECAR_CHANNELS)
+    elif args.sidecar is not None:
+        raise SystemExit("--sidecar 需要 --fast-pack：pandas 参考路径没有实现 sidecar 连接")
     device = torch.device(args.device)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is unavailable")
@@ -515,6 +528,8 @@ def main() -> int:
             flush=True,
         )
     config = MicrostructureConfig(
+        input_dim=len(MICROSTRUCTURE_CHANNELS) + extra_channels,
+        extra_channels=extra_channels,
         model_dim=args.model_dim,
         max_minutes=args.max_minutes,
         kernels=tuple(args.kernels),

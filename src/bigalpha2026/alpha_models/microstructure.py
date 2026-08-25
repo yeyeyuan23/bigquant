@@ -256,11 +256,16 @@ class MicrostructureConfig:
     industry_context: bool = False
     industry_buckets: int = 32
     industry_shrinkage: float = 10.0
+    extra_channels: int = 0
 
     def __post_init__(self) -> None:
-        if self.input_dim != len(MICROSTRUCTURE_CHANNELS):
+        if self.extra_channels < 0:
+            raise ValueError("extra_channels must not be negative")
+        expected = len(MICROSTRUCTURE_CHANNELS) + self.extra_channels
+        if self.input_dim != expected:
             raise ValueError(
-                f"input_dim must match the canonical {len(MICROSTRUCTURE_CHANNELS)} channels"
+                f"input_dim must match the canonical {len(MICROSTRUCTURE_CHANNELS)} channels "
+                f"plus extra_channels={self.extra_channels}"
             )
         if self.model_dim <= 0 or self.max_minutes <= 0 or self.tcn_blocks <= 0:
             raise ValueError("model_dim, max_minutes, and tcn_blocks must be positive")
