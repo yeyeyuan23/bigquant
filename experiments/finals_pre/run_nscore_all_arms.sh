@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# 给每个 o2o 消融臂算 N 分第一层。基座已缓存，所以每个候选只要几十秒。
+# 之前只有 M_raw 和几个对照有 N —— 「每个实验一行 A/B/N」缺的就是这一块。
+set -uo pipefail
+R=/root/autodl-tmp/projects/bigquant-default
+P=/root/autodl-tmp/conda-envs/quant/bin/python
+FP=$R/reports/dependencies/finals_pre
+NAME=unified_microstructure_full_oos.parquet
+
+args=()
+for d in $FP/e9_seed_and_label_matrix/o2o_*/; do
+  n=$(basename $d)
+  [ -f "$d/$NAME" ] && args+=(--candidate "$n=$d/$NAME")
+done
+for s in 20260801 20260812 20260823; do
+  f=$FP/e6b_o2o_label/seed$s/$NAME
+  [ -f "$f" ] && args+=(--candidate "BASE_full_o2o_$s=$f")
+done
+args+=(--candidate "linear85_o2o=$FP/e3_pathway_ablation/linear85_o2o/$NAME")
+for a in daily6 trade book; do for s in s01 s12 s23; do
+  f=$FP/e10_channel_ablation/${a}_${s}/$NAME
+  [ -f "$f" ] && args+=(--candidate "e10_${a}_${s}=$f")
+done; done
+
+echo "候选数 $(( ${#args[@]} / 2 ))"
+$P $R/experiments/finals_pre/e7_nscore/e7_layer1_ric.py \
+  --base $FP/e7_nscore/base/y_pool_oos.parquet \
+  --data-root /root/autodl-tmp/data --years 2024 \
+  --label-column ret_open_to_open \
+  --extra-labels $FP/o2o_labels.parquet \
+  --output-dir $FP/full_neutralization/nscore_all_arms \
+  "${args[@]}"
