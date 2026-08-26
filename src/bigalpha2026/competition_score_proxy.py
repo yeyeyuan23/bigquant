@@ -263,8 +263,23 @@ ROUTE_COLUMN = "__route_output__"
 
 @dataclass(frozen=True)
 class CompetitionScoreConfig:
-    """Frozen local approximation of the disclosed competition evaluator."""
+    """Frozen local approximation of the disclosed competition evaluator.
 
+    WARNING -- ``primary_label`` defaults to close-to-close, which is NOT the
+    convention the platform scores on.  The platform was verified in 2026-08-23
+    to use open-to-open: ``open[T+2] / open[T+1] - 1``.  Close-to-close inflates
+    neutralised IC by roughly 39% against the platform's own returned figures.
+
+    The default is kept at close-to-close so that every score computed before
+    that verification still reproduces exactly.  Anything meant to be comparable
+    to the platform must pass ``primary_label="ret_open_to_open"`` explicitly --
+    every finals_pre route does, via ``--label-column``.
+
+    See the E6 section of ``BigAlpha_Pre/experiment_log.md`` for the four-way
+    comparison that settled the convention.
+    """
+
+    # 不是平台口径，见上面的 WARNING。改这个默认值会让历史分数静默变化。
     primary_label: str = "ret_close_to_close"
     a_weight: float = 0.30
     b_weight: float = 0.70
