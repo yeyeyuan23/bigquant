@@ -86,7 +86,6 @@ for kind in ('excl_zero', 'incl_zero'):
         f'spearman_close_median_{kind}': float(g.spearman_close.median()),
     })
 (OUT / 'direct_price_check.json').write_text(
-    json.dumps(summary, indent=2, ensure_ascii=False) + '
-')
+    json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
 print()
 print('写出 direct_price_check.{csv,json}')
