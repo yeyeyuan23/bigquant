@@ -41,8 +41,9 @@ basis = {
     'vwap_in_low_high': float(((_s.vwap_raw >= _s.low) & (_s.vwap_raw <= _s.high)).mean()),
 }
 print('\n=== 口径核对 ===')
-print('  close 落在当日 [low,high] 内 %.4f' % basis['close_in_low_high'])
-print('  vwap  落在当日 [low,high] 内 %.4f  ← 后复权 vs 原始，不能直接比' % basis['vwap_in_low_high'])
+print(f"  close 落在当日 [low,high] 内 {basis['close_in_low_high']:.4f}")
+print(f"  vwap  落在当日 [low,high] 内 {basis['vwap_in_low_high']:.4f}"
+      "  ← 后复权 vs 原始，不能直接比")
 
 rows = []
 for d in win:
@@ -72,7 +73,7 @@ fac = m.assign(f=m.close / m.vwap_raw).groupby('instrument')['f']
 res = {
     'claim': 'Δa 对 Δlog(后复权 close)：日间差消掉逐股复权因子后，a 与独立测得的价格同向变动',
     'window': [win[0].name.split('=')[1], win[-1].name.split('=')[1]],
-    'n_stock_days': int(len(d)),
+    'n_stock_days': len(d),
     'n_instruments': int(m.instrument.nunique()),
     'basis_check': basis,
     'pearson_da_dclose': float(d.da.corr(d.dclose)),
@@ -91,15 +92,17 @@ res = {
 }
 
 print('\n=== Δa 对 Δlog(close)（独立测量）===')
-print('  Pearson  %.4f   Spearman %.4f' % (res['pearson_da_dclose'], res['spearman_da_dclose']))
-print('  回归斜率 %.4f  ← VWAP 平掉日内波动，对 close 回归必然 < 1，不是误差' % res['slope_da_on_dclose'])
-print('  逐日横截面秩相关 中位 %.4f  最差 %.4f' % (res['per_day_spearman_median'], res['per_day_spearman_min']))
+print(f"  Pearson  {res['pearson_da_dclose']:.4f}   Spearman {res['spearman_da_dclose']:.4f}")
+print(f"  回归斜率 {res['slope_da_on_dclose']:.4f}"
+      "  ← VWAP 平掉日内波动，对 close 回归必然 < 1，不是误差")
+print(f"  逐日横截面秩相关 中位 {res['per_day_spearman_median']:.4f}  最差 {res['per_day_spearman_min']:.4f}")
 print('=== 同源对照 Δa 对 Δlog(原始 vwap) ===')
-print('  Pearson %.4f' % res['pearson_da_dvwap_sameSource'])
+print(f"  Pearson {res['pearson_da_dvwap_sameSource']:.4f}")
 print('=== 复权因子 close/vwap_raw ===')
-print('  逐股变异系数 中位 %.4f （≈ 常数）' % res['adj_factor_cv_median'])
-print('  逐股均值 p5 %.2f  中位 %.2f  p95 %.2f （跨股票差 18 倍）'
-      % (res['adj_factor_mean_p5'], res['adj_factor_mean_median'], res['adj_factor_mean_p95']))
+print(f"  逐股变异系数 中位 {res['adj_factor_cv_median']:.4f} （≈ 常数）")
+print(f"  逐股均值 p5 {res['adj_factor_mean_p5']:.2f}  "
+      f"中位 {res['adj_factor_mean_median']:.2f}  "
+      f"p95 {res['adj_factor_mean_p95']:.2f} （跨股票差 18 倍）")
 
 OUT.mkdir(parents=True, exist_ok=True)
 d.to_csv(OUT / 'price_diff_check.csv', index=False)
