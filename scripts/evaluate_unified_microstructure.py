@@ -477,12 +477,15 @@ def main() -> int:
     extra_channels = 0
     if args.fast_pack:
         sys.path.insert(0, str(ROOT / "experiments" / "finals_pre" / "common"))
-        from fastpack import SIDECAR_CHANNELS, load_microstructure_day_fast
+        from fastpack import load_microstructure_day_fast, sidecar_channels
 
         day_loader = load_microstructure_day_fast
         if args.sidecar is not None:
             day_loader = partial(load_microstructure_day_fast, sidecar=args.sidecar)
-            extra_channels = len(SIDECAR_CHANNELS)
+            # 通道数从 sidecar 自带的 channels.json 读，不写死 ——
+            # E11 是 4 个、E12 是 9 个，写死就得每次改代码，而改漏了不会报错，
+            # 只会用一个宽度不对的输入投影去训练。
+            extra_channels = len(sidecar_channels(args.sidecar))
     elif args.sidecar is not None:
         raise SystemExit("--sidecar 需要 --fast-pack：pandas 参考路径没有实现 sidecar 连接")
     device = torch.device(args.device)

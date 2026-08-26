@@ -8,6 +8,7 @@ bundle carries its own copy and must keep bit-for-bit reproducibility.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +33,25 @@ SIDECAR_CHANNELS = [
 ]
 
 
+def sidecar_channels(sidecar: Path) -> list[str]:
+    """通道名从 sidecar 自带的 channels.json 读，读不到才回落到 E11 那四个。
+
+    起因：这份列表原先是硬编码的四个。E12 的 sidecar 有九个通道，
+    如果代码还按四个去 select，polars 会因为列不存在而崩 —— 那还算好的；
+    真正危险的是反过来：sidecar 只有四列而代码期望九列时，
+    如果哪天有人把 select 改成宽松匹配，就会静默少喂五个通道，
+    模型照常训练，结果却不是要测的东西。让数据自己声明有哪些通道，
+    这类不匹配就不可能发生。
+    """
+    manifest = Path(sidecar) / "channels.json"
+    if manifest.is_file():
+        names = json.loads(manifest.read_text(encoding="utf-8"))["channels"]
+        if not names:
+            raise ValueError(f"{manifest} 里的 channels 是空的")
+        return list(names)
+    return list(SIDECAR_CHANNELS)
+
+
 def load_microstructure_day_fast(
     store: Path,
     day: pd.Timestamp,
@@ -54,7 +74,8 @@ def load_microstructure_day_fast(
             "s_idx": pl.Series(np.arange(len(instruments), dtype=np.int32), dtype=pl.Int32),
         }
     )
-    channels = CHANNELS + (SIDECAR_CHANNELS if sidecar is not None else [])
+    extra = sidecar_channels(sidecar) if sidecar is not None else []
+    channels = CHANNELS + extra
     frame = (
         pl.scan_parquet(str(partition))
         .select(["instrument", "timestamp", *CHANNELS])
@@ -69,7 +90,7 @@ def load_microstructure_day_fast(
             raise FileNotFoundError(f"sidecar partition is missing: {side_partition}")
         side = (
             pl.scan_parquet(str(side_partition))
-            .select(["instrument", "timestamp", *SIDECAR_CHANNELS])
+            .select(["instrument", "timestamp", *extra])
             .with_columns(pl.col("instrument").cast(pl.Utf8))
             .collect()
         )
