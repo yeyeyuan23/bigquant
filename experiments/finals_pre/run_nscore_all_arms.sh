@@ -17,6 +17,11 @@ for s in 20260801 20260812 20260823; do
   [ -f "$f" ] && args+=(--candidate "BASE_full_o2o_$s=$f")
 done
 args+=(--candidate "linear85_o2o=$FP/e3_pathway_ablation/linear85_o2o/$NAME")
+# E11：21 通道臂。跑在另一条 lane 上，产物目录不同，所以单列一段。
+for s in 20260801 20260812 20260823 20260904 20260915; do
+  f=$FP/e11_book_orders/seed$s/$NAME
+  [ -f "$f" ] && args+=(--candidate "e11_book_orders_$s=$f")
+done
 for a in daily6 trade book; do for s in s01 s12 s23; do
   f=$FP/e10_channel_ablation/${a}_${s}/$NAME
   [ -f "$f" ] && args+=(--candidate "e10_${a}_${s}=$f")
