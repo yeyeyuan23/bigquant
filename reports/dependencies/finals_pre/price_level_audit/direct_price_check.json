@@ -6,10 +6,16 @@
     "2024-12-10"
   ],
   "instruments_per_day_median": 998.0,
-  "ratio_median_incl_zero": 0.9812315784473427,
-  "ratio_median_min_incl_zero": 0.9522834587618367,
-  "ratio_median_max_incl_zero": 0.9870265767920993,
-  "spearman_vwap_median_incl_zero": 0.9949876530238859,
+  "ratio_median_incl_zero": 0.9812315784473428,
+  "ratio_median_min_incl_zero": 0.9522834587618368,
+  "ratio_median_max_incl_zero": 0.9870265767920992,
+  "spearman_vwap_median_incl_zero": 0.994987653023886,
   "spearman_vwap_min_incl_zero": 0.9148143133113072,
-  "spearman_close_median_incl_zero": 0.4613899149650652
+  "spearman_close_median_incl_zero": 0.4613899149650652,
+  "ratio_median_excl_zero": 0.999464919425304,
+  "ratio_median_min_excl_zero": 0.997046100698206,
+  "ratio_median_max_excl_zero": 1.0019168540431542,
+  "spearman_vwap_median_excl_zero": 0.9999859315461834,
+  "spearman_vwap_min_excl_zero": 0.969965212878486,
+  "spearman_close_median_excl_zero": 0.4530098620618166
 }

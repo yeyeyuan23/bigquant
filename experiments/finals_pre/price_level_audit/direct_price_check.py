@@ -66,18 +66,25 @@ for k, g in r.groupby('kind'):
     print(f"  Spearman(exp(a), 收盘价)    中位 {g.spearman_close.median():.4f}  最差 {g.spearman_close.min():.4f}")
 
 r.to_csv(OUT / 'direct_price_check.csv', index=False)
+# 两个口径都写进 JSON。只写 incl_zero 那一版害得文档里 excl_zero 那行
+# 三个数没有出处 —— 审计当场抓到。凡是要写进文档的数，都得在文件里。
 best = r[r.kind == 'incl_zero']
-json.dump({
+summary = {
     'claim': 'a = mean(log_amount) - mean(log_volume) 直接对真实均价，不经 relative_spread 代理',
     'days_sampled': int(best.date.nunique()),
     'date_range': [str(best.date.min().date()), str(best.date.max().date())],
     'instruments_per_day_median': float(best.n.median()),
-    'ratio_median_incl_zero': float(best.ratio_med.median()),
-    'ratio_median_min_incl_zero': float(best.ratio_med.min()),
-    'ratio_median_max_incl_zero': float(best.ratio_med.max()),
-    'spearman_vwap_median_incl_zero': float(best.spearman_vwap.median()),
-    'spearman_vwap_min_incl_zero': float(best.spearman_vwap.min()),
-    'spearman_close_median_incl_zero': float(best.spearman_close.median()),
-}, open(OUT / 'direct_price_check.json', 'w'), indent=2, ensure_ascii=False)
+}
+for kind in ('excl_zero', 'incl_zero'):
+    g = r[r.kind == kind]
+    summary.update({
+        f'ratio_median_{kind}': float(g.ratio_med.median()),
+        f'ratio_median_min_{kind}': float(g.ratio_med.min()),
+        f'ratio_median_max_{kind}': float(g.ratio_med.max()),
+        f'spearman_vwap_median_{kind}': float(g.spearman_vwap.median()),
+        f'spearman_vwap_min_{kind}': float(g.spearman_vwap.min()),
+        f'spearman_close_median_{kind}': float(g.spearman_close.median()),
+    })
+json.dump(summary}, open(OUT / 'direct_price_check.json', 'w'), indent=2, ensure_ascii=False)
 print()
 print('写出 direct_price_check.{csv,json}')
