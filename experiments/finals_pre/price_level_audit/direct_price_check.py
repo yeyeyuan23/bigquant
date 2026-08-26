@@ -85,6 +85,8 @@ for kind in ('excl_zero', 'incl_zero'):
         f'spearman_vwap_min_{kind}': float(g.spearman_vwap.min()),
         f'spearman_close_median_{kind}': float(g.spearman_close.median()),
     })
-json.dump(summary}, open(OUT / 'direct_price_check.json', 'w'), indent=2, ensure_ascii=False)
+(OUT / 'direct_price_check.json').write_text(
+    json.dumps(summary, indent=2, ensure_ascii=False) + '
+')
 print()
 print('写出 direct_price_check.{csv,json}')
