@@ -44,10 +44,11 @@ OLD = pd.read_parquet("/root/autodl-tmp/data/exposures/year=2024/part-2024.parqu
 OLD["date"] = pd.to_datetime(OLD["date"]).dt.normalize()
 OLD["instrument"] = OLD["instrument"].astype(str)
 
-# 完整 exposure 表（10 个 CNE5 风格 + 31 个行业哑变量），从平台一次性导出。
-# 仓库里没有脚本能重新生成它，所以它本身就是证据，必须留在库内 —— 早先它只
-# 存在于开发机的 scratch 盘上，机器一删当前所有 A/N 数字就不可复现。
-_f = pd.read_parquet(FP / "shared/exposure_2024_full.parquet")
+# 完整 exposure 表（10 个 CNE5 风格 + 31 个行业哑变量），按年分区，2019-2024。
+# 由 experiments/finals_pre/pull_exposure_full.py 从 AIStudio 的
+# bigalpha_2026_exposure 导出；那个脚本在仓库里，所以这张表是可复现的。
+# 打分只用 2024（OOS 年），其余年份供训练期的中性化/行业上下文使用。
+_f = pd.read_parquet(FP / "shared/exposures_full/year=2024/part-2024.parquet")
 _f["date"] = pd.to_datetime(_f["date"]).dt.normalize()
 _f["instrument"] = _f["instrument"].astype(str)
 DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
