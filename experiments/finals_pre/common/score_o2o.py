@@ -56,7 +56,7 @@ def stress_days(labels: pd.DataFrame) -> set:
 
 
 def main() -> int:
-    labels = pd.read_parquet(ROOT / "reports/dependencies/finals_pre/o2o_labels.parquet")
+    labels = pd.read_parquet(ROOT / "reports/dependencies/finals_pre/shared/o2o_labels.parquet")
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
     labels = labels[labels["date"].dt.year == 2024].dropna(subset=[LABEL])
@@ -100,7 +100,7 @@ def main() -> int:
         print(name, "ok", flush=True)
 
     table = pd.DataFrame(rows).set_index("variant")
-    table.to_csv(ROOT / "reports/dependencies/finals_pre/o2o_decomposition.csv")
+    table.to_csv(ROOT / "reports/dependencies/finals_pre/shared/o2o_decomposition.csv")
     pd.set_option("display.width", 200)
     print(table.round(4).to_string())
     return 0

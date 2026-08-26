@@ -32,6 +32,6 @@ $P $R/experiments/finals_pre/e7_nscore/e7_layer1_ric.py \
   --base $FP/e7_nscore/base/y_pool_oos.parquet \
   --data-root /root/autodl-tmp/data --years 2024 \
   --label-column ret_open_to_open \
-  --extra-labels $FP/o2o_labels.parquet \
+  --extra-labels $FP/shared/o2o_labels.parquet \
   --output-dir $FP/full_neutralization/nscore_all_arms \
   "${args[@]}"

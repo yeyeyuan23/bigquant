@@ -27,6 +27,6 @@ run_variant e2b_kernel_2_10_45 --kernels 2 10 45
   "$out_root/e2b_kernel_2_10_45/unified_microstructure_full_oos.parquet" \
   --years 2024 --data-dir "$data_root" --reports-dir "$project_root/reports" \
   --cache-dir "$out_root/score_cache" \
-  --output "$out_root/e2b_j_scores.json" --summary-csv "$out_root/e2b_j_scores.csv" \
+  --output "$out_root/shared/e2b_j_scores.json" --summary-csv "$out_root/shared/e2b_j_scores.csv" \
   > "$out_root/scoring_e2b.log" 2>&1 && echo "[done ] scoring_e2b" || echo "[FAIL ] scoring_e2b"
 echo "[E2B ALL DONE] $(date -Is)"

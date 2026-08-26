@@ -25,7 +25,7 @@ OUT = ROOT / "reports/dependencies/finals_pre/e10_channel_ablation/e10_scores.cs
 
 
 def main() -> int:
-    labels = pd.read_parquet(ROOT / "reports/dependencies/finals_pre/o2o_labels.parquet")
+    labels = pd.read_parquet(ROOT / "reports/dependencies/finals_pre/shared/o2o_labels.parquet")
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
     labels = labels[labels["date"].dt.year == 2024].dropna(subset=[LABEL])

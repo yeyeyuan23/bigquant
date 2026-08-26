@@ -45,8 +45,8 @@ echo "[train phase complete] $(date -Is)"
   "$out_root/e5_reference_e6/unified_microstructure_full_oos.parquet" \
   --years 2024 --data-dir "$data_root" --reports-dir "$project_root/reports" \
   --cache-dir "$out_root/score_cache" \
-  --output "$out_root/holdout_j_scores.json" \
-  --summary-csv "$out_root/holdout_j_scores.csv" \
+  --output "$out_root/shared/holdout_j_scores.json" \
+  --summary-csv "$out_root/shared/holdout_j_scores.csv" \
   > "$out_root/scoring_e0.log" 2>&1 && echo "[done ] scoring_e0" || echo "[FAIL ] scoring_e0 — see scoring_e0.log"
 
 # Extended scoring across all five variants (kernel comparison table).
@@ -58,8 +58,8 @@ echo "[train phase complete] $(date -Is)"
   "$out_root/e2a_kernel_k60/unified_microstructure_full_oos.parquet" \
   --years 2024 --data-dir "$data_root" --reports-dir "$project_root/reports" \
   --cache-dir "$out_root/score_cache" \
-  --output "$out_root/all_variants_j_scores.json" \
-  --summary-csv "$out_root/all_variants_j_scores.csv" \
+  --output "$out_root/shared/all_variants_j_scores.json" \
+  --summary-csv "$out_root/shared/all_variants_j_scores.csv" \
   > "$out_root/scoring_all.log" 2>&1 && echo "[done ] scoring_all" || echo "[FAIL ] scoring_all — see scoring_all.log"
 
 echo "[ALL DONE] $(date -Is)"

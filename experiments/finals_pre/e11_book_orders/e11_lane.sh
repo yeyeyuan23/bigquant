@@ -22,7 +22,7 @@ for SEED in "$@"; do
       --max-minutes 242 --max-stocks 1200 --min-train-days 900 \
       --learning-rate 4e-4 --seed "$SEED" \
       --label-column ret_open_to_open \
-      --extra-labels "$P/reports/dependencies/finals_pre/o2o_labels.parquet" \
+      --extra-labels "$P/reports/dependencies/finals_pre/shared/o2o_labels.parquet" \
       --fast-pack > "$OUT/seed${SEED}.log" 2>&1; then
     echo "[done ] seed$SEED $(date -Is)"
   else

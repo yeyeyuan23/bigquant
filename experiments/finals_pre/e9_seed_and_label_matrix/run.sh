@@ -11,7 +11,7 @@ P=/root/autodl-tmp/projects/bigquant-default
 PY=/root/autodl-tmp/conda-envs/quant/bin/python
 DATA=/root/autodl-tmp/data
 STORE=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
-O2O=$P/reports/dependencies/finals_pre/o2o_labels.parquet
+O2O=$P/reports/dependencies/finals_pre/shared/o2o_labels.parquet
 OUT=$P/reports/dependencies/finals_pre/e9_seed_and_label_matrix
 ABL=$P/experiments/finals_pre/e3_pathway_ablation/evaluate_ablation.py
 mkdir -p "$OUT"; cd "$P"
