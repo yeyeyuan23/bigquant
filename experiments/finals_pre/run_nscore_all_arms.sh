@@ -2,6 +2,10 @@
 # 给每个 o2o 消融臂算 N 分第一层。基座已缓存，所以每个候选只要几十秒。
 # 之前只有 M_raw 和几个对照有 N —— 「每个实验一行 A/B/N」缺的就是这一块。
 set -uo pipefail
+# 用法：run_nscore_all_arms.sh [isotonic|linear] [输出子目录名]
+# 默认 isotonic（2026-08-26 起的现行口径）；linear 用于复现更早的数。
+RESIDUAL=${1:-isotonic}
+OUTNAME=${2:-nscore_all_arms}
 R=/root/autodl-tmp/projects/bigquant-default
 P=/root/autodl-tmp/conda-envs/quant/bin/python
 FP=$R/reports/dependencies/finals_pre
@@ -33,5 +37,6 @@ $P $R/experiments/finals_pre/e7_nscore/e7_layer1_ric.py \
   --data-root /root/autodl-tmp/data --years 2024 \
   --label-column ret_open_to_open \
   --extra-labels $FP/shared/o2o_labels.parquet \
-  --output-dir $FP/full_neutralization/nscore_all_arms \
+  --residual "$RESIDUAL" \
+  --output-dir $FP/full_neutralization/$OUTNAME \
   "${args[@]}"

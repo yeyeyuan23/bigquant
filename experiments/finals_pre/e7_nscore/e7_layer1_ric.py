@@ -1,5 +1,10 @@
 """Layer 1 of the N score: residual predictive power (RIC) against the nonlinear base.
 
+Residualisation defaults to isotonic (2026-08-26 onwards).  The earlier linear
+form only removed the base prediction's linear component, which credited part of
+the base's own ranking power to the candidate; see the E7 section of
+BigAlpha_Pre/experiment_log.md.  Pass --residual linear to reproduce older runs.
+
 For every day: residualize the rank target on the base prediction's rank
 (single-variable cross-sectional OLS), then measure Spearman(candidate, residual).
 Daily granularity gives ~240 observations per year, so the aggregate is stable by
@@ -16,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.isotonic import IsotonicRegression
 
 ROOT = Path(__file__).resolve().parents[3]
 for entry in (ROOT / "src", ROOT / "scripts"):
@@ -27,6 +33,32 @@ from evaluate_unified_temporal import load_labels
 
 def daily_rank(series: pd.Series) -> pd.Series:
     return series.rank(pct=True) * 2.0 - 1.0
+
+
+def pool_residual(y: np.ndarray, p: np.ndarray, method: str) -> np.ndarray:
+    """把池预测能解释的部分从目标里扣掉。
+
+    linear    y - beta*p，单变量 OLS。2026-08-26 之前的口径，只扣线性成分。
+    isotonic  y - g(p)，g 是最佳单调递增函数，按池排序的奇偶位两折交叉拟合。
+              RIC 用 Spearman 只看序，所以「池能解释的」应是 p 的任意单调函数，
+              linear 只是其中很小一块 —— 少扣的那部分被算成了候选的增量。
+    """
+    if method == "linear":
+        beta = np.cov(y, p)[0, 1] / max(np.var(p), 1e-12)
+        return y - beta * p
+
+    # 奇偶折：两折都覆盖 p 的完整值域，且不依赖随机种子
+    order = np.argsort(np.argsort(p))
+    fold = order % 2 == 0
+    residual = np.empty_like(y)
+    for mask in (fold, ~fold):
+        other = ~mask
+        if mask.sum() < 20 or other.sum() < 20:
+            residual[mask] = y[mask]
+            continue
+        fitted = IsotonicRegression(out_of_bounds="clip").fit(p[other], y[other])
+        residual[mask] = y[mask] - fitted.predict(p[mask])
+    return residual
 
 
 def load_factor(path: Path, value_column: str = "factor") -> pd.DataFrame:
@@ -67,6 +99,12 @@ def main() -> int:
         type=Path,
         default=None,
         help="parquet with date/instrument plus a label column not in the label store",
+    )
+    parser.add_argument(
+        "--residual",
+        choices=("isotonic", "linear"),
+        default="isotonic",
+        help="池残差化方式；isotonic 为现行口径，linear 用于复现 2026-08-26 之前的数",
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
@@ -110,8 +148,7 @@ def main() -> int:
                 continue
             y = group["y_rank"].to_numpy()
             p = group["pool_rank"].to_numpy()
-            beta = np.cov(y, p)[0, 1] / max(np.var(p), 1e-12)
-            residual = y - beta * p
+            residual = pool_residual(y, p, args.residual)
             ric = pd.Series(group["value"].to_numpy()).corr(
                 pd.Series(residual), method="spearman"
             )
@@ -147,7 +184,8 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(daily_rows).to_csv(args.output_dir / "layer1_daily_ric.csv", index=False)
     (args.output_dir / "layer1_summary.json").write_text(
-        json.dumps({"years": args.years, "candidates": summaries}, indent=2) + "\n",
+        json.dumps({"years": args.years, "residual": args.residual,
+                    "candidates": summaries}, indent=2) + "\n",
         encoding="utf-8",
     )
     return 0
