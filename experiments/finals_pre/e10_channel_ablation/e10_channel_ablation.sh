@@ -10,7 +10,7 @@
 set -uo pipefail
 P=/root/autodl-tmp/projects/bigquant-default
 PY=/root/autodl-tmp/conda-envs/quant/bin/python
-DATA=/root/autodl-tmp/projects/bigquant/data
+DATA=/root/autodl-tmp/data
 STORE=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
 O2O=$P/reports/dependencies/finals_pre/shared/o2o_labels.parquet
 EXP=$P/experiments/finals_pre/e3_pathway_ablation

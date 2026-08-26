@@ -1,54 +1,90 @@
-# Finals-pre experiment suite (2026-08-19 → 08-23)
+# 决赛复盘实验（finals_pre）
 
-Protocol unless noted: expanding history from 2019-01-02, 1-trading-day label
-isolation (asserted), predict untouched 2024; seed 20260801; RTX 4090D.
-Artifacts live under `reports/dependencies/finals_pre/`; every
-checkpoint sha256 is recorded in the sibling `oos_metrics.json`.
+**这里只放"是什么、在哪"，不放结果数字。**
+全部实验的结论、A 四小项与 N 分、判读口径，在 `BigAlpha_Pre/experiment_log.md`
+（Mac 端私有仓库），那份由脚本从本仓库现读生成。
 
-| ID | Question | Headline result |
-|---|---|---|
-| E0 | How many epochs? Untouched holdout scored after every epoch, 2023 and 2024, three seeds each (`--eval-every-epoch`) | **The curve is flat and no optimal epoch is identifiable.** Peaks land on different epochs across years (e4 vs e5); peak-to-runner-up gaps (0.0002, 0.0008) sit an order of magnitude below the seed spread (0.0024-0.0034); paired over six runs no epoch differs significantly from e3 (strongest is e1 at t −2.36). e3 is the most *consistent* choice across both years without being either year's peak. Training loss falls monotonically while OOS does not improve |
-| E1 | Pathway ablation + Linear-85 | Mean IC clusters 0.042-0.044 (stats_only 0.0334), but the full model wins BOTH stability metrics: ICIR 0.391 / LS-Sharpe 3.73 vs 3.48/3.30/2.49/1.07 — every component buys stability, matching what the contest scores |
-| E2 | Single-scale kernels k3/k15/k60 | 0.0444/0.0453/0.0425 vs full 0.0418; cross-scale corr 0.83-0.89 |
-| E2b | Kernel-value sensitivity | (5,30,120) 0.0421, (2,10,45) 0.0458 — log-spaced design robust to values |
-| E2c | Seed robustness (3 seeds x 2 configs) | full 0.0419±0.0004, (2,10,45) 0.0451±0.0006 — the smaller-kernel edge is real (5-8x seed spread) |
-| E3 | Main-result analysis (platform-style neutralization) | Neutralized IC 0.0523 (ICIR 0.91, t 14.1), LS-Sharpe(20%) 6.98, all four A percentiles 1.000; stress-day IC 0.033 (IR 0.53) positive and significant — degrades least, not strongest; top deciles monotone |
-| E4 | Walk-forward 26 blocks 2023-24 | mean per-block IC 0.0483, 25/26 positive; merged series + per_block_ic.csv. Param-drift metric is uninformative by design (fresh seed per block -> permutation symmetry); functional stability is the 25/26 |
-| E5 | EN blend dose-response (two-year J) | M x EN454 daily Spearman 0.18; J: M 0.983 > baseline 0.954; +0.006-0.007 at 10-25% blend, 50% blend falls back (B_2024 diluted to 0.842) — credit-reallocation again |
-| E7 | N score (residual RIC vs LightGBM-454 base) | M_raw +0.0246 (t 4.9); controls: noise 0.001/t0.5, in-pool -0.004/t-1.5, EN454 ns; Layer-2 delta-LGBM demoted (no power in 60d windows) |
-| Perm | Channel permutation importance (frozen e3, 61 days) | group_trade -36%, group_price -32%, group_book -26%; clock group immune to cross-stock shuffle by construction; redundant microprice_gap shuffle IMPROVES IC +3.8% |
+> 这份 README 曾经带着一张结果表，用的是一套**更早的编号**（E0=epoch、E1=双通路、
+> E3=主结果），数字停在换完整 Barra 中性化之前。两套编号并存了三天没人发现，
+> 拿着仓库目录名反查实验时会指到错误的实验上。所以现在这里不再复制任何结果数字——
+> 复制就会漂移，而漂移不报错。
 
-## Data pipeline (2026-08-23)
+## 编号对照
 
-Profiling put 65% of each training day in a Python loop over ~1000 stocks inside
-`pack_microstructure_days` (0.81s of a 1.24s day; GPU work was only 0.37s).
-`experiments/finals_pre/common/fastpack.py` adds a polars packer, enabled by the
-trainer's `--fast-pack` flag (**off by default**); the frozen submission bundle
-keeps its own pandas copy and is untouched.
+| 编号 | 是什么 | 脚本 | 产物 `reports/dependencies/finals_pre/` |
+|---|---|---|---|
+| **E1** | 通道置换重要性（冻结模型上跨股票打乱一组通道） | `e1_channel_importance/` | `e1_channel_importance/` |
+| **E2** | 卷积核尺度：单尺度（a）／数值敏感性（b）／种子稳健性（c） | `e2_kernel/` | `e2a_*`、`e2b_*`、`e2c_seed_robustness/` |
+| **E3** | 双通路消融 + Linear-85 对照 | `e3_pathway_ablation/` | `e3_pathway_ablation/` |
+| **E3b** | DeepSets 加行业分组 context | `e3b_industry_context/` | `e3b_industry_context/` |
+| **E4** | walk-forward 26 块 | `e4_walkforward/` | `e4_walkforward/` |
+| **E5** | 逐 epoch 的 OOS 曲线 | `e5_epoch_curve/` | `e5_epoch_curve/`、`e5_reference_*` |
+| **E6** | 主结果分析包 + 平台收益口径确认（o2o） | `e6_main_analysis/` | `e6_main_analysis/` |
+| **E6b** | 只换训练标签 o2c → o2o | `e6b_o2o_label/` | `e6b_o2o_label/` |
+| **E7** | N 分：对 LightGBM-454 池残差的增量预测力 | `e7_nscore/` | `e7_nscore/` |
+| **E8** | EN454 掺混剂量-响应 | `e8_en_blend/` | `e8_en_blend/` |
+| **E9** | 种子与标签矩阵（把每个消融补到 3 个种子） | `e9_seed_and_label_matrix/` | `e9_seed_and_label_matrix/` |
+| **E10** | 通道组重训消融（拿掉整组再从零训） | `e10_channel_ablation/` | `e10_channel_ablation/` |
+| **E11** | 盘口挂单笔数与四五档价量（17 → 21 通道） | `e11_book_orders/` | `e11_book_orders/` |
 
-Equivalence was checked three ways, all byte-identical: 20 random days; five edge
-cases (empty instrument list, single stock, unknown code, full universe, missing
-partition — the empty-list case caught a real bug where polars inferred a Null
-dtype and the join failed); and end-to-end by replaying the frozen e3 checkpoint,
-which reproduces `rank_ic_mean 0.041769313009848055` exactly.
+`E0` 不是独立实验，是 E2 那批的启动器（`e2_kernel/e0_e2_launcher.sh`）。
+**没有 E12。**
 
-Packing dropped 0.81s → 0.13s (4x), GPU utilisation rose 30% → 50%, and a full
-run fell from ~2h to ~37min.
+## 目录约定
 
-**Still open — redundant packing.** One run packs 8730 times over only 1213
-distinct trading days (7x redundant). A plain per-day cache is invalid because
-the training loop resamples 1200 stocks with `rng.choice` every epoch, so the
-same day yields a different tensor each pass; the fix is to cache the full-day
-tensor and slice per epoch (29 GB fits in RAM, not on the 50 GB disk). Worth
-roughly another 1.3x and needs its own byte-equality check.
+```text
+experiments/finals_pre/
+├── <E 名>/              一 E 一目录，该实验的全部脚本
+├── common/              跨实验的库代码（fastpack、score_o2o、prefetch、industry）
+├── price_level_audit/   数据审计，不是 E 编号实验
+└── 根上 6 个跨实验工具  rescore_*（三个互相 import）、run_nscore_all_arms.sh、
+                        rerun_scoring.sh、run_final_batch.sh
+```
 
-Environment notes: (1) the stale editable install of bigalpha_2026_factors
-pointed at the retired main worktree; re-installed from this worktree.
-(2) Two scorer contracts every new route script must honor: ambient
-bigalpha2026 import, and full label-universe coverage with neutral-0 fill.
-(3) Orchestrating bash processes were killed several times by an unknown
-external reaper (pythons survived); per-block resumable outputs made every
-recovery lossless.
+产物同构：`reports/dependencies/finals_pre/<E 名>/`，另有 `logs/`（纯日志）
+与 `shared/`（跨实验共用：`o2o_labels.parquet`、`o2o_decomposition.csv`、J 打分结果等）。
 
-Presentation documents live locally in `BigAlpha2026_Pre/` (deck, study
-guide, speaker notes, audits, platform-score record); repo is private.
+**一处例外**：`e7_nscore/noise_null.log` 虽是 `.log`，但它是噪声标定的数据源、
+写在 `BigAlpha_Pre/results/audit_numbers.py` 的 MANIFEST 里，所以不在 `logs/`。
+
+## 统一协议
+
+expanding 训练、起点 2019-01-02、标签隔离 1 个交易日（代码硬断言）、
+epochs=3、lr=4e-4、max_stocks=1200、2024 整年 untouched 预测、RTX 4090D。
+seed 组 {20260801, 20260812, 20260823, 20260904, 20260915}。
+消融只动被测部件，其余保持一致，因此差异可归因。
+每个 checkpoint 的 sha256 记在同目录的 `oos_metrics.json` 里。
+
+## 数据管线
+
+**打包是瓶颈，不是 GPU。** 单个训练日 1.24 s 里，读 parquet 只占 0.06 s，
+打包成张量占 0.81 s（65%），GPU 前向反向 0.37 s。慢在逐股票的 Python 循环。
+
+`common/fastpack.py` 提供 polars 打包路径，由训练器的 `--fast-pack` 启用
+（**默认关闭**）；冻结的提交 bundle 自带一份 pandas 实现，未做任何改动。
+打包 0.81 s → 0.13 s（4×），单个完整 run 约 2 小时 → 37 分钟。
+
+**等价性验证三层，全部逐字节通过**：随机 20 天；5 个边界用例（空列表、单只、
+不存在的代码、全量、分区缺失——空列表那个测出真 bug：polars 把空列推断成 Null
+导致 join 崩）；端到端复用冻结 checkpoint，逐位复现
+`rank_ic_mean 0.041769313009848055`。
+
+**E11 的 sidecar**：4 个新通道单独落盘（1456 天 / 4.7 GB，在
+`/root/autodl-tmp/e11_sidecar`，不入库），由 `--sidecar` 按
+`(instrument, timestamp)` 左连接追加在 17 个通道之后。**现有 store 一个字节不动**——
+原通道一旦变了字节，已有的 5 个 baseline seed 就不能再当对照组。
+取数脚本见 `e11_book_orders/sidecar_build/`。
+
+**尚未解决——冗余打包**：一个 run 打包 8730 次但只涉及 1213 个不同交易日（冗余 7 倍）。
+不能简单按日期缓存，因为训练循环每个 epoch 用 `rng.choice` 重新抽样 1200 只股票。
+正确做法是缓存整天全量张量再按当轮抽样切片（29 GB 内存放得下，磁盘放不下）；
+预计再快 1.3 倍，需重新做逐字节对拍。
+
+## 环境注意
+
+1. `bigalpha_2026_factors` 的 editable 安装曾指向已退役的老工作树，已从本工作树重装。
+2. 新写的打分路由必须遵守两条合同：ambient `bigalpha2026` import；
+   标签全域覆盖并以中性 0 填补。
+3. 数据根一律用 `/root/autodl-tmp/data`。老路径
+   `/root/autodl-tmp/projects/bigquant/data` 目前是指向它的软链（清理老树时留的垫片），
+   **别在新脚本里用**——垫片一旦被删就断。

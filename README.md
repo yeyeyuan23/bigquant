@@ -10,7 +10,7 @@
 | 私榜 merge | **0.88736** | 0.95788 | 0.85714 |
 
 `总分 = 0.3 × A + 0.7 × B`。逐时段读数与答辩材料以 Mac 端
-`BigAlpha2026_Pre/final_platform_scores.md` 为权威（本仓库为私有仓库）。
+`BigAlpha_Pre/experiment_log.md` 的 E6 节为权威（两个仓库都是私有）。
 
 ## 我们干了什么
 
@@ -28,9 +28,12 @@
    （2019→2024 扩窗训练，最终 checkpoint 见
    `reports/dependencies/m_raw_final_checkpoint/final_full_history_e3/`）。
    高相关变体清库后只保留低相关组合，B 项从中游回升至 0.956。
-4. **决赛复盘实验（8 月 19 日起，进行中）**：`experiments/finals_pre/`，
-   E0 重建 holdout、E2/E2b/E2c 卷积核与 seed 消融、E4 多折 walk-forward、
-   E7 N-score 增量贡献体系，为答辩提供证据页。见该目录 README。
+4. **决赛复盘实验（8 月 19 日 – 8 月 26 日）**：`experiments/finals_pre/`，
+   E1 通道置换、E2 卷积核尺度、E3 双通路消融、E4 walk-forward、E5 epoch 曲线、
+   E6 主结果与 o2o 口径确认、E7 N 分体系、E8 EN 掺混、E9 种子矩阵、
+   E10 通道组重训消融、E11 盘口挂单笔数与四五档。
+   **编号与结果以 `BigAlpha_Pre/experiment_log.md` 为准**，该目录 README 只讲
+   「是什么、在哪」，不复制结果数字（复制过一次，两套编号并存了三天没人发现）。
 
 ## 仓库布局
 

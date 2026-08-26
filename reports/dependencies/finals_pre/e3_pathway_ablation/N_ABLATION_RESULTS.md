@@ -1,4 +1,17 @@
-# E1 通路消融 × N 增量评分（2026-08-21）
+# 双通路消融 × N 增量评分（2026-08-21 的一次运行）
+
+> **这份是历史记录，不是当前结果。** 两处必须先说明，否则会读错：
+>
+> 1. **编号是旧的。** 文中的「E1 通路消融」在当前编号里是 **E3**；表里的
+>    `full (E0-e3)` 指的是当前的 E5 那批 epoch 参照 run。当前编号见
+>    `experiments/finals_pre/README.md`。
+> 2. **口径是旧的。** 这里的 N 分（完整 M +0.0246）算在只扣 SIZE 与 LIQUIDTY
+>    两个风格的中性化下；换成完整 Barra（10 风格 + 32 行业）重打之后，
+>    同一批臂的 N 在 0.0468–0.0486 之间。**当前数字以
+>    `BigAlpha_Pre/experiment_log.md` 为准。**
+>
+> 保留本文是因为它记录了那一次运行的完整设计与逐臂读数，口径内自洽。
+
 
 **方法**：每个变体训练时恰好拆掉完整 M 的一个组件（leave-one-out），其余不动；
 评分复用 E7 的 N 框架 Layer-1——对 LightGBM-Candidate454 池基线做逐日横截面残差化，
@@ -46,5 +59,5 @@
 
 - 逐路线汇总：`n_scores/layer1_summary.json`；逐日序列：`n_scores/layer1_daily_ric.csv`
 - 运行日志：`n_scores.log`；池基线：`../e7_incremental_score/base/y_pool_oos.parquet`
-- 评分脚本：`experiments/finals_pre/e7_incremental_score/e7_layer1_ric.py`（未改动）
+- 评分脚本：`experiments/finals_pre/e7_nscore/e7_layer1_ric.py`（未改动）
 - 配对 t：对逐日差值序列的标准配对检验（n=241）
