@@ -1,0 +1,15 @@
+{
+  "claim": "a = mean(log_amount) - mean(log_volume) 直接对真实均价，不经 relative_spread 代理",
+  "days_sampled": 61,
+  "date_range": [
+    "2019-01-02",
+    "2024-12-10"
+  ],
+  "instruments_per_day_median": 998.0,
+  "ratio_median_incl_zero": 0.9812315784473427,
+  "ratio_median_min_incl_zero": 0.9522834587618367,
+  "ratio_median_max_incl_zero": 0.9870265767920993,
+  "spearman_vwap_median_incl_zero": 0.9949876530238859,
+  "spearman_vwap_min_incl_zero": 0.9148143133113072,
+  "spearman_close_median_incl_zero": 0.4613899149650652
+}
