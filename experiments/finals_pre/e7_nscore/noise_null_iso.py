@@ -65,11 +65,14 @@ for draw in range(DRAWS):
 lm, im, it = np.array(lin_means), np.array(iso_means), np.array(iso_ts)
 res = {
     "draws": DRAWS, "days": len(groups),
-    "linear": {"mean": float(lm.mean()), "abs_p95": float(np.percentile(np.abs(lm), 95))},
+    "linear": {"mean": float(lm.mean()), "abs_p95": float(np.percentile(np.abs(lm), 95)),
+               "abs_max": float(np.abs(lm).max()), "per_draw": [float(x) for x in lm]},
     "isotonic_crossfit": {"mean": float(im.mean()),
                           "abs_p95": float(np.percentile(np.abs(im), 95)),
+                          "abs_max": float(np.abs(im).max()),
                           "t_sd": float(it.std(ddof=1)),
-                          "n_t_over_1_96": int((np.abs(it) > 1.96).sum())},
+                          "n_t_over_1_96": int((np.abs(it) > 1.96).sum()),
+                          "per_draw": [float(x) for x in im]},
 }
 out = FP / "e7_nscore/nonparam_residual"
 out.mkdir(parents=True, exist_ok=True)
