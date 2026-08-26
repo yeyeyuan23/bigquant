@@ -54,7 +54,7 @@ labels["y_rank"] = labels.groupby("date")[LABEL].transform(daily_rank)
 pool = pd.read_parquet(FP / "e7_nscore/base/y_pool_oos.parquet")
 pool["date"] = pd.to_datetime(pool["date"]).dt.normalize()
 pool["instrument"] = pool["instrument"].astype(str)
-pcol = [c for c in pool.columns if c not in ("date", "instrument")][0]
+pcol = next(c for c in pool.columns if c not in ("date", "instrument"))
 pool["pool_rank"] = pool.groupby("date")[pcol].transform(daily_rank)
 
 base = labels.merge(pool[["date", "instrument", "pool_rank"]], on=["date", "instrument"])
