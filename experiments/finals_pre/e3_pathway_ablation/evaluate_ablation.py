@@ -95,7 +95,9 @@ def main() -> int:
     parser.add_argument("--extra-labels", type=Path, default=None)
     parser.add_argument("--disable-sequence-path", action="store_true")
     parser.add_argument("--disable-statistics-path", action="store_true")
+    parser.add_argument("--disable-path-fusion", action="store_true")
     parser.add_argument("--disable-cross-section", action="store_true")
+    parser.add_argument("--linear-head", action="store_true")
     parser.add_argument(
         "--drop-channel-group", nargs="+", default=[],
         choices=sorted(CHANNEL_GROUPS),
@@ -146,7 +148,9 @@ def main() -> int:
         dropout=args.dropout,
         use_sequence_path=not args.disable_sequence_path,
         use_statistics_path=not args.disable_statistics_path,
+        use_path_fusion=not args.disable_path_fusion,
         use_cross_section=not args.disable_cross_section,
+        use_mlp_head=not args.linear_head,
     )
     torch.manual_seed(args.seed)
     if device.type == "cuda":
@@ -255,7 +259,9 @@ def main() -> int:
         "model": "unified_microstructure_ablation",
         "use_sequence_path": config.use_sequence_path,
         "use_statistics_path": config.use_statistics_path,
+        "use_path_fusion": config.use_path_fusion,
         "use_cross_section": config.use_cross_section,
+        "use_mlp_head": config.use_mlp_head,
         "train_start": str(dates[int(training[0])].date()),
         "train_end": str(dates[int(training[-1])].date()),
         "prediction_days": len(prediction_days),

@@ -38,7 +38,9 @@ class AblationConfig:
     dropout: float = 0.1
     use_sequence_path: bool = True
     use_statistics_path: bool = True
+    use_path_fusion: bool = True
     use_cross_section: bool = True
+    use_mlp_head: bool = True
 
     def __post_init__(self) -> None:
         if self.keep_channels:
@@ -51,6 +53,8 @@ class AblationConfig:
             raise ValueError("input_dim must match the canonical channels")
         if not (self.use_sequence_path or self.use_statistics_path):
             raise ValueError("at least one pathway must stay enabled")
+        if not self.use_path_fusion and self.use_sequence_path == self.use_statistics_path:
+            raise ValueError("path fusion can be bypassed only when exactly one pathway is enabled")
         if self.model_dim <= 0 or self.max_minutes <= 0 or self.tcn_blocks <= 0:
             raise ValueError("model_dim, max_minutes, and tcn_blocks must be positive")
         if not self.kernels or any(kernel <= 0 for kernel in self.kernels):
@@ -88,20 +92,26 @@ class AblationNetwork(nn.Module):
                 nn.LayerNorm(cfg.model_dim),
             )
         path_count = int(cfg.use_sequence_path) + int(cfg.use_statistics_path)
-        self.path_fusion = nn.Sequential(
-            nn.Linear(cfg.model_dim * path_count, cfg.model_dim),
-            nn.GELU(),
-            nn.Dropout(cfg.dropout),
-            nn.LayerNorm(cfg.model_dim),
-        )
+        if cfg.use_path_fusion:
+            self.path_fusion = nn.Sequential(
+                nn.Linear(cfg.model_dim * path_count, cfg.model_dim),
+                nn.GELU(),
+                nn.Dropout(cfg.dropout),
+                nn.LayerNorm(cfg.model_dim),
+            )
+        else:
+            self.path_fusion = nn.Identity()
         if cfg.use_cross_section:
             self.cross_section = DeepSetsContext(cfg)  # type: ignore[arg-type]
-        self.head = nn.Sequential(
-            nn.Linear(cfg.model_dim, 64),
-            nn.GELU(),
-            nn.Dropout(cfg.dropout),
-            nn.Linear(64, 1),
-        )
+        if cfg.use_mlp_head:
+            self.head = nn.Sequential(
+                nn.Linear(cfg.model_dim, 64),
+                nn.GELU(),
+                nn.Dropout(cfg.dropout),
+                nn.Linear(64, 1),
+            )
+        else:
+            self.head = nn.Linear(cfg.model_dim, 1)
 
     def forward(
         self,

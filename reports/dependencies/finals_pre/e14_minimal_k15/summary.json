@@ -1,0 +1,175 @@
+{
+  "experiment": "E14 progressive simplification of the k=15 model",
+  "question": "Can the statistics path, redundant one-path fusion, DeepSets, and MLP head be removed from the k=15 model without losing OOS performance?",
+  "protocol": {
+    "year": 2024,
+    "seeds": [
+      "20260801",
+      "20260812",
+      "20260823"
+    ],
+    "training": "2019-2023 expanding, 1-day label gap, 3 epochs, open-to-open",
+    "evaluation": "full Barra: 10 CNE5 styles plus 32 industry dummies",
+    "primary_test": "k15_minimal minus k15_baseline full-Barra IC, seed-paired two-sided t test",
+    "diagnostics": "stepwise A metrics and current isotonic-residual N score; uncorrected and not primary"
+  },
+  "parameter_counts": {
+    "k15_baseline": 144513,
+    "k15_no_stats": 126849,
+    "k15_no_stats_no_fusion": 117345,
+    "k15_no_stats_no_fusion_no_deepsets": 70689,
+    "k15_minimal": 64513
+  },
+  "inputs": {
+    "labels": "reports/dependencies/finals_pre/shared/o2o_labels.parquet",
+    "labels_sha256": "ff12b13cff10035ed173194324e1f680b0d61e79715725300ff6705631ba810e",
+    "exposures": "reports/dependencies/finals_pre/shared/exposures_full/year=2024/part-2024.parquet",
+    "exposures_sha256": "ad7b7240d4a6ce176391629701bbd6761d1b64cfc1b0cf0f6a343c262c08fd10",
+    "regressors": [
+      "SIZE",
+      "BETA",
+      "MOMENTUM",
+      "RESVOL",
+      "SIZENL",
+      "BTOP",
+      "LIQUIDTY",
+      "EARNYILD",
+      "GROWTH",
+      "LEVERAGE",
+      "AGRIFOREST",
+      "MINING",
+      "CHEM",
+      "IRONSTEEL",
+      "NONFERMETAL",
+      "ELECTRONICS",
+      "AUTO",
+      "HOUSEAPP",
+      "FOODBEVER",
+      "TEXTILE",
+      "LIGHTINDUS",
+      "HEALTH",
+      "UTILITIES",
+      "TRANSPORTATION",
+      "REALESTATE",
+      "COMMETRADE",
+      "LEISERVICE",
+      "BANK",
+      "NONBANKFINAN",
+      "CONGLOMERATES",
+      "CONMAT",
+      "BUILDDECO",
+      "ELECEQP",
+      "MACHIEQUIP",
+      "AERODEF",
+      "COMPUTER",
+      "MEDIA",
+      "TELECOM",
+      "COAL",
+      "PETRO",
+      "ENVP",
+      "BEAUTY"
+    ],
+    "sources": {
+      "k15_baseline_20260801": {
+        "path": "reports/dependencies/finals_pre/e9_seed_and_label_matrix/o2o_k15_20260801/unified_microstructure_full_oos.parquet",
+        "sha256": "cc411c59d8e5fff3e7caa4fefbc36589b2e640420ede90130e169c366664ef6d",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_20260801": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats/seed20260801/unified_microstructure_full_oos.parquet",
+        "sha256": "48e51479f9059425e0b5eb77f80649e8885a6b157d3ca55e5aa6bb64255b68b8",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_no_fusion_20260801": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats_no_fusion/seed20260801/unified_microstructure_full_oos.parquet",
+        "sha256": "7158fc4928028a6814b906bd0bab69bd9a9aa45d0167c631f2503a9fcdd8f90e",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_no_fusion_no_deepsets_20260801": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats_no_fusion_no_deepsets/seed20260801/unified_microstructure_full_oos.parquet",
+        "sha256": "644db1a1621e6125c7916585fa6f5b42c65abe4a7637eddd542ab7c03187ef9d",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_minimal_20260801": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_minimal/seed20260801/unified_microstructure_full_oos.parquet",
+        "sha256": "6da088ff44442c9cb36995d126ac1b1396cdaf2579d297d1f479ea2dcb2be164",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_baseline_20260812": {
+        "path": "reports/dependencies/finals_pre/e9_seed_and_label_matrix/o2o_k15_20260812/unified_microstructure_full_oos.parquet",
+        "sha256": "45bb853607a569ba12f776ebe1e4512d54466b366ef5a6a0f23e0bfd2c20183e",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_20260812": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats/seed20260812/unified_microstructure_full_oos.parquet",
+        "sha256": "2261990044c6c144eb25496f372d6ee561a41eac2ebd394943349843d586ea49",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_no_fusion_20260812": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats_no_fusion/seed20260812/unified_microstructure_full_oos.parquet",
+        "sha256": "c09bbad4451bd70ffe597bbdf063b20ee7ed909d3d88f52fe1109723d65b4976",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_no_fusion_no_deepsets_20260812": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats_no_fusion_no_deepsets/seed20260812/unified_microstructure_full_oos.parquet",
+        "sha256": "ff36d17e2aefbeae9e188fc4a52aa7e64df5c34e1dc262c812314b18520e526f",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_minimal_20260812": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_minimal/seed20260812/unified_microstructure_full_oos.parquet",
+        "sha256": "7b1a83601aa5424b630ae2396c9dfd42958534f6be864f21596c8cbb9255347a",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_baseline_20260823": {
+        "path": "reports/dependencies/finals_pre/e9_seed_and_label_matrix/o2o_k15_20260823/unified_microstructure_full_oos.parquet",
+        "sha256": "c1be4f3fc251cbdc10ac3a127eb91efad95b77750c31ba8563110dbca53762cc",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_20260823": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats/seed20260823/unified_microstructure_full_oos.parquet",
+        "sha256": "779e26c665e57919072a38999fd6699ab4207ae5c9da45ba8469b356e88b2457",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_no_fusion_20260823": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats_no_fusion/seed20260823/unified_microstructure_full_oos.parquet",
+        "sha256": "aac165140c98c442c8de4ddc10408b40c6cbbd59a40729840108bd4c86c2a6a4",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_no_stats_no_fusion_no_deepsets_20260823": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_no_stats_no_fusion_no_deepsets/seed20260823/unified_microstructure_full_oos.parquet",
+        "sha256": "878c47ae3f539386b3ffee2a0f1e9b251c821487ec8400c737360fae18ca3f90",
+        "rows": 242000,
+        "dates": 242
+      },
+      "k15_minimal_20260823": {
+        "path": "reports/dependencies/finals_pre/e14_minimal_k15/k15_minimal/seed20260823/unified_microstructure_full_oos.parquet",
+        "sha256": "2c901e9f39e6f567cbca79e868c7886da5fb0a5cb8e3938a8f56c74b92a3fc6b",
+        "rows": 242000,
+        "dates": 242
+      }
+    }
+  },
+  "validation": {
+    "formal_e2_reproduction_max_abs_error": 8.881784197001252e-16,
+    "factor_arm_seed_pairs": 15,
+    "scored_rows_per_factor": [
+      239332
+    ],
+    "scored_days": [
+      240
+    ]
+  }
+}
