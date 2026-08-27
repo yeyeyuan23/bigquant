@@ -4,11 +4,18 @@ E3/E2 的显著结果在完整中性化下全部消失，所以 E10 必须同样
 它是全篇最强的结论，如果它也是风格暴露造成的，那整个论点要改。
 基线用 e6b（BASE_full_o2o_*），和 E10 各臂同架构同标签。
 """
+# The setup script loaded below deliberately defines FP, NAME, score, OLD and NEW.
+# ruff: noqa: F821
+
 import sys
-sys.argv = ['x', '/tmp/ablation_runs.csv']
-exec(open('/tmp/rescore_full.py').read().split('runs = pd.read_csv')[0])
 
 import pandas as pd
+
+sys.argv = ['x', '/tmp/ablation_runs.csv']
+with open('/tmp/rescore_full.py') as handle:
+    setup_source = handle.read().split('runs = pd.read_csv')[0]
+exec(setup_source)  # noqa: S102
+
 SEED = {'s01': '20260801', 's12': '20260812', 's23': '20260823'}
 rows = []
 for arm in ('daily6', 'trade', 'book'):

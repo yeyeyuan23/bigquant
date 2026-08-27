@@ -10,6 +10,7 @@ the baseline run that used the same random seed.
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -23,8 +24,10 @@ for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from bigalpha2026.competition_score_proxy import preprocess_factor  # noqa: E402
-from score_o2o import long_short_sharpe  # noqa: E402
+preprocess_factor = importlib.import_module(
+    "bigalpha2026.competition_score_proxy"
+).preprocess_factor
+long_short_sharpe = importlib.import_module("score_o2o").long_short_sharpe
 
 FP = ROOT / "reports/dependencies/finals_pre"
 OUT = FP / "e12_full_fields"
@@ -108,9 +111,9 @@ def score(factor: pd.DataFrame, exposures: pd.DataFrame | None,
         "sharpe": float(long_short_sharpe(merged, "score_factor")),
         "stress_ic": float(stress_ic.mean()),
         "stress_ir": float(stress_ic.mean() / stress_ic.std()),
-        "days": int(len(ic)),
-        "stress_days": int(len(stress_ic)),
-        "rows": int(len(merged)),
+        "days": len(ic),
+        "stress_days": len(stress_ic),
+        "rows": len(merged),
     }
 
 
@@ -177,7 +180,7 @@ def main() -> int:
             "baseline_sha256": sha256(base_path),
             "e12": str(e12_path.relative_to(ROOT)),
             "e12_sha256": sha256(e12_path),
-            "factor_rows": int(len(e12)),
+            "factor_rows": len(e12),
             "factor_dates": int(e12["date"].nunique()),
             "missing_full_exposure_rows": missing_exposure,
         }

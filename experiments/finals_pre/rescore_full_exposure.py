@@ -16,17 +16,18 @@
   weights 是市值权重，preprocess_factor 做的是普通 OLS，
           喂进去会被当成一个普通风格因子
 """
-import json
+import importlib
 import re
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
 sys.path.insert(0, str(ROOT / "src"))
-from bigalpha2026.competition_score_proxy import preprocess_factor  # noqa: E402
+preprocess_factor = importlib.import_module(
+    "bigalpha2026.competition_score_proxy"
+).preprocess_factor
 
 FP = ROOT / "reports/dependencies/finals_pre"
 LABEL = "ret_open_to_open"
@@ -64,7 +65,7 @@ print(f"完整 exposures：{NEW.shape[1] - 2} 个风格/行业列", flush=True)
 # 夏普不要自己实现：第一版用百分位阈值分桶，和 score_o2o 的 pd.qcut 等频分桶
 # 在并列值上归属不同，算出来差最多 1.5%。直接 import 他们的函数，保证逐位一致。
 sys.path.insert(0, str(ROOT / "experiments/finals_pre/common"))
-from score_o2o import long_short_sharpe  # noqa: E402
+long_short_sharpe = importlib.import_module("score_o2o").long_short_sharpe
 
 
 def score(factor: pd.DataFrame, exposures: pd.DataFrame | None) -> dict:
@@ -82,7 +83,7 @@ def score(factor: pd.DataFrame, exposures: pd.DataFrame | None) -> dict:
         "sharpe": float(long_short_sharpe(m, "neut")),
         "stress_ic": float(s_ic.mean()),
         "stress_ir": float(s_ic.mean() / s_ic.std()),
-        "days": int(len(ic)),
+        "days": len(ic),
     }
 
 
