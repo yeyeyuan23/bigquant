@@ -46,8 +46,12 @@ src/bigalpha2026/
 ├── factor_pool.py / factorlib.py / evaluation.py / research_policy.py
 │                          # J 参考池层：B 项代理的公开库筛选、方向冻结与策略窗口
 └── competition_score_proxy.py   # 本地 J 评分器（自包含日频指标原语）
-scripts/                   # 数据装配、专家训练评估、提交构建、审计
-scripts/j_reference_inputs.py    # J 评分的参考输入装载（从退役管线中抽取的现役闭包）
+scripts/                   # 数据装配、专家训练评估、提交构建、审计；见 scripts/README.md
+├── runners/               # Candidate454 与统一专家流水线的 Shell 总入口
+├── aistudio/              # AIStudio 导出、聚合与前缀探针
+├── transfer/              # GitHub Release 数据传输与校验
+├── factor_wiki_remaining/ # 因子 Wiki 补全流水线
+└── j_reference_inputs.py  # J 评分的参考输入装载（从退役管线中抽取的现役闭包）
 experiments/finals_pre/   # 决赛实验 lane（见其 README）
 submissions/               # 冻结提交包（见其 README；冠军 = m_raw）
 reports/{latest,dependencies,archive}/   # 见 reports/README.md
@@ -81,6 +85,7 @@ scripts/train_unified_final_checkpoint.py
 scripts/build_unified_m_raw_submission.py           # 冠军提交包构建
 scripts/score_submission_j_stability.py             # J 稳定性评分
 scripts/replay_frozen_candidate454_models.py
+scripts/runners/run_unified_alpha_fusion_suite.sh   # 历史统一多专家整套 runner
 ```
 
 M 训练器只接受审计版 schema v2 store；profile 规则（e2e 价格/成交额 ÷100、

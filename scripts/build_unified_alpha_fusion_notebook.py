@@ -155,7 +155,7 @@ print({
             """if not candidate_ready:
     print("BLOCKED: upstream artifact is not candidate454-complete")
 else:
-    print("bash run_unified_alpha_fusion_suite.sh")
+    print("bash scripts/runners/run_unified_alpha_fusion_suite.sh")
     print({
         "baseline": "candidate454 full-pool Elastic Net, 60d train / 20d predict",
         "routes": [

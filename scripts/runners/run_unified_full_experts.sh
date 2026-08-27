@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DATA_ROOT="/root/autodl-tmp/data"
 PYTHON_BIN="/root/autodl-tmp/conda-envs/quant/bin/python"
 STORE_ROOT="/root/autodl-tmp/unified_microstructure_store_v2_2019_2024"
@@ -35,4 +36,4 @@ fi
 
 export UNIFIED_MICROSTRUCTURE_STORE="$STORE_ROOT"
 export UNIFIED_RUN_ID="$RUN_ID"
-exec bash run_unified_alpha_fusion_suite.sh
+exec bash "$SCRIPT_DIR/run_unified_alpha_fusion_suite.sh"

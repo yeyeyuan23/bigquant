@@ -155,7 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "schema_version": "ob-daily-full-v2-universe-cropped",
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "source_table": "bigalpha_2026_stock_bar1m",
-        "aggregation_script": "scripts/aistudio_build_ob_daily.py",
+        "aggregation_script": "scripts/aistudio/aistudio_build_ob_daily.py",
         "preparation_script": "scripts/prepare_ob_daily_full.py",
         "key": list(KEY_COLUMNS),
         "columns": [

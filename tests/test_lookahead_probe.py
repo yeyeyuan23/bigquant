@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from scripts.aistudio_submission_lookahead_probe import (
+from scripts.aistudio.aistudio_submission_lookahead_probe import (
     compare_prefixes,
     normalized_factor,
     validate_output_contract,

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CANDIDATE_STORE="/root/autodl-tmp/candidate454_completion_full_2019_2024/candidate454_store"
 MANIFEST="$CANDIDATE_STORE/candidate454_manifest.json"
 VALIDATION="$CANDIDATE_STORE/candidate454_validation.json"
@@ -23,4 +24,4 @@ while [[ ! -s "$MANIFEST" || ! -s "$VALIDATION" ]]; do
 done
 
 echo "[$(date '+%F %T')] candidate454 artifacts detected; starting unified suite"
-exec bash run_unified_alpha_fusion_suite.sh
+exec bash "$SCRIPT_DIR/run_unified_alpha_fusion_suite.sh"
