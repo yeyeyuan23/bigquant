@@ -1,0 +1,25 @@
+[
+  {
+    "train_start":"2019-01-02",
+    "train_end":"2022-12-29",
+    "prediction_start":"2023-01-03",
+    "prediction_end":"2023-12-29",
+    "usable_train_days":971,
+    "prediction_days":242,
+    "missing_prediction_days":0,
+    "rank_ic_mean":0.0708140771,
+    "epoch_losses":[
+      -0.0598348531,
+      -0.0783291791,
+      -0.0842066207
+    ],
+    "epoch_oos_rank_ic":[
+
+    ],
+    "parameter_count":217953,
+    "checkpoint":"\/root\/e13_frozen_decay\/y2023_seed20260812\/unified_microstructure_block_00_checkpoint.pt",
+    "checkpoint_sha256":"3fef26e2aa7f0046611e6175bf8178129c95ffbe4f9bb0dc1899da0745852496",
+    "checkpoint_reused":false,
+    "block":0
+  }
+]
