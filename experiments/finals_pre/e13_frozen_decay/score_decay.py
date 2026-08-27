@@ -9,6 +9,7 @@ Three common seeds are scored separately and then averaged by date.  The first
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -16,7 +17,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy import stats
-
 
 ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
 RUN_ROOT = Path("/root/e13_frozen_decay")
@@ -36,7 +36,9 @@ for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from bigalpha2026.competition_score_proxy import preprocess_factor  # noqa: E402
+preprocess_factor = importlib.import_module(
+    "bigalpha2026.competition_score_proxy"
+).preprocess_factor
 
 
 def sha256(path: Path) -> str:
@@ -106,7 +108,7 @@ def daily_rank_ic(frame: pd.DataFrame) -> pd.Series:
 
 def ic_stats(values: pd.Series) -> dict[str, float | int]:
     return {
-        "days": int(len(values)),
+        "days": len(values),
         "ic": float(values.mean()),
         "icir": float(values.mean() / values.std(ddof=1)),
     }
@@ -200,9 +202,9 @@ def main() -> int:
             sources[str(year)]["seeds"][seed] = {
                 "path": str(path),
                 "sha256": sha256(path),
-                "factor_rows": int(len(factor)),
+                "factor_rows": len(factor),
                 "factor_dates": int(factor["date"].nunique()),
-                "scored_dates": int(len(ic)),
+                "scored_dates": len(ic),
             }
 
         daily = pd.concat(seed_series, axis=1, join="inner").sort_index().dropna()
