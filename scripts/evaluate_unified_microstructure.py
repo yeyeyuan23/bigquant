@@ -88,7 +88,7 @@ def load_microstructure_day(
 
 def prepare_label_panel(
     labels: pd.DataFrame,
-    label_column: str = "ret_next_open_to_close",
+    label_column: str = "ret_close_to_close",
 ) -> tuple[pd.DatetimeIndex, dict[pd.Timestamp, pd.Series]]:
     required = {"date", "instrument", label_column}
     missing = sorted(required.difference(labels.columns))
@@ -331,7 +331,7 @@ def fit_predict_block(
             epoch_losses.append(float(np.mean(losses)))
             print(f"epoch={epoch + 1} loss={epoch_losses[-1]:.6f}", flush=True)
             if eval_every_epoch:
-                _, epoch_ic, _ = _score_prediction_block(
+                epoch_rows, epoch_ic, _ = _score_prediction_block(
                     model,
                     store,
                     dates,
@@ -344,6 +344,14 @@ def fit_predict_block(
                 )
                 mean_ic = float(np.nanmean(epoch_ic)) if epoch_ic else None
                 epoch_oos_ic.append(mean_ic)
+                if epoch_rows:
+                    epoch_factor = pd.concat(epoch_rows, ignore_index=True)
+                    epoch_factor.sort_values(["date", "instrument"]).to_parquet(
+                        checkpoint_path.with_name(
+                            f"{checkpoint_path.stem}_epoch_{epoch + 1:02d}_oos.parquet"
+                        ),
+                        index=False,
+                    )
                 print(
                     json.dumps(
                         {
@@ -432,8 +440,8 @@ def main() -> int:
     parser.add_argument("--industry-shrinkage", type=float, default=10.0)
     parser.add_argument(
         "--label-column",
-        default="ret_next_open_to_close",
-        help="E6b: training target convention; open-to-open needs --extra-labels",
+        default="ret_close_to_close",
+        help="training target; PRE experiments use the C2C default",
     )
     parser.add_argument(
         "--extra-labels",
