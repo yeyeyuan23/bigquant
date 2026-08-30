@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import torch
-
 from model_raw23 import ProgressiveConfig, ProgressiveModel
 
 ROOT = Path(__file__).resolve().parent

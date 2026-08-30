@@ -12,7 +12,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 LABEL = "ret_close_to_close"
 KEYS = ["date", "instrument"]
 ARMS = ("baseline17", "raw40")
@@ -83,7 +82,7 @@ def main() -> int:
 
     labels = normalize_keys(pd.read_parquet(args.labels))
     labels = labels[labels["date"].dt.year == 2024].dropna(subset=[LABEL])
-    labels = labels[KEYS + [LABEL]]
+    labels = labels[[*KEYS, LABEL]]
     if labels.duplicated(KEYS).any():
         raise RuntimeError("duplicate C2C label keys")
 
@@ -114,7 +113,7 @@ def main() -> int:
                     raise FileNotFoundError(path)
 
             metadata = json.loads(metrics_path.read_text(encoding="utf-8"))
-            factor = normalize_keys(pd.read_parquet(factor_path)[KEYS + ["factor"]])
+            factor = normalize_keys(pd.read_parquet(factor_path)[[*KEYS, "factor"]])
             if factor.duplicated(KEYS).any():
                 raise RuntimeError(f"duplicate factor keys: {arm}, seed={seed}")
             factor_days = int(factor["date"].nunique())
@@ -145,7 +144,7 @@ def main() -> int:
                 columns={"factor": "neutral_factor"}
             )
             merged = (
-                neutral[KEYS + ["neutral_factor"]]
+                neutral[[*KEYS, "neutral_factor"]]
                 .merge(labels, on=KEYS, validate="one_to_one")
                 .replace([np.inf, -np.inf], np.nan)
                 .dropna(subset=["neutral_factor", LABEL])
