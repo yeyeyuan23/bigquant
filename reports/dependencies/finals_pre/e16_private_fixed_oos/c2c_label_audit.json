@@ -1,0 +1,24 @@
+{
+  "label": "ret_close_to_close",
+  "formula": "adjusted_close(next trading day) / adjusted_close(current day) - 1",
+  "label_columns": [
+    "date",
+    "instrument",
+    "ret_close_to_close"
+  ],
+  "factor_rows": 402000,
+  "factor_days": 402,
+  "factor_start": "2025-01-02",
+  "factor_end": "2026-08-28",
+  "label_rows": 402000,
+  "label_non_null_rows": 400490,
+  "label_non_null_days": 401,
+  "price_rows": 881187,
+  "price_days": 402,
+  "jointly_finite_rows": 400490,
+  "null_masks_equal": true,
+  "different_rows_gt_1e_12": 0,
+  "max_abs_error": 0.0,
+  "mean_abs_error": 0.0,
+  "label_file_sha256": "33fbfaeb502ca20813234475926a17470004233980fde761e56717a10e677a73"
+}

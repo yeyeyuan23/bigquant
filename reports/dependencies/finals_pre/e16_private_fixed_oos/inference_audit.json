@@ -1,0 +1,19 @@
+{
+  "checkpoint": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/m_raw_final_checkpoint/final_full_history_e3/unified_microstructure_block_25_checkpoint.pt",
+  "checkpoint_sha256": "252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb",
+  "checkpoint_training_window": [
+    "2019-01-02",
+    "2024-12-26"
+  ],
+  "device": "cuda",
+  "bar_files": [
+    "/root/bigquant_private_data/bigalpha_2026_stock_bar15m_private_20250101_20260801.parquet",
+    "/root/bigquant_private_data/bigalpha_2026_stock_bar15m_private_20260802_20260828.parquet"
+  ],
+  "raw_rows": 14098992,
+  "factor_rows": 402000,
+  "factor_days": 402,
+  "factor_start": "2025-01-02",
+  "factor_end": "2026-08-28",
+  "label_generation": "separate build_platform_labels.py; C2C only"
+}

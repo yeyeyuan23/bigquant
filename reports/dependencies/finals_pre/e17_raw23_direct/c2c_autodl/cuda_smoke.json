@@ -1,0 +1,27 @@
+{
+  "day": "2023-01-03",
+  "rows": 1000,
+  "values_shape": [
+    1000,
+    242,
+    40
+  ],
+  "values_dtype": "float32",
+  "channels": 40,
+  "max_minutes": 242,
+  "device": "cuda",
+  "outputs": {
+    "baseline17": {
+      "shape": [
+        64
+      ],
+      "finite": true
+    },
+    "raw40": {
+      "shape": [
+        64
+      ],
+      "finite": true
+    }
+  }
+}

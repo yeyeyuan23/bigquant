@@ -1,0 +1,60 @@
+{
+  "model": "unified_microstructure",
+  "role": "raw_minute_microstructure_expert",
+  "store_schema_sha256": "67270d3f0a51a19640fa780f1212319b1c712c71b90665ad1e53ccaf0a22105a",
+  "channels": [
+    "minute_log_return",
+    "bar_range",
+    "close_location",
+    "relative_spread",
+    "microprice_gap",
+    "depth_imbalance_l1",
+    "depth_imbalance_l3",
+    "depth_shape",
+    "log_amount",
+    "log_volume",
+    "log_deal_number",
+    "log_amount_per_deal",
+    "log_volume_per_deal",
+    "signed_log_amount",
+    "time_sin",
+    "time_cos",
+    "pm_session"
+  ],
+  "training_protocol": "expanding_history_999d_predict",
+  "training_mode": "expanding",
+  "rolling_train_days": null,
+  "label_isolation_gap_days": 1,
+  "pack_path": "polars_fast",
+  "years": [
+    2024
+  ],
+  "selected_block_indices": [
+    0
+  ],
+  "neutral_filled_rows": 1465,
+  "config": {
+    "input_dim": 17,
+    "model_dim": 96,
+    "max_minutes": 242,
+    "kernels": [
+      3,
+      15,
+      60
+    ],
+    "tcn_blocks": 3,
+    "tail_minutes": 30,
+    "dropout": 0.1,
+    "industry_context": false,
+    "industry_buckets": 32,
+    "industry_shrinkage": 10.0,
+    "extra_channels": 0
+  },
+  "checkpoints": [
+    {
+      "block": 0,
+      "path": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e2_c2c_epoch_curve/y2024_seed20260823/unified_microstructure_block_00_checkpoint.pt",
+      "sha256": "61d186dee3e58f7d83a4ed0219ec62348b3df75673b06a36e96bab91af563c31"
+    }
+  ]
+}

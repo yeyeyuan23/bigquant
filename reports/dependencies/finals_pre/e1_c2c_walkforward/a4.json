@@ -1,0 +1,9 @@
+{
+  "label": "ret_close_to_close",
+  "days": 241,
+  "rank_ic": 0.08407272644908335,
+  "rank_ic_ir": 1.5857340132206272,
+  "long_short_sharpe": 13.603176719271568,
+  "stress_ic_ir": 1.1191482370914043,
+  "factor_rows_2024": 242000
+}

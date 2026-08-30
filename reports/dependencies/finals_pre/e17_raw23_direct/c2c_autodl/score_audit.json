@@ -1,0 +1,95 @@
+{
+  "label": "ret_close_to_close",
+  "test_days": 241,
+  "arms": [
+    "baseline17",
+    "raw40"
+  ],
+  "seeds": [
+    20260801,
+    20260812,
+    20260823
+  ],
+  "full_barra_regressor_count": 42,
+  "stress_day_count": 61,
+  "artifacts": [
+    {
+      "arm": "baseline17",
+      "seed": 20260801,
+      "checkpoint_bytes": 890338,
+      "checkpoint_sha256": "50fe0e0ca2785a23db08b581865df66e34087c049f96feeaf7d245f0ff6082eb",
+      "factor_rows": 240771,
+      "factor_days": 241,
+      "factor_non_null": 240771,
+      "factor_start": "2024-01-02",
+      "factor_end": "2024-12-30",
+      "device": "cuda",
+      "label": "ret_close_to_close"
+    },
+    {
+      "arm": "baseline17",
+      "seed": 20260812,
+      "checkpoint_bytes": 890338,
+      "checkpoint_sha256": "c3ceba599cacf5c5f9017562175fe8a51673de44949a2f862a2f726eb6aee57e",
+      "factor_rows": 240771,
+      "factor_days": 241,
+      "factor_non_null": 240771,
+      "factor_start": "2024-01-02",
+      "factor_end": "2024-12-30",
+      "device": "cuda",
+      "label": "ret_close_to_close"
+    },
+    {
+      "arm": "baseline17",
+      "seed": 20260823,
+      "checkpoint_bytes": 890338,
+      "checkpoint_sha256": "8ee2e208aa1fe2a95eb13c849d28fef312335480aa66ae953f60bb810b1bbfa8",
+      "factor_rows": 240771,
+      "factor_days": 241,
+      "factor_non_null": 240771,
+      "factor_start": "2024-01-02",
+      "factor_end": "2024-12-30",
+      "device": "cuda",
+      "label": "ret_close_to_close"
+    },
+    {
+      "arm": "raw40",
+      "seed": 20260801,
+      "checkpoint_bytes": 952098,
+      "checkpoint_sha256": "ada5f241e947a9b85d9be338ff9bf957a44628ec4ed3cda72c2f18e09cd54730",
+      "factor_rows": 240771,
+      "factor_days": 241,
+      "factor_non_null": 240771,
+      "factor_start": "2024-01-02",
+      "factor_end": "2024-12-30",
+      "device": "cuda",
+      "label": "ret_close_to_close"
+    },
+    {
+      "arm": "raw40",
+      "seed": 20260812,
+      "checkpoint_bytes": 952098,
+      "checkpoint_sha256": "ac57632e2c1e44fc5059ff2d45ee75c037dbccc85d524cacc08b493ab4215754",
+      "factor_rows": 240771,
+      "factor_days": 241,
+      "factor_non_null": 240771,
+      "factor_start": "2024-01-02",
+      "factor_end": "2024-12-30",
+      "device": "cuda",
+      "label": "ret_close_to_close"
+    },
+    {
+      "arm": "raw40",
+      "seed": 20260823,
+      "checkpoint_bytes": 952098,
+      "checkpoint_sha256": "b37e9dc6e033e7ebb4d781ddb2b8302ec270de34d21b19976b77d6a966fb621f",
+      "factor_rows": 240771,
+      "factor_days": 241,
+      "factor_non_null": 240771,
+      "factor_start": "2024-01-02",
+      "factor_end": "2024-12-30",
+      "device": "cuda",
+      "label": "ret_close_to_close"
+    }
+  ]
+}

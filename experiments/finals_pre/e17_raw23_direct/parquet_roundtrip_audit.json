@@ -1,0 +1,21 @@
+{
+  "expected_shape": [
+    1000,
+    242,
+    40
+  ],
+  "actual_shape": [
+    1000,
+    242,
+    40
+  ],
+  "row_count": 1000,
+  "trade_dates": [
+    "2023-01-03"
+  ],
+  "instrument_match": true,
+  "finite_mask_match": true,
+  "finite_count": 9434344,
+  "max_abs_error": 0.0,
+  "nonzero_error_count": 0
+}

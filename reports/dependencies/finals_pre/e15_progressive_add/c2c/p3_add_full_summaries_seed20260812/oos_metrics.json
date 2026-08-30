@@ -1,0 +1,23 @@
+[
+  {
+    "model": "e15_progressive_addition",
+    "use_sequence_path": true,
+    "use_statistics_path": true,
+    "use_path_fusion": true,
+    "use_cross_section": true,
+    "use_mlp_head": true,
+    "sequence_summary": "full",
+    "train_start": "2019-01-02",
+    "train_end": "2023-12-28",
+    "prediction_days": 241,
+    "rank_ic_mean": 0.106703449983086,
+    "epoch_losses": [
+      -0.10719284168325567,
+      -0.13231572508888728,
+      -0.13971283449887345
+    ],
+    "parameter_count": 217953,
+    "checkpoint_sha256": "b1035d2683dadca1019d80a86b76badef2e7a591b81198e2f295d21c0a6b7c57",
+    "seed": 20260812
+  }
+]
