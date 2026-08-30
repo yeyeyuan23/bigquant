@@ -371,7 +371,7 @@ def test_prepare_label_panel_ranks_each_day_and_rejects_duplicates() -> None:
         {
             "date": pd.to_datetime(["2024-01-02"] * 3),
             "instrument": ["A", "B", "C"],
-            "ret_next_open_to_close": [-0.1, 0.0, 0.2],
+            "ret_close_to_close": [-0.1, 0.0, 0.2],
         }
     )
     dates, targets = prepare_label_panel(labels)
