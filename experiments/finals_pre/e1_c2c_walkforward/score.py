@@ -15,7 +15,7 @@ LABEL = "ret_close_to_close"
 KEYS = ["date", "instrument"]
 DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
 sys.path.insert(0, str(ROOT / "src"))
-from bigalpha2026.competition_score_proxy import preprocess_factor
+from bigalpha2026.competition_score_proxy import preprocess_factor  # noqa: E402
 
 
 def daily_ic(frame: pd.DataFrame) -> pd.Series:

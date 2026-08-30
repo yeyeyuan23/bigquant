@@ -1,4 +1,0 @@
-epoch=1 loss=-0.035847
-epoch=2 loss=-0.058013
-epoch=3 loss=-0.064525
-{"model": "unified_microstructure_ablation", "use_sequence_path": false, "use_statistics_path": true, "use_cross_section": true, "train_start": "2019-01-02", "train_end": "2023-12-28", "prediction_days": 240, "rank_ic_mean": 0.06042861116894551, "epoch_losses": [-0.03584721291196661, -0.05801305042922202, -0.0645247875050214], "parameter_count": 70881, "checkpoint_sha256": "43e5ffc708047de810950ab004e8cf81d9dd8bc3a5148a2255e9dfa865a59b25", "seed": 20260812}

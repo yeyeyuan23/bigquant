@@ -1,5 +1,0 @@
-epoch=1 loss=-0.060149
-epoch=2 loss=-0.079276
-epoch=3 loss=-0.087149
-checkpoint=saved path=/root/e13_frozen_decay/y2022_seed20260823/unified_microstructure_block_00_checkpoint.pt
-{"train_start": "2019-01-02", "train_end": "2021-12-30", "prediction_start": "2022-01-04", "prediction_end": "2022-12-30", "usable_train_days": 729, "prediction_days": 242, "missing_prediction_days": 0, "rank_ic_mean": 0.06689194794264444, "epoch_losses": [-0.060148754697522996, -0.07927583624827272, -0.0871488487683952], "epoch_oos_rank_ic": [], "parameter_count": 217953, "checkpoint": "/root/e13_frozen_decay/y2022_seed20260823/unified_microstructure_block_00_checkpoint.pt", "checkpoint_sha256": "061a32f7a7147adcd1c8ffd7824707d8ed468d4f846405af5413fda3dfd365b3", "checkpoint_reused": false, "block": 0}

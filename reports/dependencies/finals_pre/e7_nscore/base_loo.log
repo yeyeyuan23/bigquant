@@ -1,4 +1,0 @@
-excluded FR-001; features=453
-panel days=1456 stocks=2075 features=453
-{"block": 0, "train_days": 1213, "prediction_start": "2024-01-02", "prediction_end": "2024-01-29", "rank_ic_mean": 0.09494414919370361}
-{"block": 1, "train_days": 1233, "prediction_start": "2024-01-30", "prediction_end": "2024-03-05", "rank_ic_mean": -0.0251794232911124}

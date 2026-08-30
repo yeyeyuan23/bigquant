@@ -1,6 +1,0 @@
-industry_context=on buckets=32 shrinkage=10.0
-epoch=1 loss=-0.031628
-epoch=2 loss=-0.044176
-epoch=3 loss=-0.049350
-checkpoint=saved path=/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e3b_industry_context/seed20260801/unified_microstructure_block_00_checkpoint.pt
-{"train_start": "2019-01-02", "train_end": "2023-12-28", "prediction_start": "2024-01-02", "prediction_end": "2024-12-30", "usable_train_days": 1213, "prediction_days": 241, "missing_prediction_days": 0, "rank_ic_mean": 0.04284009546962016, "epoch_losses": [-0.03162810981952373, -0.04417643721444994, -0.049350092886975505], "epoch_oos_rank_ic": [], "parameter_count": 245697, "checkpoint": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e3b_industry_context/seed20260801/unified_microstructure_block_00_checkpoint.pt", "checkpoint_sha256": "829b8cf1ff67e980c9d160511b7fc95c3ba13dd8ef19f78e229eeb798eaa385d", "checkpoint_reused": false, "block": 0}

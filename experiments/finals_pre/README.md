@@ -19,16 +19,14 @@
 |---|---|---|---|
 | **E1** | walk-forward：滚动重训是否优于长期冻结 | `e1_c2c_walkforward/` | `e1_c2c_walkforward/`；旧结果不进主表 |
 | **E2** | epoch 曲线：训练轮数如何影响严格 OOS | `e2_c2c_epoch_curve/` | `e2_c2c_epoch_curve/`；旧结果不进主表 |
-| **E3** | 渐进加法：统计基线 → DeepSets → TCN+last → 完整三摘要 | `e15_progressive_add/` | `e15_progressive_add/c2c/` |
-| **E4** | 冻结正式提交权重在 2025–2026 私榜期的表现与换手成本 | `e16_private_fixed_oos/` | `e16_private_fixed_oos/` |
-| **E5** | 23 个原始字段直接作为通道是否优于原 17 通道 | `e17_raw23_direct/` | AIStudio：`/home/aiuser/work/e17_raw23_results_c2c/`，完成后回传 |
-
-目录名保留旧编号是为了避免破坏脚本引用；PRE 对外材料只使用上表的新编号。
+| **E3** | 渐进加法：统计基线 → DeepSets → TCN+last → 完整三摘要 | `e3_progressive_add/` | `e3_progressive_add/c2c/` |
+| **E4** | 冻结正式提交权重在 2025–2026 私榜期的表现与换手成本 | `e4_private_fixed_oos/` | `e4_private_fixed_oos/` |
+| **E5** | 23 个原始字段直接作为通道是否优于原 17 通道 | `e5_raw23_direct/` | `e5_raw23_direct/c2c_autodl/` |
 
 ## 当前运行边界
 
 - E3 的四个模型臂必须全部用同一 C2C 标签从零训练。完整模型不能复用旧 O2O 因子。
-- E5 在 AIStudio 本地读取 `bigalpha_2026_stock_bar1m`、构建存储并训练；历史分钟原始数据不复制到 Mac 或 AutoDL。
+- E5 的已审计训练产物保留在 `e5_raw23_direct/c2c_autodl/`；如需重跑，代码目录和运行目录均使用 E5 命名。
 - E4 使用私榜 `bigalpha_2026_stock_bar15m_private`，冻结 checkpoint sha256 为 `252c39ba...dcb`；推理代码不生成其他收益标签。
 - E1、E2 在 C2C 重跑完成前没有可进入 PRE 主表的正式结果。
 
@@ -40,4 +38,4 @@ reports/dependencies/finals_pre/<实验目录>/  AutoDL 结果和审计
 reports/dependencies/finals_pre/<实验目录>/c2c/  与旧口径并存时的 C2C 独立产物
 ```
 
-旧 E1–E14 的置换、删减、N 分、454 因子池、O2O 标签和结构筛选结果仍可在原目录追溯，但已经退出当前 PRE 证据链。除非明确做 C2C 重训，不应把它们重新写回主实验表。
+旧置换、删减、N 分、454 因子池、O2O/O2C 标签和结构筛选代码已从当前分支删除；历史仍可从 Git 提交记录追溯，不再占用当前实验编号。

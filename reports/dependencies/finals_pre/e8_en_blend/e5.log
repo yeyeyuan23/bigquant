@@ -1,6 +1,0 @@
-M x EN454 daily Spearman: mean=0.1823 std=0.1139
-baseline_en454: rows=484000 neutral_filled=1579
-m_walkforward: rows=484000 neutral_filled=0
-blend10: rows=484000 neutral_filled=1579
-blend25: rows=484000 neutral_filled=1579
-blend50: rows=484000 neutral_filled=1579

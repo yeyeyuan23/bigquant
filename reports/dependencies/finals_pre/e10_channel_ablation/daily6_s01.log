@@ -1,5 +1,0 @@
-drop_channel_group=['book', 'trade'] kept=6/17 channels=['minute_log_return', 'bar_range', 'close_location', 'time_sin', 'time_cos', 'pm_session']
-epoch=1 loss=-0.041193
-epoch=2 loss=-0.058633
-epoch=3 loss=-0.062744
-{"model": "unified_microstructure_ablation", "use_sequence_path": true, "use_statistics_path": true, "use_cross_section": true, "train_start": "2019-01-02", "train_end": "2023-12-28", "prediction_days": 240, "rank_ic_mean": 0.05442239346407261, "epoch_losses": [-0.04119337151504236, -0.058632892743444034, -0.06274444370216521], "parameter_count": 210561, "checkpoint_sha256": "6262c7d35b223ea803f31687c643d3a3077d951287d06a9229a5788ceb8a4231", "seed": 20260801}
