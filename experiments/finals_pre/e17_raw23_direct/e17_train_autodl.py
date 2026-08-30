@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import sys
 from dataclasses import asdict
 from pathlib import Path
 
@@ -14,14 +13,12 @@ import pandas as pd
 import pyarrow.parquet as pq
 import torch
 
+from model_raw23 import ProgressiveConfig, ProgressiveModel
+
 ROOT = Path(__file__).resolve().parent
 DEFAULT_STORE = Path("/root/bigquant_private_data/e17_raw40_2023_2024_parquet")
 DEFAULT_LABELS = ROOT / "c2c_labels.parquet"
 LABEL = "ret_close_to_close"
-sys.path.insert(0, str(ROOT / "src"))
-sys.path.insert(0, str(ROOT))
-
-from model_raw23 import ProgressiveConfig, ProgressiveModel  # noqa: E402
 
 
 def sha256(path: Path) -> str:
