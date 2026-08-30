@@ -1,86 +1,93 @@
-"""Build exact-next-trading-day C2C labels inside AIStudio."""
+"""Align the canonical 2023-2024 C2C labels to the E5 Parquet store."""
 
 from __future__ import annotations
 
+import hashlib
 import json
-from itertools import pairwise
+import os
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-from bigquant import dai
 
-ROOT = Path("/home/aiuser/work/e5_raw23_direct")
-STORE = Path("/home/aiuser/work/e5_raw23_store_2023_2024")
-OUTPUT = ROOT / "c2c_labels.parquet"
-START = "2023-01-01"
-END = "2025-01-10"
+ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
+STORE = Path("/root/bigquant_private_data/e5_raw40_2023_2024_parquet")
+OUTPUT = ROOT / "experiments/finals_pre/e5_raw23_direct/c2c_labels.parquet"
+AUDIT = ROOT / "experiments/finals_pre/e5_raw23_direct/c2c_labels_audit.json"
+LABEL_FILES = (
+    Path("/root/autodl-tmp/data/labels/year=2023/part-2023.parquet"),
+    Path("/root/autodl-tmp/data/labels/year=2024/part-2024.parquet"),
+)
+KEYS = ["date", "instrument"]
+LABEL = "ret_close_to_close"
 
 
-def load_daily_returns() -> pd.DataFrame:
-    frame = dai.query(
-        f"""
-        SELECT
-          CAST(date AS DATE) AS trade_date,
-          instrument,
-          arg_max(close, date) AS close,
-          arg_min(pre_close, date) AS pre_close
-        FROM bigalpha_2026_stock_bar1m
-        WHERE date >= TIMESTAMP '{START}' AND date < TIMESTAMP '{END}'
-        GROUP BY CAST(date AS DATE), instrument
-        """,
-        filters={"date": [START, END]},
-        compression=True,
-    ).df()
-    frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="raise").dt.normalize()
-    frame["instrument"] = frame["instrument"].astype(str)
-    close = pd.to_numeric(frame["close"], errors="coerce")
-    pre_close = pd.to_numeric(frame["pre_close"], errors="coerce")
-    frame["next_day_c2c"] = (close / pre_close.where(pre_close > 0) - 1.0).replace(
-        [np.inf, -np.inf], np.nan
-    )
-    if frame.duplicated(["trade_date", "instrument"]).any():
-        raise RuntimeError("duplicate daily-return keys")
-    return frame[["trade_date", "instrument", "next_day_c2c"]]
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def store_keys() -> pd.DataFrame:
+    rows: list[pd.DataFrame] = []
+    parts = sorted(STORE.glob("day=*.parquet"))
+    if len(parts) != 484:
+        raise RuntimeError(f"expected 484 E5 day files, found {len(parts)}")
+    for path in parts:
+        day = pd.Timestamp(path.stem.removeprefix("day="))
+        frame = pd.read_parquet(path, columns=["instrument"])
+        frame["date"] = day
+        rows.append(frame[KEYS])
+    keys = pd.concat(rows, ignore_index=True)
+    keys["instrument"] = keys["instrument"].astype(str)
+    if keys.duplicated(KEYS).any():
+        raise RuntimeError("E5 Parquet store contains duplicate date/instrument keys")
+    return keys.sort_values(KEYS, kind="stable")
 
 
 def main() -> int:
-    pool = pd.read_parquet(STORE / "pool.parquet", columns=["date", "instrument"])
-    pool["date"] = pd.to_datetime(pool["date"], errors="raise").dt.normalize()
-    pool["instrument"] = pool["instrument"].astype(str)
-    pool = pool.drop_duplicates(["date", "instrument"])
-    daily = load_daily_returns()
-    calendar = sorted(daily["trade_date"].unique())
-    next_day = dict(pairwise(calendar))
-    labels = pool.copy()
-    labels["label_date"] = labels["date"].map(next_day)
-    labels = labels.merge(
-        daily.rename(columns={"trade_date": "label_date"}),
-        on=["label_date", "instrument"],
-        how="left",
-        validate="many_to_one",
-    ).rename(columns={"next_day_c2c": "ret_close_to_close"})
-    labels = labels[["date", "instrument", "ret_close_to_close"]].sort_values(
-        ["date", "instrument"], kind="stable"
+    if not (STORE / "export_manifest.json").is_file():
+        raise FileNotFoundError(STORE / "export_manifest.json")
+    for path in LABEL_FILES:
+        if not path.is_file():
+            raise FileNotFoundError(path)
+    keys = store_keys()
+    labels = pd.concat(
+        [pd.read_parquet(path, columns=[*KEYS, LABEL]) for path in LABEL_FILES],
+        ignore_index=True,
     )
-    labels.to_parquet(OUTPUT, index=False, compression="zstd")
+    labels["date"] = pd.to_datetime(labels["date"], errors="raise").dt.normalize()
+    labels["instrument"] = labels["instrument"].astype(str)
+    if labels.duplicated(KEYS).any():
+        raise RuntimeError("canonical C2C labels contain duplicate keys")
+    aligned = keys.merge(labels, on=KEYS, how="left", validate="one_to_one")
+    if len(aligned) != len(keys):
+        raise RuntimeError("E5 label alignment changed the store key count")
+    temporary = OUTPUT.with_suffix(".parquet.partial")
+    aligned.to_parquet(temporary, index=False, compression="zstd")
+    check = pd.read_parquet(temporary)
+    if len(check) != len(aligned) or check.duplicated(KEYS).any():
+        raise RuntimeError("written E5 C2C label artifact failed round-trip validation")
+    os.replace(temporary, OUTPUT)
     audit = {
-        "label": "ret_close_to_close",
-        "definition": "exact next market day close / next market day pre_close - 1",
-        "factor_start": labels["date"].min().date().isoformat(),
-        "factor_end": labels["date"].max().date().isoformat(),
-        "factor_days": int(labels["date"].nunique()),
-        "rows": len(labels),
-        "non_null_rows": int(labels["ret_close_to_close"].notna().sum()),
+        "label": LABEL,
+        "source": "canonical AutoDL labels/year=2023,2024",
+        "source_sha256": {str(path): sha256(path) for path in LABEL_FILES},
+        "rows": len(aligned),
+        "days": int(aligned["date"].nunique()),
+        "start": aligned["date"].min().date().isoformat(),
+        "end": aligned["date"].max().date().isoformat(),
+        "non_null_rows": int(aligned[LABEL].notna().sum()),
         "non_null_2024_days": int(
-            labels.loc[
-                (labels["date"].dt.year == 2024)
-                & labels["ret_close_to_close"].notna(),
-                "date",
+            aligned.loc[
+                (aligned["date"].dt.year == 2024) & aligned[LABEL].notna(), "date"
             ].nunique()
         ),
+        "duplicate_keys": int(aligned.duplicated(KEYS).sum()),
+        "output_sha256": sha256(OUTPUT),
     }
-    (ROOT / "c2c_labels_audit.json").write_text(
+    AUDIT.write_text(
         json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     print(json.dumps(audit, indent=2, ensure_ascii=False), flush=True)

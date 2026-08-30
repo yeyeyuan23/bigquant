@@ -11,6 +11,7 @@ if [[ ! -s "$STORE/export_manifest.json" ]]; then
   echo "missing audited Parquet store manifest: $STORE/export_manifest.json" >&2
   exit 1
 fi
+"$PYTHON" "$CODE/build_c2c_labels.py"
 if [[ ! -s "$CODE/c2c_labels.parquet" ]]; then
   echo "missing C2C labels: $CODE/c2c_labels.parquet" >&2
   exit 1
