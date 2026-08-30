@@ -20,7 +20,7 @@ LABEL = "ret_close_to_close"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
-from model_raw23 import ProgressiveConfig, ProgressiveModel  # noqa: E402
+from model_raw23 import ProgressiveConfig, ProgressiveModel
 
 
 def sha256(path: Path) -> str:

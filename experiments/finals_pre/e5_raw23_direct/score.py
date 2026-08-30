@@ -20,7 +20,7 @@ ARMS = ("baseline17", "raw40")
 DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
 
 sys.path.insert(0, str(ROOT / "src"))
-from bigalpha2026.competition_score_proxy import preprocess_factor  # noqa: E402
+from bigalpha2026.competition_score_proxy import preprocess_factor
 
 
 def load_exposures() -> pd.DataFrame:

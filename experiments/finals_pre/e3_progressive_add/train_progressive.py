@@ -20,17 +20,17 @@ for entry in (ROOT / "src", ROOT / "scripts"):
         sys.path.insert(0, str(entry))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from evaluate_unified_microstructure import (  # noqa: E402
+from evaluate_unified_microstructure import (
     apply_training_history,
     load_microstructure_day,
     prepare_label_panel,
     validate_micro_store,
 )
-from evaluate_unified_temporal import correlation_loss, load_labels  # noqa: E402
-from model_progressive import ProgressiveConfig, ProgressiveModel  # noqa: E402
+from evaluate_unified_temporal import correlation_loss, load_labels
+from model_progressive import ProgressiveConfig, ProgressiveModel
 
-from bigalpha2026.alpha_models import rolling_oos_blocks  # noqa: E402
-from bigalpha2026.alpha_models.microstructure import (  # noqa: E402
+from bigalpha2026.alpha_models import rolling_oos_blocks
+from bigalpha2026.alpha_models.microstructure import (
     MICROSTRUCTURE_CHANNELS,
 )
 

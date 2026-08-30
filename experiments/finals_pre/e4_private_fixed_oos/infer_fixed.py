@@ -38,7 +38,7 @@ POOL_PATHS = (
 )
 
 sys.path.insert(0, str(SUBMISSION))
-from unified_m_microstructure import (  # noqa: E402
+from unified_m_microstructure import (
     RAW_MICROSTRUCTURE_COLUMNS,
     MicrostructureModel,
     build_microstructure_features,

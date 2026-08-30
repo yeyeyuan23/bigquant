@@ -24,7 +24,7 @@ END = pd.Timestamp("2025-01-01")
 MAX_MINUTES = 242
 
 sys.path.insert(0, str(SRC))
-from bigalpha2026.alpha_models.microstructure import (  # noqa: E402
+from bigalpha2026.alpha_models.microstructure import (
     MICROSTRUCTURE_CHANNELS,
     RAW_MICROSTRUCTURE_COLUMNS,
     build_microstructure_features,
