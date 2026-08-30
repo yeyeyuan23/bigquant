@@ -27,7 +27,7 @@
 
 - E3 的四个模型臂必须全部用同一 C2C 标签从零训练。完整模型不能复用旧 O2O 因子。
 - E5 的已审计训练产物保留在 `e5_raw23_direct/c2c_autodl/`；如需重跑，代码目录和运行目录均使用 E5 命名。
-- E4 使用私榜 `bigalpha_2026_stock_bar15m_private`，冻结 checkpoint sha256 为 `252c39ba...dcb`；推理代码不生成其他收益标签。
+- E4 使用私榜 `bigalpha_2026_stock_bar1m_private`，冻结 checkpoint sha256 为 `252c39ba...dcb`；推理代码不生成其他收益标签。
 - E1、E2 在 C2C 重跑完成前没有可进入 PRE 主表的正式结果。
 
 ## 目录约定

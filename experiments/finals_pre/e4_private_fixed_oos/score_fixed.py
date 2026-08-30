@@ -140,7 +140,9 @@ def return_metrics(values: pd.Series) -> dict[str, float]:
 
 def main() -> int:
     factor = normalize_keys(pd.read_parquet(OUT / "m_raw_frozen_private_oos.parquet"))
-    labels = normalize_keys(pd.read_parquet(OUT / "platform_labels_private.parquet"))
+    labels = normalize_keys(
+        pd.read_parquet(DATA / "private_c2c_labels_20250101_20260828.parquet")
+    )
     labels = labels.replace([np.inf, -np.inf], np.nan).dropna(subset=[LABEL])
     raw_exposures = normalize_keys(
         pd.concat([pd.read_parquet(path) for path in EXPOSURE_PATHS], ignore_index=True)

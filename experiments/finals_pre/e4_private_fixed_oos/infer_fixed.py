@@ -28,10 +28,9 @@ CHECKPOINT = (
 EXPECTED_CHECKPOINT_SHA256 = (
     "252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb"
 )
-BAR_PATHS = (
-    DATA / "bigalpha_2026_stock_bar15m_private_20250101_20260801.parquet",
-    DATA / "bigalpha_2026_stock_bar15m_private_20260802_20260828.parquet",
-)
+BAR_DIR = DATA / "bigalpha_2026_stock_bar1m_private_20250101_20260828"
+BAR_MANIFEST = BAR_DIR / "manifest.json"
+BAR_PATHS = tuple(sorted(BAR_DIR.glob("part_*.parquet")))
 POOL_PATHS = (
     DATA / "bigalpha_2026_instruments_20250101_20260801.parquet",
     DATA / "bigalpha_2026_instruments_20260802_20260828.parquet",
@@ -103,6 +102,13 @@ def iter_trade_days():
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+    if not BAR_MANIFEST.is_file():
+        raise FileNotFoundError(BAR_MANIFEST)
+    source_manifest = json.loads(BAR_MANIFEST.read_text(encoding="utf-8"))
+    if source_manifest.get("table") != "bigalpha_2026_stock_bar1m_private":
+        raise RuntimeError("private-bar manifest names the wrong source table")
+    if not BAR_PATHS:
+        raise RuntimeError("private one-minute dataset contains no parquet parts")
     for path in (*BAR_PATHS, *POOL_PATHS, CHECKPOINT):
         if not path.is_file() or path.stat().st_size == 0:
             raise FileNotFoundError(path)
@@ -165,6 +171,11 @@ def main() -> int:
 
     if not outputs:
         raise RuntimeError("no factor rows produced")
+    if raw_rows != int(source_manifest["rows"]):
+        raise RuntimeError(
+            f"private-bar row mismatch: streamed={raw_rows}, "
+            f"manifest={source_manifest['rows']}"
+        )
     factor = pd.concat(outputs, ignore_index=True).sort_values(
         ["date", "instrument"], kind="stable"
     )
@@ -178,12 +189,15 @@ def main() -> int:
         "checkpoint_training_window": ["2019-01-02", "2024-12-26"],
         "device": str(device),
         "bar_files": [str(path) for path in BAR_PATHS],
+        "bar_frequency": "1 minute",
+        "bar_manifest": str(BAR_MANIFEST),
+        "bar_manifest_rows": int(source_manifest["rows"]),
         "raw_rows": raw_rows,
         "factor_rows": len(factor),
         "factor_days": int(factor["date"].nunique()),
         "factor_start": factor["date"].min().date().isoformat(),
         "factor_end": factor["date"].max().date().isoformat(),
-        "label_generation": "separate build_platform_labels.py; C2C only",
+        "label_generation": "common/build_private_c2c_labels.py; C2C only",
     }
     (OUT / "inference_audit.json").write_text(
         json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
