@@ -11,17 +11,17 @@
   ],
   "epochs": 3,
   "epoch_losses": [
-    -0.07538842826202312,
-    -0.11014642631817871,
-    -0.12289060802345188
+    -0.07538794002818976,
+    -0.11016213780361389,
+    -0.12285716798082418
   ],
   "restart_count": 0,
   "label": "ret_close_to_close",
   "device": "cuda",
   "store_format": "parquet_fixed_size_lists",
-  "raw_rank_ic": 0.09313535713531382,
+  "raw_rank_ic": 0.09337799101034144,
   "prediction_days": 241,
   "factor_rows": 240771,
   "parameter_count": 233409,
-  "checkpoint_sha256": "b37e9dc6e033e7ebb4d781ddb2b8302ec270de34d21b19976b77d6a966fb621f"
+  "checkpoint_sha256": "b55aef738f0c6c2b94bba7d9ad492b20aac4409709332c62b53a547b83625118"
 }

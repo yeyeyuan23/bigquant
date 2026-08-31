@@ -1,0 +1,12 @@
+{
+  "table": "bigalpha_2026_stock_bar1m_private",
+  "expected_files": 85,
+  "actual_files": 85,
+  "missing_files": [],
+  "unexpected_files": [],
+  "rows": 211484880,
+  "expected_rows": 211484880,
+  "bytes": 13832541747,
+  "expected_bytes": 13832541747,
+  "failures": []
+}

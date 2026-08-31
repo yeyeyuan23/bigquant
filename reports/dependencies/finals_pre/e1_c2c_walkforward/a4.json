@@ -1,9 +1,13 @@
 {
   "label": "ret_close_to_close",
-  "days": 241,
-  "rank_ic": 0.08407272644908335,
-  "rank_ic_ir": 1.5857340132206272,
-  "long_short_sharpe": 13.603176719271568,
-  "stress_ic_ir": 1.1191482370914043,
-  "factor_rows_2024": 242000
+  "period": "2025-01 to 2026-08; retrain every 60 days, predict next 20",
+  "days": 140,
+  "stress_days": 35,
+  "rank_ic": 0.08890186704635648,
+  "rank_ic_ir": 1.384847397079943,
+  "long_short_sharpe": 12.427045722805044,
+  "stress_ic_ir": 0.8504592018779443,
+  "factor_rows": 140000,
+  "barra_regressors": 42,
+  "stress_definition": "top quartile of daily cross-sectional C2C dispersion"
 }

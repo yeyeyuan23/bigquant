@@ -1,9 +1,9 @@
 {
   "factor_rows": 402000,
   "factor_days": 402,
-  "label_rows": 400490,
+  "label_rows": 400566,
   "label_days": 401,
-  "scored_rows": 400490,
+  "scored_rows": 400566,
   "scored_days": 401,
   "full_barra_regressors": [
     "SIZE",

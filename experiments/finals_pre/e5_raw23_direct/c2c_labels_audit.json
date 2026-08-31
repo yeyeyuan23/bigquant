@@ -1,0 +1,16 @@
+{
+  "label": "ret_close_to_close",
+  "source": "canonical AutoDL labels/year=2023,2024",
+  "source_sha256": {
+    "/root/autodl-tmp/data/labels/year=2023/part-2023.parquet": "c5cbae00cc009568d2ee805ce98bdb8ee250636b9544a368c700606c7e726ab4",
+    "/root/autodl-tmp/data/labels/year=2024/part-2024.parquet": "c2b59687fdc299e62ffcd73389fcae3d931c8eea1359e83fee82c0ced649b8c6"
+  },
+  "rows": 484000,
+  "days": 484,
+  "start": "2023-01-03",
+  "end": "2024-12-31",
+  "non_null_rows": 482421,
+  "non_null_2024_days": 241,
+  "duplicate_keys": 0,
+  "output_sha256": "3d3f02a2b04b9af2a12a0d8f507bcbd89dd6fd5e9e1ce56cdd20d2ae3f3ae121"
+}
