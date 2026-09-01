@@ -40,3 +40,11 @@ reports/dependencies/finals_pre/e3_progressive_add/o2c/  渐进加法 O2C 产物
 ```
 
 旧置换、删减、N 分、454 因子池和结构筛选代码不占用当前实验编号；历史可从 Git 提交记录追溯。
+
+## Contract 与测试
+
+- 机器可读的实验约束：`../contracts/o2c_experiments.json`
+- 合成数据回归测试：`../tests/`
+
+contract 只固定标签、日期、实验臂差异、评分列数和交易核算等设计边界，
+不预设 IC、p 值或“必须显著”等结果，因此不会用测试替实验挑结论。

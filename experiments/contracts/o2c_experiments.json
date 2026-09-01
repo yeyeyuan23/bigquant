@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "scope": "PRE E1-E5",
+  "outcome_free": true,
+  "global": {
+    "label_column": "ret_next_open_to_close",
+    "factor_day_target": "next_trading_day_close_div_open_minus_one",
+    "oos_year": 2024,
+    "expected_oos_days": 241,
+    "barra_regressor_count": 42,
+    "a_components": [
+      "rank_ic",
+      "rank_ic_ir",
+      "long_short_sharpe",
+      "stress_ic_ir"
+    ],
+    "seeds": [20260801, 20260812, 20260823]
+  },
+  "experiments": {
+    "E1": {
+      "directory": "e1_o2c_walkforward",
+      "retrain_step_days": 60,
+      "prediction_days": 20,
+      "label_isolation_days": 1,
+      "retrained_from_scratch": true
+    },
+    "E2": {
+      "directory": "e2_o2c_epoch_curve",
+      "epochs": [1, 2, 3, 4, 5, 6],
+      "same_oos_for_every_epoch": true
+    },
+    "E3": {
+      "directory": "e3_progressive_add",
+      "arms": {
+        "p0_statistics_head": {
+          "sequence": false,
+          "statistics": true,
+          "path_fusion": false,
+          "cross_section": false,
+          "sequence_summary": "full"
+        },
+        "p1_add_deepsets": {
+          "sequence": false,
+          "statistics": true,
+          "path_fusion": false,
+          "cross_section": true,
+          "sequence_summary": "full"
+        },
+        "p2_add_tcn_last": {
+          "sequence": true,
+          "statistics": true,
+          "path_fusion": true,
+          "cross_section": true,
+          "sequence_summary": "last"
+        },
+        "p3_add_full_summaries": {
+          "sequence": true,
+          "statistics": true,
+          "path_fusion": true,
+          "cross_section": true,
+          "sequence_summary": "full"
+        }
+      }
+    },
+    "E4": {
+      "directory": "e4_private_fixed_oos",
+      "checkpoint_frozen": true,
+      "retraining_allowed": false,
+      "turnover_definition": "0.5_sum_abs_target_weight_change",
+      "first_entry_from_cash": true,
+      "one_way_cost_bps": [0, 5, 10, 20]
+    },
+    "E5": {
+      "directory": "e5_raw23_direct",
+      "source_channels": 40,
+      "baseline_channels": 17,
+      "baseline_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+      "raw_arm_channels": 40,
+      "max_minutes": 242,
+      "only_intended_arm_difference": "input_channels"
+    }
+  }
+}
