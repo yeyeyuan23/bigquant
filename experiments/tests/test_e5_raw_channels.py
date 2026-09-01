@@ -11,7 +11,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from conftest import FINALS_PRE
+from conftest import FINALS_PRE, path_is_mounted
 
 from alpha_models import MICROSTRUCTURE_CHANNELS, build_microstructure_features
 
@@ -57,7 +57,7 @@ def test_all_40_channel_names_and_order_match_the_actual_export(e5_train, contra
 
 def test_actual_autodl_e5_store_matches_and_loads_the_40_channel_contract(e5_train):
     store = Path("/root/bigquant_private_data/e5_raw40_2023_2024_parquet")
-    if not (store / "export_manifest.json").is_file():
+    if not path_is_mounted(store / "export_manifest.json"):
         pytest.skip("AutoDL E5 store is not mounted in this environment")
     channels, max_minutes = e5_train.load_contract(store)
     first = min(store.glob("day=*.parquet"))
@@ -69,6 +69,14 @@ def test_actual_autodl_e5_store_matches_and_loads_the_40_channel_contract(e5_tra
     assert observed.shape == values.shape
     assert len(instruments) == 1000
     assert minute_mask.shape == stock_mask.shape + (242,)
+
+
+def test_unreadable_optional_mount_is_skipped_instead_of_failing(monkeypatch):
+    def denied(_path):
+        raise PermissionError("hosted runner cannot inspect /root")
+
+    monkeypatch.setattr(Path, "exists", denied)
+    assert path_is_mounted(Path("/root/autodl-tmp")) is False
 
 
 def test_all_17_engineered_channel_formulas_against_independent_values():

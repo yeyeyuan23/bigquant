@@ -17,6 +17,15 @@ for entry in (REPO_ROOT / "src", REPO_ROOT / "scripts"):
         sys.path.insert(0, str(entry))
 
 
+def path_is_mounted(path: Path) -> bool:
+    """Return false for absent paths and unreadable mounts in hosted CI."""
+
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
 @pytest.fixture(scope="session")
 def contract() -> dict[str, object]:
     return json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))

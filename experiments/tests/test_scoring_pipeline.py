@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from conftest import path_is_mounted
 
 from competition_score_proxy import (
     FULL_BARRA_INDUSTRY_COLUMNS,
@@ -180,7 +181,7 @@ def test_actual_autodl_e5_artifacts_run_the_complete_score_chain(
     labels = Path("/root/autodl-tmp/data/labels/year=2024/part-2024.parquet")
     exposures = Path("/root/autodl-tmp/exposure_2024_full.parquet")
     required = (actual_runs, labels, exposures)
-    if not all(path.exists() for path in required):
+    if not all(path_is_mounted(path) for path in required):
         pytest.skip("AutoDL formal E5 inputs are not mounted in this environment")
 
     score = load_experiment_module(
