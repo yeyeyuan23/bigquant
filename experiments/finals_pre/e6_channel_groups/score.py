@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from importlib import import_module
 from pathlib import Path
 
 import numpy as np
@@ -13,9 +14,7 @@ ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
 for entry in (ROOT / "src", ROOT):
     sys.path.insert(0, str(entry))
 
-from competition_score_proxy import preprocess_factor  # noqa: E402
-
-
+preprocess_factor = import_module("competition_score_proxy").preprocess_factor
 LABEL = "ret_next_open_to_close"
 KEYS = ["date", "instrument"]
 SEEDS = (20260801, 20260812, 20260823)
