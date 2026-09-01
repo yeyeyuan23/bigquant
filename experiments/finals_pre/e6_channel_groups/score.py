@@ -9,7 +9,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
 for entry in (ROOT / "src", ROOT):
     sys.path.insert(0, str(entry))
