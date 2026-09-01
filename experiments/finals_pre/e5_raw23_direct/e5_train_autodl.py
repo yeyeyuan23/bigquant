@@ -12,8 +12,9 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import torch
-from alpha_models.microstructure import align_legacy_packed_minutes
 from model_raw23 import ProgressiveConfig, ProgressiveModel
+
+from alpha_models.microstructure import align_legacy_packed_minutes
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_STORE = Path("/root/bigquant_private_data/e5_raw40_2023_2024_parquet")
