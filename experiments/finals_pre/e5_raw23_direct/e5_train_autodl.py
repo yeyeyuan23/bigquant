@@ -16,8 +16,8 @@ from model_raw23 import ProgressiveConfig, ProgressiveModel
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_STORE = Path("/root/bigquant_private_data/e5_raw40_2023_2024_parquet")
-DEFAULT_LABELS = ROOT / "c2c_labels.parquet"
-LABEL = "ret_close_to_close"
+DEFAULT_LABELS = ROOT / "o2c_labels.parquet"
+LABEL = "ret_next_open_to_close"
 
 
 def sha256(path: Path) -> str:

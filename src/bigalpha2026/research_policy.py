@@ -138,11 +138,8 @@ class FormalEvaluationPolicy:
     validation_2023_end: str = "2023-12-31"
     validation_2024_start: str = "2024-01-01"
     validation_2024_end: str = "2024-12-31"
-    primary_label: str = "ret_close_to_close"
-    sensitivity_labels: tuple[str, ...] = (
-        "ret_next_open_to_close",
-        "ret_close_to_next_open",
-    )
+    primary_label: str = "ret_next_open_to_close"
+    sensitivity_labels: tuple[str, ...] = ()
     winsor_lower_quantile: float = 0.01
     winsor_upper_quantile: float = 0.99
     quantile_groups: int = 5

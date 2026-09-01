@@ -101,5 +101,5 @@
   "factor_days": 402,
   "factor_start": "2025-01-02",
   "factor_end": "2026-08-28",
-  "label_generation": "common/build_private_c2c_labels.py; C2C only"
+  "label_generation": "common/build_private_o2c_labels.py; O2C only"
 }

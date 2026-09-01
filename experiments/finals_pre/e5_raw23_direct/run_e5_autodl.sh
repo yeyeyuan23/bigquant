@@ -5,15 +5,15 @@ ROOT=/root/autodl-tmp/projects/bigquant-default
 PYTHON=/root/autodl-tmp/conda-envs/quant/bin/python
 CODE=$ROOT/experiments/finals_pre/e5_raw23_direct
 STORE=/root/bigquant_private_data/e5_raw40_2023_2024_parquet
-OUT=$ROOT/reports/dependencies/finals_pre/e5_raw23_direct/c2c_autodl
+OUT=$ROOT/reports/dependencies/finals_pre/e5_raw23_direct/o2c_autodl
 
 if [[ ! -s "$STORE/export_manifest.json" ]]; then
   echo "missing audited Parquet store manifest: $STORE/export_manifest.json" >&2
   exit 1
 fi
-"$PYTHON" "$CODE/build_c2c_labels.py"
-if [[ ! -s "$CODE/c2c_labels.parquet" ]]; then
-  echo "missing C2C labels: $CODE/c2c_labels.parquet" >&2
+"$PYTHON" "$CODE/build_o2c_labels.py"
+if [[ ! -s "$CODE/o2c_labels.parquet" ]]; then
+  echo "missing O2C labels: $CODE/o2c_labels.parquet" >&2
   exit 1
 fi
 
@@ -34,7 +34,7 @@ for seed in 20260801 20260812 20260823; do
       --threads 8 \
       --device cuda \
       --store "$STORE" \
-      --labels "$CODE/c2c_labels.parquet" \
+      --labels "$CODE/o2c_labels.parquet" \
       --output-dir "$run_dir" \
       >"$log" 2>&1
     echo "[done] arm=$arm seed=$seed $(date --iso-8601=seconds)"

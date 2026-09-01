@@ -88,7 +88,7 @@ def load_microstructure_day(
 
 def prepare_label_panel(
     labels: pd.DataFrame,
-    label_column: str = "ret_close_to_close",
+    label_column: str = "ret_next_open_to_close",
 ) -> tuple[pd.DatetimeIndex, dict[pd.Timestamp, pd.Series]]:
     required = {"date", "instrument", label_column}
     missing = sorted(required.difference(labels.columns))
@@ -440,8 +440,8 @@ def main() -> int:
     parser.add_argument("--industry-shrinkage", type=float, default=10.0)
     parser.add_argument(
         "--label-column",
-        default="ret_close_to_close",
-        help="training target; PRE experiments use the C2C default",
+        default="ret_next_open_to_close",
+        help="training target; PRE experiments use the O2C default",
     )
     parser.add_argument(
         "--extra-labels",

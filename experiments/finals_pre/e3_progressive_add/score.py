@@ -1,4 +1,4 @@
-"""Score the C2C-trained E3 arms with only the four A components."""
+"""Score the O2C-trained E3 arms with only the four A components."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
 
 from bigalpha2026.competition_score_proxy import preprocess_factor
 
-LABEL = "ret_close_to_close"
+LABEL = "ret_next_open_to_close"
 SEEDS = (20260801, 20260812, 20260823)
 ARMS = {
     "P0 statistics + head": "p0_statistics_head_seed{seed}",
@@ -61,7 +61,7 @@ def factor_path(out: Path, arm_dir: str, seed: int) -> Path:
 
 
 def main() -> int:
-    out = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/c2c"
+    out = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/o2c"
     labels = pd.read_parquet(
         "/root/autodl-tmp/data/labels/year=2024/part-2024.parquet"
     )

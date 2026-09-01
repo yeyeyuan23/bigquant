@@ -1,0 +1,14 @@
+{
+  "source_table": "bigalpha_2026_stock_bar1m_private",
+  "source_rows": 211484880,
+  "verified_parquet_rows": 211484880,
+  "source_parts": 85,
+  "label": "ret_next_open_to_close",
+  "definition": "exact next market day close / exact next market day open - 1",
+  "factor_start": "2025-01-02",
+  "factor_end": "2026-08-28",
+  "factor_days": 402,
+  "rows": 402000,
+  "non_null_rows": 400566,
+  "non_null_days": 401
+}

@@ -197,7 +197,7 @@ def main() -> int:
         "factor_days": int(factor["date"].nunique()),
         "factor_start": factor["date"].min().date().isoformat(),
         "factor_end": factor["date"].max().date().isoformat(),
-        "label_generation": "common/build_private_c2c_labels.py; C2C only",
+        "label_generation": "common/build_private_o2c_labels.py; O2C only",
     }
     (OUT / "inference_audit.json").write_text(
         json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"

@@ -1,4 +1,4 @@
-"""Audit and score the AutoDL E5 C2C direct-channel experiment."""
+"""Audit and score the AutoDL E5 O2C direct-channel experiment."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-LABEL = "ret_close_to_close"
+LABEL = "ret_next_open_to_close"
 KEYS = ["date", "instrument"]
 ARMS = ("baseline17", "raw40")
 SEEDS = (20260801, 20260812, 20260823)
@@ -84,7 +84,7 @@ def main() -> int:
     labels = labels[labels["date"].dt.year == 2024].dropna(subset=[LABEL])
     labels = labels[[*KEYS, LABEL]]
     if labels.duplicated(KEYS).any():
-        raise RuntimeError("duplicate C2C label keys")
+        raise RuntimeError("duplicate O2C label keys")
 
     raw_exposures = normalize_keys(pd.read_parquet(args.exposures))
     exposures = raw_exposures[

@@ -6,7 +6,7 @@ python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
 trainer=$root/experiments/finals_pre/e3_progressive_add/train_progressive.py
 data=/root/autodl-tmp/data
 store=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
-out=$root/reports/dependencies/finals_pre/e3_progressive_add/c2c
+out=$root/reports/dependencies/finals_pre/e3_progressive_add/o2c
 
 mkdir -p "$out"
 cd "$root"
@@ -26,7 +26,7 @@ common=(
   --max-stocks 1200
   --min-train-days 900
   --learning-rate 4e-4
-  --label-column ret_close_to_close
+  --label-column ret_next_open_to_close
   --fast-pack
 )
 

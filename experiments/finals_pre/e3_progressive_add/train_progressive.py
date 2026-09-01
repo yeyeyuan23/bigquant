@@ -91,7 +91,7 @@ def main() -> int:
         action="store_true",
         help="use the polars day packer (byte-identical to the pandas reference, ~4x faster)",
     )
-    parser.add_argument("--label-column", default="ret_close_to_close")
+    parser.add_argument("--label-column", default="ret_next_open_to_close")
     parser.add_argument("--extra-labels", type=Path, default=None)
     parser.add_argument("--disable-sequence-path", action="store_true")
     parser.add_argument("--disable-statistics-path", action="store_true")

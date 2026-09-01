@@ -17,7 +17,7 @@ for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
 
 from bigalpha2026.competition_score_proxy import preprocess_factor
 
-LABEL = "ret_close_to_close"
+LABEL = "ret_next_open_to_close"
 KEYS = ["date", "instrument"]
 EXPOSURE_DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
 EXPOSURE_PATHS = (
@@ -141,7 +141,7 @@ def return_metrics(values: pd.Series) -> dict[str, float]:
 def main() -> int:
     factor = normalize_keys(pd.read_parquet(OUT / "m_raw_frozen_private_oos.parquet"))
     labels = normalize_keys(
-        pd.read_parquet(DATA / "private_c2c_labels_20250101_20260828.parquet")
+        pd.read_parquet(DATA / "private_o2c_labels_20250101_20260828.parquet")
     )
     labels = labels.replace([np.inf, -np.inf], np.nan).dropna(subset=[LABEL])
     raw_exposures = normalize_keys(

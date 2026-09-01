@@ -172,7 +172,7 @@ def load_score_reference(
     years: tuple[int, ...],
     *,
     candidate454_store: Path | None = None,
-    label_column: str = "ret_close_to_close",
+    label_column: str = "ret_next_open_to_close",
     extra_labels: Path | None = None,
 ) -> CompetitionScoreReference:
     candidate_manifest = json.loads(
@@ -309,7 +309,7 @@ def main() -> int:
     parser.add_argument("versions", nargs="+", help="route parquet paths")
     parser.add_argument("--years", nargs="+", type=int, default=list(DEFAULT_YEARS))
     parser.add_argument("--lambda-std", type=float, default=0.5)
-    parser.add_argument("--label-column", default="ret_close_to_close")
+    parser.add_argument("--label-column", default="ret_next_open_to_close")
     parser.add_argument("--extra-labels", type=Path, default=None)
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--reports-dir", type=Path, default=Path("reports"))

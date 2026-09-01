@@ -41,13 +41,13 @@ reports/current_independent/
 reports/runtime_*/
 reports/dependencies/**/daily85_features.parquet
 
-# PRE C2C runtime artifacts stay on AutoDL. Commit code, manifests, compact
+# PRE O2C runtime artifacts stay on AutoDL. Commit code, manifests, compact
 # metrics, and audits; do not commit checkpoints or factor/data Parquet files.
-experiments/finals_pre/e5_raw23_direct/c2c_labels.parquet
-reports/dependencies/finals_pre/e1_c2c_walkforward/model/*.pt
-reports/dependencies/finals_pre/e1_c2c_walkforward/model/*.parquet
-reports/dependencies/finals_pre/e2_c2c_epoch_curve/**/*.pt
-reports/dependencies/finals_pre/e2_c2c_epoch_curve/**/*.parquet
+experiments/finals_pre/e5_raw23_direct/o2c_labels.parquet
+reports/dependencies/finals_pre/e1_o2c_walkforward/model/*.pt
+reports/dependencies/finals_pre/e1_o2c_walkforward/model/*.parquet
+reports/dependencies/finals_pre/e2_o2c_epoch_curve/**/*.pt
+reports/dependencies/finals_pre/e2_o2c_epoch_curve/**/*.parquet
 reports/dependencies/finals_pre/e3_progressive_add/**/*.pt
 reports/dependencies/finals_pre/e3_progressive_add/**/*.parquet
 reports/dependencies/finals_pre/e3_progressive_add/**/*.log
