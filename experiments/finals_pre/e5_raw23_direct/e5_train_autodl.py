@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import torch
+from alpha_models.microstructure import align_legacy_packed_minutes
 from model_raw23 import ProgressiveConfig, ProgressiveModel
 
 ROOT = Path(__file__).resolve().parent
@@ -127,6 +128,7 @@ def load_day(day: pd.Timestamp, *, store: Path, channels: list[str], max_minutes
         values[:, :, channel_index] = column.values.to_numpy(zero_copy_only=False).reshape(
             table.num_rows, max_minutes
         )
+    values = align_legacy_packed_minutes(values)
     observed = np.isfinite(values)
     minute_mask = observed[:, :, 14]
     stock_mask = minute_mask.any(axis=1)

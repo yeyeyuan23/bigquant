@@ -2,8 +2,7 @@
 
 Byte-identical to pack_microstructure_days, but reads the partition with
 polars and scatters in one shot instead of looping over ~1000 stocks in
-Python. The frozen pandas implementation is left untouched: the submission
-bundle carries its own copy and must keep bit-for-bit reproducibility.
+Python. Frozen submission bundles carry their own copy and remain untouched.
 """
 
 from __future__ import annotations
@@ -17,7 +16,9 @@ import polars as pl
 
 from alpha_models.microstructure import (
     MICROSTRUCTURE_CHANNELS,
+    TRADING_MINUTES_PER_DAY,
     MicrostructureDayBatch,
+    trading_minute_indices,
 )
 
 CHANNELS = list(MICROSTRUCTURE_CHANNELS)
@@ -62,6 +63,11 @@ def load_microstructure_day_fast(
 ) -> MicrostructureDayBatch | None:
     """Drop-in replacement for load_microstructure_day (pandas path)."""
 
+    if max_minutes != TRADING_MINUTES_PER_DAY:
+        raise ValueError(
+            f"max_minutes must equal the fixed {TRADING_MINUTES_PER_DAY}-slot trading grid"
+        )
+
     partition = Path(store) / "data" / f"trade_date={pd.Timestamp(day).date()}"
     if not partition.is_dir():
         return None
@@ -97,9 +103,7 @@ def load_microstructure_day_fast(
         if side.select(["instrument", "timestamp"]).is_duplicated().any():
             raise ValueError(f"sidecar has duplicate keys: {side_partition}")
         frame = frame.join(side, on=["instrument", "timestamp"], how="left")
-    frame = frame.sort(["s_idx", "timestamp"]).with_columns(
-        pl.int_range(pl.len()).over("s_idx").cast(pl.Int32).alias("m_idx")
-    )
+    frame = frame.sort(["s_idx", "timestamp"])
 
     shape = (1, len(instruments), max_minutes, len(channels))
     values = np.full(shape, np.nan, dtype=np.float32)
@@ -107,11 +111,7 @@ def load_microstructure_day_fast(
     minute_mask = np.zeros(shape[:3], dtype=bool)
 
     if frame.height:
-        m_idx = frame["m_idx"].to_numpy()
-        if m_idx.max() >= max_minutes:
-            raise ValueError(
-                f"{pd.Timestamp(day).date()} has a stock-day exceeding max_minutes={max_minutes}"
-            )
+        m_idx = trading_minute_indices(frame["timestamp"].to_list())
         s_idx = frame["s_idx"].to_numpy()
         matrix = frame.select(channels).to_numpy().astype(np.float32, copy=False)
         matrix[~np.isfinite(matrix)] = np.nan

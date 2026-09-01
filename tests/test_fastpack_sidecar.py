@@ -59,6 +59,7 @@ def sidecar(tmp_path: Path) -> Path:
 def test_without_sidecar_keeps_the_canonical_channel_count(store: Path) -> None:
     batch = load_microstructure_day_fast(store, DAY, INSTRUMENTS)
     assert batch.values.shape[-1] == len(MICROSTRUCTURE_CHANNELS)
+    assert np.flatnonzero(batch.minute_mask[0, 0]).tolist() == [1, 2, 3, 4]
 
 
 def test_sidecar_appends_channels_and_leaves_the_first_seventeen_untouched(
@@ -74,7 +75,7 @@ def test_sidecar_appends_channels_and_leaves_the_first_seventeen_untouched(
     assert np.array_equal(base.minute_mask, ext.minute_mask)
 
     # sidecar 里那个 NaN 必须变成未观测，而不是被当成 0
-    flat = ext.observed_mask[0, :, :MINUTES, n]
+    flat = ext.observed_mask[0, :, 1 : MINUTES + 1, n]
     assert flat.sum() == len(INSTRUMENTS) * MINUTES - 1
 
 

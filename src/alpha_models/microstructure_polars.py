@@ -199,7 +199,11 @@ def _build_features(frame: pl.DataFrame) -> pl.DataFrame:
     previous_close = pl.col("close").shift(1).over(
         "trade_date", "instrument", "session_id"
     )
-    valid_close = pl.col("close").gt(0) & previous_close.gt(0)
+    previous_timestamp = pl.col("timestamp").shift(1).over(
+        "trade_date", "instrument", "session_id"
+    )
+    adjacent_minute = (pl.col("timestamp") - previous_timestamp) == pl.duration(minutes=1)
+    valid_close = pl.col("close").gt(0) & previous_close.gt(0) & adjacent_minute
     best_bid = pl.col("bid_price1")
     best_ask = pl.col("ask_price1")
     bid_volume1 = _positive_book_side("bid", 1)

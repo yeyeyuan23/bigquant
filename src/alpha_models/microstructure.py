@@ -57,6 +57,88 @@ MICROSTRUCTURE_CHANNELS = (
     "pm_session",
 )
 
+MORNING_OPEN_MINUTE = 9 * 60 + 30
+MORNING_CLOSE_MINUTE = 11 * 60 + 30
+AFTERNOON_OPEN_MINUTE = 13 * 60
+AFTERNOON_CLOSE_MINUTE = 15 * 60
+SESSION_MINUTES = MORNING_CLOSE_MINUTE - MORNING_OPEN_MINUTE + 1
+TRADING_MINUTES_PER_DAY = SESSION_MINUTES * 2
+
+
+def trading_minute_indices(timestamps: Sequence[object]) -> np.ndarray:
+    """Map timestamps to the fixed 242-slot A-share trading-minute grid."""
+
+    values = pd.DatetimeIndex(pd.to_datetime(list(timestamps), errors="coerce"))
+    invalid_timestamp = values.isna()
+    off_minute = (
+        (values.second != 0)
+        | (values.microsecond != 0)
+        | (values.nanosecond != 0)
+    )
+    minute_of_day = values.hour * 60 + values.minute
+    morning = (minute_of_day >= MORNING_OPEN_MINUTE) & (
+        minute_of_day <= MORNING_CLOSE_MINUTE
+    )
+    afternoon = (minute_of_day >= AFTERNOON_OPEN_MINUTE) & (
+        minute_of_day <= AFTERNOON_CLOSE_MINUTE
+    )
+    invalid = invalid_timestamp | off_minute | ~(morning | afternoon)
+    if invalid.any():
+        examples = [str(value) for value in values[invalid][:3]]
+        raise ValueError(
+            "timestamps must be exact trading minutes in 09:30-11:30 or "
+            f"13:00-15:00; invalid examples={examples}"
+        )
+
+    indices = np.empty(len(values), dtype=np.int32)
+    indices[morning] = minute_of_day[morning] - MORNING_OPEN_MINUTE
+    indices[afternoon] = (
+        SESSION_MINUTES + minute_of_day[afternoon] - AFTERNOON_OPEN_MINUTE
+    )
+    return indices
+
+
+def align_legacy_packed_minutes(
+    values: np.ndarray,
+    *,
+    minute_mask_channel: int = 14,
+) -> np.ndarray:
+    """Move an audited legacy 240-observation tensor onto the fixed clock."""
+
+    if (
+        values.ndim != 3
+        or values.shape[1] != TRADING_MINUTES_PER_DAY
+        or not 0 <= minute_mask_channel < values.shape[2]
+    ):
+        raise ValueError(f"unexpected packed value shape: {values.shape}")
+    minute_mask = np.isfinite(values[:, :, minute_mask_channel])
+    has_minutes = minute_mask.any(axis=1)
+    legacy = (
+        has_minutes
+        & minute_mask[:, :240].all(axis=1)
+        & ~minute_mask[:, 240:].any(axis=1)
+    )
+    provider_grid = np.ones(TRADING_MINUTES_PER_DAY, dtype=bool)
+    provider_grid[[0, SESSION_MINUTES]] = False
+    already_fixed = has_minutes & (
+        (minute_mask == provider_grid).all(axis=1) | minute_mask.all(axis=1)
+    )
+    unknown = has_minutes & ~(legacy | already_fixed)
+    if unknown.any():
+        raise ValueError(
+            "packed minute rows are neither the audited legacy 240-row layout "
+            "nor the fixed 242-slot trading grid"
+        )
+    if not legacy.any():
+        return values
+
+    aligned = values.copy()
+    source = values[legacy]
+    aligned[legacy] = np.nan
+    aligned[legacy, 1:SESSION_MINUTES] = source[:, : SESSION_MINUTES - 1]
+    aligned[legacy, SESSION_MINUTES + 1 :] = source[:, SESSION_MINUTES - 1 : 240]
+    return aligned
+
 
 def _safe_ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     valid = denominator.notna() & np.isfinite(denominator) & denominator.ne(0)
@@ -100,7 +182,9 @@ def build_microstructure_features(raw: pd.DataFrame) -> pd.DataFrame:
 
     group_keys = [frame["trade_date"], frame["instrument"], frame["session_id"]]
     previous_close = frame["close"].groupby(group_keys, sort=False).shift(1)
-    valid_close = frame["close"].gt(0) & previous_close.gt(0)
+    previous_timestamp = frame["timestamp"].groupby(group_keys, sort=False).shift(1)
+    adjacent_minute = frame["timestamp"].sub(previous_timestamp).eq(pd.Timedelta(minutes=1))
+    valid_close = frame["close"].gt(0) & previous_close.gt(0) & adjacent_minute
     frame["minute_log_return"] = np.log(
         frame["close"].where(valid_close) / previous_close.where(valid_close)
     )
@@ -190,8 +274,10 @@ def pack_microstructure_days(
     missing = sorted(required.difference(features.columns))
     if missing:
         raise ValueError(f"microstructure features are missing columns: {missing}")
-    if max_minutes <= 0:
-        raise ValueError("max_minutes must be positive")
+    if max_minutes != TRADING_MINUTES_PER_DAY:
+        raise ValueError(
+            f"max_minutes must equal the fixed {TRADING_MINUTES_PER_DAY}-slot trading grid"
+        )
     frame = features.loc[:, ["trade_date", "instrument", "timestamp", *MICROSTRUCTURE_CHANNELS]].copy()
     frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce").dt.normalize()
     frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
@@ -200,6 +286,7 @@ def pack_microstructure_days(
         raise ValueError("microstructure feature keys contain null or invalid values")
     if frame.duplicated(["trade_date", "instrument", "timestamp"]).any():
         raise ValueError("microstructure features contain duplicate minute keys")
+    frame["_minute_index"] = trading_minute_indices(frame["timestamp"])
     frame = frame.sort_values(["trade_date", "instrument", "timestamp"], kind="stable")
 
     packed_dates = pd.DatetimeIndex(
@@ -224,15 +311,11 @@ def pack_microstructure_days(
         stock_index = instrument_index.get(str(instrument))
         if day_index is None or stock_index is None:
             continue
-        if len(group) > max_minutes:
-            raise ValueError(
-                f"{day.date()} {instrument} has {len(group)} minutes; max_minutes={max_minutes}"
-            )
+        positions = group["_minute_index"].to_numpy(np.intp)
         matrix = group.loc[:, list(MICROSTRUCTURE_CHANNELS)].to_numpy(np.float32)
-        count = len(matrix)
-        values[day_index, stock_index, :count] = matrix
-        observed[day_index, stock_index, :count] = np.isfinite(matrix)
-        minute_mask[day_index, stock_index, :count] = True
+        values[day_index, stock_index, positions] = matrix
+        observed[day_index, stock_index, positions] = np.isfinite(matrix)
+        minute_mask[day_index, stock_index, positions] = True
     stock_mask = minute_mask.any(axis=2)
     return MicrostructureDayBatch(
         dates=packed_dates,

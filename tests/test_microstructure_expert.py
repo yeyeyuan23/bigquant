@@ -21,7 +21,7 @@ from alpha_models import (
     pack_microstructure_days,
     validate_instrument_map,
 )
-from alpha_models.microstructure import MicrostructureTCNBlock
+from alpha_models.microstructure import MicrostructureTCNBlock, align_legacy_packed_minutes
 from scripts.evaluate_unified_microstructure import (
     load_microstructure_day,
     prepare_label_panel,
@@ -108,6 +108,17 @@ def test_raw_feature_builder_rejects_duplicate_minutes() -> None:
         build_microstructure_features(duplicate)
 
 
+def test_raw_feature_builder_does_not_bridge_a_missing_minute() -> None:
+    raw = raw_minutes()
+    raw.loc[raw["date"] == pd.Timestamp("2024-01-02 09:32"), "date"] = pd.Timestamp(
+        "2024-01-02 09:33"
+    )
+    features = build_microstructure_features(raw)
+    stock = features.loc[features["instrument"] == "000001.SZ"].reset_index(drop=True)
+    assert pd.isna(stock.iloc[0]["minute_log_return"])
+    assert pd.isna(stock.iloc[1]["minute_log_return"])
+
+
 def test_raw_feature_builder_rejects_missing_contract_columns() -> None:
     with pytest.raises(ValueError, match="missing columns"):
         build_microstructure_features(raw_minutes().drop(columns="bid_volume3"))
@@ -174,14 +185,54 @@ def test_pack_microstructure_days_builds_masks_without_silent_truncation() -> No
     batch = pack_microstructure_days(
         features,
         instruments=("000001.SZ", "000002.SZ", "MISSING"),
-        max_minutes=8,
+        max_minutes=242,
     )
-    assert batch.values.shape == (1, 3, 8, len(MICROSTRUCTURE_CHANNELS))
+    assert batch.values.shape == (1, 3, 242, len(MICROSTRUCTURE_CHANNELS))
     assert batch.minute_mask[0, :2].sum(axis=1).tolist() == [4, 4]
+    assert np.flatnonzero(batch.minute_mask[0, 0]).tolist() == [1, 2, 121, 122]
     assert batch.stock_mask.tolist() == [[True, True, False]]
     assert not batch.observed_mask[0, 0, 0, 0]
-    with pytest.raises(ValueError, match="max_minutes=3"):
+    with pytest.raises(ValueError, match="fixed 242-slot"):
         pack_microstructure_days(features, max_minutes=3)
+
+
+def test_pack_preserves_missing_slots_and_tail30_is_the_closing_30_minutes() -> None:
+    day = pd.Timestamp("2024-01-02")
+    timestamps = pd.date_range(f"{day.date()} 09:31", periods=120, freq="min").append(
+        pd.date_range(f"{day.date()} 13:01", periods=120, freq="min")
+    )
+    features = pd.DataFrame(
+        {
+            "trade_date": day,
+            "instrument": "000001.SZ",
+            "timestamp": timestamps,
+        }
+    )
+    for channel_index, channel in enumerate(MICROSTRUCTURE_CHANNELS):
+        features[channel] = np.arange(len(features), dtype=np.float32) + channel_index
+
+    batch = pack_microstructure_days(features)
+    mask = batch.minute_mask[0, 0]
+    assert np.flatnonzero(~mask).tolist() == [0, 121]
+    assert np.flatnonzero(mask).tolist() == [*range(1, 121), *range(122, 242)]
+    np.testing.assert_allclose(
+        batch.values[0, 0, -30:, 0],
+        np.arange(210, 240, dtype=np.float32),
+    )
+
+
+def test_legacy_packed_tensor_is_aligned_without_creating_new_data() -> None:
+    values = np.full((2, 242, len(MICROSTRUCTURE_CHANNELS)), np.nan, dtype=np.float32)
+    source = np.arange(240, dtype=np.float32)
+    values[0, :240] = source[:, None]
+
+    aligned = align_legacy_packed_minutes(values)
+    assert np.isnan(aligned[0, 0]).all()
+    assert np.isnan(aligned[0, 121]).all()
+    np.testing.assert_allclose(aligned[0, 1:121, 0], source[:120])
+    np.testing.assert_allclose(aligned[0, 122:, 0], source[120:])
+    assert np.isnan(aligned[1]).all()
+    assert np.isfinite(values[0, :240]).all(), "input tensor must not be mutated"
 
 
 def test_microstructure_tcn_is_causal() -> None:
@@ -313,7 +364,7 @@ def test_prepare_store_and_day_loader_use_canonical_manifest(tmp_path) -> None:
         store,
         pd.Timestamp("2024-01-02"),
         ("000001.SZ", "000002.SZ"),
-        max_minutes=8,
+        max_minutes=242,
     )
     assert batch is not None
     assert batch.stock_mask.tolist() == [[True, True]]
@@ -321,7 +372,7 @@ def test_prepare_store_and_day_loader_use_canonical_manifest(tmp_path) -> None:
         store,
         pd.Timestamp("2024-01-05"),
         ("000001.SZ",),
-        max_minutes=8,
+        max_minutes=242,
     ) is None
 
 
