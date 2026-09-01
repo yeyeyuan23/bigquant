@@ -13,10 +13,7 @@ ROOT = Path("/root/autodl-tmp/projects/bigquant-default")
 for entry in (ROOT / "src", ROOT):
     sys.path.insert(0, str(entry))
 
-try:
-    from bigalpha2026.competition_score_proxy import preprocess_factor
-except ModuleNotFoundError:
-    from competition_score_proxy import preprocess_factor
+from competition_score_proxy import preprocess_factor  # noqa: E402
 
 
 LABEL = "ret_next_open_to_close"
