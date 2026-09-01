@@ -29,7 +29,7 @@
 
 ## 模型
 
-输入张量形状为 `[交易日批次, 股票, 分钟位置, 17 通道]`，分钟轴最多 242 个位置。17 个通道分为：
+输入张量形状为 `[交易日批次, 股票, 分钟位置, 17 通道]`。源表每个股票日有 240 条真实分钟记录；模型使用 242 个固定时钟位置，09:30 和 13:00 在当前源表中为空并由 `minute_mask` 标记。17 个通道分为：
 
 | 信息组 | 通道数 | 内容 |
 |---|---:|---|
@@ -52,17 +52,18 @@ loss = -Pearson(prediction, target)
        + 0.05 × mean(SmoothL1(prediction, target))
 ```
 
-Pearson 项让横截面预测方向与未来收益方向一致；SmoothL1 项约束分数尺度并降低极端收益对训练的影响。评估时使用 RankIC，而不是把训练用 Pearson 当作最终指标。
+训练 target 是下一交易日 O2C 收益在当天股票间的百分位排名，并缩放到 −1～1。Pearson 项让模型原始分数与该排名目标同向；SmoothL1 项约束分数尺度并降低少数大误差的影响。评估时使用 RankIC，而不是把训练用 Pearson 当作最终指标。
 
 ## 当前复盘证据
 
-复盘实验统一使用 O2C 标签。完整协议、逐实验数字、限制和产物位置只维护在 [`experiments/finals_pre/README.md`](experiments/finals_pre/README.md)。当前已核验的 E1–E5 回答：
+复盘实验统一使用 O2C 标签。完整协议、逐实验数字、限制和产物位置只维护在 [`experiments/finals_pre/README.md`](experiments/finals_pre/README.md)。当前已核验的 E1–E6 回答：
 
 - expanding walk-forward 在 7 个未来 20 日窗口中都得到正 RankIC；
 - 2019–2023 训练、2024 评价时，第 3 个 epoch 的四项均值最高；
 - 渐进实验中，TCN 与 `last` 带来最大的 RankIC、RankIC IR 和 Sharpe 增量；
 - 正式提交权重的预测力主要集中在下一交易日，五分位下一日收益保持单调；
 - 每日五分位组合平均换手为 1.403，10bp 单边成本下收益和 Sharpe 转负；
+- 通道组消融中，去掉盘口后四项均值和三个 seed 的配对结果一致下降；去掉成交结构后前三项一致下降，但压力 ICIR 不一致；
 - 额外直接加入 23 个原始字段后，四项指标没有一致改善。
 
 尚未完成评分和核验的实验不进入 README 结论。
