@@ -114,7 +114,10 @@ class ResearchPolicyTest(unittest.TestCase):
             FORMAL_EVALUATION_POLICY.validation_2024_end,
             "2024-12-31",
         )
-        self.assertEqual(FORMAL_EVALUATION_POLICY.primary_label, "ret_close_to_close")
+        self.assertEqual(
+            FORMAL_EVALUATION_POLICY.primary_label,
+            "ret_next_open_to_close",
+        )
         self.assertEqual(
             HF_OB_MANDATORY_MONTHS,
             (
