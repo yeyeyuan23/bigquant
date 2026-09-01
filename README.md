@@ -1,110 +1,111 @@
-# BigAlpha 2026 — Unified Alpha（M_raw 冠军线）
+# BigAlpha 2026 — 分钟微观结构因子
 
-用原始分钟盘口和 Candidate454 因子工程构建互补的 OOS 专家，最终以 M 专家
-（原始微观结构）单因子作为正式提交并进入决赛。平台正式成绩（提交
-`6d0fe02c-1b61-41bd-9de9-fe9ac0774ffd`，checkpoint sha256 `252c39ba…`）：
+本仓库保存 BigAlpha 2026 决赛提交模型、数据合同、训练与推理代码，以及统一使用下一交易日开盘到收盘收益（O2C）的复盘实验。
 
-| 口径 | 总分 | A | B |
+正式提交模型只使用原始分钟行情构造的 17 个通道，不依赖 Candidate454 因子池。每天收盘后，模型读取当天分钟序列，为股票池中的每只股票输出一个无量纲横截面分数；分数用于预测下一交易日开盘到收盘的收益排序。
+
+## 平台结果
+
+正式提交 `6d0fe02c-1b61-41bd-9de9-fe9ac0774ffd`，checkpoint SHA256 为 `252c39ba…dcb`。
+
+| 阶段 | 总分 | A | B |
 |---|---:|---:|---:|
 | 公榜 | **0.95480** | 0.95106 | 0.95641 |
-| 私榜 merge | **0.88736** | 0.95788 | 0.85714 |
+| 私榜合并 | **0.88736** | 0.95788 | 0.85714 |
 
-`总分 = 0.3 × A + 0.7 × B`。逐时段读数与答辩材料以 Mac 端
-`BigAlpha_Pre/experiment_log.md` 的 E6 节为权威（两个仓库都是私有）。
+`总分 = 0.3 × A + 0.7 × B`。平台成绩与本地实验是两条证据链；本地结果不用于反推平台分数。
 
-## 我们干了什么
+## 任务定义
 
-1. **候选因子工程（7 月，已退役）**：登记-实现-准入流水线（S/I/T）筛出
-   PV/HF/OB/FR/composite 共 454 个候选，冻结为 Candidate454 因子面板。
-   S/I/T 评价与组合管线代码已从工作树移除，历史见 `origin/main` 与归档 tag。
-2. **统一三专家（8 月上旬）**：
-   - `T / Factor Temporal`：Candidate454 × 60 日，CNN + Transformer + DeepSets；
-   - `X / Factor Cross-sectional`：当日 Candidate454，LightGBM 主模型 + MLP 挑战；
-   - `M / Raw Microstructure`：17 通道分钟面板（前三档盘口，午休隔离、缺失保留），
-     多尺度因果 TCN + 显式统计双通路，DeepSets 横截面上下文；
-   - `Baseline`：Candidate454 全池滚动 Elastic Net（EN454）。
-   本地统一用 J 代理（`competition_score_proxy`）比较路线。
-3. **提交演进**：EN454 → X-tree → T/M 残差链 → **M_raw expanding-history e3**
-   （2019→2024 扩窗训练，最终 checkpoint 见
-   `reports/dependencies/m_raw_final_checkpoint/final_full_history_e3/`）。
-   高相关变体清库后只保留低相关组合，B 项从中游回升至 0.956。
-4. **决赛复盘实验（8 月 19 日 – 8 月 26 日）**：`experiments/finals_pre/`，
-   E1 通道置换、E2 卷积核尺度、E3 双通路消融、E4 walk-forward、E5 epoch 曲线、
-   E6 主结果与 o2o 口径确认、E7 N 分体系、E8 EN 掺混、E9 种子矩阵、
-   E10 通道组重训消融、E11 盘口挂单笔数与四五档。
-   **编号与结果以 `BigAlpha_Pre/experiment_log.md` 为准**，该目录 README 只讲
-   「是什么、在哪」，不复制结果数字（复制过一次，两套编号并存了三天没人发现）。
+对交易日 d：
 
-## 仓库布局
+1. 使用截至 d 日收盘的分钟数据；
+2. 模型输出每只股票的无量纲 score；
+3. 评价标签是下一交易日的 `close / open - 1`；
+4. 每天计算中性化 score 排名与收益排名的 Spearman 相关；
+5. 再跨交易日汇总 RankIC、RankIC IR、五分位多空 Sharpe 和压力日 RankIC IR。
+
+中性化使用 10 个风格暴露和 32 个行业哑变量，共 42 个回归项。
+
+## 模型
+
+输入张量形状为 `[交易日批次, 股票, 分钟位置, 17 通道]`，分钟轴最多 242 个位置。17 个通道分为：
+
+| 信息组 | 通道数 | 内容 |
+|---|---:|---|
+| 价格路径 | 3 | 分钟收益、振幅、收盘位置 |
+| 盘口快照 | 5 | 相对价差、微价格偏移、不同档位深度不平衡与形状 |
+| 成交结构 | 6 | 成交额、成交量、笔数、每笔强度和方向化成交额 |
+| 时间位置 | 3 | 日内周期位置与上午/下午标记 |
+
+网络包含两条并行通路：
+
+- **序列通路**：标准化值与有效性标记拼接后，经 `Linear → GELU → LayerNorm` 投影到 96 维；三个 TCN 块依次处理序列。每个块并行使用 3、15、60 分钟因果卷积，立即混回 96 维并加残差。最后同时保留 `last`、`mean` 和 attention pooling 三种序列摘要。
+- **统计通路**：每个通道计算均值、标准差、最后值、尾部 30 分钟均值和有效占比，得到 `17 × 5 = 85` 个日级统计量，再投影到 96 维。
+
+两路各自形成 96 维后第一次融合，再通过 DeepSets 加入当天市场平均、市场分化和个股相对市场偏离，最后由打分头输出每只股票一个 score。
+
+训练目标为：
 
 ```text
-src/
-├── alpha_models/          # T/X/M 网络、数据合同、训练数据装配
-├── candidates/            # 454 候选的因子实现（pv/hf/ob/fr/composite）
-├── candidate_transforms.py
-├── feature_contracts.py
-├── factor_pool.py / factorlib.py / evaluation.py / research_policy.py
-│                          # J 参考池层：B 项代理的公开库筛选、方向冻结与策略窗口
-└── competition_score_proxy.py   # 本地 J 评分器（自包含日频指标原语）
-scripts/                   # 数据装配、专家训练评估、提交构建、审计；见 scripts/README.md
-├── runners/               # Candidate454 与统一专家流水线的 Shell 总入口
-├── aistudio/              # AIStudio 导出、聚合与前缀探针
-├── transfer/              # GitHub Release 数据传输与校验
-├── factor_wiki_remaining/ # 因子 Wiki 补全流水线
-└── j_reference_inputs.py  # J 评分的参考输入装载（从退役管线中抽取的现役闭包）
-experiments/finals_pre/   # 决赛实验 lane（见其 README）
-submissions/               # 冻结提交包（见其 README；冠军 = m_raw）
-reports/{latest,dependencies,archive}/   # 见 reports/README.md
-artifacts/                 # 冻结与传输清单
+loss = -Pearson(prediction, target)
+       + 0.05 × mean(SmoothL1(prediction, target))
 ```
 
-## 数据与环境（隔离约定）
+Pearson 项让横截面预测方向与未来收益方向一致；SmoothL1 项约束分数尺度并降低极端收益对训练的影响。评估时使用 RankIC，而不是把训练用 Pearson 当作最终指标。
 
-代码树内不放大体量数据；所有 store 位于 `/root/autodl-tmp` 下的独立路径：
+## 当前复盘证据
+
+复盘实验统一使用 O2C 标签。完整协议、逐实验数字、限制和产物位置只维护在 [`experiments/finals_pre/README.md`](experiments/finals_pre/README.md)。当前已核验的 E1–E5 回答：
+
+- expanding walk-forward 在 7 个未来 20 日窗口中都得到正 RankIC；
+- 2019–2023 训练、2024 评价时，第 3 个 epoch 的四项均值最高；
+- 渐进实验中，TCN 与 `last` 带来最大的 RankIC、RankIC IR 和 Sharpe 增量；
+- 正式提交权重的预测力主要集中在下一交易日，五分位下一日收益保持单调；
+- 每日五分位组合平均换手为 1.403，10bp 单边成本下收益和 Sharpe 转负；
+- 额外直接加入 23 个原始字段后，四项指标没有一致改善。
+
+尚未完成评分和核验的实验不进入 README 结论。
+
+## 主要目录
+
+```text
+src/alpha_models/
+    microstructure.py                 当前 17 通道分钟模型
+    temporal.py                       attention pooling 与 DeepSets
+
+scripts/
+    prepare_unified_microstructure_store.py
+    train_unified_final_checkpoint.py
+    evaluate_unified_microstructure.py
+    build_unified_m_raw_submission.py
+
+experiments/finals_pre/               当前 O2C 复盘实验与唯一结果 README
+reports/dependencies/finals_pre/      大型实验产物与审计
+submissions/                          冻结提交包
+tests/                                特征、时间因果与模型测试
+```
+
+Candidate454、T/X 专家、Elastic Net 和旧 O2O/C2C 实验属于历史研究路径，不再作为当前提交模型或 PRE 证据。相关代码和结果可从 Git 历史与归档 tag 追溯。
+
+## 数据与环境
+
+代码仓库不保存分钟数据、完整因子 Parquet 或 checkpoint。AutoDL 运行时主要使用：
 
 | 路径 | 内容 |
 |---|---|
-| `/root/autodl-tmp/data/` | 运行时数据合同：`labels/`、`universe/`、`exposures/`、`factors/`（candidate_pool）、`features/`（FACTORLIB / ALL36 / MICRO_DAILY_FULL 等）、pool manifest |
-| `/root/autodl-tmp/data/e2e_maps/` | e2e instrument 映射表与审计 report |
-| `/root/autodl-tmp/unified_microstructure_store_v2_2019_2024/` | M 训练用 17 通道分钟 store（schema v2，1456 交易日） |
-| `/root/autodl-tmp/candidate462_completion_full_2019_2024/candidate454_store/` | Candidate454 特征 store（462 补全版，E7 与评分使用） |
-| `/root/autodl-tmp/m_v3_deep_book_context_2019_2024/` | L5 日级 deep-book context（v2/L5 挑战线用） |
-| `/root/autodl-tmp/m_e2e_raw_store/` | e2e 压缩原始分钟数据 |
-| `/root/autodl-tmp/conda-envs/quant/bin/python` | 运行环境（torch 2.6.0+cu124） |
-
-`data/` 目录只保留 manifest 与小文件。老 SITJ 数据与旧 worktree 已删除；
-如需重建 store，原始数据以平台/AIStudio 为准。
-
-## 代码入口
-
-```text
-src/alpha_models/{temporal,tabular,microstructure,microstructure_v2}.py
-scripts/prepare_unified_microstructure_store.py     # 分钟 store 构建（e2e_compressed / canonical 两 profile）
-scripts/evaluate_unified_{temporal,mlp,tree,elasticnet,microstructure}.py
-scripts/train_unified_final_checkpoint.py
-scripts/build_unified_m_raw_submission.py           # 冠军提交包构建
-scripts/score_submission_j_stability.py             # J 稳定性评分
-scripts/replay_frozen_candidate454_models.py
-scripts/runners/run_unified_alpha_fusion_suite.sh   # 历史统一多专家整套 runner
-```
-
-M 训练器只接受审计版 schema v2 store；profile 规则（e2e 价格/成交额 ÷100、
-instrument 一一映射，canonical 不转换）见 `docs/unified_alpha_plan.md`。
+| `/root/autodl-tmp/data/` | 标签、股票池、暴露和小型清单 |
+| `/root/autodl-tmp/unified_microstructure_store_v2_2019_2024/` | 2019–2024 年 17 通道分钟训练 store |
+| `/root/bigquant_private_data/` | 2025–2026 私榜分钟数据 |
+| `/root/autodl-tmp/conda-envs/quant/bin/python` | 远端 Python / PyTorch 环境 |
 
 ## 验证
 
 ```bash
 python -m ruff check .
-coverage run -m pytest -q && coverage combine && coverage report --include="src/*"
+coverage run -m pytest -q
+coverage combine
+coverage report --include="src/*"
 ```
 
-两者当前均为绿色。本地/AutoDL OOS、AIStudio 真实执行、前缀一致性、提交状态与
-平台分数是不同证据层，只有完成对应验证后才能声明该层通过。
-
-## 历史与归档
-
-- SITJ 时代（候选准入、公开因子库、三组合管线）：`origin/main`、
-  tag `archive/main-sitj-20260731`；工作树中不再保留。
-- M multiaxis / v2 / v3 挑战线：结果与冻结产物在 `reports/` 与 `submissions/`，
-  实验分支见 tag `archive/feat-m-multiaxis-full-20260804`。
-- 决赛演示与平台分数记录在 Mac 端 `~/Projects/bigquant/BigAlpha2026_Pre/`。
+时间因果检查位于 `tests/test_microstructure_expert.py` 和 `tests/test_microstructure_v2.py`，覆盖前缀不变性、午休分段、mask 和张量形状。平台成绩、冻结权重推理、本地评分和可交易回测是不同证据层；只有完成对应审计后才在 README 中写入结论。
