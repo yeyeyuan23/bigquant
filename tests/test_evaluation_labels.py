@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.evaluation import build_return_labels
+from evaluation import build_return_labels
 
 
 class CalendarLabelTest(unittest.TestCase):

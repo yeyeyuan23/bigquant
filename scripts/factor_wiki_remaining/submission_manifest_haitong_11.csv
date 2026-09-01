@@ -1,12 +1,12 @@
 source_id,candidate_id,family,target_path,semantic_class,include_in_j_baseline,component_column,orientation,orientation_meaning
-HAITONG-0038,HF-092,HF,src/bigalpha2026/candidates/hf/hf_092.py,LATENT_COMPONENT,True,HAITONG-0038,1.0,storage convention only; latent regression determines sign
-HAITONG-0040,HF-093,HF,src/bigalpha2026/candidates/hf/hf_093.py,LATENT_COMPONENT,True,HAITONG-0040,1.0,storage convention only; latent regression determines sign
-HAITONG-0043,HF-094,HF,src/bigalpha2026/candidates/hf/hf_094.py,LATENT_COMPONENT,True,HAITONG-0043,1.0,storage convention only; latent regression determines sign
-HAITONG-0045,HF-095,HF,src/bigalpha2026/candidates/hf/hf_095.py,LATENT_COMPONENT,True,HAITONG-0045,1.0,storage convention only; latent regression determines sign
-HAITONG-0047,HF-096,HF,src/bigalpha2026/candidates/hf/hf_096.py,LATENT_COMPONENT,True,HAITONG-0047,1.0,storage convention only; latent regression determines sign
-HAITONG-0048,HF-097,HF,src/bigalpha2026/candidates/hf/hf_097.py,LATENT_COMPONENT,True,HAITONG-0048,1.0,storage convention only; latent regression determines sign
-HAITONG-0050,HF-098,HF,src/bigalpha2026/candidates/hf/hf_098.py,LATENT_COMPONENT,True,HAITONG-0050,1.0,storage convention only; latent regression determines sign
-HAITONG-0052,HF-099,HF,src/bigalpha2026/candidates/hf/hf_099.py,LATENT_COMPONENT,True,HAITONG-0052,1.0,storage convention only; latent regression determines sign
-HAITONG-0072,HF-100,HF,src/bigalpha2026/candidates/hf/hf_100.py,LATENT_COMPONENT,True,HAITONG-0072,1.0,storage convention only; latent regression determines sign
-HAITONG-0076,HF-101,HF,src/bigalpha2026/candidates/hf/hf_101.py,LATENT_COMPONENT,True,HAITONG-0076,1.0,storage convention only; latent regression determines sign
-HAITONG-0080,HF-102,HF,src/bigalpha2026/candidates/hf/hf_102.py,LATENT_COMPONENT,True,HAITONG-0080,1.0,storage convention only; latent regression determines sign
+HAITONG-0038,HF-092,HF,src/candidates/hf/hf_092.py,LATENT_COMPONENT,True,HAITONG-0038,1.0,storage convention only; latent regression determines sign
+HAITONG-0040,HF-093,HF,src/candidates/hf/hf_093.py,LATENT_COMPONENT,True,HAITONG-0040,1.0,storage convention only; latent regression determines sign
+HAITONG-0043,HF-094,HF,src/candidates/hf/hf_094.py,LATENT_COMPONENT,True,HAITONG-0043,1.0,storage convention only; latent regression determines sign
+HAITONG-0045,HF-095,HF,src/candidates/hf/hf_095.py,LATENT_COMPONENT,True,HAITONG-0045,1.0,storage convention only; latent regression determines sign
+HAITONG-0047,HF-096,HF,src/candidates/hf/hf_096.py,LATENT_COMPONENT,True,HAITONG-0047,1.0,storage convention only; latent regression determines sign
+HAITONG-0048,HF-097,HF,src/candidates/hf/hf_097.py,LATENT_COMPONENT,True,HAITONG-0048,1.0,storage convention only; latent regression determines sign
+HAITONG-0050,HF-098,HF,src/candidates/hf/hf_098.py,LATENT_COMPONENT,True,HAITONG-0050,1.0,storage convention only; latent regression determines sign
+HAITONG-0052,HF-099,HF,src/candidates/hf/hf_099.py,LATENT_COMPONENT,True,HAITONG-0052,1.0,storage convention only; latent regression determines sign
+HAITONG-0072,HF-100,HF,src/candidates/hf/hf_100.py,LATENT_COMPONENT,True,HAITONG-0072,1.0,storage convention only; latent regression determines sign
+HAITONG-0076,HF-101,HF,src/candidates/hf/hf_101.py,LATENT_COMPONENT,True,HAITONG-0076,1.0,storage convention only; latent regression determines sign
+HAITONG-0080,HF-102,HF,src/candidates/hf/hf_102.py,LATENT_COMPONENT,True,HAITONG-0080,1.0,storage convention only; latent regression determines sign

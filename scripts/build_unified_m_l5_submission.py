@@ -20,7 +20,7 @@ import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUN_DIR = ROOT / "reports/dependencies/m_v3_final"
-DEFAULT_SOURCE_ROOT = ROOT / "src/bigalpha2026/alpha_models"
+DEFAULT_SOURCE_ROOT = ROOT / "src/alpha_models"
 DEFAULT_OUTPUT = ROOT / "submissions/m_l5"
 DEFAULT_TRAINING_SCRIPT = ROOT / "scripts/train_unified_microstructure_v3_final.py"
 DEFAULT_ROUTE = "M_l5_seed_20260803_final"

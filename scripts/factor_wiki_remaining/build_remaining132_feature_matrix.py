@@ -46,7 +46,7 @@ def _read_manifest(path: Path, generator: str) -> list[dict[str, str]]:
 
 def _orientation(candidate_id: str) -> float:
     family, number = candidate_id.lower().split("-", maxsplit=1)
-    module = importlib.import_module(f"bigalpha2026.candidates.{family}.{family}_{number}")
+    module = importlib.import_module(f"candidates.{family}.{family}_{number}")
     if module.CANDIDATE_ID != candidate_id:
         raise ValueError(f"candidate module mismatch for {candidate_id}")
     return float(module.ORIENTATION)

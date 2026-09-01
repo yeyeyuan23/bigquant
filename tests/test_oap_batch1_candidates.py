@@ -5,31 +5,31 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.fr.fr_003 import (
+from candidates.fr.fr_003 import (
     build_fr_003_factor,
     compute_fr_003_events,
 )
-from bigalpha2026.candidates.fr.fr_004 import (
+from candidates.fr.fr_004 import (
     build_fr_004_factor,
     compute_fr_004_events,
 )
-from bigalpha2026.candidates.pv.pv_003 import (
+from candidates.pv.pv_003 import (
     build_pv_003_factor,
     compute_pv_003_daily,
 )
-from bigalpha2026.candidates.pv.pv_004 import (
+from candidates.pv.pv_004 import (
     build_pv_004_factor,
     compute_pv_004_daily,
 )
-from bigalpha2026.candidates.pv.pv_005 import (
+from candidates.pv.pv_005 import (
     build_pv_005_factor,
     compute_pv_005_daily,
 )
-from bigalpha2026.candidates.pv.pv_006 import (
+from candidates.pv.pv_006 import (
     build_pv_006_factor,
     compute_pv_006_daily,
 )
-from bigalpha2026.candidates.pv.pv_007 import (
+from candidates.pv.pv_007 import (
     build_pv_007_factor,
     compute_pv_007_daily,
 )

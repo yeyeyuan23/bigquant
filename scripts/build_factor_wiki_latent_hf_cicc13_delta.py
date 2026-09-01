@@ -11,7 +11,7 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.factor_pool import CANDIDATE_POOL_VERSION
+from factor_pool import CANDIDATE_POOL_VERSION
 
 CANDIDATE_IDS = tuple(f"HF-{number:03d}" for number in range(79, 92))
 
@@ -145,7 +145,7 @@ def build_delta(
     for candidate_id in CANDIDATE_IDS:
         number = candidate_id.split("-")[1]
         module = importlib.import_module(
-            f"bigalpha2026.candidates.hf.hf_{number}"
+            f"candidates.hf.hf_{number}"
         )
         builder = getattr(module, f"build_hf_{number}_factor_from_daily")
         factor = builder(components, pool)

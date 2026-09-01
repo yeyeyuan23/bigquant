@@ -2,7 +2,7 @@ import unittest
 
 import pandas as pd
 
-from bigalpha2026.research_policy import (
+from research_policy import (
     COMBINATION_ADMISSION_GATE,
     FORMAL_EVALUATION_POLICY,
     FROZEN_FACTORLIB_SCREENED_FEATURES,

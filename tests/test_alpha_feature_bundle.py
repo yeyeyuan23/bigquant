@@ -3,12 +3,12 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from bigalpha2026.alpha_models.feature_bundle import (
+from alpha_models.feature_bundle import (
     CANDIDATE454,
     candidate_long_to_wide,
     get_feature_bundle,
 )
-from bigalpha2026.alpha_models.training_data import (
+from alpha_models.training_data import (
     load_candidate_feature_panel,
     panel_arrays,
 )

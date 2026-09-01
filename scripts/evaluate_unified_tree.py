@@ -18,7 +18,7 @@ if str(ROOT / "scripts") not in sys.path:
 
 from evaluate_unified_temporal import fold_boundaries
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     candidate_ids_from_manifest,
     load_candidate_feature_panel,
 )

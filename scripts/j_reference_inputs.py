@@ -27,18 +27,18 @@ except ModuleNotFoundError:
         write_candidate_pool_availability_report,
     )
 
-from bigalpha2026.factor_pool import (
+from factor_pool import (
     CANDIDATE_POOL_COLUMNS,
     KEY_COLUMNS,
     file_sha256,
     validate_candidate_pool_manifest,
 )
-from bigalpha2026.factorlib import (
+from factorlib import (
     FACTORLIB_FEATURE_COLUMNS,
     validate_factorlib_frame,
     validate_factorlib_subset_frame,
 )
-from bigalpha2026.research_policy import (
+from research_policy import (
     FORMAL_EVALUATION_POLICY,
     FROZEN_FACTORLIB_SCREENED_FEATURES,
 )

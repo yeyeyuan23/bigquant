@@ -38,7 +38,7 @@
 ## 仓库布局
 
 ```text
-src/bigalpha2026/
+src/
 ├── alpha_models/          # T/X/M 网络、数据合同、训练数据装配
 ├── candidates/            # 454 候选的因子实现（pv/hf/ob/fr/composite）
 ├── candidate_transforms.py
@@ -78,7 +78,7 @@ artifacts/                 # 冻结与传输清单
 ## 代码入口
 
 ```text
-src/bigalpha2026/alpha_models/{temporal,tabular,microstructure,microstructure_v2}.py
+src/alpha_models/{temporal,tabular,microstructure,microstructure_v2}.py
 scripts/prepare_unified_microstructure_store.py     # 分钟 store 构建（e2e_compressed / canonical 两 profile）
 scripts/evaluate_unified_{temporal,mlp,tree,elasticnet,microstructure}.py
 scripts/train_unified_final_checkpoint.py

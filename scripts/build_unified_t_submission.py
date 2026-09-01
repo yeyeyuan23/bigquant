@@ -39,7 +39,7 @@ def sha256_file(path: Path) -> str:
 
 
 def temporal_runtime_source() -> str:
-    source = (ROOT / "src/bigalpha2026/alpha_models/temporal.py").read_text()
+    source = (ROOT / "src/alpha_models/temporal.py").read_text()
     source = re.sub(r"^from __future__ import annotations\n", "", source, flags=re.MULTILINE)
     source = source.replace("from .base import AlphaModel, register_model\n", "")
     source = source.split('@register_model("unified_temporal")', 1)[0]

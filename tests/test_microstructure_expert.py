@@ -8,7 +8,7 @@ import pyarrow.parquet as pq
 import pytest
 import torch
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     MICROSTRUCTURE_CHANNELS,
     PRICE_COLUMNS,
     MicrostructureConfig,
@@ -21,7 +21,7 @@ from bigalpha2026.alpha_models import (
     pack_microstructure_days,
     validate_instrument_map,
 )
-from bigalpha2026.alpha_models.microstructure import MicrostructureTCNBlock
+from alpha_models.microstructure import MicrostructureTCNBlock
 from scripts.evaluate_unified_microstructure import (
     load_microstructure_day,
     prepare_label_panel,
@@ -388,7 +388,7 @@ def test_daily_statistics_survive_a_constant_channel() -> None:
     不会被走到（统计量算自输入，上游没有参数），但只要有人对输入求梯度就会踩上。
     修法必须保持前向逐位不变——clamp_min 会把 std 从 0 抬到非零，改变冻结路径。
     """
-    from bigalpha2026.alpha_models.microstructure import _masked_channel_statistics
+    from alpha_models.microstructure import _masked_channel_statistics
 
     minutes, channels = 242, len(MICROSTRUCTURE_CHANNELS)
     values = torch.zeros(2, minutes, channels, requires_grad=True)
@@ -407,7 +407,7 @@ def test_daily_statistics_survive_a_constant_channel() -> None:
 
 def test_daily_statistics_match_plain_sqrt_when_variance_is_positive() -> None:
     """方差为正时，修复不得改变任何数值。"""
-    from bigalpha2026.alpha_models.microstructure import _masked_channel_statistics
+    from alpha_models.microstructure import _masked_channel_statistics
 
     minutes, channels = 242, len(MICROSTRUCTURE_CHANNELS)
     generator = torch.Generator().manual_seed(20260826)

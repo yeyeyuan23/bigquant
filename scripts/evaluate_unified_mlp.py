@@ -25,7 +25,7 @@ from evaluate_unified_temporal import (
     load_labels,
 )
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     CandidateMLPConfig,
     ModelFactory,
     candidate_ids_from_manifest,

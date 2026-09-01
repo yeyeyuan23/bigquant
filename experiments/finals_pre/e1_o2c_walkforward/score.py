@@ -21,7 +21,7 @@ EXPOSURE_PATHS = (
     DATA / "bigalpha_2026_exposure_20260802_20260828.parquet",
 )
 sys.path.insert(0, str(ROOT / "src"))
-from bigalpha2026.competition_score_proxy import preprocess_factor
+from competition_score_proxy import preprocess_factor
 
 
 def normalize_keys(frame: pd.DataFrame) -> pd.DataFrame:

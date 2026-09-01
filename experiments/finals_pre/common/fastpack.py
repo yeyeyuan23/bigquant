@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from bigalpha2026.alpha_models.microstructure import (
+from alpha_models.microstructure import (
     MICROSTRUCTURE_CHANNELS,
     MicrostructureDayBatch,
 )

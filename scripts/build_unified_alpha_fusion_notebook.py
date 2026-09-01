@@ -31,7 +31,7 @@ def build_notebook(
             "# Unified Alpha Fusion Development\n\n"
             "This notebook is generated from the development repository and "
             "imports the canonical implementation from "
-            "`src/bigalpha2026/alpha_models`; it does not contain a handwritten "
+            "`src/alpha_models`; it does not contain a handwritten "
             "second model. T uses a fixed 60-day sample sequence; the Elastic Net "
             "baseline and M use 60-day training / one-day label isolation / "
             "20-day prediction blocks. The upstream "
@@ -48,7 +48,7 @@ if ROOT.name == "notebooks":
     ROOT = ROOT.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     DEFAULT_SUBMISSION_DATA_CONTRACT,
     MICROSTRUCTURE_CHANNELS,
     ModelFactory,

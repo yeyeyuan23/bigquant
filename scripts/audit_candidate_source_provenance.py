@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.audit_submission_candidate_eligibility import scan_candidates
 
-CANDIDATES = ROOT / "src/bigalpha2026/candidates"
+CANDIDATES = ROOT / "src/candidates"
 ALLOWED_DIRECT_INPUTS = {
     "daily_bars": "bar1m",
     "minute_bars": "bar1m",
@@ -37,25 +37,25 @@ GENERATOR_BY_SOURCE_PREFIX = {
     ),
 }
 IN_REPOSITORY_DAILY_FEATURE_GENERATORS = {
-    "HF-001": "src/bigalpha2026/candidates/hf/hf_001.py",
-    "HF-002": "src/bigalpha2026/candidates/hf/hf_002.py",
-    "HF-003": "src/bigalpha2026/candidates/hf/hf_002.py",
-    "HF-004": "src/bigalpha2026/candidates/hf/hf_002.py",
+    "HF-001": "src/candidates/hf/hf_001.py",
+    "HF-002": "src/candidates/hf/hf_002.py",
+    "HF-003": "src/candidates/hf/hf_002.py",
+    "HF-004": "src/candidates/hf/hf_002.py",
     "HF-104": (
-        "src/bigalpha2026/candidates/hf/hf_002.py|"
-        "src/bigalpha2026/candidates/hf/hf_104.py"
+        "src/candidates/hf/hf_002.py|"
+        "src/candidates/hf/hf_104.py"
     ),
-    "OB-001": "src/bigalpha2026/candidates/ob/ob_001.py",
-    "OB-002": "src/bigalpha2026/candidates/ob/ob_002.py",
+    "OB-001": "src/candidates/ob/ob_001.py",
+    "OB-002": "src/candidates/ob/ob_002.py",
     "OB-003": (
-        "src/bigalpha2026/candidates/ob/ob_001.py|"
-        "src/bigalpha2026/candidates/ob/ob_002.py"
+        "src/candidates/ob/ob_001.py|"
+        "src/candidates/ob/ob_002.py"
     ),
-    "OB-004": "src/bigalpha2026/candidates/ob/ob_001.py",
-    "OB-005": "src/bigalpha2026/candidates/ob/ob_001.py",
+    "OB-004": "src/candidates/ob/ob_001.py",
+    "OB-005": "src/candidates/ob/ob_001.py",
     "OB-008": (
-        "src/bigalpha2026/candidates/ob/ob_001.py|"
-        "src/bigalpha2026/candidates/ob/ob_008.py"
+        "src/candidates/ob/ob_001.py|"
+        "src/candidates/ob/ob_008.py"
     ),
 }
 

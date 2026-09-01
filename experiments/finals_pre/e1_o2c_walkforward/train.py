@@ -20,7 +20,7 @@ from evaluate_unified_microstructure import fit_predict_block, prepare_label_pan
 from evaluate_unified_temporal import load_labels
 from fastpack import load_microstructure_day_fast
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     MICROSTRUCTURE_CHANNELS,
     MicrostructureConfig,
 )

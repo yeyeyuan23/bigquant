@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.evaluation import ElasticNetConfig
-from bigalpha2026.factor_pool import (
+from evaluation import ElasticNetConfig
+from factor_pool import (
     PUBLIC_PREFIX,
     SELF_PREFIX,
     apply_feature_directions,
@@ -13,7 +13,7 @@ from bigalpha2026.factor_pool import (
     screen_public_factors,
     validate_candidate_pool,
 )
-from bigalpha2026.factorlib import FACTORLIB_FEATURE_COLUMNS
+from factorlib import FACTORLIB_FEATURE_COLUMNS
 
 
 class FactorPoolTest(unittest.TestCase):

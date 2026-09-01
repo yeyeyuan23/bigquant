@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.ob.ob_001 import build_ob_001_factor
+from candidates.ob.ob_001 import build_ob_001_factor
 
 
 def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:

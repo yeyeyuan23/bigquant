@@ -2,7 +2,7 @@ import unittest
 
 import pandas as pd
 
-from bigalpha2026.feature_contracts import (
+from feature_contracts import (
     FEATURE_CONTRACTS,
     get_feature_contract,
     validate_feature_columns,

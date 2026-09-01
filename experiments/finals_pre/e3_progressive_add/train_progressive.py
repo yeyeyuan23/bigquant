@@ -29,8 +29,8 @@ from evaluate_unified_microstructure import (
 from evaluate_unified_temporal import correlation_loss, load_labels
 from model_progressive import ProgressiveConfig, ProgressiveModel
 
-from bigalpha2026.alpha_models import rolling_oos_blocks
-from bigalpha2026.alpha_models.microstructure import (
+from alpha_models import rolling_oos_blocks
+from alpha_models.microstructure import (
     MICROSTRUCTURE_CHANNELS,
 )
 

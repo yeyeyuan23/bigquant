@@ -29,7 +29,7 @@ from evaluate_unified_temporal import (
     validate_residual_baseline_manifest,
 )
 
-from bigalpha2026.alpha_models import CandidateMLPConfig, ModelFactory
+from alpha_models import CandidateMLPConfig, ModelFactory
 
 
 def _mean_daily_spearman(rows: list[pd.DataFrame], target: str) -> float:

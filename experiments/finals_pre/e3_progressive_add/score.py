@@ -13,7 +13,7 @@ for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from bigalpha2026.competition_score_proxy import preprocess_factor
+from competition_score_proxy import preprocess_factor
 
 LABEL = "ret_next_open_to_close"
 SEEDS = (20260801, 20260812, 20260823)

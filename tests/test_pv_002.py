@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.pv.pv_002 import (
+from candidates.pv.pv_002 import (
     build_pv_002_factor,
     compute_pv_002_daily,
 )

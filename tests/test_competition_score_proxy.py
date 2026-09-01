@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.competition_score_proxy import (
+from competition_score_proxy import (
     CompetitionScoreConfig,
     CompetitionScoreReference,
     inserted_percentile,

@@ -5,16 +5,16 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.fr.fr_001 import (
+from candidates.fr.fr_001 import (
     build_fr_001_factor_from_panel,
     compute_fr_001_events,
     compute_fr_001_events_from_panel,
 )
-from bigalpha2026.candidates.fr.fr_002 import build_fr_002_factor_from_panel
-from bigalpha2026.candidates.hf.hf_001 import build_hf_001_factor_from_daily
-from bigalpha2026.candidates.hf.hf_002 import build_hf_002_factor_from_daily
-from bigalpha2026.candidates.ob.ob_001 import build_ob_001_factor_from_daily
-from bigalpha2026.candidates.ob.ob_002 import build_ob_002_factor_from_daily
+from candidates.fr.fr_002 import build_fr_002_factor_from_panel
+from candidates.hf.hf_001 import build_hf_001_factor_from_daily
+from candidates.hf.hf_002 import build_hf_002_factor_from_daily
+from candidates.ob.ob_001 import build_ob_001_factor_from_daily
+from candidates.ob.ob_002 import build_ob_002_factor_from_daily
 
 
 class DailyPanelAdapterTest(unittest.TestCase):

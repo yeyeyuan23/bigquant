@@ -11,7 +11,7 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.factor_pool import CANDIDATE_POOL_VERSION
+from factor_pool import CANDIDATE_POOL_VERSION
 
 PV_WINDOWS = {
     "HAITONG-0022": ("mean_log_high_open", 10),
@@ -159,7 +159,7 @@ def build_delta(
     for candidate_id in PV_IDS:
         number = candidate_id.split("-")[1]
         module = importlib.import_module(
-            f"bigalpha2026.candidates.pv.pv_{number}"
+            f"candidates.pv.pv_{number}"
         )
         builder = getattr(module, f"build_pv_{number}_factor_from_daily")
         factor = builder(components, pool)

@@ -63,7 +63,7 @@ def long_short_sharpe(frame: pd.DataFrame, factor_column: str) -> float:
 
 def load_preprocessor(source_dir: Path) -> Callable[[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
     sys.path.insert(0, str(source_dir))
-    from bigalpha2026.competition_score_proxy import preprocess_factor
+    from competition_score_proxy import preprocess_factor
 
     return preprocess_factor
 

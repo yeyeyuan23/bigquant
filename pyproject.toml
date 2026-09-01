@@ -29,6 +29,18 @@ dev = [
   "ruff==0.16.0",
 ]
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = [
+  "candidate_transforms",
+  "competition_score_proxy",
+  "evaluation",
+  "factor_pool",
+  "factorlib",
+  "feature_contracts",
+  "research_policy",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -45,7 +57,7 @@ pythonpath = ["src"]
 branch = true
 parallel = true
 concurrency = ["multiprocessing"]
-source = ["src/bigalpha2026", "scripts"]
+source = ["src", "scripts"]
 
 [tool.coverage.report]
 show_missing = true

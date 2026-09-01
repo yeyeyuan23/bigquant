@@ -15,7 +15,7 @@ OUT = ROOT / "reports/dependencies/finals_pre/e4_private_fixed_oos"
 for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
     sys.path.insert(0, str(entry))
 
-from bigalpha2026.competition_score_proxy import preprocess_factor
+from competition_score_proxy import preprocess_factor
 
 LABEL = "ret_next_open_to_close"
 KEYS = ["date", "instrument"]

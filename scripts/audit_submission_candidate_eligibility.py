@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CANDIDATES = ROOT / "src/bigalpha2026/candidates"
+CANDIDATES = ROOT / "src/candidates"
 FORBIDDEN_INPUTS = {"exposure", "exposures", "factorlib"}
 MAX_DAILY_OBSERVATIONS = 126
 MAX_CALENDAR_MONTHS = 6

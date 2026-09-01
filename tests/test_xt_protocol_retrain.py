@@ -26,7 +26,7 @@ period_score = load_script("score_route_periods.py")
 sys_path = str(ROOT / "src")
 if sys_path not in sys.path:
     sys.path.insert(0, sys_path)
-from bigalpha2026.alpha_models.temporal import (
+from alpha_models.temporal import (
     CandidateTemporalConfig,
     CandidateTemporalNetwork,
     temporal_history_indices,

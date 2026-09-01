@@ -24,7 +24,7 @@ from evaluate_unified_temporal import (
 )
 from evaluate_unified_tree import _daily_rank, _load_year
 
-from bigalpha2026.alpha_models import candidate_ids_from_manifest
+from alpha_models import candidate_ids_from_manifest
 
 KEYS = ["date", "instrument"]
 

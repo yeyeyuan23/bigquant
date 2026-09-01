@@ -16,28 +16,28 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from bigalpha2026.candidates.fr._common import group_asof
-from bigalpha2026.candidates.fr.fr_007 import (
+from candidates.fr._common import group_asof
+from candidates.fr.fr_007 import (
     build_fr_007_factor,
     compute_fr_007_events,
 )
-from bigalpha2026.candidates.hf.hf_103 import (
+from candidates.hf.hf_103 import (
     build_hf_103_factor_from_daily,
     compute_hf_103_daily,
 )
-from bigalpha2026.candidates.hf.hf_104 import (
+from candidates.hf.hf_104 import (
     build_hf_104_factor_from_daily,
     compute_hf_104_daily,
 )
-from bigalpha2026.candidates.ob.ob_007 import (
+from candidates.ob.ob_007 import (
     build_ob_007_factor_from_daily,
     compute_ob_007_daily,
 )
-from bigalpha2026.candidates.ob.ob_008 import (
+from candidates.ob.ob_008 import (
     build_ob_008_factor_from_daily,
     compute_ob_008_daily,
 )
-from bigalpha2026.candidates.pv.pv_007 import (
+from candidates.pv.pv_007 import (
     build_pv_007_factor,
     compute_pv_007_daily,
 )

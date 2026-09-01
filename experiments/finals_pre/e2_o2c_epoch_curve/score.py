@@ -15,7 +15,7 @@ KEYS = ["date", "instrument"]
 DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
 SEEDS = (20260801, 20260812, 20260823)
 sys.path.insert(0, str(ROOT / "src"))
-from bigalpha2026.competition_score_proxy import preprocess_factor
+from competition_score_proxy import preprocess_factor
 
 
 def daily_ic(frame: pd.DataFrame) -> pd.Series:

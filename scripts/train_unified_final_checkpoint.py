@@ -27,7 +27,7 @@ if str(ROOT / "scripts") not in sys.path:
 
 from evaluate_unified_temporal import correlation_loss, eligible_target_indices, load_labels
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     CandidateMLPConfig,
     CandidateTemporalConfig,
     ModelFactory,

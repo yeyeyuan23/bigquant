@@ -5,15 +5,15 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.candidates.fr.fr_015 import (
+from candidates.fr.fr_015 import (
     build_fr_015_factor,
     compute_fr_015_events,
 )
-from bigalpha2026.candidates.ob.ob_005 import (
+from candidates.ob.ob_005 import (
     build_ob_005_factor_from_daily,
     compute_ob_005_daily,
 )
-from bigalpha2026.candidates.pv.pv_023 import (
+from candidates.pv.pv_023 import (
     build_pv_023_factor,
     compute_pv_023_daily,
 )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     CandidateMLPConfig,
     CandidateMLPModel,
     CandidateMLPNetwork,
@@ -11,7 +11,7 @@ from bigalpha2026.alpha_models import (
     CandidateTemporalNetwork,
     ModelFactory,
 )
-from bigalpha2026.alpha_models.temporal import (
+from alpha_models.temporal import (
     CausalDepthwiseConv1d,
     TemporalSummary,
     masked_cross_sectional_zscore,

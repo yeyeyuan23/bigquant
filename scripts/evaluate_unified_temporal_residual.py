@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     CandidateTemporalConfig,
     CandidateTemporalModel,
     ModelFactory,

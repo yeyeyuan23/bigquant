@@ -27,12 +27,12 @@ if str(ROOT / "scripts") not in sys.path:
 
 from evaluate_unified_temporal import correlation_loss, load_labels
 
-from bigalpha2026.alpha_models import (
+from alpha_models import (
     MICROSTRUCTURE_CHANNELS,
     ModelFactory,
     rolling_oos_blocks,
 )
-from bigalpha2026.alpha_models.microstructure_v2 import (
+from alpha_models.microstructure_v2 import (
     DEEP_BOOK_SOURCE_COLUMNS,
     MICROSTRUCTURE_V2_BASE_CHANNELS,
     MICROSTRUCTURE_V2_CHANNELS,

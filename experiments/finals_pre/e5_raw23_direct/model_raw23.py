@@ -9,11 +9,11 @@ from typing import Any
 import torch
 from torch import Tensor, nn
 
-from bigalpha2026.alpha_models.microstructure import (
+from alpha_models.microstructure import (
     MicrostructureTCNBlock,
     _masked_channel_statistics,
 )
-from bigalpha2026.alpha_models.temporal import DeepSetsContext, MaskedAttentionPool
+from alpha_models.temporal import DeepSetsContext, MaskedAttentionPool
 
 
 @dataclass(frozen=True)

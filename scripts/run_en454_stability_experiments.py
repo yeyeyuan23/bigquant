@@ -331,7 +331,7 @@ def baseline_replay_audit(route: pd.DataFrame, reference_path: Path) -> dict[str
 
 
 def run(args: argparse.Namespace) -> None:
-    from bigalpha2026.alpha_models import (
+    from alpha_models import (
         candidate_ids_from_manifest,
         load_candidate_feature_panel,
         panel_arrays,

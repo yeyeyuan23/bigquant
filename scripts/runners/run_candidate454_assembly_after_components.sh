@@ -52,7 +52,7 @@ wait_for_file "$WORK_ROOT/haitong/haitong_raw_panel_2019_2024.parquet" "haitong 
 CUTOFF_ROOT="$WORK_ROOT/prefix_cutoff_2023_06_30"
 "$PYTHON_BIN" scripts/build_gtja149_feature_matrix.py \
   --data-root "$DATA_ROOT" \
-  --candidate-root "$REPO_ROOT/src/bigalpha2026/candidates" \
+  --candidate-root "$REPO_ROOT/src/candidates" \
   --external-root "$REPO_ROOT/third_party/aurumq_gtja191" \
   --output-dir "$CUTOFF_ROOT/gtja149" \
   --years 2019 2020 2021 2022 2023 \

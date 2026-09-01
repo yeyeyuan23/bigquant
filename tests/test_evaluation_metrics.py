@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.evaluation import (
+from evaluation import (
     factor_rank_correlation,
     long_short_returns,
     quantile_group_returns,

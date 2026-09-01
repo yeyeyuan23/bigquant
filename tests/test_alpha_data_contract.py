@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from bigalpha2026.alpha_models.data_contract import SubmissionDataContract
+from alpha_models.data_contract import SubmissionDataContract
 
 
 def test_contract_accepts_only_bar1m_and_financial_factor_sources() -> None:

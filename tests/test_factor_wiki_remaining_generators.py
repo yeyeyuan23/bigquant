@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from bigalpha2026.candidates.hf.hf_104 import compute_hf_104_daily
-from bigalpha2026.candidates.ob.ob_008 import compute_ob_008_daily
+from candidates.hf.hf_104 import compute_hf_104_daily
+from candidates.ob.ob_008 import compute_ob_008_daily
 from scripts.audit_candidate_source_provenance import audit_provenance
 from scripts.factor_wiki_remaining.build_remaining132_feature_matrix import (
     _is_remaining_132,

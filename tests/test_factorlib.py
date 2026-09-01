@@ -3,19 +3,19 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bigalpha2026.evaluation import (
+from evaluation import (
     FactorLibraryValidationConfig,
     factorlib_regularized_incremental_batch_validation,
     factorlib_regularized_incremental_validation,
 )
-from bigalpha2026.factorlib import (
+from factorlib import (
     FACTORLIB_COLUMNS,
     FACTORLIB_FEATURE_COLUMNS,
     validate_factorlib_columns,
     validate_factorlib_frame,
     validate_factorlib_subset_frame,
 )
-from bigalpha2026.research_policy import (
+from research_policy import (
     TreeIncrementalGate,
     factorlib_incremental_gate,
     tree_incremental_track_gate,

@@ -26,7 +26,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from bigalpha2026.factor_pool import (
+from factor_pool import (
     CANDIDATE_POOL_COLUMNS,
     CANDIDATE_POOL_SCHEMA_VERSION,
     file_sha256,
@@ -94,7 +94,7 @@ def _load_candidate_map(package_dir: Path) -> pd.DataFrame:
 def _candidate_module_path(row: pd.Series) -> str:
     module_stem = str(row["module_name"]).removesuffix(".py")
     family = str(row["target_directory"])
-    return f"bigalpha2026.candidates.{family}.{module_stem}"
+    return f"candidates.{family}.{module_stem}"
 
 
 def _find_builder(module: object, candidate_id: str) -> Callable[[pd.DataFrame, pd.DataFrame], pd.DataFrame]:

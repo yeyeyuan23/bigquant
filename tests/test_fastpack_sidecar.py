@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from bigalpha2026.alpha_models import MICROSTRUCTURE_CHANNELS
+from alpha_models import MICROSTRUCTURE_CHANNELS
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments" / "finals_pre" / "common"))

@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 import torch
 
-from bigalpha2026.alpha_models.microstructure_v2 import (
+from alpha_models.microstructure_v2 import (
     DEEP_BOOK_CONTEXT_CHANNELS,
     DYNAMIC_MICROSTRUCTURE_CHANNELS,
     MICROSTRUCTURE_V2_BASE_CHANNELS,

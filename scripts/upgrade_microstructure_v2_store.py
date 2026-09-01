@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from bigalpha2026.alpha_models.microstructure import MICROSTRUCTURE_CHANNELS
-from bigalpha2026.alpha_models.microstructure_v2 import (
+from alpha_models.microstructure import MICROSTRUCTURE_CHANNELS
+from alpha_models.microstructure_v2 import (
     MICROSTRUCTURE_V2_BASE_CHANNELS,
     add_dynamic_microstructure_channels,
 )
