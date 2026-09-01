@@ -17,7 +17,6 @@ KEYS = ["date", "instrument"]
 ARMS = ("baseline17", "raw40")
 SEEDS = (20260801, 20260812, 20260823)
 A_COLUMNS = ("rank_ic", "rank_ic_ir", "long_short_sharpe", "stress_ic_ir")
-EXPOSURE_DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,9 +50,7 @@ def daily_ic(frame: pd.DataFrame, factor_column: str) -> pd.Series:
 def long_short_sharpe(frame: pd.DataFrame, factor_column: str) -> float:
     work = frame.dropna(subset=[factor_column, LABEL]).copy()
     work["bucket"] = work.groupby("date")[factor_column].transform(
-        lambda values: pd.qcut(
-            values.rank(method="first"), 5, labels=False, duplicates="drop"
-        )
+        lambda values: pd.qcut(values.rank(method="first"), 5, labels=False, duplicates="drop")
     )
     top = work[work["bucket"] == 4].groupby("date")[LABEL].mean()
     bottom = work[work["bucket"] == 0].groupby("date")[LABEL].mean()
@@ -61,11 +58,16 @@ def long_short_sharpe(frame: pd.DataFrame, factor_column: str) -> float:
     return float(spread.mean() / spread.std() * np.sqrt(252.0))
 
 
-def load_preprocessor(source_dir: Path) -> Callable[[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+def load_scoring_functions(
+    source_dir: Path,
+) -> tuple[
+    Callable[[pd.DataFrame, pd.DataFrame], pd.DataFrame],
+    Callable[[pd.DataFrame], pd.DataFrame],
+]:
     sys.path.insert(0, str(source_dir))
-    from competition_score_proxy import preprocess_factor
+    from competition_score_proxy import prepare_full_barra_exposures, preprocess_factor
 
-    return preprocess_factor
+    return preprocess_factor, prepare_full_barra_exposures
 
 
 def normalize_keys(frame: pd.DataFrame) -> pd.DataFrame:
@@ -77,7 +79,7 @@ def normalize_keys(frame: pd.DataFrame) -> pd.DataFrame:
 
 def main() -> int:
     args = parse_args()
-    preprocess_factor = load_preprocessor(args.source_dir)
+    preprocess_factor, prepare_full_barra_exposures = load_scoring_functions(args.source_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     labels = normalize_keys(pd.read_parquet(args.labels))
@@ -86,15 +88,8 @@ def main() -> int:
     if labels.duplicated(KEYS).any():
         raise RuntimeError("duplicate O2C label keys")
 
-    raw_exposures = normalize_keys(pd.read_parquet(args.exposures))
-    exposures = raw_exposures[
-        [column for column in raw_exposures.columns if column not in EXPOSURE_DROP]
-    ].copy()
+    exposures = prepare_full_barra_exposures(pd.read_parquet(args.exposures))
     regressors = [column for column in exposures.columns if column not in KEYS]
-    if len(regressors) != 42:
-        raise RuntimeError(f"expected 42 full-Barra regressors, found {len(regressors)}")
-    if exposures.duplicated(KEYS).any():
-        raise RuntimeError("duplicate full-Barra exposure keys")
 
     dispersion = labels.groupby("date")[LABEL].std()
     stress_days = set(dispersion[dispersion >= dispersion.quantile(0.75)].index)
@@ -151,9 +146,7 @@ def main() -> int:
             )
             ic = daily_ic(merged, "neutral_factor")
             if len(ic) != 241:
-                raise RuntimeError(
-                    f"expected 241 scored days, got {len(ic)}: {arm}, seed={seed}"
-                )
+                raise RuntimeError(f"expected 241 scored days, got {len(ic)}: {arm}, seed={seed}")
             stress_ic = ic[ic.index.isin(stress_days)]
             rows.append(
                 {
@@ -161,9 +154,7 @@ def main() -> int:
                     "seed": seed,
                     "rank_ic": float(ic.mean()),
                     "rank_ic_ir": float(ic.mean() / ic.std()),
-                    "long_short_sharpe": long_short_sharpe(
-                        merged, "neutral_factor"
-                    ),
+                    "long_short_sharpe": long_short_sharpe(merged, "neutral_factor"),
                     "stress_ic_ir": float(stress_ic.mean() / stress_ic.std()),
                     "days": len(ic),
                     "rows": len(factor),
@@ -215,12 +206,8 @@ def main() -> int:
                 "seed_count": len(values),
             }
         )
-    pd.DataFrame(paired_rows).to_csv(
-        args.output_dir / "a4_paired_deltas_per_seed.csv", index=False
-    )
-    pd.DataFrame(paired_summary).to_csv(
-        args.output_dir / "a4_paired_deltas.csv", index=False
-    )
+    pd.DataFrame(paired_rows).to_csv(args.output_dir / "a4_paired_deltas_per_seed.csv", index=False)
+    pd.DataFrame(paired_summary).to_csv(args.output_dir / "a4_paired_deltas.csv", index=False)
 
     audit = {
         "label": LABEL,

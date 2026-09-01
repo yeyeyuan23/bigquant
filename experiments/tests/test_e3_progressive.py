@@ -2,6 +2,8 @@ from __future__ import annotations
 
 """E3 progressive-addition contracts."""
 
+import numpy as np
+import pandas as pd
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -11,6 +13,13 @@ torch = pytest.importorskip("torch")
 def e3(load_experiment_module):
     return load_experiment_module(
         "e3_progressive_add/model_progressive.py", "pre_e3_model_progressive"
+    )
+
+
+@pytest.fixture(scope="module")
+def e3_train(load_experiment_module):
+    return load_experiment_module(
+        "e3_progressive_add/train_progressive.py", "pre_e3_train_progressive"
     )
 
 
@@ -89,3 +98,36 @@ def test_invalid_pathway_and_channel_configs_fail_closed(e3):
         e3.ProgressiveConfig(keep_channels=(0, 0))
     with pytest.raises(ValueError, match="out-of-range"):
         e3.ProgressiveConfig(keep_channels=(17,))
+
+
+def test_every_e3_arm_gets_the_same_days_and_stock_sample_by_seed(e3_train, contract):
+    dates = pd.bdate_range("2023-01-03", periods=12)
+    training = np.arange(len(dates))
+    instruments = [f"S{index:03d}" for index in range(20)]
+    targets = {
+        pd.Timestamp(day): pd.Series(np.arange(20, dtype=float), index=instruments) for day in dates
+    }
+    for seed in contract["global"]["seeds"]:
+        plans = [
+            e3_train.plan_epoch_inputs(
+                training,
+                dates,
+                targets,
+                np.random.default_rng(seed),
+                max_stocks=7,
+            )
+            for _arm in contract["experiments"]["E3"]["arms"]
+        ]
+        assert all(plan == plans[0] for plan in plans[1:])
+
+        broken_targets = {day: values.copy() for day, values in targets.items()}
+        broken_targets[dates[0]] = broken_targets[dates[0]].iloc[1:]
+        broken = e3_train.plan_epoch_inputs(
+            training,
+            dates,
+            broken_targets,
+            np.random.default_rng(seed),
+            max_stocks=7,
+        )
+        with pytest.raises(AssertionError):
+            assert broken == plans[0]

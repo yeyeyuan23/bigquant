@@ -60,11 +60,33 @@ def sha256(path: Path) -> str:
 
 # 幻灯片上的四组，下标对应 MICROSTRUCTURE_CHANNELS 的顺序
 CHANNEL_GROUPS = {
-    "price": (0, 1, 2),                     # 价格路径
-    "book": (3, 4, 5, 6, 7),                # 盘口状态
-    "trade": (8, 9, 10, 11, 12, 13),        # 成交结构
-    "clock": (14, 15, 16),                  # 日内时钟
+    "price": (0, 1, 2),  # 价格路径
+    "book": (3, 4, 5, 6, 7),  # 盘口状态
+    "trade": (8, 9, 10, 11, 12, 13),  # 成交结构
+    "clock": (14, 15, 16),  # 日内时钟
 }
+
+
+def plan_epoch_inputs(
+    training: np.ndarray,
+    dates: pd.DatetimeIndex,
+    targets: dict[pd.Timestamp, pd.Series],
+    rng: np.random.Generator,
+    max_stocks: int,
+) -> list[tuple[pd.Timestamp, tuple[str, ...]]]:
+    """Freeze day order and stock sample before arm-specific model work begins."""
+
+    shuffled = training.copy()
+    rng.shuffle(shuffled)
+    plan: list[tuple[pd.Timestamp, tuple[str, ...]]] = []
+    for day_index in shuffled:
+        day = pd.Timestamp(dates[int(day_index)])
+        day_target = targets[day].dropna()
+        if len(day_target) > max_stocks:
+            selected = rng.choice(len(day_target), max_stocks, replace=False)
+            day_target = day_target.iloc[np.sort(selected)]
+        plan.append((day, tuple(day_target.index.astype(str))))
+    return plan
 
 
 def main() -> int:
@@ -100,10 +122,12 @@ def main() -> int:
     parser.add_argument("--linear-head", action="store_true")
     parser.add_argument("--sequence-summary", choices=("last", "full"), default="full")
     parser.add_argument(
-        "--drop-channel-group", nargs="+", default=[],
+        "--drop-channel-group",
+        nargs="+",
+        default=[],
         choices=sorted(CHANNEL_GROUPS),
         help="删掉整组通道后从零重训。置换重要性是冻结模型的依赖度，"
-             "这个才是「拿掉之后模型重新学还能不能补回来」。",
+        "这个才是「拿掉之后模型重新学还能不能补回来」。",
     )
     args = parser.parse_args()
 
@@ -136,9 +160,12 @@ def main() -> int:
     if args.drop_channel_group:
         if not keep:
             raise SystemExit("不能把所有通道都删掉")
-        print(f"drop_channel_group={sorted(args.drop_channel_group)} "
-              f"kept={len(keep)}/{len(MICROSTRUCTURE_CHANNELS)} "
-              f"channels={[MICROSTRUCTURE_CHANNELS[i] for i in keep]}", flush=True)
+        print(
+            f"drop_channel_group={sorted(args.drop_channel_group)} "
+            f"kept={len(keep)}/{len(MICROSTRUCTURE_CHANNELS)} "
+            f"channels={[MICROSTRUCTURE_CHANNELS[i] for i in keep]}",
+            flush=True,
+        )
     config = ProgressiveConfig(
         keep_channels=() if len(keep) == len(MICROSTRUCTURE_CHANNELS) else keep,
         model_dim=args.model_dim,
@@ -166,19 +193,11 @@ def main() -> int:
     epoch_losses: list[float] = []
     model.train()
     for epoch in range(args.epochs):
-        shuffled = training.copy()
-        rng.shuffle(shuffled)
         losses: list[float] = []
-        for day_index in shuffled:
-            day = dates[int(day_index)]
-            day_target = targets[day].dropna()
-            if len(day_target) > args.max_stocks:
-                selected = rng.choice(len(day_target), args.max_stocks, replace=False)
-                day_target = day_target.iloc[np.sort(selected)]
-            instruments = tuple(day_target.index.astype(str))
-            batch = day_loader(
-                args.micro_store, day, instruments, max_minutes=config.max_minutes
-            )
+        epoch_plan = plan_epoch_inputs(training, dates, targets, rng, args.max_stocks)
+        for day, instruments in epoch_plan:
+            day_target = targets[day].reindex(instruments)
+            batch = day_loader(args.micro_store, day, instruments, max_minutes=config.max_minutes)
             if batch is None:
                 continue
             available = np.flatnonzero(batch.stock_mask[0])
@@ -216,9 +235,7 @@ def main() -> int:
             day = dates[int(day_index)]
             day_target = targets[day].dropna()
             instruments = tuple(day_target.index.astype(str))
-            batch = day_loader(
-                args.micro_store, day, instruments, max_minutes=config.max_minutes
-            )
+            batch = day_loader(args.micro_store, day, instruments, max_minutes=config.max_minutes)
             if batch is None:
                 continue
             available = np.flatnonzero(batch.stock_mask[0])

@@ -21,6 +21,93 @@ import pandas as pd
 
 # Daily metric primitives, self-contained since the SITJ evaluation module retired.
 
+FULL_BARRA_STYLE_COLUMNS = (
+    "SIZE",
+    "BETA",
+    "MOMENTUM",
+    "RESVOL",
+    "SIZENL",
+    "BTOP",
+    "LIQUIDTY",
+    "EARNYILD",
+    "GROWTH",
+    "LEVERAGE",
+)
+FULL_BARRA_INDUSTRY_COLUMNS = (
+    "AGRIFOREST",
+    "MINING",
+    "CHEM",
+    "IRONSTEEL",
+    "NONFERMETAL",
+    "ELECTRONICS",
+    "AUTO",
+    "HOUSEAPP",
+    "FOODBEVER",
+    "TEXTILE",
+    "LIGHTINDUS",
+    "HEALTH",
+    "UTILITIES",
+    "TRANSPORTATION",
+    "REALESTATE",
+    "COMMETRADE",
+    "LEISERVICE",
+    "BANK",
+    "NONBANKFINAN",
+    "CONGLOMERATES",
+    "CONMAT",
+    "BUILDDECO",
+    "ELECEQP",
+    "MACHIEQUIP",
+    "AERODEF",
+    "COMPUTER",
+    "MEDIA",
+    "TELECOM",
+    "COAL",
+    "PETRO",
+    "ENVP",
+    "BEAUTY",
+)
+FULL_BARRA_REGRESSORS = FULL_BARRA_STYLE_COLUMNS + FULL_BARRA_INDUSTRY_COLUMNS
+FULL_BARRA_METADATA_COLUMNS = (
+    "industry_level1_code",
+    "float_market_cap",
+    "weights",
+    "ret",
+)
+
+
+def prepare_full_barra_exposures(exposures: pd.DataFrame) -> pd.DataFrame:
+    """Validate and normalize the exact platform exposure schema used by A.
+
+    A count-only guard is unsafe: replacing, dropping, or reordering a regressor
+    can still leave 42 numeric columns.  The scoring contract therefore pins
+    every style and industry column by name and order.
+    """
+
+    required = ("date", "instrument", *FULL_BARRA_REGRESSORS)
+    missing = [column for column in required if column not in exposures.columns]
+    allowed = {*required, *FULL_BARRA_METADATA_COLUMNS}
+    extra = [column for column in exposures.columns if column not in allowed]
+    actual_regressors = tuple(
+        column
+        for column in exposures.columns
+        if column not in {"date", "instrument", *FULL_BARRA_METADATA_COLUMNS}
+    )
+    if missing or extra or actual_regressors != FULL_BARRA_REGRESSORS:
+        raise RuntimeError(
+            "full-Barra schema mismatch: "
+            f"missing={missing}, extra={extra}, "
+            f"expected_order={list(FULL_BARRA_REGRESSORS)}, "
+            f"actual_order={list(actual_regressors)}"
+        )
+    frame = exposures.loc[:, list(required)].copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="raise").dt.normalize()
+    frame["instrument"] = frame["instrument"].astype(str)
+    if frame.duplicated(["date", "instrument"]).any():
+        raise RuntimeError("duplicate full-Barra exposure keys")
+    return frame
+
+
 def preprocess_factor(
     factor: pd.DataFrame,
     exposures: pd.DataFrame | None = None,
@@ -42,13 +129,7 @@ def preprocess_factor(
     value = pl.col("factor")
     lower = value.quantile(lower_quantile).over("date")
     upper = value.quantile(upper_quantile).over("date")
-    winsorized = (
-        pl.when(value < lower)
-        .then(lower)
-        .when(value > upper)
-        .then(upper)
-        .otherwise(value)
-    )
+    winsorized = pl.when(value < lower).then(lower).when(value > upper).then(upper).otherwise(value)
     mean = winsorized.mean().over("date")
     std = winsorized.std().over("date")
     frame = work.with_columns(
@@ -66,8 +147,7 @@ def preprocess_factor(
     numeric_columns = [
         column
         for column in exp.columns
-        if column not in {"date", "instrument"}
-        and pd.api.types.is_numeric_dtype(exp[column])
+        if column not in {"date", "instrument"} and pd.api.types.is_numeric_dtype(exp[column])
     ]
     if "SIZE" in numeric_columns and "float_market_cap" in numeric_columns:
         numeric_columns.remove("float_market_cap")
@@ -106,11 +186,7 @@ def preprocess_factor(
             )
             if not dummies.empty:
                 design_parts.append(dummies.to_numpy(dtype=float))
-        x = (
-            np.column_stack(design_parts)
-            if design_parts
-            else np.empty((int(valid.sum()), 0))
-        )
+        x = np.column_stack(design_parts) if design_parts else np.empty((int(valid.sum()), 0))
         if valid.sum() <= x.shape[1] + 1:
             residuals.loc[indices] = block["factor"]
             continue
@@ -183,11 +259,15 @@ def rank_ic_series(
 
     base = merged[["date", factor_column, label_column]].copy()
     base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
-    work = pl.from_pandas(base).with_columns(
-        pl.col("date").cast(pl.Datetime("ns")),
-        pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
-        pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
-    ).drop_nulls(["date", "_factor", "_label"])
+    work = (
+        pl.from_pandas(base)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
+            pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+        )
+        .drop_nulls(["date", "_factor", "_label"])
+    )
     if work.is_empty():
         return pd.Series(dtype=float, name="rank_ic")
     ranked = work.with_columns(
@@ -201,11 +281,17 @@ def rank_ic_series(
             pl.len().alias("_n"),
             pl.corr("_factor_rank", "_label_rank").alias("rank_ic"),
         )
-        .with_columns(pl.when(pl.col("_n") >= 5).then(pl.col("rank_ic")).otherwise(None).alias("rank_ic"))
+        .with_columns(
+            pl.when(pl.col("_n") >= 5).then(pl.col("rank_ic")).otherwise(None).alias("rank_ic")
+        )
         .sort("date")
         .to_pandas()
     )
-    series = pd.Series(result["rank_ic"].to_numpy(dtype=float), index=pd.to_datetime(result["date"]), name="rank_ic")
+    series = pd.Series(
+        result["rank_ic"].to_numpy(dtype=float),
+        index=pd.to_datetime(result["date"]),
+        name="rank_ic",
+    )
     return series
 
 
@@ -221,11 +307,15 @@ def long_short_returns(
 
     base = merged[["date", factor_column, label_column]].copy()
     base["date"] = pd.to_datetime(base["date"], errors="coerce").dt.normalize()
-    work = pl.from_pandas(base).with_columns(
-        pl.col("date").cast(pl.Datetime("ns")),
-        pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
-        pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
-    ).drop_nulls(["date", "_factor", "_label"])
+    work = (
+        pl.from_pandas(base)
+        .with_columns(
+            pl.col("date").cast(pl.Datetime("ns")),
+            pl.col(factor_column).cast(pl.Float64, strict=False).alias("_factor"),
+            pl.col(label_column).cast(pl.Float64, strict=False).alias("_label"),
+        )
+        .drop_nulls(["date", "_factor", "_label"])
+    )
     if work.is_empty():
         return pd.Series(dtype=float, name="long_short_return")
     threshold = 1.0 / float(quantiles)
@@ -237,8 +327,16 @@ def long_short_returns(
         ranked.group_by("date")
         .agg(
             pl.first("_n").alias("_n"),
-            pl.when(pl.col("_rank_pct") > 1.0 - threshold).then(pl.col("_label")).otherwise(None).mean().alias("_top"),
-            pl.when(pl.col("_rank_pct") <= threshold).then(pl.col("_label")).otherwise(None).mean().alias("_bottom"),
+            pl.when(pl.col("_rank_pct") > 1.0 - threshold)
+            .then(pl.col("_label"))
+            .otherwise(None)
+            .mean()
+            .alias("_top"),
+            pl.when(pl.col("_rank_pct") <= threshold)
+            .then(pl.col("_label"))
+            .otherwise(None)
+            .mean()
+            .alias("_bottom"),
         )
         .with_columns(
             pl.when(pl.col("_n") >= quantiles * 2)
@@ -249,7 +347,12 @@ def long_short_returns(
         .sort("date")
         .to_pandas()
     )
-    return pd.Series(result["long_short_return"].to_numpy(dtype=float), index=pd.to_datetime(result["date"]), name="long_short_return")
+    return pd.Series(
+        result["long_short_return"].to_numpy(dtype=float),
+        index=pd.to_datetime(result["date"]),
+        name="long_short_return",
+    )
+
 
 A_COMPONENT_COLUMNS = (
     "rank_ic_mean",
@@ -300,13 +403,9 @@ class CompetitionScoreConfig:
         if self.train_window_days <= 0 or self.step_days <= 0:
             raise ValueError("Elastic Net windows must be positive")
         if self.minimum_score_days < self.train_window_days:
-            raise ValueError(
-                "minimum_score_days cannot be shorter than train_window_days"
-            )
+            raise ValueError("minimum_score_days cannot be shorter than train_window_days")
         if self.stability_window_days < self.minimum_score_days:
-            raise ValueError(
-                "stability_window_days cannot be shorter than minimum_score_days"
-            )
+            raise ValueError("stability_window_days cannot be shorter than minimum_score_days")
 
 
 def _normalize_keys(frame: pd.DataFrame, *, name: str) -> pd.DataFrame:
@@ -315,21 +414,16 @@ def _normalize_keys(frame: pd.DataFrame, *, name: str) -> pd.DataFrame:
         raise ValueError(f"{name} is missing key columns: {missing}")
     import polars as pl
 
-    result_pl = (
-        pl.from_pandas(frame)
-        .with_columns(
-            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
-            pl.col("instrument").cast(pl.Utf8),
-        )
+    result_pl = pl.from_pandas(frame).with_columns(
+        pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+        pl.col("instrument").cast(pl.Utf8),
     )
     null_keys = result_pl.select(
         pl.any_horizontal(pl.col("date").is_null(), pl.col("instrument").is_null()).any()
     ).item()
     if bool(null_keys):
         raise ValueError(f"{name} contains null keys")
-    duplicate_count = result_pl.select(
-        pl.struct(list(KEY_COLUMNS)).is_duplicated().sum()
-    ).item()
+    duplicate_count = result_pl.select(pl.struct(list(KEY_COLUMNS)).is_duplicated().sum()).item()
     if int(duplicate_count) > 0:
         raise ValueError(f"{name} contains duplicate date-instrument keys")
     return result_pl.to_pandas()
@@ -339,15 +433,16 @@ def _frame_digest(frame: pd.DataFrame, columns: Sequence[str]) -> str:
     import polars as pl
 
     selected_columns = list(columns)
-    work = (
-        pl.from_pandas(frame.loc[:, selected_columns])
-        .with_columns(
-            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
-            pl.col("instrument").cast(pl.Utf8),
-        )
+    work = pl.from_pandas(frame.loc[:, selected_columns]).with_columns(
+        pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+        pl.col("instrument").cast(pl.Utf8),
     )
     ordered = work.sort(list(KEY_COLUMNS))
-    hashed = ordered.select(pl.struct(selected_columns).hash(seed=0).alias("hash")).to_series().to_numpy()
+    hashed = (
+        ordered.select(pl.struct(selected_columns).hash(seed=0).alias("hash"))
+        .to_series()
+        .to_numpy()
+    )
     return hashlib.sha256(hashed.tobytes()).hexdigest()
 
 
@@ -487,8 +582,7 @@ def _preprocess_wide_factors(
     numeric_columns = [
         column
         for column in exp.columns
-        if column not in KEY_COLUMNS
-        and pd.api.types.is_numeric_dtype(exp[column])
+        if column not in KEY_COLUMNS and pd.api.types.is_numeric_dtype(exp[column])
     ]
     if "SIZE" in numeric_columns and "float_market_cap" in numeric_columns:
         numeric_columns.remove("float_market_cap")
@@ -523,9 +617,7 @@ def _preprocess_wide_factors(
             valid_index = pd.Index(valid_index_tuple)
             design_parts: list[np.ndarray] = []
             if numeric_columns:
-                design_parts.append(
-                    block.loc[valid_index, numeric_columns].to_numpy(dtype=float)
-                )
+                design_parts.append(block.loc[valid_index, numeric_columns].to_numpy(dtype=float))
             if categorical_columns:
                 dummies = pd.get_dummies(
                     block.loc[valid_index, categorical_columns].astype("string"),
@@ -534,11 +626,7 @@ def _preprocess_wide_factors(
                 )
                 if not dummies.empty:
                     design_parts.append(dummies.to_numpy(dtype=float))
-            x = (
-                np.column_stack(design_parts)
-                if design_parts
-                else np.empty((len(valid_index), 0))
-            )
+            x = np.column_stack(design_parts) if design_parts else np.empty((len(valid_index), 0))
             if len(valid_index) <= x.shape[1] + 1:
                 continue
             x = np.column_stack([np.ones(len(x)), x])
@@ -570,34 +658,20 @@ def _a_components(
         label_column=label_column,
     ).dropna()
     market_volatility = _daily_std(merged, label_column)
-    stress_cutoff = (
-        market_volatility.quantile(0.75)
-        if not market_volatility.empty
-        else np.nan
-    )
-    stress_dates = market_volatility.index[
-        market_volatility >= stress_cutoff
-    ]
+    stress_cutoff = market_volatility.quantile(0.75) if not market_volatility.empty else np.nan
+    stress_dates = market_volatility.index[market_volatility >= stress_cutoff]
     stress_ic = ic.reindex(stress_dates).dropna()
 
     def ratio(values: pd.Series) -> float:
         if values.empty:
             return np.nan
         std = float(values.std())
-        return (
-            float(values.mean() / std)
-            if np.isfinite(std) and std > 1e-12
-            else np.nan
-        )
+        return float(values.mean() / std) if np.isfinite(std) and std > 1e-12 else np.nan
 
     return {
         "rank_ic_mean": float(ic.mean()) if not ic.empty else np.nan,
         "rank_ic_ir": ratio(ic),
-        "long_short_sharpe": (
-            ratio(long_short) * np.sqrt(252)
-            if not long_short.empty
-            else np.nan
-        ),
+        "long_short_sharpe": (ratio(long_short) * np.sqrt(252) if not long_short.empty else np.nan),
         "stress_ic_ir": ratio(stress_ic),
     }
 
@@ -623,34 +697,20 @@ def _a_components_from_processed(
         label_column=label_column,
     ).dropna()
     market_volatility = _daily_std(merged, label_column)
-    stress_cutoff = (
-        market_volatility.quantile(0.75)
-        if not market_volatility.empty
-        else np.nan
-    )
-    stress_dates = market_volatility.index[
-        market_volatility >= stress_cutoff
-    ]
+    stress_cutoff = market_volatility.quantile(0.75) if not market_volatility.empty else np.nan
+    stress_dates = market_volatility.index[market_volatility >= stress_cutoff]
     stress_ic = ic.reindex(stress_dates).dropna()
 
     def ratio(values: pd.Series) -> float:
         if values.empty:
             return np.nan
         std = float(values.std())
-        return (
-            float(values.mean() / std)
-            if np.isfinite(std) and std > 1e-12
-            else np.nan
-        )
+        return float(values.mean() / std) if np.isfinite(std) and std > 1e-12 else np.nan
 
     return {
         "rank_ic_mean": float(ic.mean()) if not ic.empty else np.nan,
         "rank_ic_ir": ratio(ic),
-        "long_short_sharpe": (
-            ratio(long_short) * np.sqrt(252)
-            if not long_short.empty
-            else np.nan
-        ),
+        "long_short_sharpe": (ratio(long_short) * np.sqrt(252) if not long_short.empty else np.nan),
         "stress_ic_ir": ratio(stress_ic),
     }
 
@@ -661,11 +721,7 @@ def _ratio_array(values: np.ndarray) -> float:
     if values.size == 0:
         return np.nan
     std = float(np.std(values, ddof=1)) if values.size > 1 else np.nan
-    return (
-        float(np.mean(values) / std)
-        if np.isfinite(std) and std > 1e-12
-        else np.nan
-    )
+    return float(np.mean(values) / std) if np.isfinite(std) and std > 1e-12 else np.nan
 
 
 def _a_components_from_processed_wide(
@@ -718,9 +774,7 @@ def _a_components_from_processed_wide(
             ]
         )
 
-    market_volatility = work.group_by("date").agg(
-        pl.col("_label").std().alias("_label_std")
-    )
+    market_volatility = work.group_by("date").agg(pl.col("_label").std().alias("_label_std"))
     volatility_frame = market_volatility.sort("date").to_pandas()
     volatility_values = volatility_frame["_label_std"].to_numpy(dtype=float)
     stress_cutoff = (
@@ -753,12 +807,7 @@ def _a_components_from_processed_wide(
         ls_name = f"__long_short_{index}"
         value = pl.col(column).cast(pl.Float64, strict=False)
         label = pl.col("_label")
-        valid = (
-            value.is_not_null()
-            & value.is_finite()
-            & label.is_not_null()
-            & label.is_finite()
-        )
+        valid = value.is_not_null() & value.is_finite() & label.is_not_null() & label.is_finite()
         clean_exprs.extend(
             [
                 pl.when(valid).then(value).otherwise(None).alias(factor_name),
@@ -768,20 +817,12 @@ def _a_components_from_processed_wide(
         column_temp_names[column] = (ic_name, ls_name, count_name, rank_pct_name)
         rank_exprs.extend(
             [
-                pl.col(factor_name)
-                .rank("average")
-                .over("date")
-                .alias(factor_rank_name),
-                pl.col(label_name)
-                .rank("average")
-                .over("date")
-                .alias(label_rank_name),
+                pl.col(factor_name).rank("average").over("date").alias(factor_rank_name),
+                pl.col(label_name).rank("average").over("date").alias(label_rank_name),
                 pl.col(factor_name).count().over("date").alias(count_name),
             ]
         )
-        rank_pct_exprs.append(
-            (pl.col(factor_rank_name) / pl.col(count_name)).alias(rank_pct_name)
-        )
+        rank_pct_exprs.append((pl.col(factor_rank_name) / pl.col(count_name)).alias(rank_pct_name))
         agg_exprs.extend(
             [
                 pl.first(count_name).alias(count_name),
@@ -824,9 +865,7 @@ def _a_components_from_processed_wide(
             {
                 "factor": column,
                 "rank_ic_mean": (
-                    float(np.nanmean(ic_values))
-                    if np.isfinite(ic_values).any()
-                    else np.nan
+                    float(np.nanmean(ic_values)) if np.isfinite(ic_values).any() else np.nan
                 ),
                 "rank_ic_ir": _ratio_array(ic_values),
                 "long_short_sharpe": (
@@ -851,28 +890,20 @@ def _model_scores(
     try:
         from sklearn.linear_model import ElasticNet
     except ImportError as exc:  # pragma: no cover
-        raise RuntimeError(
-            "scikit-learn is required for competition score evaluation"
-        ) from exc
+        raise RuntimeError("scikit-learn is required for competition score evaluation") from exc
 
     import polars as pl
 
     columns = tuple(factor_columns)
     target_column = config.primary_label
-    processed_pl = (
-        pl.from_pandas(processed_panel.loc[:, [*KEY_COLUMNS, *columns]])
-        .with_columns(
-            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
-            pl.col("instrument").cast(pl.Utf8),
-        )
+    processed_pl = pl.from_pandas(processed_panel.loc[:, [*KEY_COLUMNS, *columns]]).with_columns(
+        pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+        pl.col("instrument").cast(pl.Utf8),
     )
-    labels_pl = (
-        pl.from_pandas(labels.loc[:, [*KEY_COLUMNS, target_column]])
-        .with_columns(
-            pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
-            pl.col("instrument").cast(pl.Utf8),
-            pl.col(target_column).cast(pl.Float64, strict=False),
-        )
+    labels_pl = pl.from_pandas(labels.loc[:, [*KEY_COLUMNS, target_column]]).with_columns(
+        pl.col("date").cast(pl.Datetime("ns"), strict=False).dt.truncate("1d"),
+        pl.col("instrument").cast(pl.Utf8),
+        pl.col(target_column).cast(pl.Float64, strict=False),
     )
     merged = processed_pl.join(labels_pl, on=list(KEY_COLUMNS), how="inner", validate="1:1")
     target = pl.col(target_column).cast(pl.Float64, strict=False)
@@ -880,7 +911,10 @@ def _model_scores(
     std = target.std().over("date")
     merged = (
         merged.with_columns(
-            [pl.col(column).cast(pl.Float64, strict=False).fill_null(0.0).alias(column) for column in columns]
+            [
+                pl.col(column).cast(pl.Float64, strict=False).fill_null(0.0).alias(column)
+                for column in columns
+            ]
             + [
                 pl.when(std.is_not_null() & std.is_finite() & (std > 0))
                 .then((target - mean) / std)
@@ -966,9 +1000,7 @@ def _model_scores(
             else pd.Series(dtype=float)
         )
         mean_abs = float(coefficients.mean()) if not coefficients.empty else 0.0
-        std_abs = (
-            float(coefficients.std(ddof=0)) if not coefficients.empty else 0.0
-        )
+        std_abs = float(coefficients.std(ddof=0)) if not coefficients.empty else 0.0
         model_score = mean_abs / (std_abs + config.coefficient_epsilon)
         scores.append(
             {
@@ -985,9 +1017,9 @@ def _model_scores(
         )
     score_frame = pd.DataFrame(scores)
     if not score_frame.empty:
-        score_frame["model_score_percentile"] = score_frame[
-            "model_score"
-        ].rank(method="average", pct=True)
+        score_frame["model_score_percentile"] = score_frame["model_score"].rank(
+            method="average", pct=True
+        )
     return score_frame, weights
 
 
@@ -1013,19 +1045,12 @@ class CompetitionScoreReference:
             reference_panel,
             name="reference_panel",
         )
-        missing = sorted(
-            set(self.reference_columns).difference(self.reference_panel.columns)
-        )
+        missing = sorted(set(self.reference_columns).difference(self.reference_panel.columns))
         if missing:
-            raise ValueError(
-                f"reference_panel is missing factor columns: {missing}"
-            )
+            raise ValueError(f"reference_panel is missing factor columns: {missing}")
         self.labels = _normalize_keys(labels, name="labels")
         if self.config.primary_label not in self.labels:
-            raise ValueError(
-                "labels is missing primary label "
-                f"{self.config.primary_label}"
-            )
+            raise ValueError(f"labels is missing primary label {self.config.primary_label}")
         self.exposures = (
             _normalize_keys(exposures, name="exposures")
             if exposures is not None and not exposures.empty
@@ -1160,9 +1185,7 @@ class CompetitionScoreReference:
         for cached_key, cached_frame in self._processed_reference_cache.items():
             if not requested_dates.issubset(set(cached_key)):
                 continue
-            result = cached_frame.loc[
-                cached_frame["date"].isin(requested_dates)
-            ].copy()
+            result = cached_frame.loc[cached_frame["date"].isin(requested_dates)].copy()
             self._processed_reference_cache[cache_key] = result.copy()
             if profile_stages:
                 print(
@@ -1267,9 +1290,7 @@ class CompetitionScoreReference:
                 equal_nan=True,
             ):
                 continue
-            result = cached_processed.loc[
-                cached_processed["date"].isin(requested_dates)
-            ].copy()
+            result = cached_processed.loc[cached_processed["date"].isin(requested_dates)].copy()
             if profile_stages:
                 print(
                     json.dumps(
@@ -1349,8 +1370,7 @@ class CompetitionScoreReference:
             list(KEY_COLUMNS),
         ]
         label_keys = self.labels.loc[
-            self.labels["date"].isin(route_dates)
-            & self.labels[self.config.primary_label].notna(),
+            self.labels["date"].isin(route_dates) & self.labels[self.config.primary_label].notna(),
             list(KEY_COLUMNS),
         ]
         scorable_keys = _drop_duplicate_keys_polars(
@@ -1361,8 +1381,7 @@ class CompetitionScoreReference:
         missing_route_rows = int(aligned_route["factor"].isna().sum())
         if missing_route_rows:
             raise ValueError(
-                "route_factor is missing values on scorable all36 stock-days: "
-                f"{missing_route_rows}"
+                f"route_factor is missing values on scorable all36 stock-days: {missing_route_rows}"
             )
         route = aligned_route
         score_cache_key = hashlib.sha256(
@@ -1437,9 +1456,7 @@ class CompetitionScoreReference:
                 "b_model_score": float(route_row["model_score"]),
                 "b_mean_abs_weight": float(route_row["mean_abs_weight"]),
                 "b_std_abs_weight": float(route_row["std_abs_weight"]),
-                "b_nonzero_window_ratio": float(
-                    route_row["nonzero_window_ratio"]
-                ),
+                "b_nonzero_window_ratio": float(route_row["nonzero_window_ratio"]),
                 "b_proxy": b_proxy,
                 "score_proxy": float(total),
                 "score_days": float(len(dates)),
@@ -1483,11 +1500,7 @@ class CompetitionScoreReference:
             self.config.a_weight * negative_a_proxy
             + self.config.b_weight * float(positive["b_proxy"])
         )
-        direction = (
-            -1.0
-            if float(negative["score_proxy"]) > float(positive["score_proxy"])
-            else 1.0
-        )
+        direction = -1.0 if float(negative["score_proxy"]) > float(positive["score_proxy"]) else 1.0
         selected = negative if direction < 0 else positive
         return {
             **selected,
@@ -1528,9 +1541,7 @@ class CompetitionScoreReference:
             route = route[[*KEY_COLUMNS, "factor"]].dropna(subset=["factor"])
             keys = route.loc[:, list(KEY_COLUMNS)].drop_duplicates()
             common_key_frame = (
-                keys
-                if common_key_frame is None
-                else _key_join(common_key_frame, keys, how="inner")
+                keys if common_key_frame is None else _key_join(common_key_frame, keys, how="inner")
             )
             normalized[str(name)] = route
 
@@ -1551,14 +1562,12 @@ class CompetitionScoreReference:
         )
         if common_key_frame.empty:
             raise ValueError("joint routes have no common scorable stock-days")
-        dates = pd.DatetimeIndex(
-            sorted(common_key_frame["date"].unique())
-        )
+        dates = pd.DatetimeIndex(sorted(common_key_frame["date"].unique()))
         if len(dates) < self.config.minimum_score_days:
             raise ValueError(
                 "joint routes have too few dates for competition scoring: "
                 f"{len(dates)} < {self.config.minimum_score_days}"
-        )
+            )
         labels = self.labels.loc[self.labels["date"].isin(dates)]
         exposures = self._slice_exposures(dates)
         scorable_keys = common_key_frame
@@ -1621,9 +1630,7 @@ class CompetitionScoreReference:
         for name, model_column in route_columns.items():
             route_score = scores.loc[scores["factor"].eq(model_column)]
             if len(route_score) != 1:
-                raise RuntimeError(
-                    f"joint scorer did not produce one score for route {name}"
-                )
+                raise RuntimeError(f"joint scorer did not produce one score for route {name}")
             route_row = route_score.iloc[0]
             component_percentiles = {
                 component: inserted_percentile(
@@ -1650,19 +1657,14 @@ class CompetitionScoreReference:
                     "b_model_score": float(route_row["model_score"]),
                     "b_mean_abs_weight": float(route_row["mean_abs_weight"]),
                     "b_std_abs_weight": float(route_row["std_abs_weight"]),
-                    "b_nonzero_window_ratio": float(
-                        route_row["nonzero_window_ratio"]
-                    ),
+                    "b_nonzero_window_ratio": float(route_row["nonzero_window_ratio"]),
                     "b_proxy": b_proxy,
                     "score_proxy": float(
-                        self.config.a_weight * a_proxy
-                        + self.config.b_weight * b_proxy
+                        self.config.a_weight * a_proxy + self.config.b_weight * b_proxy
                     ),
                     "score_days": float(len(dates)),
                     "score_weight_windows": float(len(weights)),
-                    "reference_factor_count": float(
-                        len(self.reference_columns)
-                    ),
+                    "reference_factor_count": float(len(self.reference_columns)),
                     "joint_route_count": float(len(route_columns)),
                     "joint_common_rows": float(len(scorable_keys)),
                 }
@@ -1682,26 +1684,16 @@ class CompetitionScoreReference:
         baseline = _normalize_keys(
             baseline_factor,
             name="baseline_factor",
-        )[[*KEY_COLUMNS, "factor"]].rename(
-            columns={"factor": "baseline_factor"}
-        )
+        )[[*KEY_COLUMNS, "factor"]].rename(columns={"factor": "baseline_factor"})
         augmented = _normalize_keys(
             augmented_factor,
             name="augmented_factor",
-        )[[*KEY_COLUMNS, "factor"]].rename(
-            columns={"factor": "augmented_factor"}
-        )
-        baseline_keys = pd.MultiIndex.from_frame(
-            baseline.loc[:, list(KEY_COLUMNS)]
-        )
-        augmented_keys = pd.MultiIndex.from_frame(
-            augmented.loc[:, list(KEY_COLUMNS)]
-        )
+        )[[*KEY_COLUMNS, "factor"]].rename(columns={"factor": "augmented_factor"})
+        baseline_keys = pd.MultiIndex.from_frame(baseline.loc[:, list(KEY_COLUMNS)])
+        augmented_keys = pd.MultiIndex.from_frame(augmented.loc[:, list(KEY_COLUMNS)])
         baseline_only = len(baseline_keys.difference(augmented_keys))
         augmented_only = len(augmented_keys.difference(baseline_keys))
-        if baseline_only or augmented_only or len(baseline_keys) != len(
-            augmented_keys
-        ):
+        if baseline_only or augmented_only or len(baseline_keys) != len(augmented_keys):
             raise ValueError(
                 "baseline and augmented factors must have identical stock-day "
                 f"keys: baseline_only={baseline_only}, "
@@ -1717,9 +1709,7 @@ class CompetitionScoreReference:
             raise ValueError("baseline and augmented factors have no common rows")
 
         def as_factor(column: str, block: pd.DataFrame) -> pd.DataFrame:
-            return block[[*KEY_COLUMNS, column]].rename(
-                columns={column: "factor"}
-            )
+            return block[[*KEY_COLUMNS, column]].rename(columns={column: "factor"})
 
         baseline_score = self.score(as_factor("baseline_factor", paired))
         augmented_score = self.score(as_factor("augmented_factor", paired))
@@ -1727,39 +1717,21 @@ class CompetitionScoreReference:
         for name in ("a_proxy", "b_proxy", "score_proxy"):
             output[f"baseline_{name}"] = float(baseline_score[name])
             output[f"augmented_{name}"] = float(augmented_score[name])
-            output[f"delta_{name}"] = float(
-                augmented_score[name] - baseline_score[name]
-            )
+            output[f"delta_{name}"] = float(augmented_score[name] - baseline_score[name])
         for component in A_COMPONENT_COLUMNS:
             for metric in (f"a_{component}", f"a_{component}_percentile"):
                 output[f"baseline_{metric}"] = float(baseline_score[metric])
                 output[f"augmented_{metric}"] = float(augmented_score[metric])
-                output[f"delta_{metric}"] = float(
-                    augmented_score[metric] - baseline_score[metric]
-                )
+                output[f"delta_{metric}"] = float(augmented_score[metric] - baseline_score[metric])
         output.update(
             {
-                "baseline_b_model_score": float(
-                    baseline_score["b_model_score"]
-                ),
-                "augmented_b_model_score": float(
-                    augmented_score["b_model_score"]
-                ),
-                "baseline_b_mean_abs_weight": float(
-                    baseline_score["b_mean_abs_weight"]
-                ),
-                "augmented_b_mean_abs_weight": float(
-                    augmented_score["b_mean_abs_weight"]
-                ),
-                "baseline_b_std_abs_weight": float(
-                    baseline_score["b_std_abs_weight"]
-                ),
-                "augmented_b_std_abs_weight": float(
-                    augmented_score["b_std_abs_weight"]
-                ),
-                "baseline_b_nonzero_window_ratio": float(
-                    baseline_score["b_nonzero_window_ratio"]
-                ),
+                "baseline_b_model_score": float(baseline_score["b_model_score"]),
+                "augmented_b_model_score": float(augmented_score["b_model_score"]),
+                "baseline_b_mean_abs_weight": float(baseline_score["b_mean_abs_weight"]),
+                "augmented_b_mean_abs_weight": float(augmented_score["b_mean_abs_weight"]),
+                "baseline_b_std_abs_weight": float(baseline_score["b_std_abs_weight"]),
+                "augmented_b_std_abs_weight": float(augmented_score["b_std_abs_weight"]),
+                "baseline_b_nonzero_window_ratio": float(baseline_score["b_nonzero_window_ratio"]),
                 "augmented_b_nonzero_window_ratio": float(
                     augmented_score["b_nonzero_window_ratio"]
                 ),
@@ -1774,9 +1746,7 @@ class CompetitionScoreReference:
         )
 
         merged_labels = paired.merge(
-            self.labels[
-                ["date", "instrument", self.config.primary_label]
-            ],
+            self.labels[["date", "instrument", self.config.primary_label]],
             on=list(KEY_COLUMNS),
             how="inner",
             validate="one_to_one",
@@ -1831,14 +1801,10 @@ class CompetitionScoreReference:
 
         output.update(
             {
-                "positive_score_years": float(
-                    sum(delta > 0 for delta in yearly_deltas)
-                ),
+                "positive_score_years": float(sum(delta > 0 for delta in yearly_deltas)),
                 "score_years": float(len(yearly_deltas)),
                 "positive_score_window_ratio": (
-                    float(np.mean(np.asarray(block_deltas) > 0))
-                    if block_deltas
-                    else 0.0
+                    float(np.mean(np.asarray(block_deltas) > 0)) if block_deltas else 0.0
                 ),
                 "score_windows": float(len(block_deltas)),
             }
@@ -1850,12 +1816,8 @@ class CompetitionScoreReference:
 
         return {
             "reference": "competition_reference_pool_base_proxy",
-            "reference_scope": (
-                "fixed_reference_pool_not_platform_global_submission_history"
-            ),
-            "final_crowding_stress": (
-                "one_joint_fit_of_frozen_sibling_routes"
-            ),
+            "reference_scope": ("fixed_reference_pool_not_platform_global_submission_history"),
+            "final_crowding_stress": ("one_joint_fit_of_frozen_sibling_routes"),
             "reference_columns": list(self.reference_columns),
             "reference_data_digest": self.reference_data_digest,
             "a_formula": (
@@ -1863,9 +1825,7 @@ class CompetitionScoreReference:
                 "percentile(long_short_sharpe), percentile(stress_IC_IR))"
             ),
             "b_formula": "percentile(mean(abs(w))/(std(abs(w))+epsilon))",
-            "score_formula": (
-                f"{self.config.a_weight:g}*A+{self.config.b_weight:g}*B"
-            ),
+            "score_formula": (f"{self.config.a_weight:g}*A+{self.config.b_weight:g}*B"),
             "b_positive_coefficients": False,
             "train_window_days": self.config.train_window_days,
             "step_days": self.config.step_days,

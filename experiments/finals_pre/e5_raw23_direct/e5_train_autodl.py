@@ -18,6 +18,48 @@ ROOT = Path(__file__).resolve().parent
 DEFAULT_STORE = Path("/root/bigquant_private_data/e5_raw40_2023_2024_parquet")
 DEFAULT_LABELS = ROOT / "o2c_labels.parquet"
 LABEL = "ret_next_open_to_close"
+E5_RAW40_CHANNELS = (
+    "minute_log_return",
+    "bar_range",
+    "close_location",
+    "relative_spread",
+    "microprice_gap",
+    "depth_imbalance_l1",
+    "depth_imbalance_l3",
+    "depth_shape",
+    "log_amount",
+    "log_volume",
+    "log_deal_number",
+    "log_amount_per_deal",
+    "log_volume_per_deal",
+    "signed_log_amount",
+    "time_sin",
+    "time_cos",
+    "pm_session",
+    "open",
+    "ask_price2",
+    "ask_price3",
+    "bid_price2",
+    "bid_price3",
+    "ask_price4",
+    "ask_price5",
+    "bid_price4",
+    "bid_price5",
+    "ask_volume4",
+    "ask_volume5",
+    "bid_volume4",
+    "bid_volume5",
+    "ask_num_orders1",
+    "ask_num_orders2",
+    "ask_num_orders3",
+    "ask_num_orders4",
+    "ask_num_orders5",
+    "bid_num_orders1",
+    "bid_num_orders2",
+    "bid_num_orders3",
+    "bid_num_orders4",
+    "bid_num_orders5",
+)
 
 
 def sha256(path: Path) -> str:
@@ -39,16 +81,39 @@ def load_contract(store: Path) -> tuple[list[str], int]:
     payload = json.loads((store / "export_manifest.json").read_text(encoding="utf-8"))
     channels = [str(value) for value in payload["channels"]]
     max_minutes = int(payload["max_minutes"])
-    if len(channels) != 40 or max_minutes != 242:
+    if tuple(channels) != E5_RAW40_CHANNELS or max_minutes != 242:
         raise RuntimeError(
-            f"unexpected Parquet contract: channels={len(channels)} minutes={max_minutes}"
+            "unexpected Parquet contract: "
+            f"channels={channels} minutes={max_minutes}; "
+            f"expected_channels={list(E5_RAW40_CHANNELS)}"
         )
     return channels, max_minutes
 
 
-def load_day(
-    day: pd.Timestamp, *, store: Path, channels: list[str], max_minutes: int
-):
+def shuffled_training_days(train_days: list[pd.Timestamp], rng: np.random.Generator) -> np.ndarray:
+    """Return one epoch's order; shared by every arm for paired-by-seed runs."""
+
+    shuffled = np.asarray(train_days, dtype="datetime64[ns]")
+    rng.shuffle(shuffled)
+    return shuffled
+
+
+def training_day_plan(
+    train_days: list[pd.Timestamp], seed: int, epochs: int
+) -> tuple[tuple[int, ...], ...]:
+    """Serializable plan used by tests to prove paired arms see identical days."""
+
+    rng = np.random.default_rng(seed)
+    return tuple(
+        tuple(
+            day.astype("datetime64[ns]").astype(np.int64)
+            for day in shuffled_training_days(train_days, rng)
+        )
+        for _ in range(epochs)
+    )
+
+
+def load_day(day: pd.Timestamp, *, store: Path, channels: list[str], max_minutes: int):
     path = store / f"day={day.date()}.parquet"
     if not path.is_file():
         return None
@@ -56,14 +121,12 @@ def load_day(
     if table.num_rows != 1000:
         raise RuntimeError(f"unexpected row count in {path}: {table.num_rows}")
     instruments = np.asarray(table["instrument"].to_pylist(), dtype=str)
-    values = np.empty(
-        (table.num_rows, max_minutes, len(channels)), dtype=np.float32
-    )
+    values = np.empty((table.num_rows, max_minutes, len(channels)), dtype=np.float32)
     for channel_index, channel in enumerate(channels):
         column = table[channel].combine_chunks()
-        values[:, :, channel_index] = column.values.to_numpy(
-            zero_copy_only=False
-        ).reshape(table.num_rows, max_minutes)
+        values[:, :, channel_index] = column.values.to_numpy(zero_copy_only=False).reshape(
+            table.num_rows, max_minutes
+        )
     observed = np.isfinite(values)
     minute_mask = observed[:, :, 14]
     stock_mask = minute_mask.any(axis=1)
@@ -133,9 +196,7 @@ def load_targets(
     labels["date"] = pd.to_datetime(labels["date"], errors="raise").dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
     labels = labels.dropna(subset=[LABEL])
-    labels["target"] = (
-        labels.groupby("date")[LABEL].rank(pct=True) * 2.0 - 1.0
-    )
+    labels["target"] = labels.groupby("date")[LABEL].rank(pct=True) * 2.0 - 1.0
     targets = {
         pd.Timestamp(day): group.set_index("instrument")["target"]
         for day, group in labels.groupby("date", sort=True)
@@ -186,9 +247,7 @@ def main() -> int:
     optimizer = torch.optim.AdamW(model.parameters(), lr=4e-4, weight_decay=1e-4)
     targets, train_days, test_days = load_targets(args.labels)
     if len(train_days) < 230 or len(test_days) != 241:
-        raise RuntimeError(
-            f"unexpected split: train={len(train_days)} test={len(test_days)}"
-        )
+        raise RuntimeError(f"unexpected split: train={len(train_days)} test={len(test_days)}")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     training_state = args.output_dir / "training_state.pt"
@@ -204,9 +263,7 @@ def main() -> int:
         expected = {"arm": args.arm, "seed": args.seed, "epochs": args.epochs}
         actual = {key: payload[key] for key in expected}
         if actual != expected:
-            raise RuntimeError(
-                f"training-state mismatch: expected={expected}, actual={actual}"
-            )
+            raise RuntimeError(f"training-state mismatch: expected={expected}, actual={actual}")
         if payload["config"] != asdict(config):
             raise RuntimeError("training-state model configuration mismatch")
         model.load_state_dict(payload["state_dict"])
@@ -238,9 +295,7 @@ def main() -> int:
             flush=True,
         )
 
-    print(
-        f"[device] {device} store={args.store} labels={args.labels} ", flush=True
-    )
+    print(f"[device] {device} store={args.store} labels={args.labels} ", flush=True)
     model.train()
     for epoch in range(completed_epochs, args.epochs):
         if resume_epoch == epoch and resume_days is not None:
@@ -248,17 +303,14 @@ def main() -> int:
             start_index = resume_index
             losses = list(resume_losses)
         else:
-            shuffled = np.asarray(train_days, dtype="datetime64[ns]")
-            rng.shuffle(shuffled)
+            shuffled = shuffled_training_days(train_days, rng)
             start_index = 0
             losses = []
         for zero_index in range(start_index, len(shuffled)):
             index = zero_index + 1
             raw_day = shuffled[zero_index]
             day = pd.Timestamp(raw_day)
-            batch = load_day(
-                day, store=args.store, channels=channels, max_minutes=max_minutes
-            )
+            batch = load_day(day, store=args.store, channels=channels, max_minutes=max_minutes)
             if batch is None:
                 continue
             instruments = pd.Index(batch[0])
@@ -268,9 +320,7 @@ def main() -> int:
                 continue
             target_tensor = torch.from_numpy(target[selection]).to(device)
             optimizer.zero_grad(set_to_none=True)
-            prediction = model(
-                *tensor_inputs(batch, selection, device=device)
-            ).squeeze(0)
+            prediction = model(*tensor_inputs(batch, selection, device=device)).squeeze(0)
             loss = correlation_loss(prediction, target_tensor)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -328,9 +378,7 @@ def main() -> int:
     model.eval()
     with torch.inference_mode():
         for index, day in enumerate(test_days, start=1):
-            batch = load_day(
-                day, store=args.store, channels=channels, max_minutes=max_minutes
-            )
+            batch = load_day(day, store=args.store, channels=channels, max_minutes=max_minutes)
             if batch is None:
                 continue
             instruments = np.asarray(batch[0])
@@ -348,9 +396,7 @@ def main() -> int:
             if valid.sum() >= 50:
                 raw_ic.append(
                     float(
-                        pd.Series(factor[valid]).corr(
-                            pd.Series(target[valid]), method="spearman"
-                        )
+                        pd.Series(factor[valid]).corr(pd.Series(target[valid]), method="spearman")
                     )
                 )
             rows.append(
@@ -364,8 +410,7 @@ def main() -> int:
             )
             if index % 40 == 0:
                 print(
-                    f"[predict] arm={args.arm} seed={args.seed} "
-                    f"days={index}/{len(test_days)}",
+                    f"[predict] arm={args.arm} seed={args.seed} days={index}/{len(test_days)}",
                     flush=True,
                 )
 

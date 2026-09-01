@@ -19,6 +19,57 @@ POOL_PATHS = (
     DATA / "bigalpha_2026_instruments_20250101_20260801.parquet",
     DATA / "bigalpha_2026_instruments_20260802_20260828.parquet",
 )
+KEYS = ["date", "instrument"]
+LABEL = "ret_next_open_to_close"
+
+
+def build_next_day_o2c_labels(pool: pd.DataFrame, daily_returns: pd.DataFrame) -> pd.DataFrame:
+    """Map each factor date to the next observed market date, never a row offset."""
+
+    pool = pool.copy()
+    daily = daily_returns.copy()
+    pool["date"] = pd.to_datetime(pool["date"], errors="raise").dt.normalize()
+    pool["instrument"] = pool["instrument"].astype(str)
+    daily["trade_date"] = pd.to_datetime(daily["trade_date"], errors="raise").dt.normalize()
+    daily["instrument"] = daily["instrument"].astype(str)
+    if pool.duplicated(KEYS).any():
+        raise RuntimeError("duplicate private stock-pool keys")
+    if daily.duplicated(["trade_date", "instrument"]).any():
+        raise RuntimeError("duplicate private daily-return keys")
+    calendar = sorted(daily["trade_date"].unique())
+    next_day = dict(pairwise(calendar))
+    labels = pool.copy()
+    labels["label_date"] = labels["date"].map(next_day)
+    labels = labels.merge(
+        daily.rename(columns={"trade_date": "label_date", "daily_o2c": LABEL}),
+        on=["label_date", "instrument"],
+        how="left",
+        validate="many_to_one",
+    )
+    return labels[[*KEYS, "label_date", LABEL]].sort_values(KEYS, kind="stable")
+
+
+def validate_next_day_o2c_labels(
+    labels: pd.DataFrame, pool: pd.DataFrame, daily_returns: pd.DataFrame
+) -> None:
+    """Fail closed if a saved label uses the same or a later-than-next day."""
+
+    expected = build_next_day_o2c_labels(pool, daily_returns)
+    actual = labels.copy()
+    actual["date"] = pd.to_datetime(actual["date"], errors="raise").dt.normalize()
+    actual["instrument"] = actual["instrument"].astype(str)
+    if "label_date" in actual:
+        actual["label_date"] = pd.to_datetime(actual["label_date"], errors="coerce").dt.normalize()
+        columns = [*KEYS, "label_date", LABEL]
+    else:
+        columns = [*KEYS, LABEL]
+        expected = expected.drop(columns="label_date")
+    actual = actual.loc[:, columns].sort_values(KEYS, kind="stable").reset_index(drop=True)
+    expected = expected.loc[:, columns].reset_index(drop=True)
+    try:
+        pd.testing.assert_frame_equal(actual, expected, check_dtype=False)
+    except AssertionError as exc:
+        raise RuntimeError("O2C labels are not aligned to the exact next market day") from exc
 
 
 def load_daily_returns(parts: list[Path]) -> pd.DataFrame:
@@ -81,19 +132,10 @@ def main() -> int:
             raise FileNotFoundError(path)
 
     daily = load_daily_returns(parts)
-    calendar = sorted(daily["trade_date"].unique())
-    next_day = dict(pairwise(calendar))
-    labels = load_pool()
-    labels["label_date"] = labels["date"].map(next_day)
-    labels = labels.merge(
-        daily.rename(columns={"trade_date": "label_date"}),
-        on=["label_date", "instrument"],
-        how="left",
-        validate="many_to_one",
-    ).rename(columns={"daily_o2c": "ret_next_open_to_close"})
-    labels = labels[["date", "instrument", "ret_next_open_to_close"]].sort_values(
-        ["date", "instrument"], kind="stable"
-    )
+    pool = load_pool()
+    labels_with_dates = build_next_day_o2c_labels(pool, daily)
+    validate_next_day_o2c_labels(labels_with_dates, pool, daily)
+    labels = labels_with_dates.drop(columns="label_date")
     labels.to_parquet(OUTPUT, index=False, compression="zstd")
     audit = {
         "source_table": manifest["table"],
@@ -111,9 +153,7 @@ def main() -> int:
             labels.loc[labels["ret_next_open_to_close"].notna(), "date"].nunique()
         ),
     }
-    AUDIT.write_text(
-        json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    AUDIT.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(audit, indent=2, ensure_ascii=False), flush=True)
     return 0
 

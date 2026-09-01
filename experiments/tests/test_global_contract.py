@@ -7,6 +7,8 @@ from pathlib import Path
 
 from conftest import FINALS_PRE
 
+from competition_score_proxy import FULL_BARRA_REGRESSORS
+
 
 def literal_assignment(path: Path, name: str):
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -45,18 +47,17 @@ def test_seeded_experiments_share_the_declared_seeds(contract):
     assert literal_assignment(FINALS_PRE / "e5_raw23_direct/score_autodl.py", "SEEDS") == expected
 
 
-def test_score_guards_pin_241_days_and_42_barra_regressors(contract):
-    expected_days = str(contract["global"]["expected_oos_days"])
-    expected_regressors = str(contract["global"]["barra_regressor_count"])
+def test_every_scorer_calls_the_exact_full_barra_schema_guard(contract):
+    assert len(FULL_BARRA_REGRESSORS) == contract["global"]["barra_regressor_count"]
     for relative in (
+        "e1_o2c_walkforward/score.py",
         "e2_o2c_epoch_curve/score.py",
+        "e3_progressive_add/score.py",
         "e4_private_fixed_oos/score_fixed.py",
         "e5_raw23_direct/score_autodl.py",
     ):
         source = (FINALS_PRE / relative).read_text(encoding="utf-8")
-        assert expected_regressors in source
-    for relative in ("e2_o2c_epoch_curve/score.py", "e5_raw23_direct/score_autodl.py"):
-        assert expected_days in (FINALS_PRE / relative).read_text(encoding="utf-8")
+        assert "prepare_full_barra_exposures" in source
 
 
 def test_a_components_are_only_the_four_declared_scores(contract):
@@ -66,6 +67,6 @@ def test_a_components_are_only_the_four_declared_scores(contract):
         "long_short_sharpe",
         "stress_ic_ir",
     ]
-    assert literal_assignment(
-        FINALS_PRE / "e5_raw23_direct/score_autodl.py", "A_COLUMNS"
-    ) == tuple(contract["global"]["a_components"])
+    assert literal_assignment(FINALS_PRE / "e5_raw23_direct/score_autodl.py", "A_COLUMNS") == tuple(
+        contract["global"]["a_components"]
+    )

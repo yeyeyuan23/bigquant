@@ -13,7 +13,7 @@ for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from competition_score_proxy import preprocess_factor
+from competition_score_proxy import prepare_full_barra_exposures, preprocess_factor
 
 LABEL = "ret_next_open_to_close"
 SEEDS = (20260801, 20260812, 20260823)
@@ -25,7 +25,6 @@ ARMS = {
 }
 A_COLUMNS = ("rank_ic", "rank_ic_ir", "long_short_sharpe", "stress_ic_ir")
 EXPOSURE_PATH = Path("/root/autodl-tmp/exposure_2024_full.parquet")
-EXPOSURE_DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
 
 
 def daily_ic(frame: pd.DataFrame, factor_column: str) -> pd.Series:
@@ -39,9 +38,7 @@ def daily_ic(frame: pd.DataFrame, factor_column: str) -> pd.Series:
     return pd.Series(values, dtype=float)
 
 
-def long_short_sharpe(
-    frame: pd.DataFrame, factor_column: str, quantiles: int = 5
-) -> float:
+def long_short_sharpe(frame: pd.DataFrame, factor_column: str, quantiles: int = 5) -> float:
     work = frame.dropna(subset=[factor_column, LABEL]).copy()
     work["bucket"] = work.groupby("date")[factor_column].transform(
         lambda values: pd.qcut(
@@ -62,27 +59,11 @@ def factor_path(out: Path, arm_dir: str, seed: int) -> Path:
 
 def main() -> int:
     out = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/o2c"
-    labels = pd.read_parquet(
-        "/root/autodl-tmp/data/labels/year=2024/part-2024.parquet"
-    )
+    labels = pd.read_parquet("/root/autodl-tmp/data/labels/year=2024/part-2024.parquet")
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)
     labels = labels[labels["date"].dt.year == 2024].dropna(subset=[LABEL])
-    raw_exposures = pd.read_parquet(EXPOSURE_PATH)
-    exposures = raw_exposures[
-        [column for column in raw_exposures.columns if column not in EXPOSURE_DROP]
-    ].copy()
-    exposures["date"] = pd.to_datetime(exposures["date"]).dt.normalize()
-    exposures["instrument"] = exposures["instrument"].astype(str)
-    regressors = [
-        column for column in exposures.columns if column not in {"date", "instrument"}
-    ]
-    if len(regressors) != 42:
-        raise RuntimeError(
-            f"expected 42 full-Barra regressors, found {len(regressors)}"
-        )
-    if exposures.duplicated(["date", "instrument"]).any():
-        raise RuntimeError("duplicate full-Barra exposure keys")
+    exposures = prepare_full_barra_exposures(pd.read_parquet(EXPOSURE_PATH))
     dispersion = labels.groupby("date")[LABEL].std()
     stress_days = set(dispersion[dispersion >= dispersion.quantile(0.75)].index)
 
@@ -95,16 +76,12 @@ def main() -> int:
                 raise FileNotFoundError(path)
             factor = pd.read_parquet(path)
             value = "factor" if "factor" in factor.columns else "value"
-            factor = factor.rename(columns={value: "factor"})[
-                ["date", "instrument", "factor"]
-            ]
+            factor = factor.rename(columns={value: "factor"})[["date", "instrument", "factor"]]
             factor["date"] = pd.to_datetime(factor["date"]).dt.normalize()
             factor["instrument"] = factor["instrument"].astype(str)
             factor = factor[factor["date"].dt.year == 2024]
             keys = pd.MultiIndex.from_frame(
-                factor[["date", "instrument"]].drop_duplicates().sort_values(
-                    ["date", "instrument"]
-                )
+                factor[["date", "instrument"]].drop_duplicates().sort_values(["date", "instrument"])
             )
             if expected_keys is None:
                 expected_keys = keys
@@ -122,18 +99,14 @@ def main() -> int:
             ic = daily_ic(merged, "neutral_factor")
             if len(ic) != 241:
                 raise RuntimeError(f"expected 241 scored days, got {len(ic)}: {arm}, {seed}")
-            stress_ic = daily_ic(
-                merged[merged["date"].isin(stress_days)], "neutral_factor"
-            )
+            stress_ic = daily_ic(merged[merged["date"].isin(stress_days)], "neutral_factor")
             rows.append(
                 {
                     "arm": arm,
                     "seed": seed,
                     "rank_ic": float(ic.mean()),
                     "rank_ic_ir": float(ic.mean() / ic.std()),
-                    "long_short_sharpe": float(
-                        long_short_sharpe(merged, "neutral_factor")
-                    ),
+                    "long_short_sharpe": float(long_short_sharpe(merged, "neutral_factor")),
                     "stress_ic_ir": float(stress_ic.mean() / stress_ic.std()),
                     "days": len(ic),
                     "rows": len(factor),
@@ -143,9 +116,7 @@ def main() -> int:
     per_seed = pd.DataFrame(rows)
     per_seed.to_csv(out / "a4_per_seed.csv", index=False)
     summary = (
-        per_seed.groupby("arm", sort=False)[list(A_COLUMNS)]
-        .agg(["mean", "std"])
-        .reset_index()
+        per_seed.groupby("arm", sort=False)[list(A_COLUMNS)].agg(["mean", "std"]).reset_index()
     )
     summary.to_csv(out / "a4_summary.csv", index=False)
     order = list(ARMS)

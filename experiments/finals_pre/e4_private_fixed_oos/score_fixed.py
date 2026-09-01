@@ -15,11 +15,10 @@ OUT = ROOT / "reports/dependencies/finals_pre/e4_private_fixed_oos"
 for entry in (ROOT / "src", ROOT / "experiments/finals_pre/common"):
     sys.path.insert(0, str(entry))
 
-from competition_score_proxy import preprocess_factor
+from competition_score_proxy import prepare_full_barra_exposures, preprocess_factor
 
 LABEL = "ret_next_open_to_close"
 KEYS = ["date", "instrument"]
-EXPOSURE_DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
 EXPOSURE_PATHS = (
     DATA / "bigalpha_2026_exposure_20250101_20260801.parquet",
     DATA / "bigalpha_2026_exposure_20260802_20260828.parquet",
@@ -47,9 +46,7 @@ def daily_ic(frame: pd.DataFrame, factor_column: str) -> pd.Series:
 def long_short_sharpe(frame: pd.DataFrame, factor_column: str) -> float:
     work = frame.dropna(subset=[factor_column, LABEL]).copy()
     work["bucket"] = work.groupby("date")[factor_column].transform(
-        lambda values: pd.qcut(
-            values.rank(method="first"), 5, labels=False, duplicates="drop"
-        )
+        lambda values: pd.qcut(values.rank(method="first"), 5, labels=False, duplicates="drop")
     )
     top = work[work["bucket"] == 4].groupby("date")[LABEL].mean()
     bottom = work[work["bucket"] == 0].groupby("date")[LABEL].mean()
@@ -109,10 +106,7 @@ def backtest_daily(frame: pd.DataFrame) -> pd.DataFrame:
         gross = float((weights * aligned_returns).sum())
         names = previous.index.union(weights.index)
         turnover = 0.5 * float(
-            (
-                weights.reindex(names, fill_value=0.0)
-                - previous.reindex(names, fill_value=0.0)
-            )
+            (weights.reindex(names, fill_value=0.0) - previous.reindex(names, fill_value=0.0))
             .abs()
             .sum()
         )
@@ -120,9 +114,7 @@ def backtest_daily(frame: pd.DataFrame) -> pd.DataFrame:
         previous = weights
     result = pd.DataFrame(rows)
     for bps in (5, 10, 20):
-        result[f"net_return_{bps}bp"] = (
-            result["gross_return"] - result["turnover"] * bps / 10_000.0
-        )
+        result[f"net_return_{bps}bp"] = result["gross_return"] - result["turnover"] * bps / 10_000.0
     return result
 
 
@@ -140,26 +132,17 @@ def return_metrics(values: pd.Series) -> dict[str, float]:
 
 def main() -> int:
     factor = normalize_keys(pd.read_parquet(OUT / "m_raw_frozen_private_oos.parquet"))
-    labels = normalize_keys(
-        pd.read_parquet(DATA / "private_o2c_labels_20250101_20260828.parquet")
-    )
+    labels = normalize_keys(pd.read_parquet(DATA / "private_o2c_labels_20250101_20260828.parquet"))
     labels = labels.replace([np.inf, -np.inf], np.nan).dropna(subset=[LABEL])
-    raw_exposures = normalize_keys(
+    exposures = prepare_full_barra_exposures(
         pd.concat([pd.read_parquet(path) for path in EXPOSURE_PATHS], ignore_index=True)
     )
-    exposures = raw_exposures[
-        [column for column in raw_exposures.columns if column not in EXPOSURE_DROP]
-    ].copy()
     regressors = [column for column in exposures.columns if column not in KEYS]
-    if len(regressors) != 42:
-        raise RuntimeError(f"expected 42 full-Barra regressors, found {len(regressors)}")
     for name, frame in (("factor", factor), ("labels", labels), ("exposures", exposures)):
         if frame.duplicated(KEYS).any():
             raise RuntimeError(f"duplicate {name} keys")
 
-    neutral = preprocess_factor(factor, exposures).rename(
-        columns={"factor": "neutral_factor"}
-    )
+    neutral = preprocess_factor(factor, exposures).rename(columns={"factor": "neutral_factor"})
     merged = (
         neutral[KEYS + ["neutral_factor"]]
         .merge(labels[KEYS + [LABEL]], on=KEYS, validate="one_to_one")
@@ -174,12 +157,8 @@ def main() -> int:
     for start in range(0, len(scored_dates), 60):
         block = scored_dates[start : start + 60]
         periods.append((f"block_{start // 60 + 1:02d}", block))
-    public_private1 = scored_dates[
-        (scored_dates >= "2025-03-01") & (scored_dates <= "2025-12-31")
-    ]
-    private2 = scored_dates[
-        (scored_dates >= "2025-03-01") & (scored_dates <= "2026-08-28")
-    ]
+    public_private1 = scored_dates[(scored_dates >= "2025-03-01") & (scored_dates <= "2025-12-31")]
+    private2 = scored_dates[(scored_dates >= "2025-03-01") & (scored_dates <= "2026-08-28")]
     periods.extend(
         (
             ("platform_2025_03_to_2025_12", public_private1),
@@ -209,9 +188,7 @@ def main() -> int:
             (10, "net_return_10bp"),
             (20, "net_return_20bp"),
         ):
-            backtest_rows.append(
-                {**base, "one_way_cost_bp": cost, **return_metrics(daily[column])}
-            )
+            backtest_rows.append({**base, "one_way_cost_bp": cost, **return_metrics(daily[column])})
 
     score_table = pd.DataFrame(score_rows)
     backtest_table = pd.DataFrame(backtest_rows)
