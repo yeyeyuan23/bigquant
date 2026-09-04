@@ -24,6 +24,7 @@ FULL_ROOT = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/o2c"
 OUT = ROOT / "reports/dependencies/finals_pre/e6_channel_groups/o2c"
 ARMS = {
     "Full 17 channels": (FULL_ROOT, "p3_add_full_summaries_seed{seed}"),
+    "Without price-path channels": (OUT, "no_price_path_seed{seed}"),
     "Without order-book channels": (OUT, "no_book_seed{seed}"),
     "Without trading-structure channels": (OUT, "no_trading_structure_seed{seed}"),
     "Price path and clock only": (OUT, "price_time_only_seed{seed}"),

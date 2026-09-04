@@ -52,6 +52,7 @@ else
 fi
 
 for seed in "${seeds[@]}"; do
+  run_arm no_price_path "$seed" --drop-channel-group price
   run_arm no_book "$seed" --drop-channel-group book
   run_arm no_trading_structure "$seed" --drop-channel-group trade
   run_arm price_time_only "$seed" --drop-channel-group book trade
