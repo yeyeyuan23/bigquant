@@ -55,3 +55,5 @@ reports/dependencies/finals_pre/e4_private_fixed_oos/*.parquet
 reports/dependencies/finals_pre/e5_raw23_direct/**/*.pt
 reports/dependencies/finals_pre/e5_raw23_direct/**/*.parquet
 reports/dependencies/finals_pre/e5_raw23_direct/**/*.log
+reports/dependencies/finals_pre/minute_grid_240/**/*.pt
+reports/dependencies/finals_pre/minute_grid_240/**/*.parquet

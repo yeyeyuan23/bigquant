@@ -57,16 +57,20 @@ MICROSTRUCTURE_CHANNELS = (
     "pm_session",
 )
 
-MORNING_OPEN_MINUTE = 9 * 60 + 30
+MORNING_OPEN_MINUTE = 9 * 60 + 31
 MORNING_CLOSE_MINUTE = 11 * 60 + 30
-AFTERNOON_OPEN_MINUTE = 13 * 60
+AFTERNOON_OPEN_MINUTE = 13 * 60 + 1
 AFTERNOON_CLOSE_MINUTE = 15 * 60
 SESSION_MINUTES = MORNING_CLOSE_MINUTE - MORNING_OPEN_MINUTE + 1
 TRADING_MINUTES_PER_DAY = SESSION_MINUTES * 2
 
 
 def trading_minute_indices(timestamps: Sequence[object]) -> np.ndarray:
-    """Map timestamps to the fixed 242-slot A-share trading-minute grid."""
+    """Map provider minute-close timestamps to 240 fixed clock positions.
+
+    09:31..11:30 map to 0..119; 13:01..15:00 map to 120..239.
+    An absent observation leaves its own slot empty, never shifts later rows.
+    """
 
     values = pd.DatetimeIndex(pd.to_datetime(list(timestamps), errors="coerce"))
     invalid_timestamp = values.isna()
@@ -86,8 +90,8 @@ def trading_minute_indices(timestamps: Sequence[object]) -> np.ndarray:
     if invalid.any():
         examples = [str(value) for value in values[invalid][:3]]
         raise ValueError(
-            "timestamps must be exact trading minutes in 09:30-11:30 or "
-            f"13:00-15:00; invalid examples={examples}"
+            "timestamps must be exact minute-close times in 09:31-11:30 or "
+            f"13:01-15:00; invalid examples={examples}"
         )
 
     indices = np.empty(len(values), dtype=np.int32)
@@ -103,11 +107,18 @@ def align_legacy_packed_minutes(
     *,
     minute_mask_channel: int = 14,
 ) -> np.ndarray:
-    """Move an audited legacy 240-observation tensor onto the fixed clock."""
+    """Keep the historical E5 242-slot packed-store conversion unchanged.
+
+    This compatibility helper is not the active M_raw 240-minute packer.
+    E5 stores have no timestamps, so their audited layout must stay explicit.
+    """
+
+    legacy_session_minutes = 121
+    legacy_day_minutes = 242
 
     if (
         values.ndim != 3
-        or values.shape[1] != TRADING_MINUTES_PER_DAY
+        or values.shape[1] != legacy_day_minutes
         or not 0 <= minute_mask_channel < values.shape[2]
     ):
         raise ValueError(f"unexpected packed value shape: {values.shape}")
@@ -118,8 +129,8 @@ def align_legacy_packed_minutes(
         & minute_mask[:, :240].all(axis=1)
         & ~minute_mask[:, 240:].any(axis=1)
     )
-    provider_grid = np.ones(TRADING_MINUTES_PER_DAY, dtype=bool)
-    provider_grid[[0, SESSION_MINUTES]] = False
+    provider_grid = np.ones(legacy_day_minutes, dtype=bool)
+    provider_grid[[0, legacy_session_minutes]] = False
     already_fixed = has_minutes & (
         (minute_mask == provider_grid).all(axis=1) | minute_mask.all(axis=1)
     )
@@ -135,8 +146,8 @@ def align_legacy_packed_minutes(
     aligned = values.copy()
     source = values[legacy]
     aligned[legacy] = np.nan
-    aligned[legacy, 1:SESSION_MINUTES] = source[:, : SESSION_MINUTES - 1]
-    aligned[legacy, SESSION_MINUTES + 1 :] = source[:, SESSION_MINUTES - 1 : 240]
+    aligned[legacy, 1:legacy_session_minutes] = source[:, : legacy_session_minutes - 1]
+    aligned[legacy, legacy_session_minutes + 1 :] = source[:, legacy_session_minutes - 1 : 240]
     return aligned
 
 
@@ -266,7 +277,7 @@ def pack_microstructure_days(
     *,
     dates: Sequence[str | pd.Timestamp] | None = None,
     instruments: Sequence[str] | None = None,
-    max_minutes: int = 242,
+    max_minutes: int = TRADING_MINUTES_PER_DAY,
 ) -> MicrostructureDayBatch:
     """Pack long minute features into ``[day, stock, minute, channel]`` arrays."""
 
@@ -331,7 +342,7 @@ def pack_microstructure_days(
 class MicrostructureConfig:
     input_dim: int = len(MICROSTRUCTURE_CHANNELS)
     model_dim: int = 96
-    max_minutes: int = 242
+    max_minutes: int = TRADING_MINUTES_PER_DAY
     kernels: tuple[int, ...] = (3, 15, 60)
     tcn_blocks: int = 3
     tail_minutes: int = 30

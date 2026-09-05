@@ -21,8 +21,13 @@ from alpha_models import (
     pack_microstructure_days,
     validate_instrument_map,
 )
-from alpha_models.microstructure import MicrostructureTCNBlock, align_legacy_packed_minutes
+from alpha_models.microstructure import (
+    MicrostructureTCNBlock,
+    align_legacy_packed_minutes,
+    trading_minute_indices,
+)
 from scripts.evaluate_unified_microstructure import (
+    fit_predict_block,
     load_microstructure_day,
     prepare_label_panel,
     validate_micro_store,
@@ -35,8 +40,8 @@ def raw_minutes() -> pd.DataFrame:
         [
             "2024-01-02 09:31",
             "2024-01-02 09:32",
-            "2024-01-02 13:00",
             "2024-01-02 13:01",
+            "2024-01-02 13:02",
         ]
     )
     rows = []
@@ -185,14 +190,14 @@ def test_pack_microstructure_days_builds_masks_without_silent_truncation() -> No
     batch = pack_microstructure_days(
         features,
         instruments=("000001.SZ", "000002.SZ", "MISSING"),
-        max_minutes=242,
+        max_minutes=240,
     )
-    assert batch.values.shape == (1, 3, 242, len(MICROSTRUCTURE_CHANNELS))
+    assert batch.values.shape == (1, 3, 240, len(MICROSTRUCTURE_CHANNELS))
     assert batch.minute_mask[0, :2].sum(axis=1).tolist() == [4, 4]
-    assert np.flatnonzero(batch.minute_mask[0, 0]).tolist() == [1, 2, 121, 122]
+    assert np.flatnonzero(batch.minute_mask[0, 0]).tolist() == [0, 1, 120, 121]
     assert batch.stock_mask.tolist() == [[True, True, False]]
     assert not batch.observed_mask[0, 0, 0, 0]
-    with pytest.raises(ValueError, match="fixed 242-slot"):
+    with pytest.raises(ValueError, match="fixed 240-slot"):
         pack_microstructure_days(features, max_minutes=3)
 
 
@@ -213,12 +218,30 @@ def test_pack_preserves_missing_slots_and_tail30_is_the_closing_30_minutes() -> 
 
     batch = pack_microstructure_days(features)
     mask = batch.minute_mask[0, 0]
-    assert np.flatnonzero(~mask).tolist() == [0, 121]
-    assert np.flatnonzero(mask).tolist() == [*range(1, 121), *range(122, 242)]
+    assert mask.shape == (240,)
+    assert mask.all()
     np.testing.assert_allclose(
         batch.values[0, 0, -30:, 0],
         np.arange(210, 240, dtype=np.float32),
     )
+
+    # Removing an actual minute must not move later observations or tail30.
+    missing = pack_microstructure_days(features.drop(index=[4, 122]))
+    assert np.flatnonzero(~missing.minute_mask[0, 0]).tolist() == [4, 122]
+    np.testing.assert_array_equal(missing.values[0, 0, 123:], batch.values[0, 0, 123:])
+    assert np.isnan(missing.values[0, 0, [4, 122]]).all()
+
+
+def test_minute_close_session_boundaries_map_to_240_positions() -> None:
+    times = ["09:31", "11:30", "13:01", "15:00"]
+    assert trading_minute_indices([f"2024-01-02 {t}" for t in times]).tolist() == [
+        0, 119, 120, 239
+    ]
+    for invalid in ("09:30", "13:00", "11:31", "15:01", "09:31:01"):
+        with pytest.raises(ValueError, match="minute-close times"):
+            trading_minute_indices([f"2024-01-02 {invalid}"])
+    with pytest.raises(ValueError, match="fixed 240-slot"):
+        pack_microstructure_days(build_microstructure_features(raw_minutes()), max_minutes=242)
 
 
 def test_legacy_packed_tensor_is_aligned_without_creating_new_data() -> None:
@@ -233,6 +256,18 @@ def test_legacy_packed_tensor_is_aligned_without_creating_new_data() -> None:
     np.testing.assert_allclose(aligned[0, 122:, 0], source[120:])
     assert np.isnan(aligned[1]).all()
     assert np.isfinite(values[0, :240]).all(), "input tensor must not be mutated"
+
+
+def test_training_refuses_to_reuse_a_checkpoint_from_another_minute_grid(tmp_path) -> None:
+    checkpoint = tmp_path / "old242.pt"
+    MicrostructureModel(max_minutes=242).save(checkpoint)
+    with pytest.raises(ValueError, match="checkpoint minute grid differs"):
+        fit_predict_block(
+            tmp_path, pd.DatetimeIndex([]), {}, np.array([], dtype=int),
+            np.array([], dtype=int), MicrostructureConfig(), epochs=3, max_stocks=1200,
+            learning_rate=4e-4, min_train_days=900, device=torch.device("cpu"),
+            seed=20260801, checkpoint_path=checkpoint, reuse_checkpoint=True,
+        )
 
 
 def test_microstructure_tcn_is_causal() -> None:
@@ -364,7 +399,7 @@ def test_prepare_store_and_day_loader_use_canonical_manifest(tmp_path) -> None:
         store,
         pd.Timestamp("2024-01-02"),
         ("000001.SZ", "000002.SZ"),
-        max_minutes=242,
+        max_minutes=240,
     )
     assert batch is not None
     assert batch.stock_mask.tolist() == [[True, True]]
@@ -372,7 +407,7 @@ def test_prepare_store_and_day_loader_use_canonical_manifest(tmp_path) -> None:
         store,
         pd.Timestamp("2024-01-05"),
         ("000001.SZ",),
-        max_minutes=242,
+        max_minutes=240,
     ) is None
 
 
@@ -441,7 +476,7 @@ def test_daily_statistics_survive_a_constant_channel() -> None:
     """
     from alpha_models.microstructure import _masked_channel_statistics
 
-    minutes, channels = 242, len(MICROSTRUCTURE_CHANNELS)
+    minutes, channels = 240, len(MICROSTRUCTURE_CHANNELS)
     values = torch.zeros(2, minutes, channels, requires_grad=True)
     observed = torch.ones(2, minutes, channels, dtype=torch.bool)
     minute_mask = torch.ones(2, minutes, dtype=torch.bool)
@@ -460,7 +495,7 @@ def test_daily_statistics_match_plain_sqrt_when_variance_is_positive() -> None:
     """方差为正时，修复不得改变任何数值。"""
     from alpha_models.microstructure import _masked_channel_statistics
 
-    minutes, channels = 242, len(MICROSTRUCTURE_CHANNELS)
+    minutes, channels = 240, len(MICROSTRUCTURE_CHANNELS)
     generator = torch.Generator().manual_seed(20260826)
     values = torch.randn(4, minutes, channels, generator=generator)
     observed = torch.ones(4, minutes, channels, dtype=torch.bool)

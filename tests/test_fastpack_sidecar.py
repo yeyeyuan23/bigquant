@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alpha_models import MICROSTRUCTURE_CHANNELS
+from alpha_models import MICROSTRUCTURE_CHANNELS, pack_microstructure_days
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments" / "finals_pre" / "common"))
@@ -59,7 +59,23 @@ def sidecar(tmp_path: Path) -> Path:
 def test_without_sidecar_keeps_the_canonical_channel_count(store: Path) -> None:
     batch = load_microstructure_day_fast(store, DAY, INSTRUMENTS)
     assert batch.values.shape[-1] == len(MICROSTRUCTURE_CHANNELS)
-    assert np.flatnonzero(batch.minute_mask[0, 0]).tolist() == [1, 2, 3, 4]
+    assert np.flatnonzero(batch.minute_mask[0, 0]).tolist() == [0, 1, 2, 3]
+
+
+def test_fast_and_reference_packers_match_across_sessions_and_missing_minutes(store: Path) -> None:
+    path = store / "data" / f"trade_date={DAY.date()}" / "part-000.parquet"
+    frame = pd.read_parquet(path)
+    afternoon = frame.iloc[[0, 4]].copy()
+    afternoon["timestamp"] = DAY + pd.Timedelta(hours=13, minutes=1)
+    close = afternoon.copy()
+    close["timestamp"] = DAY + pd.Timedelta(hours=15)
+    frame = pd.concat([frame.drop(index=[1]), afternoon, close], ignore_index=True)
+    frame.to_parquet(path, index=False)
+    reference = pack_microstructure_days(frame.assign(trade_date=DAY), instruments=INSTRUMENTS)
+    fast = load_microstructure_day_fast(store, DAY, INSTRUMENTS)
+    for field in ("values", "observed_mask", "minute_mask", "stock_mask"):
+        np.testing.assert_array_equal(getattr(fast, field), getattr(reference, field))
+    assert np.flatnonzero(fast.minute_mask[0, 0]).tolist() == [0, 2, 3, 120, 239]
 
 
 def test_sidecar_appends_channels_and_leaves_the_first_seventeen_untouched(
@@ -75,7 +91,7 @@ def test_sidecar_appends_channels_and_leaves_the_first_seventeen_untouched(
     assert np.array_equal(base.minute_mask, ext.minute_mask)
 
     # sidecar 里那个 NaN 必须变成未观测，而不是被当成 0
-    flat = ext.observed_mask[0, :, 1 : MINUTES + 1, n]
+    flat = ext.observed_mask[0, :, :MINUTES, n]
     assert flat.sum() == len(INSTRUMENTS) * MINUTES - 1
 
 

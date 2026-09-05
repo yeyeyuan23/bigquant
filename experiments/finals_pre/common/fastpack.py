@@ -58,7 +58,7 @@ def load_microstructure_day_fast(
     day: pd.Timestamp,
     instruments: tuple[str, ...],
     *,
-    max_minutes: int = 242,
+    max_minutes: int = TRADING_MINUTES_PER_DAY,
     sidecar: Path | None = None,
 ) -> MicrostructureDayBatch | None:
     """Drop-in replacement for load_microstructure_day (pandas path)."""

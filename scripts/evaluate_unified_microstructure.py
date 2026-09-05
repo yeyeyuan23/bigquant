@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import sys
+import time
 from contextlib import nullcontext
 from dataclasses import asdict
 from functools import partial
@@ -35,6 +36,7 @@ from alpha_models import (
     pack_microstructure_days,
     rolling_oos_blocks,
 )
+from alpha_models.microstructure import TRADING_MINUTES_PER_DAY
 
 
 def validate_micro_store(store: Path) -> dict[str, object]:
@@ -194,7 +196,8 @@ def _score_prediction_block(
     missing_prediction_days = 0
     model.eval()
     with torch.inference_mode():
-        for day_index in prediction_days:
+        score_started = time.monotonic()
+        for score_step, day_index in enumerate(prediction_days, start=1):
             day = dates[int(day_index)]
             day_target = targets[day].dropna()
             instruments = tuple(day_target.index.astype(str))
@@ -236,6 +239,11 @@ def _score_prediction_block(
                     }
                 )
             )
+            if score_step % 50 == 0:
+                print(json.dumps({"phase": "inference", "step": score_step,
+                                  "total": len(prediction_days),
+                                  "elapsed_seconds": round(time.monotonic() - score_started, 2)}),
+                      flush=True)
     model.train()
     return rows, daily_ic, missing_prediction_days
 
@@ -270,6 +278,8 @@ def fit_predict_block(
     checkpoint_reused = reuse_checkpoint and checkpoint_path.is_file()
     if checkpoint_reused:
         adapter = type(adapter).load(checkpoint_path, map_location=device)
+        if adapter.network.config.max_minutes != config.max_minutes:
+            raise ValueError("checkpoint minute grid differs from the requested grid; retrain")
         model = adapter.network.to(device)
         available_train_days = {
             dates[int(day_index)]
@@ -286,10 +296,11 @@ def fit_predict_block(
         available_train_days: set[pd.Timestamp] = set()
         model.train()
         for epoch in range(epochs):
+            epoch_started = time.monotonic()
             shuffled = training.copy()
             rng.shuffle(shuffled)
             losses: list[float] = []
-            for day_index in shuffled:
+            for train_step, day_index in enumerate(shuffled, start=1):
                 day = dates[int(day_index)]
                 day_target = targets[day].dropna()
                 if len(day_target) > max_stocks:
@@ -326,6 +337,11 @@ def fit_predict_block(
                 scaler.step(optimizer)
                 scaler.update()
                 losses.append(float(loss.detach()))
+                if train_step % 50 == 0:
+                    print(json.dumps({"phase": "training", "epoch": epoch + 1,
+                                      "step": train_step, "total": len(shuffled),
+                                      "elapsed_seconds": round(time.monotonic() - epoch_started, 2)}),
+                          flush=True)
             if not losses:
                 raise RuntimeError("microstructure training block contains no usable days")
             epoch_losses.append(float(np.mean(losses)))
@@ -425,7 +441,7 @@ def main() -> int:
     parser.add_argument("--kernels", nargs="+", type=int, default=[3, 15, 60])
     parser.add_argument("--tcn-blocks", type=int, default=3)
     parser.add_argument("--tail-minutes", type=int, default=30)
-    parser.add_argument("--max-minutes", type=int, default=242)
+    parser.add_argument("--max-minutes", type=int, default=TRADING_MINUTES_PER_DAY)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--max-stocks", type=int, default=1200)
     parser.add_argument("--min-train-days", type=int, default=50)
