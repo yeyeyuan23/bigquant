@@ -1,0 +1,165 @@
+{
+  "started_at": "2026-09-05T16:50:22.645343+00:00",
+  "seed": 20260801,
+  "epochs": 3,
+  "paired_preflight": {
+    "parameter_count": 217953,
+    "initial_weights_sha256": "09bc7a1a879e5ca72888dd2b8538a057c20886cdf1ad6276bd772a5ba99c4a0d",
+    "training_order_sha256": "cf25bae2aa5b49010f701a6c90d04a4692636f583205c8f072c0ff652a4284dc",
+    "train_days": 1213,
+    "test_days": 241,
+    "train_start": "2019-01-02",
+    "train_end": "2023-12-28",
+    "sample_inputs": [
+      {
+        "date": "2019-01-02",
+        "stocks": 1000,
+        "hashes": {
+          "values": "dccae5638955f646b742ab3938b6b56d35f944c5b6411b068c3ca71d890e675a",
+          "observed_mask": "8b58852b67ab5ee465082d3d689b5efb768dac5ba8a5ba94d535e0e072879d7e",
+          "minute_mask": "bc98466a8ec672b3dbfdf7d83cddb9884931cea471622ad8cd517e17cfc80a2d"
+        }
+      },
+      {
+        "date": "2023-12-28",
+        "stocks": 997,
+        "hashes": {
+          "values": "bb7717f37f5ccd708ec074b52a7b97db5166917a36efe28b3152cbc95420387b",
+          "observed_mask": "10d22a34f7675f47fc9ea884aa0196c1268e7304a094ce560e04043b7491e33e",
+          "minute_mask": "0eae1102b05fb1db789d6078ccf1654571f666dea744d9b9f1a3a305d7ff85cb"
+        }
+      },
+      {
+        "date": "2024-01-02",
+        "stocks": 997,
+        "hashes": {
+          "values": "5165d1cde492a422580dd52a5445ca1df870d00e3b5540966fecd776a48374fa",
+          "observed_mask": "e112b05138f8cd95b9cc367fc1d888fff0d604a6aa2af9d95c3c68801040f49a",
+          "minute_mask": "0eae1102b05fb1db789d6078ccf1654571f666dea744d9b9f1a3a305d7ff85cb"
+        }
+      }
+    ]
+  },
+  "control": "pre-fix c0dcd21941e30739e3135997e7928875bca022aa fixed 242 grid",
+  "train": "2019-2023, expanding with one trading date label isolation",
+  "test": "2024 O2C, 241 scoreable dates",
+  "preserved": "original submissions bundles and existing experiment outputs",
+  "environment": {
+    "OMP_NUM_THREADS": "8",
+    "POLARS_MAX_THREADS": "8"
+  },
+  "data_root": "/root/autodl-tmp/data",
+  "micro_store": "/root/autodl-tmp/unified_microstructure_store_v2_2019_2024",
+  "store_manifest_sha256": "54f9e476c74831181441dde8bf0b7fee3b162532b7de2162acf1525b1799cd46",
+  "label_sha256": {
+    "2019": "7783a73f9a8b197c738b3d0560b33ab86c78024ff710fdef2c0c765067ffed91",
+    "2020": "63db57a83d2bed5461b794898256732bf281e77908e12a7f3e4da1db7f115dc5",
+    "2021": "d3d519c0a42bcbf07e28b70cbcd767dce41f6a188fc19eaa31fa0fe1060d81ac",
+    "2022": "6a5a9c6de9df2aa648dcf875133e626513a1eb86d1984c328f73f5c0b4238702",
+    "2023": "c5cbae00cc009568d2ee805ce98bdb8ee250636b9544a368c700606c7e726ab4",
+    "2024": "c2b59687fdc299e62ffcd73389fcae3d931c8eea1359e83fee82c0ced649b8c6"
+  },
+  "exposure_sha256": "55d1bd6adea01d1b24c7e9ae964d43af75c2c456d13e370467a516ab5c299bf0",
+  "arms": {
+    "clock240": {
+      "command": [
+        "/root/autodl-tmp/conda-envs/quant/bin/python",
+        "-u",
+        "/root/autodl-tmp/minute-grid-240-20260906/clock240/scripts/evaluate_unified_microstructure.py",
+        "--data-root",
+        "/root/autodl-tmp/data",
+        "--micro-store",
+        "/root/autodl-tmp/unified_microstructure_store_v2_2019_2024",
+        "--output-dir",
+        "/root/autodl-tmp/minute-grid-240-20260906/results/clock240",
+        "--years",
+        "2024",
+        "--train-start-year",
+        "2019",
+        "--training-mode",
+        "expanding",
+        "--prediction-days",
+        "999",
+        "--epochs",
+        "3",
+        "--model-dim",
+        "96",
+        "--kernels",
+        "3",
+        "15",
+        "60",
+        "--tcn-blocks",
+        "3",
+        "--tail-minutes",
+        "30",
+        "--max-minutes",
+        "240",
+        "--max-stocks",
+        "1200",
+        "--min-train-days",
+        "900",
+        "--learning-rate",
+        "4e-4",
+        "--seed",
+        "20260801",
+        "--label-column",
+        "ret_next_open_to_close",
+        "--fast-pack"
+      ],
+      "root": "/root/autodl-tmp/minute-grid-240-20260906/clock240",
+      "model_sha256": "03167fb8bbe75f7ace7d9a8932d6731f186ba1ccb55e080d3f54e66b9eca71f3",
+      "trainer_sha256": "144babc5cd6924e27ef8b0b2942ed03fc4751a34f8f476cdb1e8ff9dfe11b615",
+      "fastpack_sha256": "6623f3e533933bfbc85ae0d4506dc813f2a179536d65513e47a444e22f86453b"
+    },
+    "clock242": {
+      "command": [
+        "/root/autodl-tmp/conda-envs/quant/bin/python",
+        "-u",
+        "/root/autodl-tmp/minute-grid-240-20260906/clock242/scripts/evaluate_unified_microstructure.py",
+        "--data-root",
+        "/root/autodl-tmp/data",
+        "--micro-store",
+        "/root/autodl-tmp/unified_microstructure_store_v2_2019_2024",
+        "--output-dir",
+        "/root/autodl-tmp/minute-grid-240-20260906/results/clock242",
+        "--years",
+        "2024",
+        "--train-start-year",
+        "2019",
+        "--training-mode",
+        "expanding",
+        "--prediction-days",
+        "999",
+        "--epochs",
+        "3",
+        "--model-dim",
+        "96",
+        "--kernels",
+        "3",
+        "15",
+        "60",
+        "--tcn-blocks",
+        "3",
+        "--tail-minutes",
+        "30",
+        "--max-minutes",
+        "242",
+        "--max-stocks",
+        "1200",
+        "--min-train-days",
+        "900",
+        "--learning-rate",
+        "4e-4",
+        "--seed",
+        "20260801",
+        "--label-column",
+        "ret_next_open_to_close",
+        "--fast-pack"
+      ],
+      "root": "/root/autodl-tmp/minute-grid-240-20260906/clock242",
+      "model_sha256": "26f0b9b595ddd1163848753efc08466df1ac322f2a44cd99046cc8308d07d39c",
+      "trainer_sha256": "144babc5cd6924e27ef8b0b2942ed03fc4751a34f8f476cdb1e8ff9dfe11b615",
+      "fastpack_sha256": "794d8644496d49209d6a99c25a3da7f2242f8d137001807a60bc26c159ea1353"
+    }
+  }
+}

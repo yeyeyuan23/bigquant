@@ -1,0 +1,9 @@
+{
+  "verified_at": "2026-09-05T18:03:27.700436+00:00",
+  "remote_host": "autodl-bigquant",
+  "shutdown_ssh_returncode": 0,
+  "subsequent_ssh_exit_code": 255,
+  "observation": "SSH connection closed after shutdown; no shell connection established.",
+  "automation_id": "240",
+  "automation_status": "PAUSED"
+}

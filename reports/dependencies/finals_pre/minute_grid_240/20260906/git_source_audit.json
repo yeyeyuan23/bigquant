@@ -1,0 +1,30 @@
+{
+  "clock240": {
+    "src/alpha_models/microstructure.py": {
+      "git_revision": "232563c",
+      "sha256": "03167fb8bbe75f7ace7d9a8932d6731f186ba1ccb55e080d3f54e66b9eca71f3"
+    },
+    "experiments/finals_pre/common/fastpack.py": {
+      "git_revision": "232563c",
+      "sha256": "6623f3e533933bfbc85ae0d4506dc813f2a179536d65513e47a444e22f86453b"
+    },
+    "scripts/evaluate_unified_microstructure.py": {
+      "git_revision": "232563c",
+      "sha256": "144babc5cd6924e27ef8b0b2942ed03fc4751a34f8f476cdb1e8ff9dfe11b615"
+    }
+  },
+  "clock242": {
+    "src/alpha_models/microstructure.py": {
+      "git_revision": "c0dcd21",
+      "sha256": "26f0b9b595ddd1163848753efc08466df1ac322f2a44cd99046cc8308d07d39c"
+    },
+    "experiments/finals_pre/common/fastpack.py": {
+      "git_revision": "c0dcd21",
+      "sha256": "794d8644496d49209d6a99c25a3da7f2242f8d137001807a60bc26c159ea1353"
+    },
+    "scripts/evaluate_unified_microstructure.py": {
+      "git_revision": "232563c",
+      "sha256": "144babc5cd6924e27ef8b0b2942ed03fc4751a34f8f476cdb1e8ff9dfe11b615"
+    }
+  }
+}

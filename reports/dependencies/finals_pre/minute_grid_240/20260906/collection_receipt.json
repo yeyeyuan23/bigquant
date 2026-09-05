@@ -1,0 +1,9 @@
+{
+  "remote": "autodl-bigquant:/root/autodl-tmp/minute-grid-240-20260906/results",
+  "state": "completed",
+  "collected_at": "2026-09-05T18:00:06.197277+00:00",
+  "verified_files": 28,
+  "shutdown_requested_at": "2026-09-05T18:00:06.994761+00:00",
+  "shutdown_ssh_returncode": 0,
+  "shutdown_output": "Connection to connect.cqa1.seetacloud.com closed by remote host.\n"
+}

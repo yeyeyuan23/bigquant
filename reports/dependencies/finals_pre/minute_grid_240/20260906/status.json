@@ -1,0 +1,20 @@
+{
+  "state": "completed",
+  "started_at": "2026-09-05T16:50:22.644923+00:00",
+  "pid": 2036,
+  "completed_arms": [
+    {
+      "arm": "clock240",
+      "seconds": 1770.616883821087
+    },
+    {
+      "arm": "clock242",
+      "seconds": 1757.7262912038714
+    }
+  ],
+  "arm": "clock242",
+  "arm_started_at": "2026-09-05T17:19:53.372938+00:00",
+  "phase": "complete",
+  "finished_at": "2026-09-05T17:49:17.770873+00:00",
+  "elapsed_seconds": 3535.125975852832
+}
