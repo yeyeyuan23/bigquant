@@ -1,0 +1,9 @@
+{
+  "remote": "autodl-bigquant:/root/autodl-tmp/minute-grid-240-moreseeds-20260906/results",
+  "state": "completed",
+  "collected_at": "2026-09-06T07:37:13.570060+00:00",
+  "verified_files": 47,
+  "shutdown_requested_at": "2026-09-06T07:37:14.155111+00:00",
+  "shutdown_ssh_returncode": 0,
+  "shutdown_output": ""
+}

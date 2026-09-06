@@ -1,0 +1,6 @@
+     arm     seed  epochs  days  neutral_rank_ic  neutral_rank_ic_ir  long_short_sharpe  stress_ic_ir
+clock240 20260812       3   241         0.029926            0.731901           8.012347      0.427575
+clock242 20260812       3   241         0.029028            0.713762           7.731820      0.394104
+     arm     seed  epochs  days  neutral_rank_ic  neutral_rank_ic_ir  long_short_sharpe  stress_ic_ir
+clock240 20260823       3   241         0.029522            0.722096           8.543856      0.446408
+clock242 20260823       3   241         0.029112            0.719925           8.134255      0.442795

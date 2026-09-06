@@ -1,0 +1,25 @@
+[
+  {
+    "train_start":"2019-01-02",
+    "train_end":"2023-12-28",
+    "prediction_start":"2024-01-02",
+    "prediction_end":"2024-12-30",
+    "usable_train_days":1213,
+    "prediction_days":241,
+    "missing_prediction_days":0,
+    "rank_ic_mean":0.0436802978,
+    "epoch_losses":[
+      -0.0304160806,
+      -0.0451606092,
+      -0.050743387
+    ],
+    "epoch_oos_rank_ic":[
+
+    ],
+    "parameter_count":217953,
+    "checkpoint":"\/root\/autodl-tmp\/minute-grid-240-moreseeds-20260906\/results\/seed20260812\/clock242\/unified_microstructure_block_00_checkpoint.pt",
+    "checkpoint_sha256":"b300527d0afa2c47383566c6627977a050501089d5d7ef1891a9f5f90482dba0",
+    "checkpoint_reused":false,
+    "block":0
+  }
+]

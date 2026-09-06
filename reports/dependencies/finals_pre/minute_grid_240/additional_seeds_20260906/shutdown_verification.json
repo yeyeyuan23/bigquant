@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-09-06T07:41:05.276954+00:00",
+  "command": "ssh -o BatchMode=yes -o ConnectTimeout=10 autodl-bigquant true",
+  "returncode": 255,
+  "observed_output": "Connection closed by remote endpoint",
+  "shutdown_command_returncode": 0,
+  "shell_available_after_shutdown": false,
+  "automation_id": "240",
+  "automation_status": "PAUSED",
+  "automation_interval_minutes": 30,
+  "scope": "Shutdown command success followed by SSH connection closure; not a platform billing audit."
+}
