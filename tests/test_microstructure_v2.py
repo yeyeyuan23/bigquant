@@ -161,7 +161,8 @@ def test_v2_pack_and_gated_network_backward() -> None:
     assert any(parameter.grad is not None for parameter in network.path_gate.parameters())
 
 
-def test_v2_fixed_clock_keeps_missing_minutes_and_session_boundary() -> None:
+@pytest.mark.parametrize("copy_on_write", [False, True])
+def test_v2_fixed_clock_keeps_missing_minutes_and_session_boundary(copy_on_write) -> None:
     raw = _minute_frame(levels=3, days=1).groupby("instrument", sort=False).head(4).copy()
     times = pd.to_datetime([
         "2024-01-02 09:31", "2024-01-02 09:33",
@@ -169,7 +170,13 @@ def test_v2_fixed_clock_keeps_missing_minutes_and_session_boundary() -> None:
     ])
     raw["date"] = list(times) * 3
     features = build_microstructure_v2_features(raw, _deep_context(raw))
-    batch = pack_microstructure_v2_days(features)
+    features = features.astype(dict.fromkeys(MICROSTRUCTURE_V2_CHANNELS, "float32"))
+    features.loc[features.index[0], MICROSTRUCTURE_V2_CHANNELS[0]] = float("inf")
+    original = features.copy(deep=True)
+    with pd.option_context("mode.copy_on_write", copy_on_write):
+        batch = pack_microstructure_v2_days(features)
+    pd.testing.assert_frame_equal(features, original)
+    assert not batch.observed_mask[0, 0, 0, 0]
     assert batch.values.shape == (1, 3, 240, len(MICROSTRUCTURE_V2_CHANNELS))
     assert batch.minute_mask[0, 0].nonzero()[0].tolist() == [0, 2, 120, 239]
     assert not batch.observed_mask[:, :, 1].any()

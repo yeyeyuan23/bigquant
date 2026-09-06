@@ -302,7 +302,9 @@ def pack_microstructure_v2_days(
             raise ValueError(
                 f"{day.date()} {instrument} has {len(group)} minutes; max_minutes={max_minutes}"
             )
-        matrix = group.loc[:, list(MICROSTRUCTURE_V2_CHANNELS)].to_numpy(np.float32)
+        matrix = group.loc[:, list(MICROSTRUCTURE_V2_CHANNELS)].to_numpy(
+            dtype=np.float32, copy=True
+        )
         positions = trading_minute_indices(group["timestamp"])
         if not group["timestamp"].dt.normalize().eq(day).all():
             raise ValueError("timestamp date does not match trade_date")
