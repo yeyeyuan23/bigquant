@@ -1,9 +1,10 @@
 """Independent accounting and time-order checks for strategy comparison."""
 
 import unittest
+
 import numpy as np
 import pandas as pd
-from backtest import Costs, Inputs, execute, run, targets, summarize
+from backtest import Costs, Inputs, execute, run, summarize, targets
 
 
 def example(days=6):

@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+from itertools import pairwise
 from pathlib import Path
 
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
@@ -120,7 +121,7 @@ def main() -> None:
     assert not daily.duplicated(["date", "instrument"]).any()
     assert not (daily[["adjusted_open", "adjusted_close"]] <= 0).any().any()
     dates = pd.DatetimeIndex(sorted(daily["date"].unique()))
-    nxt = dict(zip(dates[:-1], dates[1:]))
+    nxt = dict(pairwise(dates))
     keys = neutral[["date", "instrument"]].copy()
     keys["entry"] = keys["date"].map(nxt)
     keys["exit"] = keys["entry"].map(nxt)

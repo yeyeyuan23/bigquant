@@ -48,12 +48,18 @@ where = ["src"]
 line-length = 100
 # Frozen platform submission bundles and concluded experiment staging are
 # generated artifacts; they are archived as-is and excluded from linting.
-extend-exclude = ["third_party", "submissions", "remote_submission_notebooks", "work"]
+extend-exclude = [
+  "third_party", "submissions", "remote_submission_notebooks", "work",
+  "reports/dependencies/finals_pre/e7_strategy_application/20260906/code",
+]
 # The local schedule helper also runs with macOS's Python 3.9; training uses 3.11+.
 per-file-target-version = { "experiments/finals_pre/minute_grid_240/monitor.py" = "py39" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+# Immutable source snapshots accompany historical results; collect the maintained
+# experiment tests instead of importing a second copy with the same module name.
+addopts = ["--ignore=reports/dependencies/finals_pre/e7_strategy_application/20260906/code"]
 
 [tool.coverage.run]
 branch = true
