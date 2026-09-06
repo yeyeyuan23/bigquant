@@ -1,0 +1,162 @@
+{
+  "status": "passed",
+  "runs": 18,
+  "daily_rows": 7200,
+  "days_per_run": 400,
+  "checks": [
+    "transfer SHA-256",
+    "complete strategy and scenario matrix",
+    "self-financing identity",
+    "directional commission/tax and per-side slippage independently recomputed",
+    "signal precedes trade",
+    "continuous NAV",
+    "independent annualized return/Sharpe/CAGR/drawdown/turnover recomputation",
+    "delivered engine hash"
+  ],
+  "results": [
+    {
+      "strategy": "baseline_daily",
+      "scenario": "gross",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.43835809718729e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "baseline_daily",
+      "scenario": "fees_slip0",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 4.51461784622964e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "baseline_daily",
+      "scenario": "fees_slip2",
+      "slippage_bps": 2.0,
+      "phase": 0,
+      "max_accounting_error": 5.178149575790769e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "baseline_daily",
+      "scenario": "fees_slip5",
+      "slippage_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 2.96637714392034e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "scenario": "gross",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.551115123125783e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "scenario": "fees_slip0",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 6.21247844834194e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "scenario": "fees_slip2",
+      "slippage_bps": 2.0,
+      "phase": 0,
+      "max_accounting_error": 4.659900937342698e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "scenario": "fees_slip5",
+      "slippage_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 4.831204880595408e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "rebalance_3d",
+      "scenario": "gross",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.789639601072594e-16,
+      "terminal_residual_pct_nav": 0.4731504494144358
+    },
+    {
+      "strategy": "rebalance_3d",
+      "scenario": "fees_slip0",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.73976630113826e-16,
+      "terminal_residual_pct_nav": 0.5120575808232366
+    },
+    {
+      "strategy": "rebalance_3d",
+      "scenario": "fees_slip2",
+      "slippage_bps": 2.0,
+      "phase": 0,
+      "max_accounting_error": 3.7947076036992655e-16,
+      "terminal_residual_pct_nav": 0.5269824833358071
+    },
+    {
+      "strategy": "rebalance_3d",
+      "scenario": "fees_slip5",
+      "slippage_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 4.0245584642661925e-16,
+      "terminal_residual_pct_nav": 0.5501896044574617
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "gross",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.325601071248798e-16,
+      "terminal_residual_pct_nav": 0.31393136543677574
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "fees_slip0",
+      "slippage_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 7.883233996142103e-16,
+      "terminal_residual_pct_nav": 0.3533609400042074
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "fees_slip2",
+      "slippage_bps": 2.0,
+      "phase": 0,
+      "max_accounting_error": 5.926249074805767e-16,
+      "terminal_residual_pct_nav": 0.3688919325046716
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "fees_slip5",
+      "slippage_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 4.662069341687669e-16,
+      "terminal_residual_pct_nav": 0.3934789508197777
+    },
+    {
+      "strategy": "rebalance_3d",
+      "scenario": "fees_slip0",
+      "slippage_bps": 0.0,
+      "phase": 1,
+      "max_accounting_error": 6.346919517730143e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "rebalance_3d",
+      "scenario": "fees_slip0",
+      "slippage_bps": 0.0,
+      "phase": 2,
+      "max_accounting_error": 5.017687654262915e-16,
+      "terminal_residual_pct_nav": 0.45843624305320624
+    }
+  ]
+}

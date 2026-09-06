@@ -1,0 +1,46 @@
+{
+  "checkpoint_sha256": "252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb",
+  "training_window": [
+    "2019-01-02",
+    "2024-12-26"
+  ],
+  "factor_rows": 402000,
+  "factor_days": 402,
+  "factor_start": "2025-01-02",
+  "factor_end": "2026-08-28",
+  "neutralization": "signal-day 10 Barra styles + 32 industry columns; original preprocess_factor",
+  "o2c_reproduction": {
+    "days": 401,
+    "rank_ic": 0.02516923999851031
+  },
+  "daily_prices": {
+    "rows": 881187,
+    "days": 402,
+    "instruments": 2212,
+    "start": "2025-01-02",
+    "end": "2026-08-28",
+    "open_missing": 0,
+    "close_missing": 0,
+    "opening_price": "09:31 one-minute bar open * adjust_factor",
+    "valuation": "adjusted opening prices; total-return approximation, not a corporate-action cash ledger"
+  },
+  "old_o2o_label_check": {
+    "matched_finite_rows": 399489,
+    "max_abs_error": 0.0
+  },
+  "source_hashes": {
+    "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "/root/bigquant_private_data/private_o2c_labels_20250101_20260828.parquet": "e23eea3aea4b8c9823fd22bb12fe1a3c24bb3baed04d2c3424518809b3b2521d",
+    "/root/bigquant_private_data/bigalpha_2026_exposure_20250101_20260801.parquet": "634a39270c50bf858994b099fa17b8e36330017a3cc55e2e33c085aef56744ad",
+    "/root/bigquant_private_data/bigalpha_2026_exposure_20260802_20260828.parquet": "5dae576ae044f7a4343b271e32218bd21ccba6c6bb95058c8a7a0b0564adc2f8",
+    "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/inference_audit.json": "96c27d7947b6ef78b19159c2e1e0d04532c1f7411a109e5ccea9e6ee86947a96",
+    "/root/autodl-tmp/projects/bigquant-default/src/competition_score_proxy.py": "9876638cd215ee62378abf3745ab1762cbe50256430e8ebbbfc8b35ce3d5aa8e"
+  },
+  "input_hashes": {
+    "signals.parquet": "fffa18b92c8598eb144ecbaa44bb160008acc2f8ca4141d808e439e5869860e8",
+    "daily_prices.parquet": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa",
+    "daily_prices_source.json": "24f7580b52dc2b4d1a9690c6cf45eea660672c989b5aba2fb3132b7e0445f1b7"
+  },
+  "bar_parts_metadata_signature": "50c17e140ca21ee2c44a09f301d0499d7049e1bcd0aee7e7a76ff7ef488f29c8",
+  "selection": "Signals prepared without joining future returns. Future price availability is not used to select stocks."
+}

@@ -1,0 +1,14 @@
+test_buffer_and_partial_targets_are_dollar_neutral (test_backtest.AccountingTests.test_buffer_and_partial_targets_are_dollar_neutral) ... ok
+test_constant_price_roundtrip_charges_both_sides (test_backtest.AccountingTests.test_constant_price_roundtrip_charges_both_sides) ... ok
+test_future_scores_and_prices_do_not_change_initial_positions (test_backtest.AccountingTests.test_future_scores_and_prices_do_not_change_initial_positions) ... ok
+test_hold_three_days_does_not_rebalance_price_drift (test_backtest.AccountingTests.test_hold_three_days_does_not_rebalance_price_drift) ... ok
+test_missing_open_blocks_trade_without_excluding_from_rank (test_backtest.AccountingTests.test_missing_open_blocks_trade_without_excluding_from_rank) ... ok
+test_self_financing_with_price_move_and_fees (test_backtest.AccountingTests.test_self_financing_with_price_move_and_fees) ... ok
+test_terminal_missing_quote_not_fabricated_liquidation (test_backtest.AccountingTests.test_terminal_missing_quote_not_fabricated_liquidation) ... ok
+test_unchanged_target_weights_still_trade_after_price_drift (test_backtest.AccountingTests.test_unchanged_target_weights_still_trade_after_price_drift) ... ok
+test_zero_cost_daily_matches_direct_long_short_returns (test_backtest.AccountingTests.test_zero_cost_daily_matches_direct_long_short_returns) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.055s
+
+OK

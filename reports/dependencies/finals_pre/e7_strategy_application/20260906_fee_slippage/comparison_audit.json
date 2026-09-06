@@ -1,0 +1,7 @@
+{
+  "status": "passed",
+  "same_factor_and_price_hashes": true,
+  "same_checkpoint": true,
+  "gross_daily_rows_compared": 1600,
+  "gross_max_abs_difference": 0.0
+}
