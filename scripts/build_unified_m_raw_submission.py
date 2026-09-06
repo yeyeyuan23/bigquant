@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import io
 import json
 import py_compile
 import tempfile
@@ -13,16 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ASSET = (
-    ROOT
-    / "work/unified_submission_runtime/assets/m_raw_block25_checkpoint.pt"
-)
-DEFAULT_SOURCE_ROOT = ROOT / "work/unified_submission_runtime/src_snapshot"
-DEFAULT_OUTPUT = ROOT / "submissions"
-REMOTE_COMMIT = "f23365d0ac0d715daf1966734f26f2a3cdb640ba"
-EXPECTED_CHECKPOINT_SHA256 = (
-    "cb47348880e7a424450ffe894e26eb97cee5543f15042a08350f3eef5af6f4c7"
-)
+DEFAULT_SOURCE_ROOT = ROOT / "src/alpha_models"
+DEFAULT_OUTPUT = ROOT / "submissions/m_raw_240"
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -45,6 +38,8 @@ def build_sources(
     training_end: str,
     training_protocol: str,
 ) -> tuple[dict[str, str], dict[str, object]]:
+    import torch
+
     if not checkpoint.is_file():
         raise FileNotFoundError(checkpoint)
     checkpoint_bytes = checkpoint.read_bytes()
@@ -53,10 +48,20 @@ def build_sources(
         raise ValueError(
             f"checkpoint SHA-256 mismatch: {checkpoint_sha256}"
         )
+    checkpoint_config = torch.load(
+        io.BytesIO(checkpoint_bytes), map_location="cpu", weights_only=True
+    )["config"]
+    if checkpoint_config["input_dim"] != 17:
+        raise ValueError("M_raw checkpoint must have 17 input channels")
+    if checkpoint_config["max_minutes"] != 240:
+        raise ValueError("current export requires a 240-minute checkpoint; use the frozen bundle for historical weights")
     source_paths = {
-        "frozen_alpha.base": source_root / "alpha_models_base.py",
-        "frozen_alpha.temporal": source_root / "alpha_models_temporal.py",
-        "frozen_alpha.microstructure": source_root / "alpha_models_microstructure.py",
+        f"frozen_alpha.{name}": (
+            source_root / f"{name}.py"
+            if (source_root / f"{name}.py").is_file()
+            else source_root / f"alpha_models_{name}.py"
+        )
+        for name in ("base", "temporal", "microstructure")
     }
     missing = [str(path) for path in source_paths.values() if not path.is_file()]
     if missing:
@@ -83,7 +88,7 @@ def build_sources(
         "checkpoint_training_window": [training_start, training_end],
         "input_schema": {
             "profile": "canonical",
-            "max_minutes": 242,
+            "max_minutes": int(checkpoint_config["max_minutes"]),
             "channels": 17,
             "book_levels": [1, 2, 3],
         },
@@ -239,7 +244,7 @@ def main(datasources, start_date, end_date):
                 features,
                 dates=[day],
                 instruments=instruments,
-                max_minutes=242,
+                max_minutes=model.config.max_minutes,
             )
             available = np.flatnonzero(batch.stock_mask[0])
             if len(available) < 2:
@@ -300,18 +305,18 @@ def main(datasources, start_date, end_date):
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_ASSET)
+    parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--source-root", type=Path, default=DEFAULT_SOURCE_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument(
-        "--expected-checkpoint-sha256", default=EXPECTED_CHECKPOINT_SHA256
+        "--expected-checkpoint-sha256", required=True
     )
-    parser.add_argument("--training-commit", default=REMOTE_COMMIT)
+    parser.add_argument("--training-commit", required=True)
     parser.add_argument("--training-tree-dirty", action="store_true")
-    parser.add_argument("--checkpoint-block", type=int, default=25)
-    parser.add_argument("--training-start", default="2024-09-27")
-    parser.add_argument("--training-end", default="2024-12-26")
-    parser.add_argument("--training-protocol", default="rolling_60d_e3")
+    parser.add_argument("--checkpoint-block", type=int, required=True)
+    parser.add_argument("--training-start", required=True)
+    parser.add_argument("--training-end", required=True)
+    parser.add_argument("--training-protocol", required=True)
     args = parser.parse_args()
     module_sources, manifest = build_sources(
         args.checkpoint,

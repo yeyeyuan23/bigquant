@@ -286,6 +286,8 @@ def fit_predict_block(
     checkpoint_reused = reuse_checkpoint and checkpoint_path.is_file()
     if checkpoint_reused:
         adapter = type(adapter).load(checkpoint_path, map_location=device)
+        if asdict(adapter.config) != asdict(config):
+            raise ValueError("checkpoint configuration differs from the requested model")
         model = adapter.network.to(device)
         available_train_days = {
             dates[int(day_index)]
@@ -437,7 +439,7 @@ def main() -> int:
     parser.add_argument("--kernels", nargs="+", type=int, default=[3, 15, 60])
     parser.add_argument("--tcn-blocks", type=int, default=3)
     parser.add_argument("--tail-minutes", type=int, default=30)
-    parser.add_argument("--max-minutes", type=int, default=242)
+    parser.add_argument("--max-minutes", type=int, default=240)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--max-stocks", type=int, default=1200)
     parser.add_argument("--min-train-days", type=int, default=50)

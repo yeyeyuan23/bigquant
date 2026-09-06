@@ -35,7 +35,7 @@ def _stats() -> dict[str, object]:
     }
 
 
-def _frame(stocks: int = 3, minutes: int = 242) -> pd.DataFrame:
+def _frame(stocks: int = 3, minutes: int = 240) -> pd.DataFrame:
     rows = []
     for key in range(stocks):
         for minute in range(minutes):
@@ -44,7 +44,7 @@ def _frame(stocks: int = 3, minutes: int = 242) -> pd.DataFrame:
             values[RAW_FIELDS.index("amount")] = np.log1p(1000 + (minute + 1) ** 2 + key)
             rows.append(
                 {
-                    "date": pd.Timestamp("2024-01-02 09:30") + pd.Timedelta(minutes=minute),
+                    "date": pd.Timestamp("2024-01-02 09:31") + pd.Timedelta(minutes=minute + (90 if minute >= 120 else 0)),
                     "key": key,
                     **dict(zip(RAW_FIELDS, values, strict=True)),
                 }
@@ -53,7 +53,7 @@ def _frame(stocks: int = 3, minutes: int = 242) -> pd.DataFrame:
 
 
 def test_event_segments_are_chronological_contiguous_and_exhaustive() -> None:
-    weights = np.geomspace(1.0, 100.0, 242)
+    weights = np.geomspace(1.0, 100.0, 240)
     segments = _equal_event_segments(weights, 24)
     assert len(segments) == 24
     assert segments[0][0] == 0

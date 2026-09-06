@@ -321,7 +321,7 @@ def replay_m(
                 features,
                 dates=valid_days,
                 instruments=instruments,
-                max_minutes=242,
+                max_minutes=model.config.max_minutes,
             )
             values = torch.from_numpy(batch.values).to(device)
             observed = torch.from_numpy(batch.observed_mask).to(device)
@@ -450,7 +450,7 @@ def replay_m_l5(
                 features,
                 dates=valid_days,
                 instruments=instruments,
-                max_minutes=242,
+                max_minutes=model.config.max_minutes,
             )
             values = torch.from_numpy(batch.values).to(device)
             observed = torch.from_numpy(batch.observed_mask).to(device)

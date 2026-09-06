@@ -151,6 +151,34 @@ def align_legacy_packed_minutes(
     return aligned
 
 
+def compact_packed_minutes(values: np.ndarray, *, minute_mask_channel: int = 14) -> np.ndarray:
+    """Convert an audited packed export to the current 240-position input.
+
+    Native 240-slot exports pass through. Historical E5 exports first use their
+    documented alignment; only empty reserved positions may then be removed.
+    Timestamp-free, unrecognized layouts must not silently lose observations.
+    """
+
+    if values.ndim != 3 or not 0 <= minute_mask_channel < values.shape[2]:
+        raise ValueError(f"unexpected packed value shape: {values.shape}")
+    if values.shape[1] == TRADING_MINUTES_PER_DAY:
+        return values
+    if values.shape[1] == TRADING_MINUTES_PER_DAY + 2:
+        mask = np.isfinite(values[:, :, minute_mask_channel])
+        tail_padded = mask[:, :TRADING_MINUTES_PER_DAY].all(axis=1) & ~mask[
+            :, TRADING_MINUTES_PER_DAY:
+        ].any(axis=1)
+        if np.isfinite(values[tail_padded, TRADING_MINUTES_PER_DAY:, :]).any():
+            raise ValueError("cannot discard observed values in reserved minute positions")
+    aligned = align_legacy_packed_minutes(values, minute_mask_channel=minute_mask_channel)
+    if np.isfinite(aligned[:, [0, SESSION_MINUTES + 1], :]).any():
+        raise ValueError("cannot discard observed values in reserved minute positions")
+    return np.concatenate(
+        (aligned[:, 1 : SESSION_MINUTES + 1], aligned[:, SESSION_MINUTES + 2 :]),
+        axis=1,
+    )
+
+
 def _safe_ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     valid = denominator.notna() & np.isfinite(denominator) & denominator.ne(0)
     return numerator.div(denominator.where(valid))

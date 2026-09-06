@@ -156,7 +156,7 @@ if [[ -n "$MICROSTRUCTURE_STORE" && -s "$MICROSTRUCTURE_STORE/manifest.json" ]];
   "$PYTHON_BIN" scripts/evaluate_unified_microstructure.py \
     --data-root "$DATA_ROOT" \
     --micro-store "$MICROSTRUCTURE_STORE" \
-    --output-dir "$RUN_ROOT/microstructure" \
+    --output-dir "$RUN_ROOT/microstructure/clock240" \
     --years 2023 2024 \
     --train-start-year 2019 \
     --train-days 60 \
@@ -166,9 +166,9 @@ if [[ -n "$MICROSTRUCTURE_STORE" && -s "$MICROSTRUCTURE_STORE/manifest.json" ]];
     --kernels 3 15 60 \
     --tcn-blocks 3 \
     --tail-minutes 30 \
-    --max-minutes 242 \
+    --max-minutes 240 \
     2>&1 | tee "$LOG_ROOT/microstructure.log"
-  MICROSTRUCTURE_ROUTE="$RUN_ROOT/microstructure/unified_microstructure_full_oos.parquet"
+  MICROSTRUCTURE_ROUTE="$RUN_ROOT/microstructure/clock240/unified_microstructure_full_oos.parquet"
   EXPERT_ROUTES+=("$MICROSTRUCTURE_ROUTE")
   printf '{"status":"complete","store":"%s"}\n' "$MICROSTRUCTURE_STORE" \
     > "$RUN_ROOT/microstructure_status.json"

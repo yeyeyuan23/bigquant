@@ -139,11 +139,11 @@ def test_v3_rejects_missing_prediction_period_five_level_coverage() -> None:
 def test_v2_pack_and_gated_network_backward() -> None:
     raw = _minute_frame(levels=3, days=1)
     features = build_microstructure_v2_features(raw, _deep_context(raw))
-    batch = pack_microstructure_v2_days(features, max_minutes=40)
-    assert batch.values.shape == (1, 3, 40, len(MICROSTRUCTURE_V2_CHANNELS))
+    batch = pack_microstructure_v2_days(features)
+    assert batch.values.shape == (1, 3, 240, len(MICROSTRUCTURE_V2_CHANNELS))
     config = MicrostructureV2Config(
         model_dim=16,
-        max_minutes=40,
+        max_minutes=240,
         kernels=(2, 5),
         tcn_blocks=1,
         tail_minutes=10,
@@ -159,6 +159,45 @@ def test_v2_pack_and_gated_network_backward() -> None:
     assert torch.isfinite(scores).all()
     scores.square().mean().backward()
     assert any(parameter.grad is not None for parameter in network.path_gate.parameters())
+
+
+def test_v2_fixed_clock_keeps_missing_minutes_and_session_boundary() -> None:
+    raw = _minute_frame(levels=3, days=1).groupby("instrument", sort=False).head(4).copy()
+    times = pd.to_datetime([
+        "2024-01-02 09:31", "2024-01-02 09:33",
+        "2024-01-02 13:01", "2024-01-02 15:00",
+    ])
+    raw["date"] = list(times) * 3
+    features = build_microstructure_v2_features(raw, _deep_context(raw))
+    batch = pack_microstructure_v2_days(features)
+    assert batch.values.shape == (1, 3, 240, len(MICROSTRUCTURE_V2_CHANNELS))
+    assert batch.minute_mask[0, 0].nonzero()[0].tolist() == [0, 2, 120, 239]
+    assert not batch.observed_mask[:, :, 1].any()
+    assert batch.stock_mask.all()
+    with pytest.raises(ValueError, match="fixed 240-slot"):
+        pack_microstructure_v2_days(features, max_minutes=242)
+    invalid = features.copy()
+    invalid.loc[invalid.index[0], "timestamp"] = pd.Timestamp("2024-01-02 09:30")
+    with pytest.raises(ValueError, match="minute-close"):
+        pack_microstructure_v2_days(invalid)
+
+
+def test_v2_reuse_rejects_checkpoint_with_different_minute_grid(tmp_path) -> None:
+    import numpy as np
+
+    from alpha_models.microstructure_v2 import MicrostructureV2Model
+    from scripts.evaluate_unified_microstructure_v2 import fit_predict_block
+
+    checkpoint = tmp_path / "legacy.pt"
+    MicrostructureV2Model(max_minutes=242).save(checkpoint)
+    with pytest.raises(ValueError, match="checkpoint configuration differs"):
+        fit_predict_block(
+            tmp_path, {}, pd.DatetimeIndex([]), {}, np.array([], dtype=int),
+            np.array([], dtype=int), MicrostructureV2Config(), epochs=3,
+            max_stocks=1200, learning_rate=4e-4, min_train_days=900,
+            device=torch.device("cpu"), seed=7, checkpoint_path=checkpoint,
+            reuse_checkpoint=True,
+        )
 
 
 def test_v2_store_has_separate_schema_and_l1_l3_source_contract(tmp_path) -> None:

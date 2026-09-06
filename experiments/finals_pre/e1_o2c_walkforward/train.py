@@ -32,7 +32,7 @@ STORE_VIEW = Path("/root/autodl-tmp/e1_o2c_walkforward_combined_store")
 PRIVATE_LABELS = Path(
     "/root/bigquant_private_data/private_o2c_labels_20250101_20260828.parquet"
 )
-OUT = ROOT / "reports/dependencies/finals_pre/e1_o2c_walkforward/model"
+OUT = ROOT / "reports/dependencies/finals_pre/e1_o2c_walkforward/clock240/model"
 LABEL = "ret_next_open_to_close"
 PRIVATE_START = pd.Timestamp("2025-01-01")
 PRIVATE_END = pd.Timestamp("2026-08-28")
@@ -123,7 +123,7 @@ def main() -> int:
     config = MicrostructureConfig(
         input_dim=len(MICROSTRUCTURE_CHANNELS),
         model_dim=96,
-        max_minutes=242,
+        max_minutes=240,
         kernels=(3, 15, 60),
         tcn_blocks=3,
         tail_minutes=30,

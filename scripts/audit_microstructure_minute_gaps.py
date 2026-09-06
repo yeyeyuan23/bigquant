@@ -3,7 +3,8 @@
 The audit is intentionally key-only: DuckDB projects the timestamp and stock key
 from parquet, derives the provider's normal minute slots from cross-sectional
 coverage, and aggregates at stock-day grain. Numeric market-data columns are never
-read. The model's 242 positions are a maximum length, not an assumed row count.
+read. The provider contract has 240 minute-close positions; individual stocks may
+have missing rows within that schedule.
 """
 
 from __future__ import annotations
@@ -96,10 +97,10 @@ def audit_dataset(
     schedule = tuple(slot_coverage.loc[slot_coverage["expected"], "minute"].tolist())
     if not schedule:
         raise ValueError("no expected minute slots were derived")
-    if len(schedule) > 242:
+    if len(schedule) > 240:
         raise ValueError(
             "derived schedule exceeds the model contract: "
-            f"slots={len(schedule)}, maximum=242"
+            f"slots={len(schedule)}, maximum=240"
         )
     connection.register(
         "expected_schedule",

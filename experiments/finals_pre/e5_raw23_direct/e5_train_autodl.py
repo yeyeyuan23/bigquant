@@ -14,7 +14,7 @@ import pyarrow.parquet as pq
 import torch
 from model_raw23 import ProgressiveConfig, ProgressiveModel
 
-from alpha_models.microstructure import align_legacy_packed_minutes
+from alpha_models.microstructure import TRADING_MINUTES_PER_DAY, compact_packed_minutes
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_STORE = Path("/root/bigquant_private_data/e5_raw40_2023_2024_parquet")
@@ -83,7 +83,8 @@ def load_contract(store: Path) -> tuple[list[str], int]:
     payload = json.loads((store / "export_manifest.json").read_text(encoding="utf-8"))
     channels = [str(value) for value in payload["channels"]]
     max_minutes = int(payload["max_minutes"])
-    if tuple(channels) != E5_RAW40_CHANNELS or max_minutes != 242:
+    # This is the stored export length, not the model input length.
+    if tuple(channels) != E5_RAW40_CHANNELS or max_minutes not in (240, 242):
         raise RuntimeError(
             "unexpected Parquet contract: "
             f"channels={channels} minutes={max_minutes}; "
@@ -129,7 +130,7 @@ def load_day(day: pd.Timestamp, *, store: Path, channels: list[str], max_minutes
         values[:, :, channel_index] = column.values.to_numpy(zero_copy_only=False).reshape(
             table.num_rows, max_minutes
         )
-    values = align_legacy_packed_minutes(values)
+    values = compact_packed_minutes(values)
     observed = np.isfinite(values)
     minute_mask = observed[:, :, 14]
     stock_mask = minute_mask.any(axis=1)
@@ -239,7 +240,7 @@ def main() -> int:
         input_dim=40,
         keep_channels=keep,
         model_dim=96,
-        max_minutes=max_minutes,
+        max_minutes=TRADING_MINUTES_PER_DAY,
         kernels=(3, 15, 60),
         tcn_blocks=3,
         tail_minutes=30,

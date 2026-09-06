@@ -58,7 +58,7 @@ def factor_path(out: Path, arm_dir: str, seed: int) -> Path:
 
 
 def main() -> int:
-    out = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/o2c"
+    out = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/o2c/clock240"
     labels = pd.read_parquet("/root/autodl-tmp/data/labels/year=2024/part-2024.parquet")
     labels["date"] = pd.to_datetime(labels["date"]).dt.normalize()
     labels["instrument"] = labels["instrument"].astype(str)

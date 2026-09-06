@@ -5,7 +5,7 @@ root=/root/autodl-tmp/projects/bigquant-default
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
 raw=/root/bigquant_private_data/bigalpha_2026_stock_bar1m_private_20250101_20260828
 private_store=/root/autodl-tmp/unified_microstructure_store_private1m_2025_2026
-out=$root/reports/dependencies/finals_pre/e1_o2c_walkforward
+out=$root/reports/dependencies/finals_pre/e1_o2c_walkforward/clock240
 
 mkdir -p "$out"
 cd "$root"

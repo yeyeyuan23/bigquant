@@ -9,7 +9,12 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from .microstructure import BOOK_LEVELS, MICROSTRUCTURE_CHANNELS, RAW_MICROSTRUCTURE_COLUMNS
+from .microstructure import (
+    BOOK_LEVELS,
+    MICROSTRUCTURE_CHANNELS,
+    RAW_MICROSTRUCTURE_COLUMNS,
+    TRADING_MINUTES_PER_DAY,
+)
 from .microstructure_data import (
     PRICE_COLUMNS,
     VOLUME_COLUMNS,
@@ -163,9 +168,9 @@ def _audit_canonical(
         pl.col("len").median().alias("median"),
         pl.col("len").max().alias("maximum"),
     ).row(0, named=True)
-    if int(minute_stats["maximum"]) > 242:
+    if int(minute_stats["maximum"]) > TRADING_MINUTES_PER_DAY:
         raise ValueError(
-            "canonical microstructure exceeds the 242-minute model contract: "
+            f"canonical microstructure exceeds the {TRADING_MINUTES_PER_DAY}-minute model contract: "
             f"maximum={int(minute_stats['maximum'])}"
         )
     return {

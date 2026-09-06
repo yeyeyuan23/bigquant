@@ -21,7 +21,7 @@ class ProgressiveConfig:
     input_dim: int = 40
     keep_channels: tuple[int, ...] = ()
     model_dim: int = 96
-    max_minutes: int = 242
+    max_minutes: int = 240
     kernels: tuple[int, ...] = (3, 15, 60)
     tcn_blocks: int = 3
     tail_minutes: int = 30

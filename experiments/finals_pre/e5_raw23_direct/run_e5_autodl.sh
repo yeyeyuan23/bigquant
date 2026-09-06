@@ -5,7 +5,7 @@ ROOT=/root/autodl-tmp/projects/bigquant-default
 PYTHON=/root/autodl-tmp/conda-envs/quant/bin/python
 CODE=$ROOT/experiments/finals_pre/e5_raw23_direct
 STORE=/root/bigquant_private_data/e5_raw40_2023_2024_parquet
-OUT=$ROOT/reports/dependencies/finals_pre/e5_raw23_direct/o2c_autodl
+OUT=$ROOT/reports/dependencies/finals_pre/e5_raw23_direct/o2c_autodl/clock240
 
 if [[ ! -s "$STORE/export_manifest.json" ]]; then
   echo "missing audited Parquet store manifest: $STORE/export_manifest.json" >&2

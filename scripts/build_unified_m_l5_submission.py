@@ -19,9 +19,9 @@ import nbformat
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_RUN_DIR = ROOT / "reports/dependencies/m_v3_final"
+DEFAULT_RUN_DIR = ROOT / "reports/dependencies/m_v3_final/clock240"
 DEFAULT_SOURCE_ROOT = ROOT / "src/alpha_models"
-DEFAULT_OUTPUT = ROOT / "submissions/m_l5"
+DEFAULT_OUTPUT = ROOT / "submissions/m_l5_240"
 DEFAULT_TRAINING_SCRIPT = ROOT / "scripts/train_unified_microstructure_v3_final.py"
 DEFAULT_ROUTE = "M_l5_seed_20260803_final"
 UPLOAD_FILES = (
@@ -438,7 +438,7 @@ def main(datasources, start_date, end_date):
                 features,
                 dates=[day],
                 instruments=instruments,
-                max_minutes=242,
+                max_minutes=model.config.max_minutes,
             )
             available = np.flatnonzero(batch.stock_mask[0])
             if len(available) < 2:
@@ -607,6 +607,11 @@ def main() -> int:
     if checkpoint_hash != checkpoint_manifest.get("checkpoint_sha256"):
         raise ValueError("final checkpoint SHA-256 does not match its manifest")
     config = checkpoint_manifest.get("config", {})
+    if config.get("max_minutes") != 240:
+        raise ValueError("current export requires a 240-minute checkpoint; use the frozen bundle for historical weights")
+    stored_config = torch.load(checkpoint, map_location="cpu", weights_only=True)["config"]
+    if json.loads(json.dumps(stored_config)) != json.loads(json.dumps(config)):
+        raise ValueError("checkpoint configuration differs from its manifest")
     if config.get("input_dim") != 28:
         raise ValueError("M-l5 final checkpoint must have exactly 28 input channels")
 

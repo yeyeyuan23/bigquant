@@ -27,7 +27,7 @@ def e5_train(load_experiment_module):
     return load_experiment_module("e5_raw23_direct/e5_train_autodl.py", "pre_e5_train")
 
 
-def test_parquet_manifest_requires_exactly_40_by_242(e5_train, tmp_path, contract):
+def test_parquet_manifest_preserves_legacy_source_contract(e5_train, tmp_path, contract):
     expected = contract["experiments"]["E5"]
     manifest = {
         "channels": expected["channels"],
@@ -65,10 +65,10 @@ def test_actual_autodl_e5_store_matches_and_loads_the_40_channel_contract(e5_tra
     batch = e5_train.load_day(day, store=store, channels=channels, max_minutes=max_minutes)
     assert batch is not None
     instruments, values, observed, minute_mask, stock_mask = batch
-    assert values.shape == (1000, 242, 40)
+    assert values.shape == (1000, 240, 40)
     assert observed.shape == values.shape
     assert len(instruments) == 1000
-    assert minute_mask.shape == stock_mask.shape + (242,)
+    assert minute_mask.shape == stock_mask.shape + (240,)
 
 
 def test_unreadable_optional_mount_is_skipped_instead_of_failing(monkeypatch):

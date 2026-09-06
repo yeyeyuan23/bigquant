@@ -30,7 +30,7 @@ class ProgressiveConfig:
     # 变成 0，E3b 那次全网络 NaN 就是 sqrt(0) 引起的。
     keep_channels: tuple[int, ...] = ()
     model_dim: int = 96
-    max_minutes: int = 242
+    max_minutes: int = 240
     kernels: tuple[int, ...] = (3, 15, 60)
     tcn_blocks: int = 3
     tail_minutes: int = 30

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT / "reports/dependencies/finals_pre/e2_o2c_epoch_curve"
+OUT = ROOT / "reports/dependencies/finals_pre/e2_o2c_epoch_curve/clock240"
 LABEL = "ret_next_open_to_close"
 KEYS = ["date", "instrument"]
 SEEDS = (20260801, 20260812, 20260823)

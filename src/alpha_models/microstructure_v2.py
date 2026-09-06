@@ -23,9 +23,11 @@ from .base import AlphaModel, register_model
 from .microstructure import (
     MICROSTRUCTURE_CHANNELS,
     RAW_MICROSTRUCTURE_COLUMNS,
+    TRADING_MINUTES_PER_DAY,
     MicrostructureTCNBlock,
     _masked_channel_statistics,
     build_microstructure_features,
+    trading_minute_indices,
 )
 from .temporal import DeepSetsContext, MaskedAttentionPool
 
@@ -239,9 +241,9 @@ def pack_microstructure_v2_days(
     *,
     dates: Sequence[str | pd.Timestamp] | None = None,
     instruments: Sequence[str] | None = None,
-    max_minutes: int = 242,
+    max_minutes: int = TRADING_MINUTES_PER_DAY,
 ) -> MicrostructureV2DayBatch:
-    """Pack v2 features into ``[day, stock, minute, channel]`` arrays."""
+    """Pack v2 features on the same 240 fixed clock positions as M_raw."""
 
     required = {
         "trade_date",
@@ -252,8 +254,10 @@ def pack_microstructure_v2_days(
     missing = sorted(required.difference(features.columns))
     if missing:
         raise ValueError(f"microstructure v2 features are missing columns: {missing}")
-    if max_minutes <= 0:
-        raise ValueError("max_minutes must be positive")
+    if max_minutes != TRADING_MINUTES_PER_DAY:
+        raise ValueError(
+            f"max_minutes must equal the fixed {TRADING_MINUTES_PER_DAY}-slot trading grid"
+        )
     frame = features.loc[
         :,
         ["trade_date", "instrument", "timestamp", *MICROSTRUCTURE_V2_CHANNELS],
@@ -299,10 +303,13 @@ def pack_microstructure_v2_days(
                 f"{day.date()} {instrument} has {len(group)} minutes; max_minutes={max_minutes}"
             )
         matrix = group.loc[:, list(MICROSTRUCTURE_V2_CHANNELS)].to_numpy(np.float32)
-        count = len(matrix)
-        values[day_index, stock_index, :count] = matrix
-        observed[day_index, stock_index, :count] = np.isfinite(matrix)
-        minute_mask[day_index, stock_index, :count] = True
+        positions = trading_minute_indices(group["timestamp"])
+        if not group["timestamp"].dt.normalize().eq(day).all():
+            raise ValueError("timestamp date does not match trade_date")
+        matrix[~np.isfinite(matrix)] = np.nan
+        values[day_index, stock_index, positions] = matrix
+        observed[day_index, stock_index, positions] = np.isfinite(matrix)
+        minute_mask[day_index, stock_index, positions] = True
     stock_mask = minute_mask.any(axis=2)
     return MicrostructureV2DayBatch(
         dates=packed_dates,
@@ -318,7 +325,7 @@ def pack_microstructure_v2_days(
 class MicrostructureV2Config:
     input_dim: int = len(MICROSTRUCTURE_V2_CHANNELS)
     model_dim: int = 96
-    max_minutes: int = 242
+    max_minutes: int = TRADING_MINUTES_PER_DAY
     kernels: tuple[int, ...] = (3, 15, 60)
     tcn_blocks: int = 3
     tail_minutes: int = 30

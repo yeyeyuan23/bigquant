@@ -135,7 +135,7 @@ print({
     "unified_microstructure",
     {
         "model_dim": 96,
-        "max_minutes": 242,
+        "max_minutes": 240,
         "kernels": (3, 15, 60),
         "tcn_blocks": 3,
         "tail_minutes": 30,

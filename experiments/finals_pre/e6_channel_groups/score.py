@@ -20,8 +20,8 @@ KEYS = ["date", "instrument"]
 SEEDS = (20260801, 20260812, 20260823)
 EXPOSURE_PATH = Path("/root/autodl-tmp/exposure_2024_full.parquet")
 EXPOSURE_DROP = {"ret", "weights", "float_market_cap", "industry_level1_code"}
-FULL_ROOT = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/o2c"
-OUT = ROOT / "reports/dependencies/finals_pre/e6_channel_groups/o2c"
+FULL_ROOT = ROOT / "reports/dependencies/finals_pre/e3_progressive_add/o2c/clock240"
+OUT = ROOT / "reports/dependencies/finals_pre/e6_channel_groups/o2c/clock240"
 ARMS = {
     "Full 17 channels": (FULL_ROOT, "p3_add_full_summaries_seed{seed}"),
     "Without price-path channels": (OUT, "no_price_path_seed{seed}"),

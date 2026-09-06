@@ -8,7 +8,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from .microstructure import BOOK_LEVELS, RAW_MICROSTRUCTURE_COLUMNS
+from .microstructure import BOOK_LEVELS, RAW_MICROSTRUCTURE_COLUMNS, TRADING_MINUTES_PER_DAY
 
 SourceProfile = Literal["canonical", "e2e_compressed"]
 PRICE_COLUMNS = (
@@ -165,9 +165,9 @@ def audit_canonical_microstructure(frame: pd.DataFrame) -> dict[str, object]:
         .groupby(["trade_date", "instrument"], sort=False)
         .size()
     )
-    if int(day_counts.max()) > 242:
+    if int(day_counts.max()) > TRADING_MINUTES_PER_DAY:
         raise ValueError(
-            "canonical microstructure exceeds the 242-minute model contract: "
+            f"canonical microstructure exceeds the {TRADING_MINUTES_PER_DAY}-minute model contract: "
             f"maximum={int(day_counts.max())}"
         )
     return {

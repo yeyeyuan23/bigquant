@@ -12,7 +12,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
 DATA = Path("/root/bigquant_private_data")
-OUT = ROOT / "reports/dependencies/finals_pre/e1_o2c_walkforward"
+OUT = ROOT / "reports/dependencies/finals_pre/e1_o2c_walkforward/clock240"
 LABEL = "ret_next_open_to_close"
 KEYS = ["date", "instrument"]
 EXPOSURE_PATHS = (

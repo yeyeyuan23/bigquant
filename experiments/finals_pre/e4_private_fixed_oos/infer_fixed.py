@@ -137,7 +137,7 @@ def main() -> int:
         model_raw = raw_day.loc[raw_day["instrument"].astype(str).isin(instruments)]
         features = build_microstructure_features(model_raw[list(RAW_MICROSTRUCTURE_COLUMNS)])
         batch = pack_microstructure_days(
-            features, dates=[day], instruments=instruments, max_minutes=242
+            features, dates=[day], instruments=instruments, max_minutes=model.config.max_minutes
         )
         available = np.flatnonzero(batch.stock_mask[0])
         if len(available) < 2:

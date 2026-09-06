@@ -179,7 +179,7 @@ def pack_multiaxis_day(
     *,
     keys: Sequence[Any],
     stats: dict[str, Any],
-    max_minutes: int = 242,
+    max_minutes: int = 240,
     tail_minutes: int = 60,
     axis_bins: int = 24,
 ) -> MultiAxisBatch:
@@ -266,7 +266,7 @@ class MultiAxisConfig:
     input_dim: int = len(RAW_FIELDS)
     axis_token_dim: int = AXIS_TOKEN_DIM
     model_dim: int = 96
-    max_minutes: int = 242
+    max_minutes: int = 240
     tail_minutes: int = 60
     axis_bins: int = 24
     heads: int = 4

@@ -3,12 +3,21 @@ set -euo pipefail
 
 project_root=/root/autodl-tmp/projects/bigquant-m-v3-l5-channels-20260803
 integration_root=/root/autodl-tmp/projects/bigquant-default
-m_v2_root=/root/autodl-tmp/projects/bigquant-m-v2-l5-gated-20260803/reports/m_v2_flow_gated_20260803
+m_v2_root=/root/autodl-tmp/projects/bigquant-m-v2-l5-gated-20260803/reports/m_v2_flow_gated_20260803/clock240
 python_bin=/root/autodl-tmp/conda-envs/quant/bin/python
 data_root=/root/autodl-tmp/data
 micro_store=/root/autodl-tmp/unified_microstructure_store_v2_2019_2024
 deep_book_dir=/root/autodl-tmp/m_v3_deep_book_context_2019_2024
-run_root="$project_root/reports/m_v3_l5_channels_20260803"
+run_root="$project_root/reports/m_v3_l5_channels_20260803/clock240"
+
+baseline="$integration_root/reports/dependencies/m_raw_final_checkpoint/clock240/strict_oos_route_2023_2024/unified_microstructure_strict_oos.parquet"
+# Require matching-grid baselines before launching an expensive challenge.
+for required_route in "$baseline" "$m_v2_root"/holdout_2024_seed_2026080{1,2,3}/unified_microstructure_v2_full_oos.parquet; do
+  if [[ ! -s "$required_route" ]]; then
+    echo "missing 240-minute baseline: $required_route" >&2
+    exit 1
+  fi
+done
 
 mkdir -p "$run_root"
 cd "$project_root"
@@ -38,7 +47,7 @@ for seed in 20260801 20260802 20260803; do
     --kernels 3 15 60 \
     --tcn-blocks 3 \
     --tail-minutes 30 \
-    --max-minutes 242 \
+    --max-minutes 240 \
     --max-stocks 1200 \
     --min-train-days 900 \
     --learning-rate 4e-4 \
@@ -46,7 +55,6 @@ for seed in 20260801 20260802 20260803; do
     2>&1 | tee "$output_dir/train.log"
 done
 
-baseline="$integration_root/reports/dependencies/m_raw_final_checkpoint/strict_oos_route_2023_2024/unified_microstructure_strict_oos.parquet"
 m_v2_ensemble="$run_root/m_dynamic_seed_ensemble.parquet"
 m_v3_ensemble="$run_root/m_l5_seed_ensemble.parquet"
 
