@@ -9,12 +9,12 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
 def now():
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def write_json(path, value):
@@ -73,16 +73,16 @@ def score(args):
         ).dropna()
         stress_ic = ic[ic.index.isin(stress)]
         scores.append(
-            dict(
-                arm=arm,
-                seed=20260801,
-                epochs=3,
-                days=len(ic),
-                neutral_rank_ic=float(ic.mean()),
-                neutral_rank_ic_ir=float(ic.mean() / ic.std()),
-                long_short_sharpe=float(spread.mean() / spread.std() * np.sqrt(252)),
-                stress_ic_ir=float(stress_ic.mean() / stress_ic.std()),
-            )
+            {
+                "arm": arm,
+                "seed": 20260801,
+                "epochs": 3,
+                "days": len(ic),
+                "neutral_rank_ic": float(ic.mean()),
+                "neutral_rank_ic_ir": float(ic.mean() / ic.std()),
+                "long_short_sharpe": float(spread.mean() / spread.std() * np.sqrt(252)),
+                "stress_ic_ir": float(stress_ic.mean() / stress_ic.std()),
+            }
         )
     pd.testing.assert_frame_equal(factors["clock240"][keys], factors["clock242"][keys])
     table = pd.DataFrame(scores)

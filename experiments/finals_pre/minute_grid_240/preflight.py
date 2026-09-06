@@ -1,5 +1,4 @@
 """Compare the real inputs, training calendar and initial weights across code snapshots."""
-# ruff: noqa: E402
 # Select the requested snapshot before importing any model or loader modules.
 
 import hashlib

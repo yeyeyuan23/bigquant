@@ -67,6 +67,7 @@ def main():
             capture_output=True,
             text=True,
             timeout=30,
+            check=False,  # Preserve SSH's disconnect/exit status in the shutdown receipt.
         )
         receipt["shutdown_ssh_returncode"] = result.returncode
         receipt["shutdown_output"] = result.stdout + result.stderr

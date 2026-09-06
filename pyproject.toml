@@ -49,6 +49,8 @@ line-length = 100
 # Frozen platform submission bundles and concluded experiment staging are
 # generated artifacts; they are archived as-is and excluded from linting.
 extend-exclude = ["third_party", "submissions", "remote_submission_notebooks", "work"]
+# The local schedule helper also runs with macOS's Python 3.9; training uses 3.11+.
+per-file-target-version = { "experiments/finals_pre/minute_grid_240/monitor.py" = "py39" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
