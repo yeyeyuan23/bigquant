@@ -75,7 +75,7 @@ def score(args):
         scores.append(
             {
                 "arm": arm,
-                "seed": 20260801,
+                "seed": args.seed,
                 "epochs": 3,
                 "days": len(ic),
                 "neutral_rank_ic": float(ic.mean()),
@@ -113,14 +113,12 @@ def main():
         "exposure",
     ):
         parser.add_argument("--" + key, type=Path, required=True)
+    parser.add_argument("--seed", type=int, default=20260801)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     status_path = args.output_dir / "status.json"
     if status_path.exists():
         raise RuntimeError("output already has a run; use a fresh output directory")
-    started = time.monotonic()
-    status = {"state": "running", "started_at": now(), "pid": os.getpid(), "completed_arms": []}
-    write_json(status_path, status)
     env = dict(
         os.environ,
         OMP_NUM_THREADS="8",
@@ -133,12 +131,14 @@ def main():
     for minutes in (240, 242):
         item = json.loads((args.output_dir / f"preflight{minutes}.json").read_text())
         assert item.pop("minutes") == minutes
+        if item.get("seed", 20260801) != args.seed:
+            raise RuntimeError("preflight seed differs from requested training seed")
         preflight[minutes] = item
     if preflight[240] != preflight[242]:
         raise RuntimeError("paired preflight differs beyond the minute count")
     manifest = {
         "started_at": now(),
-        "seed": 20260801,
+        "seed": args.seed,
         "epochs": 3,
         "paired_preflight": preflight[240],
         "control": "pre-fix c0dcd21941e30739e3135997e7928875bca022aa fixed 242 grid",
@@ -157,6 +157,15 @@ def main():
         "arms": {},
     }
     write_json(args.output_dir / "pair_manifest.json", manifest)
+    started = time.monotonic()
+    status = {
+        "state": "running",
+        "seed": args.seed,
+        "started_at": now(),
+        "pid": os.getpid(),
+        "completed_arms": [],
+    }
+    write_json(status_path, status)
     try:
         for arm, root, minutes in [
             ("clock240", args.current_root, 240),
@@ -202,7 +211,7 @@ def main():
                 "--learning-rate",
                 "4e-4",
                 "--seed",
-                "20260801",
+                str(args.seed),
                 "--label-column",
                 "ret_next_open_to_close",
                 "--fast-pack",

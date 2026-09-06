@@ -1,12 +1,17 @@
 """Compare the real inputs, training calendar and initial weights across code snapshots."""
 # Select the requested snapshot before importing any model or loader modules.
 
+import argparse
 import hashlib
 import json
 import sys
 from pathlib import Path
 
-root = Path(sys.argv[1]).resolve()
+parser = argparse.ArgumentParser()
+parser.add_argument("root", type=Path)
+parser.add_argument("--seed", type=int, default=20260801)
+args = parser.parse_args()
+root = args.root.resolve()
 sys.path[:0] = [
     str(root / "src"),
     str(root / "scripts"),
@@ -22,7 +27,7 @@ from alpha_models import rolling_oos_blocks
 from alpha_models.microstructure import MicrostructureConfig, MicrostructureNetwork
 
 config = MicrostructureConfig()
-torch.manual_seed(20260801)
+torch.manual_seed(args.seed)
 model = MicrostructureNetwork(config)
 weight_hash = hashlib.sha256()
 for name, value in model.state_dict().items():
@@ -36,7 +41,7 @@ blocks = apply_training_history(
 assert len(blocks) == 1
 train, test = blocks[0]
 assert len(test) == 241
-rng = np.random.default_rng(20260801)
+rng = np.random.default_rng(args.seed)
 order_hash = hashlib.sha256()
 for _ in range(3):
     shuffled = train.copy()
@@ -65,6 +70,7 @@ for day in (dates[train[0]], dates[train[-1]], dates[test[0]]):
 print(
     json.dumps(
         {
+            "seed": args.seed,
             "minutes": config.max_minutes,
             "parameter_count": sum(p.numel() for p in model.parameters()),
             "initial_weights_sha256": weight_hash.hexdigest(),
