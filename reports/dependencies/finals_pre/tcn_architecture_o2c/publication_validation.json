@@ -1,0 +1,13 @@
+{
+  "experiment_id": "E9",
+  "sealed_sources": 20,
+  "specialized_tests": {
+    "passed": 29,
+    "command": "python -m pytest -q -o addopts=\"\" experiments/finals_pre/tcn_architecture_o2c/test_protocol.py"
+  },
+  "ruff": "passed",
+  "published_result_verification": "passed: 45 daily series; 10000 moving-block bootstrap draws; Holm; original source/result hashes",
+  "full_repository_tests": "Executed separately; authoritative push validation is GitHub Actions tests workflow",
+  "snapshot_isolation": "E9 tests run in a separate Python process to avoid changing other tests module imports",
+  "original_training_audit": "audits/completion_audit.json"
+}

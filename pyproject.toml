@@ -59,7 +59,11 @@ per-file-target-version = { "experiments/finals_pre/minute_grid_240/monitor.py" 
 pythonpath = ["src"]
 # Immutable source snapshots accompany historical results; collect the maintained
 # experiment tests instead of importing a second copy with the same module name.
-addopts = ["--ignore=reports/dependencies/finals_pre/e7_strategy_application/20260906/code"]
+# E9 uses a sealed alpha_models snapshot; CI runs its tests in a separate process.
+addopts = [
+  "--ignore=reports/dependencies/finals_pre/e7_strategy_application/20260906/code",
+  "--ignore=experiments/finals_pre/tcn_architecture_o2c",
+]
 
 [tool.coverage.run]
 branch = true
@@ -70,3 +74,8 @@ source = ["src", "scripts"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+# These historical report/audit sources are kept byte-for-byte for E9 hashes.
+[tool.ruff.lint.per-file-ignores]
+"experiments/finals_pre/tcn_architecture_o2c/analysis/completion_check.py" = ["I001", "F401"]
+"experiments/finals_pre/tcn_architecture_o2c/analysis/build_readme.py" = ["I001", "C401"]

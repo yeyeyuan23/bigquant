@@ -1,0 +1,17 @@
+{
+  "completed_at": "2026-09-07T08:59:48.231709+00:00",
+  "runs": 45,
+  "prepared_sha256": "7084bf6dbe0625920b51facadb9c25072d82c040fbdccfe763c13488b2dab5d0",
+  "files": {
+    "per_run.csv": "7dba4efe90125e9a12188736eeaa50d8f6a1600a7fe0c2c34e9752c79b94b9ba",
+    "paired_deltas.csv": "950318bb26db0ab3de474547069a2df745d3dd1963707f31cd685162f5112bf6",
+    "summary.csv": "791a74de628f5f8a598aa3f6f8ad7d8c3b200a40d5fb3adcafedaaadd86207ea",
+    "summary.json": "232ce5d33b99dbf73ad8458807241b9d32013b4c75e33e05a749a3ba01294420",
+    "daily_rankic_cube.npz": "83423068158f2847654caa4970d7fb765c1a9023ef22791c96745de39e8425ce",
+    "depth.csv": "677d50a08b8ee4f7be3ace496cc5ac3f74ec0c7f3015076c8b86655e41bc825c",
+    "branches.csv": "956621ec6f83af64df910a58ee1d077dc4e3a94ce6b649084957900cc3a5d7ea",
+    "kernels.csv": "d9511eeada931dc7237aeef223b257be3f35fa9c839a190a825db69c8045fa37",
+    "controls.csv": "7c4e7c2c55465570868f0230b185c2468000796a6feaf1e793e9a6ffb4618e2f",
+    "README.md": "0384305c1d8e35d8320d95cda3dac3a3b8e54bba6fe44b4c6161cb923f5cc3c2"
+  }
+}

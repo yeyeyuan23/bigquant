@@ -1,0 +1,10 @@
+{
+  "state": "verified",
+  "files": 206,
+  "daily_metric_files": 45,
+  "bundle_sha256": "7c162d2113847bf1ea7b1846d62c70a59fb9f694d2aa4d9811c778bb67f38ab0",
+  "raw_data_checkpoints_full_factors_downloaded": false,
+  "final_readme_sha256": "d3e41d5629d7d9cc4d39e157116e21536fa61408f4dbf8b0d5260c105374a38e",
+  "final_readme_remote_sha256_verified": true,
+  "readme_post_bundle_change": "Corrected daily metrics path to runs/seedN/arm; all original result hashes unchanged."
+}

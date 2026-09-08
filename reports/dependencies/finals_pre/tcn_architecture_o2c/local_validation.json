@@ -1,0 +1,74 @@
+{
+  "state": "complete",
+  "specialized_tests_passed": 29,
+  "related_regression_passed": 38,
+  "related_regression_skipped": 1,
+  "isolated_snapshot_tests_passed": 29,
+  "ruff": "passed",
+  "py_compile": "passed",
+  "source_receipt": "source_receipt.json",
+  "remote_training_completed": 45,
+  "remote_training_planned": 45,
+  "upload_succeeded": true,
+  "followup_required": [],
+  "snapshot_head": "f2071692bdaa443d9d4eaf6c45c9f35c11902e3c",
+  "instance_power_state": "stopped; verified 已关机 in AutoDL console",
+  "repository_ci": {
+    "run_id": 34022259925,
+    "conclusion": "success",
+    "passed": 682,
+    "skipped": 2,
+    "subtests_passed": 5,
+    "src_coverage_percent": 84,
+    "tcn_uncommitted_not_in_this_ci": true
+  },
+  "local_experiment_code_removed": true,
+  "remote_specialized_tests_passed": 29,
+  "remote_real_forward_backward_checks_passed": 45,
+  "amp_initial_scale": 1024,
+  "artifact_naming": "seed1/seed2/seed3 and attempt counters; no dates",
+  "code_authority": "AutoDL experiments/finals_pre/tcn_architecture_o2c",
+  "explicit_upload_authorization": true,
+  "remote_real_input_preflight": "passed",
+  "remote_training_current": {
+    "state": "complete",
+    "completed": 45,
+    "total": 45
+  },
+  "full_preflight": {
+    "input_partitions": 1455,
+    "training_dates": 1213,
+    "scoring_dates": 241,
+    "scoring_rows": 240567,
+    "channels": 17,
+    "source_files": 20,
+    "real_forward_backward_checks_passed": 45,
+    "protocol_hash": "b5954cd3705656ecf33c0fcb7233cedf693b356e3ccfa9f157f575ed4b0a5318"
+  },
+  "remote_date_named_artifacts": [],
+  "heartbeat": {
+    "id": "tcn",
+    "state": "PAUSED",
+    "interval_minutes": 30
+  },
+  "previous_instance_shutdown_history": {
+    "instance_shutdown_command_exit_code": 0,
+    "instance_shutdown_ui": "已关机"
+  },
+  "first_completed_run_audit": "seed1_baseline_audit.json",
+  "estimated_remaining_hours": 0,
+  "shutdown_policy": {
+    "authorized": true,
+    "condition": "all 45 runs, scoring and planned statistical checks complete; results saved and small summaries/daily metrics retrieved",
+    "action": "shutdown AutoDL and verify stopped state",
+    "do_not_shutdown_before_completion": true
+  },
+  "seed_completion_audits": {
+    "seed1": "seed1_complete_audit.json",
+    "seed2": "seed2_complete_audit.json"
+  },
+  "final_audit": "audits/completion_audit.json",
+  "handoff_receipt": "handoff/local_receipt.json",
+  "shutdown_receipt": "handoff/shutdown_receipt.json",
+  "design_findings_updated": true
+}

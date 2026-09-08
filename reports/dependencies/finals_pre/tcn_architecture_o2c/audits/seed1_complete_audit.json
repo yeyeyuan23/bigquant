@@ -1,0 +1,111 @@
+{
+  "state": "passed",
+  "seed_tag": "seed1",
+  "completed_runs": 15,
+  "epochs_per_run": 3,
+  "scoring_dates": 241,
+  "scoring_rows": 240567,
+  "checks": [
+    "source and artifact checksums",
+    "prepared manifest identity",
+    "actual sample order",
+    "initial module weights",
+    "prediction key and availability manifest hashes",
+    "scoring key hashes",
+    "daily metric calendars, finiteness and means"
+  ],
+  "total_training_inference_hours": 7.879688942150549,
+  "costs": [
+    {
+      "arm": "baseline",
+      "elapsed_seconds": 1919.568465705961,
+      "parameter_count": 217953,
+      "peak_cuda_allocated_bytes": 1941624320
+    },
+    {
+      "arm": "depth1",
+      "elapsed_seconds": 1676.3477946058847,
+      "parameter_count": 147105,
+      "peak_cuda_allocated_bytes": 1032005120
+    },
+    {
+      "arm": "depth2",
+      "elapsed_seconds": 1751.022663359996,
+      "parameter_count": 182529,
+      "peak_cuda_allocated_bytes": 1486757376
+    },
+    {
+      "arm": "depth4",
+      "elapsed_seconds": 1963.84718877892,
+      "parameter_count": 253377,
+      "peak_cuda_allocated_bytes": 2396491264
+    },
+    {
+      "arm": "single15",
+      "elapsed_seconds": 1634.6352334069088,
+      "parameter_count": 144513,
+      "peak_cuda_allocated_bytes": 1352437248
+    },
+    {
+      "arm": "single60",
+      "elapsed_seconds": 1771.924799283035,
+      "parameter_count": 157473,
+      "peak_cuda_allocated_bytes": 1378535424
+    },
+    {
+      "arm": "branches2",
+      "elapsed_seconds": 1830.1807459089905,
+      "parameter_count": 189441,
+      "peak_cuda_allocated_bytes": 1663531008
+    },
+    {
+      "arm": "branches4",
+      "elapsed_seconds": 1878.6688951170072,
+      "parameter_count": 248193,
+      "peak_cuda_allocated_bytes": 2223252480
+    },
+    {
+      "arm": "branches5",
+      "elapsed_seconds": 1972.1875323581044,
+      "parameter_count": 284481,
+      "peak_cuda_allocated_bytes": 2528344064
+    },
+    {
+      "arm": "kernels_2_10_45",
+      "elapsed_seconds": 1776.2084468109533,
+      "parameter_count": 211905,
+      "peak_cuda_allocated_bytes": 1929383424
+    },
+    {
+      "arm": "kernels_5_30_120",
+      "elapsed_seconds": 2112.1484382511117,
+      "parameter_count": 240129,
+      "peak_cuda_allocated_bytes": 1987124736
+    },
+    {
+      "arm": "kernels_5_60_120",
+      "elapsed_seconds": 2177.6086835670285,
+      "parameter_count": 248769,
+      "peak_cuda_allocated_bytes": 2004465664
+    },
+    {
+      "arm": "same_scale60",
+      "elapsed_seconds": 2160.9866874329746,
+      "parameter_count": 247329,
+      "peak_cuda_allocated_bytes": 2001009664
+    },
+    {
+      "arm": "rf179_depth2",
+      "elapsed_seconds": 1790.7644465300255,
+      "parameter_count": 189825,
+      "peak_cuda_allocated_bytes": 1501449728
+    },
+    {
+      "arm": "rf177_depth4",
+      "elapsed_seconds": 1950.7801706250757,
+      "parameter_count": 245697,
+      "peak_cuda_allocated_bytes": 2381142528
+    }
+  ],
+  "results_interpretation": "No architecture decision before all three seeds complete"
+}

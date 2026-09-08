@@ -58,3 +58,10 @@ reports/dependencies/finals_pre/e5_raw23_direct/**/*.log
 reports/dependencies/finals_pre/minute_grid_240/**/*.pt
 reports/dependencies/finals_pre/minute_grid_240/**/*.parquet
 reports/dependencies/finals_pre/minute_grid_240/**/executed_sources/
+
+# E9 private runtime products remain on AutoDL.
+reports/dependencies/finals_pre/tcn_architecture_o2c/**/*.pt
+reports/dependencies/finals_pre/tcn_architecture_o2c/**/*.parquet
+reports/dependencies/finals_pre/tcn_architecture_o2c/**/*.log
+reports/dependencies/finals_pre/tcn_architecture_o2c/**/*.gz
+reports/dependencies/finals_pre/tcn_architecture_o2c/handoff/*.zip

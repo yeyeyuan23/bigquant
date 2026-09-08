@@ -1,0 +1,10 @@
+{
+  "state": "stopped",
+  "verified_at": "2026-09-07T09:36:15.830184+00:00",
+  "command": "ssh autodl-bigquant: sync && shutdown -h now",
+  "exit_code": 0,
+  "ui_state": "已关机",
+  "instance": "4e0e468bcd-7deafccc",
+  "results_retrieved_before_shutdown": true,
+  "verification": "AutoDL console instance list, one RTX 4090D instance, displayed 已关机 and 开机 button"
+}

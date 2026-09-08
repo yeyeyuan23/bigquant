@@ -1,0 +1,16 @@
+{
+  "state": "complete",
+  "arm": "same_scale60",
+  "seed": 20260823,
+  "started_at": "2026-09-07T07:24:09.641587+00:00",
+  "pid": 42449,
+  "phase": "inference",
+  "epoch": 3,
+  "step": 200,
+  "total_steps": 3639,
+  "last_loss": -0.20829294621944427,
+  "grad_norm": 0.42865800857543945,
+  "elapsed_seconds": 2111.435293470975,
+  "updated_at": "2026-09-07T07:59:03.884254+00:00",
+  "finished_at": "2026-09-07T07:59:21.503259+00:00"
+}
