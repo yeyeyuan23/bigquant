@@ -43,7 +43,7 @@ E1–E7 没有计算 p 值或置信区间，只报告均值、标准差、配对
 | **E3** | 统计基线、DeepSets、TCN+last 和三种摘要分别带来什么变化 | `e3_progressive_add/` | `reports/dependencies/finals_pre/e3_progressive_add/o2c/` |
 | **E4** | 正式提交权重在 2025–2026 年的表现、预测期限和成本敏感性 | `e4_private_fixed_oos/` | `reports/dependencies/finals_pre/e4_private_fixed_oos/` |
 | **E5** | 直接加入 23 个原始字段是否优于原 17 通道 | `e5_raw23_direct/` | `reports/dependencies/finals_pre/e5_raw23_direct/o2c_autodl/` |
-| **E6** | 价格路径、盘口与成交结构通道是否各自提供独立增量 | `e6_channel_groups/` | `reports/dependencies/finals_pre/e6_channel_groups/o2c/` |
+| **E6** | 价格路径、盘口与成交结构通道是否各自提供独立增量 | [e6_channel_groups/](e6_channel_groups/README.md) | [历史结果与补档核验](../../reports/dependencies/finals_pre/e6_channel_groups/o2c/README.md) |
 | **E7** | 同一冻结因子在固定成本下，持仓规则如何影响换手、收益与回撤（含隔夜） | `e7_strategy_application/` | `reports/dependencies/finals_pre/e7_strategy_application/20260906_fee_slippage/` |
 | **E8** | 固定模型、0.05 系数与三轮预算，SmoothL1、L1、半平方 L2 的差异 | [e8_loss_comparison/](e8_loss_comparison/README.md) | [结果与审计](../../reports/dependencies/finals_pre/e8_loss_comparison/20260915/results/README.md) |
 | **E9** | 三块、三个分支与 3/15/60 是否值得选择：15 配置 × 3 种子，含成本与统计检验 | [tcn_architecture_o2c/](tcn_architecture_o2c/README.md) | [结果与审计](../../reports/dependencies/finals_pre/tcn_architecture_o2c/README.md) |

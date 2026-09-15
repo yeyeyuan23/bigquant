@@ -70,6 +70,8 @@ loss = -Pearson(prediction, target)
 
 尚未完成评分和核验的实验不进入 README 结论。
 
+实验直达：[E6 通道消融的代码与结果](experiments/finals_pre/e6_channel_groups/README.md)、[E8 三种辅助损失对照](experiments/finals_pre/e8_loss_comparison/README.md)、[E9 大规模架构对照（45 次训练）](experiments/finals_pre/tcn_architecture_o2c/README.md)。
+
 ## 主要目录
 
 ```text

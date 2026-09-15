@@ -1,0 +1,33 @@
+{
+  "source_repository": "https://github.com/yeyeyuan23/BigAlpha_Pre",
+  "source_path": "results/sources/o2c_pre/e6",
+  "copied_without_modification": true,
+  "files": {
+    "a4_paired_deltas.csv": {
+      "github_blob_sha": "9d95c898d7ef2655e78b13213e5baecc21f71948",
+      "sha256": "923bfc2b02bbdc613af7996ea68934abc60f0b5913027cafeba7c9c3e40c22cc"
+    },
+    "a4_per_seed.csv": {
+      "github_blob_sha": "44be8e7c2c54c473e40c7d86a119633b4deead1a",
+      "sha256": "55086f16d01d89804384abf123a2512678afb5b9a486927bcc65115c5a8a69e3"
+    },
+    "a4_summary.csv": {
+      "github_blob_sha": "c2a31a934e464139e8920f42523cf3ce0436ce78",
+      "sha256": "f443aedec5df9e838119951385ce5bfddeef40222e6d86e08764f3eb2793bc98"
+    },
+    "audit.json": {
+      "github_blob_sha": "c27da95c1ecd1b6b3cb0cc503f11c62ea8db242e",
+      "sha256": "96a080bccf2f14efe9907530aafa0a9290df27a8d6a8de03e60174dfa4d15742"
+    }
+  },
+  "validation": {
+    "status": "pass",
+    "arms": 5,
+    "seeds_per_arm": 3,
+    "per_seed_rows": 15,
+    "summary_mean_and_sample_sd_recomputed": true,
+    "paired_deltas_and_direction_counts_recomputed": 16
+  },
+  "historical_code_reference": "c0dcd21941e30739e3135997e7928875bca022aa",
+  "scope": "Aggregate tables recovered from the published PRE repository. No local retraining, stock-level neutralization or daily-return reconstruction. Current 240-minute entry points have not regenerated these historical results."
+}
