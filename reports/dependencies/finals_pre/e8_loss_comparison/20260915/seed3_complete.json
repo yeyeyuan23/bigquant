@@ -1,0 +1,10 @@
+{
+  "seed": 20260823,
+  "at": "2026-09-15T08:55:53.648592+00:00",
+  "arms_completed": [
+    "smooth_l1",
+    "l1",
+    "l2_half"
+  ],
+  "candidate_elimination": false
+}

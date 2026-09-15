@@ -1,0 +1,164 @@
+[
+  {
+    "arm": "smooth_l1",
+    "date": "2019-01-02",
+    "loss": -0.0025685299187898636,
+    "loss_name": "smooth_l1",
+    "loss_diagnostics": {
+      "correlation": 0.011168557219207287,
+      "auxiliary": 0.17200054228305817,
+      "weighted_auxiliary": 0.008600027300417423,
+      "prediction_mean": 0.2688255310058594,
+      "prediction_std": 0.18446122109889984,
+      "mean_absolute_error": 0.478442519903183,
+      "large_error_fraction": 0.09375
+    },
+    "gradient_norm": 15.50906753540039,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "smooth_l1",
+    "date": "2023-12-28",
+    "loss": -0.12136950343847275,
+    "loss_name": "smooth_l1",
+    "loss_diagnostics": {
+      "correlation": 0.13222761452198029,
+      "auxiliary": 0.21716222167015076,
+      "weighted_auxiliary": 0.010858111083507538,
+      "prediction_mean": 0.1631617546081543,
+      "prediction_std": 0.20513831079006195,
+      "mean_absolute_error": 0.5735385417938232,
+      "large_error_fraction": 0.125
+    },
+    "gradient_norm": 12.413985252380371,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "smooth_l1",
+    "date": "2024-01-02",
+    "loss": 0.21807025372982025,
+    "loss_name": "smooth_l1",
+    "loss_diagnostics": {
+      "correlation": -0.21029578149318695,
+      "auxiliary": 0.15548951923847198,
+      "weighted_auxiliary": 0.007774475961923599,
+      "prediction_mean": 0.20390605926513672,
+      "prediction_std": 0.1481318175792694,
+      "mean_absolute_error": 0.47901564836502075,
+      "large_error_fraction": 0.0
+    },
+    "gradient_norm": 12.88608455657959,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "l1",
+    "date": "2019-01-02",
+    "loss": 0.012753569521009922,
+    "loss_name": "l1",
+    "loss_diagnostics": {
+      "correlation": 0.011168557219207287,
+      "auxiliary": 0.478442519903183,
+      "weighted_auxiliary": 0.02392212674021721,
+      "prediction_mean": 0.2688255310058594,
+      "prediction_std": 0.18446122109889984,
+      "mean_absolute_error": 0.478442519903183,
+      "large_error_fraction": 0.09375
+    },
+    "gradient_norm": 15.554399490356445,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "l1",
+    "date": "2023-12-28",
+    "loss": -0.10390950739383698,
+    "loss_name": "l1",
+    "loss_diagnostics": {
+      "correlation": 0.13257229328155518,
+      "auxiliary": 0.5732557773590088,
+      "weighted_auxiliary": 0.0286627896130085,
+      "prediction_mean": 0.16243457794189453,
+      "prediction_std": 0.20515239238739014,
+      "mean_absolute_error": 0.5732557773590088,
+      "large_error_fraction": 0.125
+    },
+    "gradient_norm": 12.440279006958008,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "l1",
+    "date": "2024-01-02",
+    "loss": 0.23260349035263062,
+    "loss_name": "l1",
+    "loss_diagnostics": {
+      "correlation": -0.20863166451454163,
+      "auxiliary": 0.47943657636642456,
+      "weighted_auxiliary": 0.023971829563379288,
+      "prediction_mean": 0.19891512393951416,
+      "prediction_std": 0.1477782279253006,
+      "mean_absolute_error": 0.47943657636642456,
+      "large_error_fraction": 0.0
+    },
+    "gradient_norm": 12.955601692199707,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "l2_half",
+    "date": "2019-01-02",
+    "loss": -0.002479245886206627,
+    "loss_name": "l2_half",
+    "loss_diagnostics": {
+      "correlation": 0.011168557219207287,
+      "auxiliary": 0.1737862229347229,
+      "weighted_auxiliary": 0.00868931133300066,
+      "prediction_mean": 0.2688255310058594,
+      "prediction_std": 0.18446122109889984,
+      "mean_absolute_error": 0.478442519903183,
+      "large_error_fraction": 0.09375
+    },
+    "gradient_norm": 15.511305809020996,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "l2_half",
+    "date": "2023-12-28",
+    "loss": -0.12098197638988495,
+    "loss_name": "l2_half",
+    "loss_diagnostics": {
+      "correlation": 0.13192623853683472,
+      "auxiliary": 0.21888530254364014,
+      "weighted_auxiliary": 0.010944264940917492,
+      "prediction_mean": 0.1630411148071289,
+      "prediction_std": 0.20514515042304993,
+      "mean_absolute_error": 0.5735743045806885,
+      "large_error_fraction": 0.125
+    },
+    "gradient_norm": 12.416325569152832,
+    "parameters": 217953,
+    "receptive_field": 178
+  },
+  {
+    "arm": "l2_half",
+    "date": "2024-01-02",
+    "loss": 0.21771974861621857,
+    "loss_name": "l2_half",
+    "loss_diagnostics": {
+      "correlation": -0.20994187891483307,
+      "auxiliary": 0.15555736422538757,
+      "weighted_auxiliary": 0.007777868304401636,
+      "prediction_mean": 0.2018871307373047,
+      "prediction_std": 0.14791308343410492,
+      "mean_absolute_error": 0.47915393114089966,
+      "large_error_fraction": 0.0
+    },
+    "gradient_norm": 12.910567283630371,
+    "parameters": 217953,
+    "receptive_field": 178
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "state": "complete",
+  "arm": "l2_half",
+  "seed": 20260801,
+  "started_at": "2026-09-15T05:42:46.704230+00:00",
+  "pid": 4244,
+  "phase": "inference",
+  "epoch": 3,
+  "step": 200,
+  "total_steps": 3639,
+  "last_loss": -0.08553032577037811,
+  "grad_norm": 0.37730076909065247,
+  "loss_diagnostics": {
+    "correlation": 0.09401583671569824,
+    "auxiliary": 0.169710174202919,
+    "weighted_auxiliary": 0.00848550908267498,
+    "prediction_mean": 0.00347489258274436,
+    "prediction_std": 0.1492369920015335,
+    "mean_absolute_error": 0.5004100203514099,
+    "large_error_fraction": 0.04909819737076759
+  },
+  "elapsed_seconds": 1645.2630811557174,
+  "updated_at": "2026-09-15T06:09:56.226580+00:00",
+  "finished_at": "2026-09-15T06:10:12.342805+00:00"
+}

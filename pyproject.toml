@@ -59,10 +59,11 @@ per-file-target-version = { "experiments/finals_pre/minute_grid_240/monitor.py" 
 pythonpath = ["src"]
 # Immutable source snapshots accompany historical results; collect the maintained
 # experiment tests instead of importing a second copy with the same module name.
-# E9 uses a sealed alpha_models snapshot; CI runs its tests in a separate process.
+# E8 and E9 use sealed alpha_models snapshots; CI runs each suite separately.
 addopts = [
   "--ignore=reports/dependencies/finals_pre/e7_strategy_application/20260906/code",
   "--ignore=experiments/finals_pre/tcn_architecture_o2c",
+  "--ignore=experiments/finals_pre/e8_loss_comparison",
 ]
 
 [tool.coverage.run]

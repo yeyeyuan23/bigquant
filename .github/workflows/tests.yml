@@ -20,6 +20,10 @@ jobs:
         run: |
           python -m pytest -q -o addopts="" experiments/finals_pre/tcn_architecture_o2c/test_protocol.py
           python experiments/finals_pre/tcn_architecture_o2c/analysis/verify_results.py
+      - name: E8 sealed experiment checks
+        run: |
+          python -m pytest -q -o addopts="" experiments/finals_pre/e8_loss_comparison/test_e8.py
+          python experiments/finals_pre/e8_loss_comparison/validate_results.py reports/dependencies/finals_pre/e8_loss_comparison/20260915
       - run: coverage run -m pytest -q
       - run: coverage combine
       - run: coverage report --include="src/*" --fail-under=75

@@ -1,0 +1,16 @@
+{
+  "validated_at_utc": "2026-09-15T12:16:14.125714+00:00",
+  "status": "pass",
+  "runs": 9,
+  "scoring_days": 241,
+  "scoring_rows_per_run": 240567,
+  "collected_files_verified": 69,
+  "sealed_source_files_verified": 21,
+  "collection_source_files_verified": 23,
+  "paired_initialization_samples_and_config": true,
+  "distinct_checkpoint_hashes": 9,
+  "daily_metrics_summary_pairs_bootstrap_holm_recomputed": true,
+  "max_sharpe_float32_to_float64_difference": 8.767536572307222e-07,
+  "scope": "Local verification begins with archived daily scores. Full factors, labels, exposures and weights remain on AutoDL; stock-level neutralization and training are not rerun locally. Their original checksums and remote audit are preserved.",
+  "interpretation": "No reliable RankIC difference under three epochs and auxiliary weight 0.05. Not equivalence or evidence that auxiliary loss is necessary."
+}

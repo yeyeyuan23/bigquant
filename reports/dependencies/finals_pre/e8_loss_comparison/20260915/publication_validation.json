@@ -1,0 +1,22 @@
+{
+  "checked_at_utc": "2026-09-15T12:17:52.570615+00:00",
+  "base_commit": "28d5441d4943ad8d0a9ea277b345166187e501dc",
+  "ruff": "0.16.0: all checks passed",
+  "e8_tests": {
+    "passed": 10,
+    "isolation": "dedicated CI process; original sealed test source unchanged"
+  },
+  "e9_tests": {
+    "passed": 29,
+    "sealed_result_verification": "passed"
+  },
+  "repository_tests": {
+    "passed": 693,
+    "skipped": 2,
+    "subtests_passed": 5
+  },
+  "coverage_total_line": "TOTAL                                       25205   2518   4540   2050    84%",
+  "coverage_threshold_percent": 75,
+  "result_recomputation": "passed: files, sources, pairing, daily metrics, summaries, bootstrap and Holm",
+  "scope": "CPU publication checks. The original nine GPU training runs are documented separately in their manifests. Full factors and raw data remain on AutoDL."
+}

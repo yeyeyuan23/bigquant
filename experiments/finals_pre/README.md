@@ -6,6 +6,8 @@
 
 2026-09-06 已完成 [240 位分钟输入修正的三种子对照](minute_grid_240/README.md)，[结果与运行记录](minute_grid_240/RUN_STATUS.md)。active M_raw 默认使用 240 个分钟收盘时刻；本页既有成绩仍属于各自记录的历史实现，不能自动视为 240 位结果。复现历史 242 位实验须使用原提交版本及对应配置。 当前训练、推理、导出入口和新结果目录见 [240 分钟输入约定](../../docs/MINUTE_GRID.md)；本页结果表继续记录历史实验。
 
+[E8：辅助损失对照](e8_loss_comparison/README.md)已完成三种损失 × 三个种子的九次训练。固定系数 0.05、三轮预算下，三种配置的 RankIC 接近，两项比较均未得到可靠差异；[结果与复算](e8_loss_comparison/RUN_STATUS.md)已归档。
+
 ## 1. 统一实验定义
 
 [E9：TCN 三尺度与三块串联实验](tcn_architecture_o2c/README.md)已完成 15 个配置 × 3 个种子的 45 次训练、评分与独立审计，统一三轮、当前 240 位输入。没有候选通过主指标改善标准；原核宽四块显著下降，五分支未见可靠收益且总耗时增加 6.3%，但其下降未通过 Holm 校正。三块、三分支及 3/15/60 的必要性或最优性未获证明。完整逐配置结论和成本见 README；[运行状态](tcn_architecture_o2c/RUN_STATUS.md)单独记录，正式模型未替换。
@@ -30,7 +32,7 @@
 
 中性化使用 10 个风格暴露和 32 个行业哑变量，共 42 个回归项。实验选择只使用以上四项，不使用平台 B、N 或 J。
 
-下方既有编号实验没有计算 p 值或置信区间，只报告均值、标准差、配对变化和同向次数，不把差异写成“统计显著”。新增 TCN 专项预先约定同步日期移动块 bootstrap 和 14 个对比的 Holm 校正，不能把其统计规则追溯套用到旧表。
+E1–E7 没有计算 p 值或置信区间，只报告均值、标准差、配对变化和同向次数，不把差异写成“统计显著”。E8 和 E9 使用预先约定的同步日期移动块 bootstrap，分别对 2 个和 14 个对比作 Holm 校正，不能把其统计规则追溯套用到旧表。
 
 ## 2. 当前编号
 
@@ -43,6 +45,7 @@
 | **E5** | 直接加入 23 个原始字段是否优于原 17 通道 | `e5_raw23_direct/` | `reports/dependencies/finals_pre/e5_raw23_direct/o2c_autodl/` |
 | **E6** | 价格路径、盘口与成交结构通道是否各自提供独立增量 | `e6_channel_groups/` | `reports/dependencies/finals_pre/e6_channel_groups/o2c/` |
 | **E7** | 同一冻结因子在固定成本下，持仓规则如何影响换手、收益与回撤（含隔夜） | `e7_strategy_application/` | `reports/dependencies/finals_pre/e7_strategy_application/20260906_fee_slippage/` |
+| **E8** | 固定模型、0.05 系数与三轮预算，SmoothL1、L1、半平方 L2 的差异 | [e8_loss_comparison/](e8_loss_comparison/README.md) | [结果与审计](../../reports/dependencies/finals_pre/e8_loss_comparison/20260915/results/README.md) |
 | **E9** | 三块、三个分支与 3/15/60 是否值得选择：15 配置 × 3 种子，含成本与统计检验 | [tcn_architecture_o2c/](tcn_architecture_o2c/README.md) | [结果与审计](../../reports/dependencies/finals_pre/tcn_architecture_o2c/README.md) |
 
 ## 3. E1：O2C expanding walk-forward
@@ -220,7 +223,19 @@ DeepSets 使 RankIC 和压力 ICIR 均值小幅上升，但 RankIC IR 和多空 
 
 主表期末未平仓绝对市值最多约占净值 0.51%，缺报价持仓继续按最近可见价估值。比例费率未计每笔最低 5 元佣金，未另加过户费；未模拟借券、融资、非线性冲击、开盘容量与涨跌停排队，不能视为已验证的实盘收益。定义、费率来源、全表、11 项测试及 7,200 行记账验证见 [E7](e7_strategy_application/README.md)。
 
-## 10. E9：TCN 深度、并行尺度与核宽
+## 10. E8：辅助损失对照
+
+相同种子下使用相同初始化、日期顺序和股票抽样；固定 240 分钟输入、三轮训练和 0.05 辅助系数。三种配置均使用负 Pearson 主项，2019–2023 训练，2024 历史验证，共九次训练。
+
+| 辅助损失 | RankIC（均值 ± 种子标准差） | RankIC IR | 毛多空 Sharpe |
+|---|---:|---:|---:|
+| SmoothL1 | 0.025809 ± 0.001366 | 0.5909 | 5.857 |
+| L1 | 0.025731 ± 0.001282 | 0.5888 | 5.607 |
+| 半平方 L2 | 0.025853 ± 0.001305 | 0.5958 | 5.792 |
+
+相对 SmoothL1，L1 的 ΔRankIC 为 −0.000078，95% 区间 [−0.000308, +0.000165]；半平方 L2 为 +0.000044，区间 [−0.000355, +0.000415]。同步 10 日移动块 bootstrap 10,000 次，两项 Holm p 均为 1.0。本轮不足以区分，也未证明 SmoothL1 更优；不代表效果等价，不证明辅助项必要或分别调参后的最优性能。完整数据与核验见 [E8](e8_loss_comparison/README.md)。
+
+## 11. E9：TCN 深度、并行尺度与核宽
 
 15 个配置全部重新训练三个种子，每次三轮；使用 240 个固定分钟位置、17 通道、2019–2023 训练与 2024 年 241 日历史验证期。主指标是行业与 Barra 中性化平均 RankIC。以下差值均为候选减三块 3/15/60 基线，主指标对 14 个候选统一做 Holm 校正。
 
@@ -235,7 +250,7 @@ DeepSets 使 RankIC 和压力 ICIR 均值小幅上升，但 RankIC IR 和多空 
 
 完整 15 配置结论、逐种子差值、区间、训练耗时、参数、显存、源码及复核命令见 [E9 README](tcn_architecture_o2c/README.md)。
 
-## 11. 当前结论
+## 12. 当前结论
 
 1. 七个 20 日 walk-forward 窗口的 RankIC 都为正；第 3 个 epoch 的四项均值最高。
 2. 渐进实验中，TCN 与 `last` 带来最大的 RankIC、RankIC IR 和 Sharpe 增量；`mean` 与 attention 继续提高四项均值。

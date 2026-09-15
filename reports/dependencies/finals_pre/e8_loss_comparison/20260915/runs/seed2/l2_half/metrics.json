@@ -1,0 +1,20 @@
+{
+  "arm": "l2_half",
+  "seed": 20260812,
+  "rank_ic": 0.02635225524271869,
+  "rank_ic_ir": 0.579905931472154,
+  "long_short_sharpe": 5.827554702758789,
+  "stress_ic_ir": 0.36401901063531616,
+  "parameter_count": 217953,
+  "receptive_field": 178,
+  "elapsed_seconds": 1642.103970874101,
+  "peak_cuda_allocated_bytes": 1941648896,
+  "peak_cuda_reserved_bytes": 2434793472,
+  "scored_days": 241,
+  "scored_rows": 240567,
+  "stress_days": 61,
+  "scoring_keys_hash": "bbe80c2903012407b26f9b78e0dfc626381495d2e94b935a49b0302c444bc404",
+  "factor_sha256": "129de0f02821701669d3000e9c801c4da16406cc32806582807a78f7c1b736e9",
+  "prepared_sha256": "6de00fb068502d54551086f3da09f77627ac85130bce606e9f82df7c09bde8e1",
+  "daily_metrics_sha256": "34374c73b43df9c5b8d35eafa9c4a8cb5b457fb91b03f633e41c36aaf6394334"
+}

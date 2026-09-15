@@ -1,0 +1,25 @@
+{
+  "state": "complete",
+  "arm": "l1",
+  "seed": 20260823,
+  "started_at": "2026-09-15T08:00:31.014985+00:00",
+  "pid": 7860,
+  "phase": "inference",
+  "epoch": 3,
+  "step": 200,
+  "total_steps": 3639,
+  "last_loss": -0.191872239112854,
+  "grad_norm": 0.46278321743011475,
+  "loss_diagnostics": {
+    "correlation": 0.21564431488513947,
+    "auxiliary": 0.47544145584106445,
+    "weighted_auxiliary": 0.023772073909640312,
+    "prediction_mean": 0.00104275974445045,
+    "prediction_std": 0.21656903624534607,
+    "mean_absolute_error": 0.47544145584106445,
+    "large_error_fraction": 0.05711422860622406
+  },
+  "elapsed_seconds": 1655.625472575426,
+  "updated_at": "2026-09-15T08:27:51.188121+00:00",
+  "finished_at": "2026-09-15T08:28:07.016393+00:00"
+}
