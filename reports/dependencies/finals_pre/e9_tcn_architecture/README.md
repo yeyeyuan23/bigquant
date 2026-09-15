@@ -2,7 +2,7 @@
 
 15 个配置 × 3 个种子，共 45 次重新训练；每次三轮，240 个固定分钟位置、17 通道。2019–2023 训练，2024 年 241 日历史验证期。
 
-完整问题、每个配置的结论和复核方法见 [E9 实验说明](../../../../experiments/finals_pre/tcn_architecture_o2c/README.md)。
+完整问题、每个配置的结论和复核方法见 [E9 实验说明](../../../../experiments/finals_pre/e9_tcn_architecture/README.md)。
 
 - [汇总表](results/summary.csv)、[结构化汇总](results/summary.json)、[45 次原表](results/per_run.csv)、[逐种子配对差值](results/paired_deltas.csv)。
 - 四组结果：[深度](results/depth.csv)、[分支数](results/branches.csv)、[核宽](results/kernels.csv)、[解释对照](results/controls.csv)。

@@ -4,7 +4,7 @@
 
 ## E9 发布与复核入口
 
-本实验正式编号为 **E9**，包含深度、分支数、核宽与解释对照四组，共 15 个配置、45 次训练。保留原目录名 tcn_architecture_o2c，以保持封存源码导入路径、历史 manifest 与校验和一致。源码、冻结依赖和小型结果已归入本次 Git 发布；原始分钟数据、checkpoint、完整因子和训练抽样大文件留在 AutoDL。
+本实验正式编号为 **E9**，代码与结果目录统一命名为 `e9_tcn_architecture`。包含深度、分支数、核宽与解释对照四组，共 15 个配置、45 次训练。旧名 `tcn_architecture_o2c` 仅作为兼容路径别名，供封存源码导入和历史 manifest 校验使用；源码和原始结果的内容不变。原始分钟数据、checkpoint、完整因子和训练抽样大文件留在 AutoDL。
 
 - 实验入口：[run.py](run.py)、[固定协议](protocol.py)、[训练](train.py)、[评分与统计](score.py)、[预检查](prepare.py)、[专项测试](test_protocol.py)。
 - [_runtime/](./_runtime/) 保存实际运行的依赖；封存的 20 个源码文件保持原 SHA-256。
@@ -12,10 +12,10 @@
 - [analysis/verify_results.py](analysis/verify_results.py) 可在安装仓库依赖后仅用本次提交的小型结果复核源码、45 份逐日 RankIC、10,000 次 bootstrap 和 Holm，无需私有数据或 GPU：
 
 ```bash
-python experiments/finals_pre/tcn_architecture_o2c/analysis/verify_results.py
+python experiments/finals_pre/e9_tcn_architecture/analysis/verify_results.py
 ```
 
-[发布清单](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/publication_manifest.json)记录纳入版本库的源码与结果文件校验和。运行状态中的关机记录属于本轮结束时的历史操作，不代表之后实例始终保持关闭。
+[发布清单](../../../reports/dependencies/finals_pre/e9_tcn_architecture/publication_manifest.json)保留原发布快照及旧路径；目录更名后的导航文档以当前版本为准，实验源码与结果仍按原校验和复核。运行状态中的关机记录属于本轮结束时的历史操作，不代表之后实例始终保持关闭。
 
 ## 先说结论
 
@@ -143,11 +143,11 @@ RankIC IR 使用非年化定义；五分位多空 Sharpe 按 sqrt(252) 年化，
 
 ## 结果文件与复核
 
-- [完整汇总 CSV](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/results/summary.csv)、[逐次结果](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/results/per_run.csv)、[逐种子配对差值](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/results/paired_deltas.csv)。
-- [训练时间汇总](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/results/timing_summary.csv)、[逐次训练计时](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/results/timing_per_run.csv)。
-- [独立完成审计](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/audits/completion_audit.json)：45 次运行、样本与评分键、初始化、源码和数据校验和、checkpoint 与因子校验和、每日指标、bootstrap 与 Holm 均通过。
-- 逐日指标在结果目录的 runs/seed1/<配置>/、runs/seed2/<配置>/、runs/seed3/<配置>/ 中。压缩的每日 RankIC 数据立方体见 [daily_rankic_cube.npz](../../../reports/dependencies/finals_pre/tcn_architecture_o2c/results/daily_rankic_cube.npz)。
-- 代码已纳入 E9 Git 发布并继续在 AutoDL 维护；原始分钟数据、checkpoint 和完整因子留在 AutoDL，本地工作区仅保留说明、小型汇总、manifest 与逐日指标。代码入口为 /root/autodl-tmp/projects/bigquant-default/experiments/finals_pre/tcn_architecture_o2c/。
+- [完整汇总 CSV](../../../reports/dependencies/finals_pre/e9_tcn_architecture/results/summary.csv)、[逐次结果](../../../reports/dependencies/finals_pre/e9_tcn_architecture/results/per_run.csv)、[逐种子配对差值](../../../reports/dependencies/finals_pre/e9_tcn_architecture/results/paired_deltas.csv)。
+- [训练时间汇总](../../../reports/dependencies/finals_pre/e9_tcn_architecture/results/timing_summary.csv)、[逐次训练计时](../../../reports/dependencies/finals_pre/e9_tcn_architecture/results/timing_per_run.csv)。
+- [独立完成审计](../../../reports/dependencies/finals_pre/e9_tcn_architecture/audits/completion_audit.json)：45 次运行、样本与评分键、初始化、源码和数据校验和、checkpoint 与因子校验和、每日指标、bootstrap 与 Holm 均通过。
+- 逐日指标在结果目录的 runs/seed1/<配置>/、runs/seed2/<配置>/、runs/seed3/<配置>/ 中。压缩的每日 RankIC 数据立方体见 [daily_rankic_cube.npz](../../../reports/dependencies/finals_pre/e9_tcn_architecture/results/daily_rankic_cube.npz)。
+- 代码、冻结依赖与小型结果已纳入主仓库；原始分钟数据、checkpoint 和完整因子留在 AutoDL。远端历史运行仍记录旧路径 `/root/autodl-tmp/projects/bigquant-default/experiments/finals_pre/tcn_architecture_o2c/`。
 - 所有性能结论只适用于本历史验证期、三轮训练预算及当前候选集合；不推断充分训练上限，不自动替换正式提交模型。
 
 ## 实施协议与原始结构假设
@@ -226,11 +226,11 @@ RankIC IR 使用非年化定义；五分位多空 Sharpe 按 sqrt(252) 年化，
 
 ```bash
 /root/autodl-tmp/conda-envs/quant/bin/python -u \
-  experiments/finals_pre/tcn_architecture_o2c/run.py \
+  experiments/finals_pre/e9_tcn_architecture/run.py \
   --data-root /root/autodl-tmp/data \
   --micro-store /root/autodl-tmp/unified_microstructure_store_v2_2019_2024 \
   --exposure /root/autodl-tmp/exposure_2024_full.parquet \
-  --output /root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/tcn_architecture_o2c \
+  --output /root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e9_tcn_architecture \
   --device cuda
 ```
 
@@ -243,13 +243,13 @@ RankIC IR 使用非年化定义；五分位多空 Sharpe 按 sqrt(252) 年化，
 验证：
 
 ```bash
-python -m pytest -q -o addopts="" experiments/finals_pre/tcn_architecture_o2c/test_protocol.py
-ruff check experiments/finals_pre/tcn_architecture_o2c experiments/finals_pre/tcn_architecture_o2c/test_protocol.py
+python -m pytest -q -o addopts="" experiments/finals_pre/e9_tcn_architecture/test_protocol.py
+ruff check experiments/finals_pre/e9_tcn_architecture experiments/finals_pre/e9_tcn_architecture/test_protocol.py
 ```
 
 ## 代码与命名约定
 
-本轮直接在 AutoDL 研究仓库的 `experiments/finals_pre/tcn_architecture_o2c/` 开发。与当前 240 位输入相符的运行依赖封存在本目录 `_runtime/`，不会覆盖远端仓库较旧的共享源文件。全部消费源码纳入 prepared manifest。
+本轮最初在 AutoDL 研究仓库的 `experiments/finals_pre/tcn_architecture_o2c/` 开发，现归档到 `experiments/finals_pre/e9_tcn_architecture/`。与当前 240 位输入相符的运行依赖封存在本目录 `_runtime/`，不会覆盖远端仓库较旧的共享源文件。全部消费源码纳入 prepared manifest。
 
 新增文件和目录不以日期或时间戳命名。三个种子目录分别为 `seed1`、`seed2`、`seed3`，数值只保存在配置和 manifest 中；重试日志使用 `attempt1` 等序号。数据源已有日期分区保持原样。
 

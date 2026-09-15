@@ -10,7 +10,7 @@
 
 ## 1. 统一实验定义
 
-[E9：TCN 三尺度与三块串联实验](tcn_architecture_o2c/README.md)已完成 15 个配置 × 3 个种子的 45 次训练、评分与独立审计，统一三轮、当前 240 位输入。没有候选通过主指标改善标准；原核宽四块显著下降，五分支未见可靠收益且总耗时增加 6.3%，但其下降未通过 Holm 校正。三块、三分支及 3/15/60 的必要性或最优性未获证明。完整逐配置结论和成本见 README；[运行状态](tcn_architecture_o2c/RUN_STATUS.md)单独记录，正式模型未替换。
+[E9：TCN 三尺度与三块串联实验](e9_tcn_architecture/README.md)已完成 15 个配置 × 3 个种子的 45 次训练、评分与独立审计，统一三轮、当前 240 位输入。没有候选通过主指标改善标准；原核宽四块显著下降，五分支未见可靠收益且总耗时增加 6.3%，但其下降未通过 Holm 校正。三块、三分支及 3/15/60 的必要性或最优性未获证明。完整逐配置结论和成本见 README；[运行状态](e9_tcn_architecture/RUN_STATUS.md)单独记录，正式模型未替换。
 
 ### 标签与时间关系
 
@@ -46,7 +46,7 @@ E1–E7 没有计算 p 值或置信区间，只报告均值、标准差、配对
 | **E6** | 价格路径、盘口与成交结构通道是否各自提供独立增量 | [e6_channel_groups/](e6_channel_groups/README.md) | [历史结果与补档核验](../../reports/dependencies/finals_pre/e6_channel_groups/o2c/README.md) |
 | **E7** | 同一冻结因子在固定成本下，持仓规则如何影响换手、收益与回撤（含隔夜） | `e7_strategy_application/` | `reports/dependencies/finals_pre/e7_strategy_application/20260906_fee_slippage/` |
 | **E8** | 固定模型、0.05 系数与三轮预算，SmoothL1、L1、半平方 L2 的差异 | [e8_loss_comparison/](e8_loss_comparison/README.md) | [结果与审计](../../reports/dependencies/finals_pre/e8_loss_comparison/20260915/results/README.md) |
-| **E9** | 三块、三个分支与 3/15/60 是否值得选择：15 配置 × 3 种子，含成本与统计检验 | [tcn_architecture_o2c/](tcn_architecture_o2c/README.md) | [结果与审计](../../reports/dependencies/finals_pre/tcn_architecture_o2c/README.md) |
+| **E9** | 三块、三个分支与 3/15/60 是否值得选择：15 配置 × 3 种子，含成本与统计检验 | [e9_tcn_architecture/](e9_tcn_architecture/README.md) | [结果与审计](../../reports/dependencies/finals_pre/e9_tcn_architecture/README.md) |
 
 ## 3. E1：O2C expanding walk-forward
 
@@ -248,7 +248,7 @@ DeepSets 使 RankIC 和压力 ICIR 均值小幅上升，但 RankIC IR 和多空 
 
 没有候选通过预定的主指标改善标准。基线 RankIC 均值 0.025809，平均训练阶段 29.86 分钟、含推理 31.45 分钟；五分支对应 0.024264、31.81 分钟、33.43 分钟。所有结论限定于三轮训练预算与本历史验证期，未显著不等于等价，正式模型不自动替换。
 
-完整 15 配置结论、逐种子差值、区间、训练耗时、参数、显存、源码及复核命令见 [E9 README](tcn_architecture_o2c/README.md)。
+完整 15 配置结论、逐种子差值、区间、训练耗时、参数、显存、源码及复核命令见 [E9 README](e9_tcn_architecture/README.md)。
 
 ## 12. 当前结论
 

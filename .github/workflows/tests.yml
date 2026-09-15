@@ -18,8 +18,8 @@ jobs:
       - run: python -m ruff check .
       - name: E9 sealed experiment checks
         run: |
-          python -m pytest -q -o addopts="" experiments/finals_pre/tcn_architecture_o2c/test_protocol.py
-          python experiments/finals_pre/tcn_architecture_o2c/analysis/verify_results.py
+          python -m pytest -q -o addopts="" experiments/finals_pre/e9_tcn_architecture/test_protocol.py
+          python experiments/finals_pre/e9_tcn_architecture/analysis/verify_results.py
       - name: E8 sealed experiment checks
         run: |
           python -m pytest -q -o addopts="" experiments/finals_pre/e8_loss_comparison/test_e8.py
