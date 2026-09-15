@@ -5,8 +5,8 @@
 ## 代码入口
 
 - [run.sh](run.sh)：启动四组删减版，传入要删除的通道组。
-- [train_progressive.py](../e3_progressive_add/train_progressive.py)：E6 复用的训练程序，因此本目录没有第二份 `train.py`。
-- [model_progressive.py](../e3_progressive_add/model_progressive.py)：完整架构及通道删减实现。
+- [train_progressive.py](../e3_progressive_add/train_progressive.py)：执行通道删减和训练；E6 复用此程序，因此本目录没有第二份 `train.py`。
+- [model_progressive.py](../e3_progressive_add/model_progressive.py)：模型网络结构。
 - [score.py](score.py)：统一中性化评分，生成逐种子、汇总和配对差值表。
 
 ## 已完成的历史结果
