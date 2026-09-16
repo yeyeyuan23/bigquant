@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "python": "/root/autodl-tmp/conda-envs/quant/bin/python",
+  "finished_utc": "2026-09-16T18:58:39.027549+00:00",
+  "neutralization": false,
+  "winsorization": false,
+  "standardization": false,
+  "raw_values_preserved": true,
+  "grouping": "Raw score ascending; ties by instrument; 10 groups of 100 before label join",
+  "label": "Next trading day close/open-1; no return neutralization",
+  "missing_returns": "Omit only within the original group; never regroup using labels",
+  "benchmark": "Same-day equal-weight average of ten group returns",
+  "cumulative": "Arithmetic sum, percentage points; no costs, no overnight",
+  "long_short": "Q10 minus Q1 daily O2C return; +100% Q10 and -100% Q1, no division by 2",
+  "display_series": [
+    "Q1",
+    "Q5",
+    "Q10",
+    "Q10-Q1"
+  ],
+  "score_rows": 402000,
+  "scored_rows": 400566,
+  "groups": 10,
+  "days": 401,
+  "signal_start": "2025-01-02",
+  "signal_end": "2026-08-27",
+  "return_start": "2025-01-03",
+  "return_end": "2026-08-28",
+  "missing_return_stock_days_excluding_last_signal": 434,
+  "q10_minus_q1_bp": 10.951055761140198,
+  "long_short_cumulative_pp": 43.9137336021722,
+  "strictly_increasing_group_means": false,
+  "independent_group_means_cumulative_and_spread_checks": true,
+  "input_hashes": {
+    "scores": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "labels": "e23eea3aea4b8c9823fd22bb12fe1a3c24bb3baed04d2c3424518809b3b2521d"
+  },
+  "code_hashes": {
+    "evaluate_raw_deciles.py": "eccea506d331cf8d54762fdc32c3f3f0cbbb8058ae9473cc3e6337b74101a145",
+    "evaluate_raw_quintiles.py": "838357af7b6c86b4d5320eef6e6b879953325b840afcadc4619d3301a162c3ec"
+  },
+  "output_hashes": {
+    "decile_daily_returns.csv": "dcce537eb0a7eb12038708212f81804b580a4dfac077b7eabb3636694f13cdb8",
+    "decile_summary.csv": "af96daafdb3f6845920b8b43b6455dcb657a879111284369d0246589f717fe7a",
+    "display_daily.csv": "d630fe20ea3f271856fcb3b9b28ad2d949a6c96b7dc4d0df505c4cdd2025eb05"
+  }
+}
