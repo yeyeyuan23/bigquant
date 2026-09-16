@@ -1,0 +1,41 @@
+{
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "platform": "Linux-5.15.0-94-generic-x86_64-with-glibc2.35",
+  "python": "/root/autodl-tmp/conda-envs/quant/bin/python",
+  "python_version": "3.11.15",
+  "numpy": "2.4.6",
+  "pandas": "3.0.5",
+  "pyarrow": "25.0.0",
+  "started_utc": "2026-09-16T13:26:54.684730+00:00",
+  "finished_utc": "2026-09-16T13:27:01.753961+00:00",
+  "raw_scores_path": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet",
+  "daily_prices_path": "/root/autodl-tmp/strategy-application-20260906/results/daily_prices.parquet",
+  "inference_audit_sha256": "96c27d7947b6ef78b19159c2e1e0d04532c1f7411a109e5ccea9e6ee86947a96",
+  "input_hashes": {
+    "raw_scores": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "daily_prices": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa"
+  },
+  "code_hashes": {
+    "raw_engine.py": "354c49253a54077297b1cc1dc01ff83228942d0adfcea7dad5667c14e0aebde5",
+    "run_raw_scores.py": "bd544b97d3a0458ef4eb24aefee6b7df1b5cab3dade94dcc86a36832d73ce4de",
+    "test_raw_backtest.py": "7f07f47518d3f490f972a2466f366968c21a33fedc2faddb8eaebb773240d697",
+    "validate_results.py": "a40c6c13d83075dd09ba8545e60072aa380034fd32dca54b2a6d6473982ed81c"
+  },
+  "protocol_sha256": "ae2e833a252541a0aabd321dae8e0a0bb2b2c206b2d37912d6c405dcbf451b4a",
+  "raw_score_values_preserved_exactly": true,
+  "neutralization": false,
+  "winsorization": false,
+  "standardization": false,
+  "raw_factor_rows": 402000,
+  "sessions": 402,
+  "holding_intervals": 400,
+  "first_trade": "2025-01-03",
+  "last_liquidation": "2026-08-28",
+  "future_score_invariance": true,
+  "output_hashes": {
+    "daily.csv": "00dd56e3733afff8d3f44291a39ebe1ef13ec45742dec2c1b76fff89fec018cc",
+    "net_nav.csv": "f73e55f0aa008acd660bfa56e3a103f2b134be43915058b45b5845065eece853",
+    "primary.csv": "2ae404380570dadbe413031b3a7832d8adc8f107b2f553c0dae63640ca854dbf",
+    "summary.csv": "efc37e13cc0525c37e8c248ff2c756a30d6839a33190d9468aa1c7183814f53a"
+  }
+}

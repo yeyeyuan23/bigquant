@@ -1,0 +1,28 @@
+{
+  "name": "raw_model_scores_202501_202608",
+  "code_base_commit": "f0a73b4",
+  "execution": "AutoDL only; local workstation authors code and renders reports",
+  "signal": "Original factor column from frozen model inference, without clipping, standardization or industry/style neutralization",
+  "raw_scores_sha256": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+  "daily_prices_sha256": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa",
+  "checkpoint_sha256": "252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb",
+  "training_end": "2024-12-26",
+  "start": "2025-01-02",
+  "end": "2026-08-28",
+  "strategies": ["baseline_daily", "buffer_20_30", "rank_mean_5d"],
+  "costs": [
+    {"scenario": "gross", "buy_bps": 0, "sell_bps": 0, "slippage_bps": 0},
+    {"scenario": "fees_slip0", "buy_bps": 3, "sell_bps": 8, "slippage_bps": 0},
+    {"scenario": "fees_slip2", "buy_bps": 3, "sell_bps": 8, "slippage_bps": 2},
+    {"scenario": "fees_slip5", "buy_bps": 3, "sell_bps": 8, "slippage_bps": 5}
+  ],
+  "portfolio": "Equal weight within top/bottom quintiles; target long +100% and short -100% of post-fee NAV",
+  "buffer": "Retain existing longs in top 30% and shorts in bottom 30%, then fill each side to 20%; equal weight daily",
+  "rank_mean": "Daily cross-sectional percentile of raw model scores; trailing five trading sessions t-5 through t-1 for trading at t open; finite mean with expanding warmup and prior-session eligibility",
+  "execution_time": "Signal after close, trade at next open; hold continuously including overnight; last available open reserved for liquidation",
+  "marking": "Daily adjusted close; missing close uses current known opening mark, missing open blocks trading and uses previous known close/mark",
+  "annualization": "252 times arithmetic mean of daily close-to-close portfolio returns across all 402 sessions, including initial cash day",
+  "sharpe": "sqrt(252) times daily mean divided by sample standard deviation (ddof=1); risk-free rate zero; net Sharpe at stated fees",
+  "turnover": "Daily (buy notional + sell notional)/(2 * pre-trade opening NAV), including initial/terminal trading; mean over all 402 sessions",
+  "scope": "Retrospective comparison of three already selected rules; no parameter search or claim of independent strategy-selection out-of-sample performance"
+}

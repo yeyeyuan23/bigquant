@@ -1,0 +1,14 @@
+test_buffer_retains_names_inside_band (test_raw_backtest.RawBacktestTests.test_buffer_retains_names_inside_band) ... ok
+test_five_day_mean_uses_past_cross_sectional_ranks (test_raw_backtest.RawBacktestTests.test_five_day_mean_uses_past_cross_sectional_ranks) ... ok
+test_flat_price_roundtrip_accounts_for_buys_and_short_sales (test_raw_backtest.RawBacktestTests.test_flat_price_roundtrip_accounts_for_buys_and_short_sales) ... ok
+test_future_inputs_do_not_change_prior_positions (test_raw_backtest.RawBacktestTests.test_future_inputs_do_not_change_prior_positions) ... ok
+test_missing_open_blocks_trade_without_changing_score_universe (test_raw_backtest.RawBacktestTests.test_missing_open_blocks_trade_without_changing_score_universe) ... ok
+test_short_cover_is_buy_and_long_exit_is_sell (test_raw_backtest.RawBacktestTests.test_short_cover_is_buy_and_long_exit_is_sell) ... ok
+test_terminal_untradable_position_remains_valued (test_raw_backtest.RawBacktestTests.test_terminal_untradable_position_remains_valued) ... ok
+test_today_missing_score_not_reintroduced_by_history (test_raw_backtest.RawBacktestTests.test_today_missing_score_not_reintroduced_by_history) ... ok
+test_zero_fee_day_return_matches_manual_overnight_and_intraday (test_raw_backtest.RawBacktestTests.test_zero_fee_day_return_matches_manual_overnight_and_intraday) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.068s
+
+OK

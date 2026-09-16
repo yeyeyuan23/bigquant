@@ -1,0 +1,83 @@
+# 原始模型分数回测
+
+使用正式提交模型每天生成的原始 `factor` 分数，比较每日五分位、排名缓冲区和五日平均排名。**不做行业或风格中性化，也不做缩尾、标准化。** 模型权重固定，分数每天变化。本次不重新训练模型。
+
+代码基于本地从 GitHub 更新的 bigquant `f0a73b4` 编写，随后同步到 AutoDL 执行。回测、数值测试和结果复核均在 AutoDL 上完成，本地只编写代码、取回小型结果和更新展示。完整原始分数、行情与模型文件不入库。
+
+## 2025 年至 2026 年 8 月结果
+
+全期为 **2025-01-02 至 2026-08-28，共 402 个交易日**。第一日为初始现金，2025-01-03 开盘首次建仓；2026-08-28 开盘处理期末平仓，缺报价的剩余持仓继续估值。初始现金日以零收益、零换手计入全期统计。
+
+| 持仓规则 | 日均单边换手 | 不扣费年化收益 | 扣费后年化收益 | 扣费后 Sharpe |
+| --- | ---: | ---: | ---: | ---: |
+| 每日五分位 | 129.18% | 38.61% | 2.74% | 0.199 |
+| 排名缓冲区 | 101.09% | 41.73% | 13.65% | 0.953 |
+| 五日平均排名 | 42.87% | 24.07% | 12.17% | 0.723 |
+
+基准费用为买入 3bp、卖出 8bp，额外滑点为零。净年化和净 Sharpe 在这组回顾性比较中均以排名缓冲区最高；五日平均排名的换手最低。不能沿用旧中性化分数回测中的收益数字和结论。
+
+年化收益采用日收益均值乘 252，并非复合年增长率。三种规则的复合年增长率分别约为 1.81%、13.46%、11.36%，另在 CSV 中保留。每侧额外 5bp 滑点下，五日规则算术年化仍约为 +1.36%，但复合年增长率约为 -0.05%、全期累计收益约为 -0.08%，不能据正的算术年化称其“仍然盈利”。
+
+结果：[`primary.csv`](results/20260916_raw_scores/primary.csv)、[`summary.csv`](results/20260916_raw_scores/summary.csv)、[`net_nav.csv`](results/20260916_raw_scores/net_nav.csv)、[`daily.csv`](results/20260916_raw_scores/daily.csv)。
+
+## 三种持仓规则
+
+- **每日五分位**：调仓日 t 使用 t−1 收盘后的原始模型分数，最高 20% 等权做多、最低 20% 等权做空。
+- **排名缓冲区**：仍按原始分数排序；旧多头处于前 30%、旧空头处于后 30% 时优先保留，再补足两边各 20%，每日等权调整。
+- **五日平均排名**：每天先在当天有分数的股票之间计算原始分数的百分位，分数越高百分位越高。调仓日 t 使用 t−5 至 t−1 五个交易日的百分位均值，按均值选择两边各 20%。起始不足五日时使用已有记录，窗口内缺失值不参与均值；t−1 没有分数的股票不进入新目标。这里没有使用实际收益排名。
+
+多空目标分别为扣费后净值的 +100% 与 −100%，合计目标总敞口 200%。等权目标用扣费后净值求解，费用不会凭空扩大资金。相同目标权重在价格变化后也可能需要交易。并列分数按股票代码稳定排序。
+
+## 成交、净值与统计定义
+
+当天收盘后形成信号，下一交易日开盘调仓，连续持有并计入隔夜涨跌。最后一个可用开盘只用于退出，保留与旧策略比较相同的 400 个开盘到开盘持有区间。本次所有展示指标统一从实际交易日的**收盘净值序列**计算。
+
+- 参考价来自已核对的复权日开盘/收盘数据。开盘采用 09:31 分钟 bar 的 open × adjust_factor；复权近似公司行动，没有逐笔重建分红现金流。
+- 缺开盘报价时不能交易，以前一已知收盘/最近可见价格估值。缺收盘报价使用当日已知开盘估值，不使用未来价格补值。未来收益是否存在不参与选股。
+- 买入费率同时适用于加多和买回空头；卖出费率适用于减多和开空。初始建仓、日常调整和期末实际平仓均计费。
+- 日收益 `r[t] = close_nav[t] / close_nav[t−1] − 1`，初始净值为 1。
+- 算术年化收益 `252 × mean(r)`；复合年增长率 `final_nav ** (252 / 402) − 1`。
+- 年化 Sharpe `sqrt(252) × mean(r) / std(r, ddof=1)`，无风险利率设为零。主表展示扣费后 Sharpe，毛 Sharpe 另存于结果。
+- 日均单边换手：每日 `(买入成交额 + 卖出成交额) / (2 × 调仓前开盘净值)`，再对全期 402 日取平均。多空各 100% 的口径下，该值可以超过 100%。
+- 毛收益单独按零费用重跑；净收益按基准费率重跑。主表换手来自基准费率情景。
+
+完整逐日账本保存开盘净值、收盘净值、现金、头寸价值、隔夜与日内损益、分项成交额、费用、换手、信号日期和期末未退出市值。
+
+## 输入、运行与复核
+
+[`protocol.json`](protocol.json) 在看到本次结果之前固定了三种规则及零费率、基准费率、每侧另加 2bp/5bp 的 12 组配置；没有继续搜索策略参数。策略本身来自此前已经看过这段时期的研究，本次是回顾性比较，不能称为独立的策略选择样本外验证。
+
+原始分数共 402,000 行，SHA-256 为 `d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c`。模型训练截至 2024-12-26，checkpoint SHA-256 为 `252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb`。运行时逐值检查读入分数与原始输出完全相同，输入接口不接收暴露或未来收益标签。
+
+在 AutoDL 上从仓库根目录执行，输出目录必须尚不存在：
+
+```sh
+export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
+/root/autodl-tmp/conda-envs/quant/bin/python -m unittest discover -s backtest -p test_raw_backtest.py -v
+/root/autodl-tmp/conda-envs/quant/bin/python backtest/run_raw_scores.py \
+  --raw-scores /root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet \
+  --daily-prices /root/autodl-tmp/strategy-application-20260906/results/daily_prices.parquet \
+  --inference-audit /root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/inference_audit.json \
+  --out backtest/results/NEW_RUN
+/root/autodl-tmp/conda-envs/quant/bin/python backtest/validate_results.py backtest/results/NEW_RUN
+```
+
+完成条件是 `status.json` 的 `state=complete`、`completed=12` 和 `audit.json` 的 `status=passed`。只看到进程结束不能替代这些条件。
+
+9 项独立小例子检查初末费用、空头回补、隔夜/日内记账、五日排名窗口、未来信息扰动、缺报价、期末剩余持仓和缓冲区。`validate_results.py` 不调用回测指标函数，直接从保存的账本独立复算年化、Sharpe、费用、换手和净值恒等式。运行主机、Python/库版本、代码/输入/输出哈希见 [`execution.json`](results/20260916_raw_scores/execution.json)，检查结果见 [`audit.json`](results/20260916_raw_scores/audit.json) 与 [`tests.txt`](results/20260916_raw_scores/tests.txt)。
+
+## 结果边界
+
+原始分数回测允许行业与风格倾向；分数和组合都没有额外风险中性约束。模型训练预测下一日开盘到收盘排序，本策略则连续持有并计入隔夜，两者的收益口径不同。
+
+仍采用理想化开盘参考价成交并假设可卖空，未模拟借券/融资费、每笔最低佣金、额外过户费、非线性冲击、涨跌停排队和容量。滑点只是按成交额线性扣费的情景，不能视为实盘成交保证。
+
+## 文件与仓库边界
+
+- `raw_engine.py`：独立的原始分数输入、三种持仓规则和逐日记账。
+- `run_raw_scores.py`：AutoDL 执行入口、输入校验、记录与汇总。
+- `validate_results.py`：从账本独立复核。
+- `test_raw_backtest.py`：小型会计与时序测试。
+- `results/20260916_raw_scores/`：本次小型结果与审计记录。
+
+演示稿和讲稿属于 `BigAlpha_Pre`，链接并摘录本目录结果；本目录不依赖旧 E7 目录中的未提交代码。
