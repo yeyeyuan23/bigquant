@@ -7,7 +7,7 @@ import json
 import platform
 import socket
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 
@@ -38,7 +38,7 @@ def main():
     assert sha(args.daily_prices) == protocol["daily_prices_sha256"], "Wrong daily price file"
     inference = json.loads(args.inference_audit.read_text())
     assert inference["checkpoint_sha256"] == protocol["checkpoint_sha256"]
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     data = load_panel(args.raw_scores, args.daily_prices, protocol["start"], protocol["end"])
     raw = pd.read_parquet(args.raw_scores)
     expected = raw.pivot(index="date", columns="instrument", values="factor").reindex(
@@ -90,7 +90,7 @@ def main():
         "host": socket.gethostname(), "platform": platform.platform(), "python": sys.executable,
         "python_version": platform.python_version(), "numpy": np.__version__, "pandas": pd.__version__,
         "pyarrow": version("pyarrow"),
-        "started_utc": started, "finished_utc": datetime.now(timezone.utc).isoformat(),
+        "started_utc": started, "finished_utc": datetime.now(UTC).isoformat(),
         "raw_scores_path": str(args.raw_scores), "daily_prices_path": str(args.daily_prices),
         "inference_audit_sha256": sha(args.inference_audit),
         "input_hashes": {"raw_scores": sha(args.raw_scores), "daily_prices": sha(args.daily_prices)},

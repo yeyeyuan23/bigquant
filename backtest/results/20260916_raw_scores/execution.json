@@ -6,8 +6,8 @@
   "numpy": "2.4.6",
   "pandas": "3.0.5",
   "pyarrow": "25.0.0",
-  "started_utc": "2026-09-16T13:26:54.684730+00:00",
-  "finished_utc": "2026-09-16T13:27:01.753961+00:00",
+  "started_utc": "2026-09-16T13:35:43.904858+00:00",
+  "finished_utc": "2026-09-16T13:35:51.530166+00:00",
   "raw_scores_path": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet",
   "daily_prices_path": "/root/autodl-tmp/strategy-application-20260906/results/daily_prices.parquet",
   "inference_audit_sha256": "96c27d7947b6ef78b19159c2e1e0d04532c1f7411a109e5ccea9e6ee86947a96",
@@ -17,7 +17,7 @@
   },
   "code_hashes": {
     "raw_engine.py": "354c49253a54077297b1cc1dc01ff83228942d0adfcea7dad5667c14e0aebde5",
-    "run_raw_scores.py": "bd544b97d3a0458ef4eb24aefee6b7df1b5cab3dade94dcc86a36832d73ce4de",
+    "run_raw_scores.py": "a63105b68a605963fe98ef970998e882b7a32e8da36d3bb2c0b90535350c1c5e",
     "test_raw_backtest.py": "7f07f47518d3f490f972a2466f366968c21a33fedc2faddb8eaebb773240d697",
     "validate_results.py": "a40c6c13d83075dd09ba8545e60072aa380034fd32dca54b2a6d6473982ed81c"
   },
