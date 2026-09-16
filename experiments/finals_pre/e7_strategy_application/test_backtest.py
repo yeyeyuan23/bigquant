@@ -18,16 +18,6 @@ def example(days=6):
 
 
 class AccountingTests(unittest.TestCase):
-    def test_configurable_interval_preserves_units_between_rebalances(self):
-        data = example(days=9)
-        data.prices[:, 9] = np.arange(1, 10)
-        daily, _ = run(data, "rebalance_3d", 10, rebalance_every=2, phase=1)
-        self.assertEqual(daily.rebalance.tolist(), [True, True, False, True, False, True, False])
-        self.assertEqual(daily.traded_notional.iloc[2], 0)
-        self.assertEqual(daily.traded_notional.iloc[4], 0)
-        # Terminal liquidation is still charged on the final non-rebalance day.
-        self.assertGreater(daily.traded_notional.iloc[-1], 0)
-
     def test_asymmetric_costs_follow_trade_direction_including_short_cover(self):
         # Both a long buy and a short cover are buys; a long sale and a new
         # short are sells. Flat target makes trade amounts known independently.

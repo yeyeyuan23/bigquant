@@ -1,16 +1,5 @@
 # E7：冻结因子在不同持仓规则下的应用比较
 
-## 2026-09-16 演示稿使用的结果
-
-当前正文展示每日五分位、排名缓冲区和五日平均排名，分别统计 2025 年全年、2026 年至 8 月 28 日的累计收益。五日规则在已查看时期中选出，现有结果属于回顾性比较。
-
-- [候选规则、成本情景和逐日账本](../../../reports/dependencies/finals_pre/e7_strategy_application/20260916_simple_rules/README.md)
-- [按年末收盘切分的扣费后收益与换手](../../../reports/dependencies/finals_pre/e7_strategy_application/20260916_calendar_year_returns/README.md)
-- [相同规则下的不扣费收益](../../../reports/dependencies/finals_pre/e7_strategy_application/20260916_calendar_year_gross/README.md)
-- [五日排名窗口与调仓时点检查](../../../reports/dependencies/finals_pre/e7_strategy_application/20260916_rank_mean_timing/README.md)
-
-本地回测输入保存在 `data/runtime/finals_pre/e7_strategy_application/20260916/inputs/`，不提交原始 parquet。`compare_simple_strategies.py` 生成候选比较，`yearly_close_returns.py` 生成分年结果，`audit_rank_mean_timing.py` 检查历史信息使用。对应 HTML 制作脚本在 PRE 仓库读取上述结果。
-
 ## 研究问题与配置
 
 固定因子、股票池、评价期与费率，比较降低换手能否抵偿跟踪最新信号变慢造成的毛收益变化。四种规则全部报告，不按回测表现选择费率或调仓起点。
@@ -83,4 +72,4 @@ python experiments/finals_pre/e7_strategy_application/validate_results.py \
   --results reports/dependencies/finals_pre/e7_strategy_application/20260906_fee_slippage
 ```
 
-12 项测试覆盖可配置调仓间隔、买卖不对称费率、开空/平空方向、滑点分项、初末费用、价格漂移、非调仓日持股、未来信息隔离、缺报价交易阻断、终端未平仓与自融资恒等式。独立验证器逐日重算费用、滑点、净值和汇总指标，并核对传输文件与实际运行脚本哈希。2026-09-16 的复核使用上述本地输入，汇总、逐日净值和审计文件纳入研究记录。
+11 项测试覆盖买卖不对称费率、开空/平空方向、滑点分项、初末费用、价格漂移、非调仓日持股、未来信息隔离、缺报价交易阻断、终端未平仓与自融资恒等式。独立验证器逐日重算费用、滑点、净值和汇总指标，并核对传输文件与实际运行脚本哈希。原始数据保留在远程，取回汇总、逐日净值和审计文件。

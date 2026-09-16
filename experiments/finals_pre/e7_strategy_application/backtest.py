@@ -164,14 +164,9 @@ def run(
     cost_bps: float | Costs,
     phase: int = 0,
     capture_positions: bool = False,
-    rebalance_every: int = 3,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if strategy not in STRATEGIES:
         raise ValueError(strategy)
-    if not isinstance(rebalance_every, int) or rebalance_every < 1:
-        raise ValueError("rebalance_every must be a positive integer")
-    if strategy == "rebalance_3d" and not 0 <= phase < rebalance_every:
-        raise ValueError("phase must be within the rebalance interval")
     q = np.zeros(len(data.instruments))
     cash = 1.0
     cost = cost_bps if isinstance(cost_bps, Costs) else Costs("symmetric", cost_bps, cost_bps)
@@ -183,7 +178,7 @@ def run(
         p0, p1 = data.prices[t], data.prices[t + 1]
         nav_start = float(cash + (q * p0).sum())
         current = q * p0 / nav_start
-        rebalance = t == 1 or strategy != "rebalance_3d" or (t - 1) % rebalance_every == phase
+        rebalance = t == 1 or strategy != "rebalance_3d" or (t - 1) % 3 == phase
         fee, traded = 0.0, 0.0
         buys, sells = 0.0, 0.0
         blocked_names = 0
