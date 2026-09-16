@@ -1,0 +1,38 @@
+{
+  "status": "passed",
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "python": "/root/autodl-tmp/conda-envs/quant/bin/python",
+  "python_version": "3.11.15",
+  "numpy": "2.4.6",
+  "pandas": "3.0.5",
+  "finished_utc": "2026-09-16T18:14:13.538901+00:00",
+  "neutralization": false,
+  "winsorization": false,
+  "standardization": false,
+  "raw_values_preserved": true,
+  "grouping": "Signal-date raw scores; ties by instrument; five groups of 200 before label join",
+  "label": "Next trading day close/open-1; no return neutralization",
+  "missing_returns": "Leave groups unchanged; omit missing returns within each group",
+  "benchmark": "Same-day arithmetic mean of the five group returns",
+  "cumulative": "Arithmetic sum of daily excess returns, in percentage points; no costs",
+  "score_rows": 402000,
+  "scored_rows": 400566,
+  "days": 401,
+  "signal_start": "2025-01-02",
+  "signal_end": "2026-08-27",
+  "return_start": "2025-01-03",
+  "return_end": "2026-08-28",
+  "missing_return_stock_days_excluding_last_signal": 434,
+  "q5_minus_q1_bp": 6.959950903491011,
+  "strictly_increasing_group_means": true,
+  "independent_group_mean_and_cumulative_checks": true,
+  "input_hashes": {
+    "scores": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "labels": "e23eea3aea4b8c9823fd22bb12fe1a3c24bb3baed04d2c3424518809b3b2521d"
+  },
+  "code_sha256": "838357af7b6c86b4d5320eef6e6b879953325b840afcadc4619d3301a162c3ec",
+  "output_hashes": {
+    "quintile_daily_returns.csv": "af1a124b7a3fd9acd4d38f66a226a082e16beb4a6ba60e92f9b6de1292285179",
+    "quintile_summary.csv": "790aacabedbc982984ee3bf7c5d6c9a35de6678681827b025fcb0b7231ad9326"
+  }
+}
