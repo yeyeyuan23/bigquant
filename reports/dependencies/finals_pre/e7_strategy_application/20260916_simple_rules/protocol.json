@@ -1,0 +1,38 @@
+{
+  "fixed_before_running_candidates": true,
+  "purpose": "Find a simpler holding rule with transparent turnover and fee effects",
+  "primary_candidate": "rank_mean_3d",
+  "candidates": [
+    "rebalance_2d",
+    "rebalance_5d",
+    "rank_mean_3d",
+    "rank_mean_5d"
+  ],
+  "periodic_rules": "Same quintile target as baseline. First day enters, then every 2 or 5 days; hold original units between trades. Report every starting phase at baseline fees.",
+  "rank_mean_rules": "Compute each day's percentile rank among that day's finite scores (higher is better). Average the latest 3 or 5 available calendar days including the signal day, with expanding warmup. Select only signal-day eligible names; average over finite ranks in the window. Then equal-weight top and bottom 20% each day.",
+  "cost_scenarios": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      3,
+      8,
+      0
+    ],
+    [
+      3,
+      8,
+      2
+    ],
+    [
+      3,
+      8,
+      5
+    ]
+  ],
+  "scope": "Same frozen factor, inputs, 400 holding intervals, execution/valuation and initial/terminal trading costs as existing comparison.",
+  "report": "All candidate results, all periodic phases, and calendar-2025/calendar-2026 slices. Select 3-day rank averaging for explanation if useful; do not search additional parameters to obtain a positive result.",
+  "status": "Retrospective development on a previously viewed period; these results are not independent strategy-selection OOS."
+}

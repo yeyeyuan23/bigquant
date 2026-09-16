@@ -1,0 +1,80 @@
+{
+  "status": "passed",
+  "scope": "five-session smoothing and next-session execution on frozen inputs",
+  "trade_day_t_uses": "cross-sectional percentile ranks from trading dates t-5 through t-1",
+  "warmup": "available dates used during first four entries",
+  "missing_ranks": "mean of finite ranks in the same five-session window; prior-session score required",
+  "dates": 402,
+  "holding_intervals": 400,
+  "manual_window_max_error": 3.3306690738754696e-16,
+  "saved_daily_max_error": 2.220446049250313e-16,
+  "cutoff_checks": [
+    {
+      "entry_index": 1,
+      "entry_date": "2025-01-03",
+      "signal_prefix_equal": true,
+      "position_prefix_equal": true,
+      "future_score_and_price_invariance": true
+    },
+    {
+      "entry_index": 4,
+      "entry_date": "2025-01-08",
+      "signal_prefix_equal": true,
+      "position_prefix_equal": true,
+      "future_score_and_price_invariance": true
+    },
+    {
+      "entry_index": 5,
+      "entry_date": "2025-01-09",
+      "signal_prefix_equal": true,
+      "position_prefix_equal": true,
+      "future_score_and_price_invariance": true
+    },
+    {
+      "entry_index": 20,
+      "entry_date": "2025-02-07",
+      "signal_prefix_equal": true,
+      "position_prefix_equal": true,
+      "future_score_and_price_invariance": true
+    },
+    {
+      "entry_index": 100,
+      "entry_date": "2025-06-06",
+      "signal_prefix_equal": true,
+      "position_prefix_equal": true,
+      "future_score_and_price_invariance": true
+    },
+    {
+      "entry_index": 200,
+      "entry_date": "2025-11-03",
+      "signal_prefix_equal": true,
+      "position_prefix_equal": true,
+      "future_score_and_price_invariance": true
+    },
+    {
+      "entry_index": 399,
+      "entry_date": "2026-08-26",
+      "signal_prefix_equal": true,
+      "position_prefix_equal": true,
+      "future_score_and_price_invariance": true
+    }
+  ],
+  "summary": {
+    "annualized_return": 0.14489683966622793,
+    "average_one_way_turnover": 0.5170738356216638,
+    "max_drawdown": -0.063074139117834
+  },
+  "warmup_entry_days": 4,
+  "selected_stock_day_records_with_short_windows_after_warmup": 653,
+  "boundaries": [
+    "Upstream factor inference and historical data publication/revision timestamps were not rerun.",
+    "Selecting the five-day rule after viewing this evaluation period remains retrospective strategy selection."
+  ],
+  "input_hashes": {
+    "daily_prices.parquet": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa",
+    "signals.parquet": "fffa18b92c8598eb144ecbaa44bb160008acc2f8ca4141d808e439e5869860e8"
+  },
+  "engine_sha256": "17edc8dc42d92cc1dcfef1ef963d51d7982d55a97bc038b5cbf5adaf3af77b74",
+  "comparison_script_sha256": "011dd074b9a2fe8dd796baf9ff4f029a03fdf78c440665f7edcb9bd568261dd6",
+  "audit_script_sha256": "c9563cfab2f354049d5418af94b9a71e65b41741559976ac852d7c2174dca73c"
+}
