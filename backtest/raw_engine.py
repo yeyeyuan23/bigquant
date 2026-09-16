@@ -17,6 +17,7 @@ NAMES = {
     "buffer_20_30": "排名缓冲区",
     "rank_mean_5d": "五日平均排名",
     "long_only_buffer_20_30": "纯多头（排名缓冲）",
+    "daily_decile": "每日十分组 Q10−Q1",
 }
 
 
@@ -87,12 +88,17 @@ def smooth_ranks(scores: np.ndarray, window: int = 5) -> np.ndarray:
 
 
 def targets(scores: np.ndarray, current: np.ndarray, buffer: bool = False,
-            long_only: bool = False) -> np.ndarray:
+            long_only: bool = False, groups: int = 5) -> np.ndarray:
+    if groups not in (5, 10):
+        raise ValueError("Expected five or ten score groups")
     eligible = np.flatnonzero(np.isfinite(scores))
     if len(eligible) < 10:
         raise ValueError("Too few signal-date eligible stocks")
     ranked = eligible[np.argsort(-scores[eligible], kind="stable")]
-    count = len(ranked) // 5
+    if groups == 10:
+        # Match the decile evaluation: ascending scores, instrument order for ties.
+        ranked = eligible[np.argsort(scores[eligible], kind="stable")][::-1]
+    count = len(ranked) // groups
     long_names, short_names = ranked[:count], ranked[-count:]
     if buffer:
         band = int(np.ceil(len(ranked) * 0.30))
@@ -172,6 +178,7 @@ def run(data: Panel, strategy: str, costs: Costs, capture: bool = False):
                 signals[t - 1], qty * data.opens[t] / opening_nav,
                 buffer=strategy in ("buffer_20_30", "long_only_buffer_20_30"),
                 long_only=long_only,
+                groups=10 if strategy == "daily_decile" else 5,
             ))
             blocked = int(((np.abs(weights * opening_nav - qty * data.opens[t]) > 1e-10)
                            & ~data.tradable[t]).sum())

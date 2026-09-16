@@ -1,0 +1,45 @@
+{
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "platform": "Linux-5.15.0-94-generic-x86_64-with-glibc2.35",
+  "python": "/root/autodl-tmp/conda-envs/quant/bin/python",
+  "python_version": "3.11.15",
+  "numpy": "2.4.6",
+  "pandas": "3.0.5",
+  "pyarrow": "25.0.0",
+  "started_utc": "2026-09-16T19:21:43.412429+00:00",
+  "finished_utc": "2026-09-16T19:21:47.233677+00:00",
+  "raw_scores_path": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet",
+  "daily_prices_path": "/root/autodl-tmp/strategy-application-20260906/results/daily_prices.parquet",
+  "inference_audit_sha256": "96c27d7947b6ef78b19159c2e1e0d04532c1f7411a109e5ccea9e6ee86947a96",
+  "input_hashes": {
+    "raw_scores": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "daily_prices": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa"
+  },
+  "code_hashes": {
+    "build_decile_strategy_preview.py": "bae8ddbeced198b03c3d4d602dea543edac6914b21780ea2d167acba718357c0",
+    "build_market_reference.py": "bc8c85c803f724b5f08f0a5f7504d7541b8461e19fda1e13c0a885cf2b4ec48d",
+    "evaluate_raw_deciles.py": "eccea506d331cf8d54762fdc32c3f3f0cbbb8058ae9473cc3e6337b74101a145",
+    "evaluate_raw_quintiles.py": "838357af7b6c86b4d5320eef6e6b879953325b840afcadc4619d3301a162c3ec",
+    "raw_engine.py": "9f96af060539e337625299d857e40097c03b2fc7f61398e8e3f886331846d47f",
+    "run_raw_scores.py": "f497537cf83383f40c4c923497db8533d89323257592ba11cc0cab760e03b0c4",
+    "test_raw_backtest.py": "b0c09c640ccc7108e0c8d3c3d25bde474189874ea37fefffde59af0e8a52e69a",
+    "validate_results.py": "db3fa1f0c1c31c30b90a253c546a5f0a96734e6feba5b7d711c0989a8e335ced"
+  },
+  "protocol_sha256": "c80a7f86ad38d174762ab9e4d56ff1d8a7143cea5c8bc95e978fc9c1c14a4cde",
+  "raw_score_values_preserved_exactly": true,
+  "neutralization": false,
+  "winsorization": false,
+  "standardization": false,
+  "raw_factor_rows": 402000,
+  "sessions": 402,
+  "holding_intervals": 400,
+  "first_trade": "2025-01-03",
+  "last_liquidation": "2026-08-28",
+  "future_score_invariance": true,
+  "output_hashes": {
+    "daily.csv": "77eafae36950e803ae99ecd0ca932f4b9fb6d355b412990e7819956f08127aa8",
+    "net_nav.csv": "67899088f099bcd187340d20344f44d5a62723f5ef7a29779203c2e7f46a3b04",
+    "primary.csv": "7649a9b04b450f1cc9c8eca0222b77e1228d33726854848a863dbc30c4d50fc4",
+    "summary.csv": "99b0b2be4d42c5db2c9a4ce37f72c3faeb8832f0e32dbc911f931abe6216febe"
+  }
+}

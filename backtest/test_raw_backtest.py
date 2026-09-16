@@ -18,7 +18,7 @@ def example():
 
 class RawBacktestTests(unittest.TestCase):
     def test_flat_price_roundtrip_accounts_for_buys_and_short_sales(self):
-        for strategy in ("baseline_daily", "buffer_20_30", "rank_mean_5d"):
+        for strategy in ("baseline_daily", "buffer_20_30", "rank_mean_5d", "daily_decile"):
             daily, _ = run(example(), strategy, Costs("net", 3, 8))
             self.assertAlmostEqual(daily.closing_nav.iloc[-1], (1-.0011)/(1+.0011), places=12)
             self.assertGreater(daily.cost_amount.iloc[1], 0)
@@ -53,7 +53,7 @@ class RawBacktestTests(unittest.TestCase):
 
     def test_future_inputs_do_not_change_prior_positions(self):
         data = example()
-        for strategy in ("baseline_daily", "buffer_20_30", "rank_mean_5d",
+        for strategy in ("baseline_daily", "buffer_20_30", "rank_mean_5d", "daily_decile",
                          "long_only_buffer_20_30"):
             _, first = run(data, strategy, Costs("net", 3, 8), capture=True)
             changed = replace(data, scores=data.scores.copy(), opens=data.opens.copy(),
@@ -90,6 +90,27 @@ class RawBacktestTests(unittest.TestCase):
         scores = np.tile(np.arange(10, dtype=float), (6, 1))
         scores[4, 9] = np.nan
         self.assertTrue(np.isnan(smooth_ranks(scores)[4, 9]))
+
+    def test_deciles_select_one_hundred_per_side_with_stable_ties(self):
+        for scores in (np.arange(1000, dtype=float), np.zeros(1000)):
+            weights = targets(scores, np.zeros(1000), groups=10)
+            np.testing.assert_array_equal(np.flatnonzero(weights < 0), np.arange(100))
+            np.testing.assert_array_equal(np.flatnonzero(weights > 0), np.arange(900, 1000))
+            self.assertAlmostEqual(weights[weights > 0].sum(), 1)
+            self.assertAlmostEqual(weights[weights < 0].sum(), -1)
+
+    def test_decile_run_uses_extreme_tenths_and_previous_close_signal(self):
+        data = example()
+        data.closes[1, 9] = 1.1
+        data.scores[1] *= -1
+        daily, positions = run(data, "daily_decile", Costs("gross", 0, 0), capture=True)
+        self.assertAlmostEqual(daily.daily_return.iloc[1], .1)
+        first = positions[str(data.dates[1].date())]
+        np.testing.assert_array_equal(np.flatnonzero(first > 0), [9])
+        np.testing.assert_array_equal(np.flatnonzero(first < 0), [0])
+        second = positions[str(data.dates[2].date())]
+        np.testing.assert_array_equal(np.flatnonzero(second > 0), [0])
+        np.testing.assert_array_equal(np.flatnonzero(second < 0), [9])
 
     def test_long_only_roundtrip_fees_and_no_short_exposure(self):
         daily, positions = run(example(), "long_only_buffer_20_30", Costs("net", 3, 8),

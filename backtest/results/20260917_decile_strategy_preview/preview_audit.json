@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "finished_utc": "2026-09-16T19:21:49.022923+00:00",
+  "score_group_checks": 402,
+  "chart_rows": 804,
+  "drawdown_independent_checks": 804,
+  "strategy": "Daily Q10-Q1, +100% and -100%, net of buy 3bp/sell 8bp; overnight included",
+  "market": "CSI 1000 price index, market reference only; never subtracted",
+  "cumulative": "100 * (compounded closing NAV - 1); not arithmetic O2C accumulation",
+  "drawdown": "100 * (closing NAV / historical maximum NAV including initial 1 - 1)",
+  "calendar_note": "402 same reporting dates. Strategies start trading Jan 3 open and liquidate Aug 28 open; index reference remains close-to-close.",
+  "input_hashes": {
+    "daily.csv": "77eafae36950e803ae99ecd0ca932f4b9fb6d355b412990e7819956f08127aa8",
+    "market_reference.csv": "a7f578993360247adf4f269f6c1aae8ec21cd7cf4004625361d1c1ea43c49140"
+  },
+  "code_sha256": "bae8ddbeced198b03c3d4d602dea543edac6914b21780ea2d167acba718357c0",
+  "output_hashes": {
+    "preview_daily.csv": "2ccdc15f16a1bb0e8d52b8dbd967f9739b64b24b2a592ffd7d9e11c0b87b80cb",
+    "preview_summary.json": "05cf7db65bfe5afb8c197adda725eb2abcb862b126426df0cf0971acfa052232"
+  }
+}
