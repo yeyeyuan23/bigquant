@@ -53,7 +53,8 @@ class RawBacktestTests(unittest.TestCase):
 
     def test_future_inputs_do_not_change_prior_positions(self):
         data = example()
-        for strategy in ("baseline_daily", "buffer_20_30", "rank_mean_5d"):
+        for strategy in ("baseline_daily", "buffer_20_30", "rank_mean_5d",
+                         "long_only_buffer_20_30"):
             _, first = run(data, strategy, Costs("net", 3, 8), capture=True)
             changed = replace(data, scores=data.scores.copy(), opens=data.opens.copy(),
                               closes=data.closes.copy())
@@ -89,6 +90,42 @@ class RawBacktestTests(unittest.TestCase):
         scores = np.tile(np.arange(10, dtype=float), (6, 1))
         scores[4, 9] = np.nan
         self.assertTrue(np.isnan(smooth_ranks(scores)[4, 9]))
+
+    def test_long_only_roundtrip_fees_and_no_short_exposure(self):
+        daily, positions = run(example(), "long_only_buffer_20_30", Costs("net", 3, 8),
+                               capture=True)
+        self.assertAlmostEqual(daily.closing_nav.iloc[-1], (1-.0008)/(1+.0003), places=12)
+        self.assertTrue((daily.short_value == 0).all())
+        self.assertTrue((daily.cash >= -1e-12).all())
+        self.assertAlmostEqual(daily.one_way_turnover.iloc[1], .5/(1+.0003), places=12)
+        self.assertAlmostEqual(daily.one_way_turnover.iloc[-1], .5, places=12)
+        first = positions[str(example().dates[1].date())]
+        np.testing.assert_array_equal(np.flatnonzero(first), [8, 9])
+
+    def test_blocked_long_exit_does_not_borrow_for_replacement(self):
+        qty = np.array([.5, .5, 0.])
+        updated, cash, trades, fee = execute(
+            qty, 0., np.ones(3), np.array([False, True, True]),
+            np.array([0., .5, .5]), Costs("net", 3, 8), long_only=True)
+        self.assertEqual(updated[0], .5)
+        self.assertGreaterEqual(cash, -1e-12)
+        self.assertAlmostEqual(updated[1], updated[2])
+        self.assertLess(updated[1], .25)
+        self.assertAlmostEqual(cash+updated.sum(), 1-fee)
+        self.assertEqual(trades[0], 0)
+
+    def test_long_only_buffer_retains_then_replaces_with_highest_available(self):
+        score = np.arange(100, dtype=float)
+        held = targets(score, np.zeros(100), buffer=True, long_only=True)
+        score[79], score[80] = score[80], score[79]
+        buffered = targets(score, held, buffer=True, long_only=True)
+        np.testing.assert_array_equal(buffered, held)
+        score[80] = -100
+        replaced = targets(score, held, buffer=True, long_only=True)
+        self.assertEqual(replaced[80], 0)
+        self.assertGreater(replaced[79], 0)
+        self.assertTrue((replaced >= 0).all())
+        self.assertAlmostEqual(replaced.sum(), 1)
 
 
 if __name__ == "__main__":

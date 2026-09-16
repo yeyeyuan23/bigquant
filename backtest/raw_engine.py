@@ -16,6 +16,7 @@ NAMES = {
     "baseline_daily": "每日五分位",
     "buffer_20_30": "排名缓冲区",
     "rank_mean_5d": "五日平均排名",
+    "long_only_buffer_20_30": "纯多头（排名缓冲）",
 }
 
 
@@ -85,7 +86,8 @@ def smooth_ranks(scores: np.ndarray, window: int = 5) -> np.ndarray:
     return result
 
 
-def targets(scores: np.ndarray, current: np.ndarray, buffer: bool = False) -> np.ndarray:
+def targets(scores: np.ndarray, current: np.ndarray, buffer: bool = False,
+            long_only: bool = False) -> np.ndarray:
     eligible = np.flatnonzero(np.isfinite(scores))
     if len(eligible) < 10:
         raise ValueError("Too few signal-date eligible stocks")
@@ -104,19 +106,35 @@ def targets(scores: np.ndarray, current: np.ndarray, buffer: bool = False) -> np
         long_names = select(ranked, current > 1e-12)
         short_names = select(ranked[::-1], current < -1e-12)
     result = np.zeros(len(scores), dtype=float)
-    result[long_names], result[short_names] = 1.0 / count, -1.0 / count
+    result[long_names] = 1.0 / count
+    if not long_only:
+        result[short_names] = -1.0 / count
     return result
 
 
-def execute(qty, cash, prices, tradable, weights, costs):
+def execute(qty, cash, prices, tradable, weights, costs, long_only=False):
     before = qty * prices
     nav = float(cash + before.sum())
     if nav <= 0:
         raise ValueError("Portfolio insolvent")
+    if long_only and ((weights < 0).any() or weights.sum() > 1 + 1e-12
+                      or (qty < -1e-12).any() or cash < -1e-10):
+        raise ValueError("Long-only portfolio must not borrow cash or sell short")
+
+    def desired_positions(post_fee_nav):
+        desired = weights * post_fee_nav
+        desired[~tradable] = before[~tradable]
+        if long_only:
+            # A blocked exit still occupies capital. Do not borrow to buy its replacement.
+            available = max(0., post_fee_nav - before[~tradable].sum())
+            requested = desired[tradable].sum()
+            if requested > available:
+                desired[tradable] *= available / requested
+        return desired
+
     post = nav
     for _ in range(100):
-        desired = weights * post
-        desired[~tradable] = before[~tradable]
+        desired = desired_positions(post)
         updated = nav - costs.charge(desired - before)
         if abs(updated - post) < 1e-13 * max(nav, 1):
             post = updated
@@ -124,13 +142,14 @@ def execute(qty, cash, prices, tradable, weights, costs):
         post = updated
     else:
         raise RuntimeError("Post-fee target sizing did not converge")
-    desired = weights * post
-    desired[~tradable] = before[~tradable]
+    desired = desired_positions(post)
     trades = desired - before
     fee = costs.charge(trades)
     new_qty = desired / prices
     new_cash = float(cash - trades.sum() - fee)
     np.testing.assert_allclose(new_cash + desired.sum(), nav - fee, atol=1e-11, rtol=0)
+    if long_only:
+        assert new_cash >= -1e-10 and (new_qty >= -1e-12).all()
     return new_qty, new_cash, trades, fee
 
 
@@ -138,6 +157,7 @@ def run(data: Panel, strategy: str, costs: Costs, capture: bool = False):
     if strategy not in NAMES:
         raise ValueError(strategy)
     signals = smooth_ranks(data.scores) if strategy == "rank_mean_5d" else data.scores
+    long_only = strategy == "long_only_buffer_20_30"
     qty = np.zeros(len(data.instruments))
     cash, previous_nav = 1.0, 1.0
     records, positions = [], {}
@@ -150,12 +170,13 @@ def run(data: Panel, strategy: str, costs: Costs, capture: bool = False):
         if t > 0:
             weights = (np.zeros_like(qty) if terminal else targets(
                 signals[t - 1], qty * data.opens[t] / opening_nav,
-                buffer=strategy == "buffer_20_30",
+                buffer=strategy in ("buffer_20_30", "long_only_buffer_20_30"),
+                long_only=long_only,
             ))
             blocked = int(((np.abs(weights * opening_nav - qty * data.opens[t]) > 1e-10)
                            & ~data.tradable[t]).sum())
             qty, cash, trades, fee = execute(
-                qty, cash, data.opens[t], data.tradable[t], weights, costs
+                qty, cash, data.opens[t], data.tradable[t], weights, costs, long_only=long_only
             )
         closing_nav = float(cash + np.dot(qty, data.closes[t]))
         overnight = float(np.dot(old_qty, data.opens[t] - data.closes[t - 1])) if t else 0.0

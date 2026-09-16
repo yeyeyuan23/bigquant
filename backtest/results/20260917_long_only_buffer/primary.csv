@@ -1,0 +1,2 @@
+strategy,name,start,end,days,average_one_way_turnover,gross_annualized_return,net_annualized_return,net_sharpe,gross_sharpe,net_cagr,net_cumulative_return,net_max_drawdown
+long_only_buffer_20_30,纯多头（排名缓冲）,2025-01-02,2026-08-28,402,0.44948558112821263,0.3187221166852395,0.19391003537223062,1.0526640276442825,1.7284132565608294,0.19321467599200526,0.325514282213635,-0.15879578878235923

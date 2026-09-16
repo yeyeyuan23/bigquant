@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "strategy": "baseline_daily",
+      "scenario": "gross",
+      "days": 402,
+      "max_absolute_difference": 4.440892098500626e-16
+    },
+    {
+      "strategy": "baseline_daily",
+      "scenario": "fees_slip0",
+      "days": 402,
+      "max_absolute_difference": 2.220446049250313e-16
+    },
+    {
+      "strategy": "buffer_20_30",
+      "scenario": "gross",
+      "days": 402,
+      "max_absolute_difference": 4.440892098500626e-16
+    },
+    {
+      "strategy": "buffer_20_30",
+      "scenario": "fees_slip0",
+      "days": 402,
+      "max_absolute_difference": 2.220446049250313e-16
+    }
+  ]
+}

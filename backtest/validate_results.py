@@ -59,10 +59,15 @@ def main():
             assert (pd.to_datetime(trading.signal_date).to_numpy()
                     < pd.to_datetime(trading.date).to_numpy()).all()
             assert d.iloc[0].daily_return == 0 and d.iloc[0].one_way_turnover == 0
+            if strategy == "long_only_buffer_20_30":
+                assert (d.short_value == 0).all()
+                assert (d.cash >= -1e-10).all()
+                assert (d.long_value <= d.closing_nav + 1e-10).all()
             checks.append({"strategy": strategy, "scenario": config["scenario"],
                            "days": len(d), "accounting": True, "metrics": True,
                            "next_session_signals": True})
-    assert len(checks) == 12
+    expected_checks = len(protocol["strategies"]) * len(protocol["costs"])
+    assert len(checks) == expected_checks
     primary = pd.read_csv(root / "primary.csv")
     for row in primary.itertuples():
         net = summary.loc[(row.strategy, "fees_slip0")]
@@ -77,9 +82,9 @@ def main():
              "raw_score_input": True, "all_metrics_independently_recomputed": True,
              "validator_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
     (root / "audit.json").write_text(json.dumps(audit, indent=2)+"\n")
-    (root / "status.json").write_text(json.dumps({"state": "complete", "completed": 12,
+    (root / "status.json").write_text(json.dumps({"state": "complete", "completed": expected_checks,
                                                   "validation": "passed"})+"\n")
-    print("PASS: 12 runs, raw inputs, calendar dates, fees, NAV, turnover, annualization and Sharpe.")
+    print(f"PASS: {expected_checks} runs, raw inputs, dates, fees, NAV, turnover and metrics.")
 
 
 if __name__ == "__main__":

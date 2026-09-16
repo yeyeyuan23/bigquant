@@ -1,0 +1,44 @@
+{
+  "status": "passed",
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "finished_utc": "2026-09-16T18:41:12.784911+00:00",
+  "sources": {
+    "sina": {
+      "url": "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20csi1000=/CN_MarketDataService.getKLineData?symbol=sh000852&scale=240&ma=no&datalen=1023",
+      "http_status": 200,
+      "sha256": "fcded41cf4a8126ec7f64edc202367206801055cc459460f796e8d80b10f4091",
+      "retrieved_utc": "2026-09-16T18:41:11.888584+00:00"
+    },
+    "tencent": {
+      "url": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh000852,day,2025-01-01,2026-09-01,640,qfq",
+      "http_status": 200,
+      "sha256": "865dc0b5e995733d8df9d4c3bb8bc0931b8e1e9d954d9b93339523cfbef2f77a",
+      "retrieved_utc": "2026-09-16T18:41:12.070454+00:00"
+    }
+  },
+  "series": "CSI 1000 price index, no dividend reinvestment or trading fees",
+  "normalization": "2025-01-02 close = 1; daily closes through 2026-08-28",
+  "role": "Market reference only; never subtracted from strategy returns",
+  "calendar_note": "402 same reporting dates. Strategies start trading Jan 3 open and liquidate Aug 28 open; index reference remains close-to-close.",
+  "cross_provider_days": 402,
+  "cross_provider_max_abs_difference": {
+    "open": 0.005000000001018634,
+    "close": 0.005000000001018634
+  },
+  "official_universe_source": "https://bigquant.com/square/competition/76ad3f56-ec2b-431a-890e-139a7f4bbcba",
+  "pool": "Historical CSI 1000 constituents supplied by BigAlpha",
+  "factor_keys_match_official_instruments_exactly": true,
+  "factor_stock_days": 402000,
+  "unique_instruments": 1307,
+  "input_hashes": {
+    "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "backtest/results/20260917_long_only_buffer/net_nav.csv": "f4c6453740ba3d5b8aafdd2449c2fca16603d33f3733d3e5ff9cd8319b7ed438",
+    "/root/bigquant_private_data/bigalpha_2026_instruments_20250101_20260801.parquet": "7a658403a9275ab582ea5b21f2cdbf45e1d7ea32f394296f78282475a56312c0",
+    "/root/bigquant_private_data/bigalpha_2026_instruments_20260802_20260828.parquet": "df53e4566c46758e8621770bda89400ac3649d8183acc69d8cb5278dfb8c75eb"
+  },
+  "code_sha256": "bc8c85c803f724b5f08f0a5f7504d7541b8461e19fda1e13c0a885cf2b4ec48d",
+  "output_hashes": {
+    "market_reference.csv": "a7f578993360247adf4f269f6c1aae8ec21cd7cf4004625361d1c1ea43c49140",
+    "summary.json": "46576afb986c445fea856fdbffdbf587c73ca64fc2648b1ff41085625fbf00ce"
+  }
+}

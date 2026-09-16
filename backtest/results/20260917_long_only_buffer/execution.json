@@ -1,0 +1,43 @@
+{
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "platform": "Linux-5.15.0-94-generic-x86_64-with-glibc2.35",
+  "python": "/root/autodl-tmp/conda-envs/quant/bin/python",
+  "python_version": "3.11.15",
+  "numpy": "2.4.6",
+  "pandas": "3.0.5",
+  "pyarrow": "25.0.0",
+  "started_utc": "2026-09-16T18:41:04.910014+00:00",
+  "finished_utc": "2026-09-16T18:41:10.265445+00:00",
+  "raw_scores_path": "/root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet",
+  "daily_prices_path": "/root/autodl-tmp/strategy-application-20260906/results/daily_prices.parquet",
+  "inference_audit_sha256": "96c27d7947b6ef78b19159c2e1e0d04532c1f7411a109e5ccea9e6ee86947a96",
+  "input_hashes": {
+    "raw_scores": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "daily_prices": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa"
+  },
+  "code_hashes": {
+    "build_market_reference.py": "bc8c85c803f724b5f08f0a5f7504d7541b8461e19fda1e13c0a885cf2b4ec48d",
+    "evaluate_raw_quintiles.py": "838357af7b6c86b4d5320eef6e6b879953325b840afcadc4619d3301a162c3ec",
+    "raw_engine.py": "b43a6932770f116059c054af4f9443f95f2f1882289062509f7ade9252c8ac10",
+    "run_raw_scores.py": "f497537cf83383f40c4c923497db8533d89323257592ba11cc0cab760e03b0c4",
+    "test_raw_backtest.py": "f987107276d745b71e2773fe0722ef60ed7a07119ebbaf0ab31a7566d3245df8",
+    "validate_results.py": "db3fa1f0c1c31c30b90a253c546a5f0a96734e6feba5b7d711c0989a8e335ced"
+  },
+  "protocol_sha256": "cb476c38330752bf96968d5cb4f05bf34ed400772e803f5d687ae6d02b1955a1",
+  "raw_score_values_preserved_exactly": true,
+  "neutralization": false,
+  "winsorization": false,
+  "standardization": false,
+  "raw_factor_rows": 402000,
+  "sessions": 402,
+  "holding_intervals": 400,
+  "first_trade": "2025-01-03",
+  "last_liquidation": "2026-08-28",
+  "future_score_invariance": true,
+  "output_hashes": {
+    "daily.csv": "158558aa47c0adfe6ec6649f5511bce8cd34506333460d2848ea1987564bcd96",
+    "net_nav.csv": "f4c6453740ba3d5b8aafdd2449c2fca16603d33f3733d3e5ff9cd8319b7ed438",
+    "primary.csv": "2ee017457692a3742d1085bb9a889e8284ad2d64ed23cc2acc882995119f6eb3",
+    "summary.csv": "fcd34691525c47d0b6134bf8f46dea20ce5019a336cef70d9042b6478e76a7fb"
+  }
+}

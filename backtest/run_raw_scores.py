@@ -28,9 +28,12 @@ def main():
     parser.add_argument("--daily-prices", type=Path, required=True)
     parser.add_argument("--inference-audit", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--protocol", type=Path,
+                        default=Path(__file__).resolve().parent / "protocol.json")
     args = parser.parse_args()
     source = Path(__file__).resolve().parent
-    protocol = json.loads((source / "protocol.json").read_text())
+    protocol = json.loads(args.protocol.read_text())
+    total = len(protocol["strategies"]) * len(protocol["costs"])
     args.out.mkdir(parents=True, exist_ok=False)
     (args.out / "protocol.json").write_text(json.dumps(protocol, ensure_ascii=False, indent=2)+"\n")
     (args.out / "status.json").write_text(json.dumps({"state": "running", "completed": 0}))
@@ -61,7 +64,7 @@ def main():
             summaries.append(summarize(daily))
             records.append(daily)
             (args.out / "status.json").write_text(json.dumps(
-                {"state": "running", "completed": len(summaries), "total": 12}))
+                {"state": "running", "completed": len(summaries), "total": total}))
             print(json.dumps(summaries[-1], ensure_ascii=False), flush=True)
     summary = pd.DataFrame(summaries)
     daily = pd.concat(records, ignore_index=True)
@@ -94,7 +97,7 @@ def main():
         "raw_scores_path": str(args.raw_scores), "daily_prices_path": str(args.daily_prices),
         "inference_audit_sha256": sha(args.inference_audit),
         "input_hashes": {"raw_scores": sha(args.raw_scores), "daily_prices": sha(args.daily_prices)},
-        "code_hashes": code_hashes, "protocol_sha256": sha(source / "protocol.json"),
+        "code_hashes": code_hashes, "protocol_sha256": sha(args.protocol),
         "raw_score_values_preserved_exactly": True, "neutralization": False,
         "winsorization": False, "standardization": False,
         "raw_factor_rows": int(np.isfinite(data.scores).sum()), "sessions": len(data.dates),
@@ -103,7 +106,7 @@ def main():
         "output_hashes": {p.name: sha(p) for p in sorted(args.out.glob("*.csv"))},
     }
     (args.out / "execution.json").write_text(json.dumps(execution, ensure_ascii=False, indent=2)+"\n")
-    (args.out / "status.json").write_text(json.dumps({"state": "computed", "completed": 12}))
+    (args.out / "status.json").write_text(json.dumps({"state": "computed", "completed": total}))
 
 
 if __name__ == "__main__":
