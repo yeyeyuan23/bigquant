@@ -80,22 +80,22 @@ def main():
     )
     for date in data.dates[: cutoff + 1]:
         np.testing.assert_array_equal(positions[str(date.date())], holdings[str(date.date())])
-    result = dict(
-        status="passed",
-        strategy=args.strategy,
-        independent_membership_dates=checks,
-        each_target_leg_names=100,
-        target_long=1,
-        target_short=-1,
-        retained_names_per_leg_min=min_kept,
-        retained_names_per_leg_max=max_kept,
-        future_perturbation_cutoff=str(data.dates[cutoff].date()),
-        prefix_unchanged_dates=cutoff + 1,
-        baseline_source_daily_sha256=hashlib.sha256(
+    result = {
+        "status": "passed",
+        "strategy": args.strategy,
+        "independent_membership_dates": checks,
+        "each_target_leg_names": 100,
+        "target_long": 1,
+        "target_short": -1,
+        "retained_names_per_leg_min": min_kept,
+        "retained_names_per_leg_max": max_kept,
+        "future_perturbation_cutoff": str(data.dates[cutoff].date()),
+        "prefix_unchanged_dates": cutoff + 1,
+        "baseline_source_daily_sha256": hashlib.sha256(
             (root / "daily.csv.gz").read_bytes()
         ).hexdigest(),
-        audit_code_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-    )
+        "audit_code_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
     (root / "candidate_audit.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
 

@@ -65,20 +65,20 @@ def main():
                 r = d.daily_return.to_numpy()
                 curve = np.r_[1.0, np.cumprod(1 + r)]
                 periods.append(
-                    dict(
-                        strategy=rule["name"],
-                        scenario=cost["scenario"],
-                        year=year,
-                        days=len(d),
-                        average_one_way_turnover=float(d.one_way_turnover.mean()),
-                        annualized_return=float(r.mean() * 252),
-                        sharpe=float(r.mean() / r.std(ddof=1) * np.sqrt(252)),
-                        cumulative_return=float(curve[-1] - 1),
-                        max_drawdown=float((curve / np.maximum.accumulate(curve) - 1).min()),
-                    )
+                    {
+                        "strategy": rule["name"],
+                        "scenario": cost["scenario"],
+                        "year": year,
+                        "days": len(d),
+                        "average_one_way_turnover": float(d.one_way_turnover.mean()),
+                        "annualized_return": float(r.mean() * 252),
+                        "sharpe": float(r.mean() / r.std(ddof=1) * np.sqrt(252)),
+                        "cumulative_return": float(curve[-1] - 1),
+                        "max_drawdown": float((curve / np.maximum.accumulate(curve) - 1).min()),
+                    }
                 )
             (args.out / "status.json").write_text(
-                json.dumps(dict(state="running", completed=len(summaries), total=84))
+                json.dumps({"state": "running", "completed": len(summaries), "total": 84})
             )
         print(rule["name"], "complete", flush=True)
     summary = pd.DataFrame(summaries)
@@ -95,14 +95,17 @@ def main():
         ["strategy", "date", "closing_nav", "daily_return", "one_way_turnover"]
     ].to_csv(args.out / "net_nav.csv", index=False)
     files = ["summary.csv", "daily.csv.gz", "calendar_years.csv", "comparison.csv", "net_nav.csv"]
-    execution = dict(
-        host=socket.gethostname(),
-        platform=platform.platform(),
-        python=sys.executable,
-        started_utc=started,
-        finished_utc=datetime.now(UTC).isoformat(),
-        input_hashes=dict(raw_scores=sha(args.raw_scores), daily_prices=sha(args.daily_prices)),
-        code_hashes={
+    execution = {
+        "host": socket.gethostname(),
+        "platform": platform.platform(),
+        "python": sys.executable,
+        "started_utc": started,
+        "finished_utc": datetime.now(UTC).isoformat(),
+        "input_hashes": {
+            "raw_scores": sha(args.raw_scores),
+            "daily_prices": sha(args.daily_prices),
+        },
+        "code_hashes": {
             n: sha(source / n)
             for n in [
                 "raw_engine.py",
@@ -112,15 +115,15 @@ def main():
                 "validate_turnover_trials.py",
             ]
         },
-        protocol_sha256=sha(source / "protocol_turnover_trials.json"),
-        baseline_reproduced=True,
-        output_hashes={n: sha(args.out / n) for n in files},
-        neutralization=False,
-        backtests_run_locally=False,
-    )
+        "protocol_sha256": sha(source / "protocol_turnover_trials.json"),
+        "baseline_reproduced": True,
+        "output_hashes": {n: sha(args.out / n) for n in files},
+        "neutralization": False,
+        "backtests_run_locally": False,
+    }
     (args.out / "execution.json").write_text(json.dumps(execution, indent=2) + "\n")
     (args.out / "status.json").write_text(
-        json.dumps(dict(state="computed", completed=len(summaries), total=84)) + "\n"
+        json.dumps({"state": "computed", "completed": len(summaries), "total": 84}) + "\n"
     )
     print(
         net[

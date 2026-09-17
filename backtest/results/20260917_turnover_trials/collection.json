@@ -1,30 +1,34 @@
 {
   "status": "passed",
-  "collected_utc": "2026-09-17T05:04:21.604110+00:00",
-  "remote_directory": "/root/autodl-tmp/turnover-trials-20260917/backtest/results/20260917_turnover_trials",
+  "collected_utc": "2026-09-17T05:09:16.576314+00:00",
+  "remote_directory": "/root/autodl-tmp/turnover-trials-20260917/backtest/results/20260917_turnover_trials_verified",
   "remote_host": "autodl-container-4e0e468bcd-7deafccc",
-  "simulation_source_commit": "46bfaee",
+  "source_git_base_commit": "77bd0bb",
+  "source_note": "C408 dictionary-literal syntax cleanup; exact executed code hashes in execution.json. All 84 decompressed ledgers and metric tables match the 77bd0bb results exactly.",
   "local_numerical_recomputation": false,
   "output_and_code_hashes_verified": true,
-  "unit_tests_observed_on_autodl": {
+  "unit_tests_on_autodl": {
     "raw_engine": 14,
     "turnover_policies": 8,
-    "exit_code": 0
+    "exit_code": 0,
+    "log": "tests.txt"
   },
   "files": {
     "summary.csv": "ef282f1bfb79d444c537190e1f35298f4a89e3cfdc15975e613ef7a63f7f5c0a",
-    "audit.json": "8f780dd3a0758f8c061ff967bbea895cbc6e6fed832fd2078c842e317e502314",
+    "audit.json": "d4a1e65228ef538121a90991d16827563fd816694d1bf2ef4a7239890bde7c17",
+    "tests.txt": "54e59e00687fa2c4fd9947ab356cad33a75dca07bb6e76692473015fadb80352",
     "review_table.csv": "3989fdc89e22c6e3398c92d5dff16d1dc5eb01b1d6911ca51d6ad1078dd95d99",
     "README.md": "2aa3648a1d41cfa8495deb363f92aa3708af7246c8f0090adfa9ed66befd77ae",
     "phase_ranges.csv": "7f81e904fa148a23e7b702d99a7c41ab5df85a33c34407d103fc6257f3e19c5f",
-    "report_audit.json": "571b0f214902e5789146040d30a2b865227278ce73d1c2c9a0269c3568c5d5c1",
+    "report_audit.json": "6fce0f547cc3b0ea6c0961bdeebb7488d3ffcc61cda5f2fd7b1d628576319c2a",
     "comparison.csv": "a68b7d720b0993f0141cde4e715703aa4eb340f7e5272ba78f3634615e0c75e4",
     "protocol.json": "550e7792fdaab8bd58c0facf6b2f32b47ffc747bea42bf65045e71f0c62dc84a",
     "calendar_years.csv": "47ef53952db5198e8b00a23b408190c540bf1f3e3f03355ac02751055010d334",
     "net_nav.csv": "fff613f4223f4817c07183a9d20295906d0614e9b660b5c9efd3ce510a3ffb98",
-    "daily.csv.gz": "ff52828cd3449c11648a9609ff3efda179e17e38d3f649a44de176b32f617678",
+    "formatting_equivalence.json": "e6b860d95fa6e0157ff664c4af831f847013baf02d3d4db6acda610082976267",
+    "daily.csv.gz": "15fd2af5b1d15c7ec3a4b625dcce02a9db160240a4cbf206f4deed97c4f04826",
     "status.json": "cba02f1e2fd209e2fb1c2edbafb4a1b184b3b96af70dfa1f1f5e8e2e076ff640",
-    "candidate_audit.json": "baa38bbadcb74730cc3a61beea22354f82465cbe5f7c32fdc5e01f1231bcd47f",
-    "execution.json": "5803aef59b6ae735e134079ea8b45f9400cd861ffb0ec52c21517ae9eea414e1"
+    "candidate_audit.json": "8ffd03353d95668ac7c9c38c2baa337ac2d0d3e7f10f008b08882c5cd0887bbf",
+    "execution.json": "943979bb9ee1cc88561a94c8cf014df1e1e71d30cbef4090558678b770d1e037"
   }
 }

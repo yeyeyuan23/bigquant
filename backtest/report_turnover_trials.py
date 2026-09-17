@@ -45,40 +45,45 @@ def main():
     for row in comparison.itertuples():
         years = [periods.loc[(row.strategy, "fees_slip0", year)] for year in (2025, 2026)]
         rows.append(
-            dict(
-                strategy=row.strategy,
-                name=name(row.strategy),
-                turnover=row.average_one_way_turnover,
-                turnover_reduction_vs_daily=1
+            {
+                "strategy": row.strategy,
+                "name": name(row.strategy),
+                "turnover": row.average_one_way_turnover,
+                "turnover_reduction_vs_daily": 1
                 - row.average_one_way_turnover / base.average_one_way_turnover,
-                gross_annualized=row.gross_annualized_return,
-                net_annualized=row.annualized_return,
-                net_sharpe=row.sharpe,
-                net_cumulative=row.cumulative_return,
-                max_drawdown=row.max_drawdown,
-                net_annualized_delta=row.annualized_return - base.annualized_return,
-                gross_annualized_delta=row.gross_annualized_return - base.gross_annualized_return,
-                net_2025_annualized=years[0].annualized_return,
-                net_2025_sharpe=years[0].sharpe,
-                net_2026_annualized=years[1].annualized_return,
-                net_2026_sharpe=years[1].sharpe,
-                net_slip2_annualized=summary.loc[(row.strategy, "fees_slip2"), "annualized_return"],
-                net_slip2_sharpe=summary.loc[(row.strategy, "fees_slip2"), "sharpe"],
-                net_slip5_annualized=summary.loc[(row.strategy, "fees_slip5"), "annualized_return"],
-                net_slip5_sharpe=summary.loc[(row.strategy, "fees_slip5"), "sharpe"],
-                turnover_lower_net_and_sharpe_higher=bool(
+                "gross_annualized": row.gross_annualized_return,
+                "net_annualized": row.annualized_return,
+                "net_sharpe": row.sharpe,
+                "net_cumulative": row.cumulative_return,
+                "max_drawdown": row.max_drawdown,
+                "net_annualized_delta": row.annualized_return - base.annualized_return,
+                "gross_annualized_delta": row.gross_annualized_return
+                - base.gross_annualized_return,
+                "net_2025_annualized": years[0].annualized_return,
+                "net_2025_sharpe": years[0].sharpe,
+                "net_2026_annualized": years[1].annualized_return,
+                "net_2026_sharpe": years[1].sharpe,
+                "net_slip2_annualized": summary.loc[
+                    (row.strategy, "fees_slip2"), "annualized_return"
+                ],
+                "net_slip2_sharpe": summary.loc[(row.strategy, "fees_slip2"), "sharpe"],
+                "net_slip5_annualized": summary.loc[
+                    (row.strategy, "fees_slip5"), "annualized_return"
+                ],
+                "net_slip5_sharpe": summary.loc[(row.strategy, "fees_slip5"), "sharpe"],
+                "turnover_lower_net_and_sharpe_higher": bool(
                     row.average_one_way_turnover < base.average_one_way_turnover
                     and row.annualized_return > base.annualized_return
                     and row.sharpe > base.sharpe
                 ),
-                annualized_beats_daily_both_years=bool(
+                "annualized_beats_daily_both_years": bool(
                     all(
                         y.annualized_return
                         > periods.loc[("daily_decile", "fees_slip0", year), "annualized_return"]
                         for y, year in zip(years, (2025, 2026))
                     )
                 ),
-            )
+            }
         )
     report = pd.DataFrame(rows)
     report.to_csv(root / "review_table.csv", index=False)
@@ -86,17 +91,17 @@ def main():
     for prefix in ("every_2d_", "every_3d_", "every_5d_", "buffer_10_20_every2_"):
         group = report[report.strategy.str.startswith(prefix)]
         phase_rows.append(
-            dict(
-                family=prefix.rstrip("_"),
-                phases=len(group),
-                turnover_min=group.turnover.min(),
-                turnover_max=group.turnover.max(),
-                net_annualized_min=group.net_annualized.min(),
-                net_annualized_max=group.net_annualized.max(),
-                net_sharpe_min=group.net_sharpe.min(),
-                net_sharpe_max=group.net_sharpe.max(),
-                worst_max_drawdown=group.max_drawdown.min(),
-            )
+            {
+                "family": prefix.rstrip("_"),
+                "phases": len(group),
+                "turnover_min": group.turnover.min(),
+                "turnover_max": group.turnover.max(),
+                "net_annualized_min": group.net_annualized.min(),
+                "net_annualized_max": group.net_annualized.max(),
+                "net_sharpe_min": group.net_sharpe.min(),
+                "net_sharpe_max": group.net_sharpe.max(),
+                "worst_max_drawdown": group.max_drawdown.min(),
+            }
         )
     phases = pd.DataFrame(phase_rows)
     phases.to_csv(root / "phase_ranges.csv", index=False)
@@ -169,17 +174,17 @@ def main():
     (root / "README.md").write_text("\n".join(lines))
     (root / "report_audit.json").write_text(
         json.dumps(
-            dict(
-                status="passed",
-                source="audited summary and calendar_years",
-                rows=len(report),
-                phase_families=len(phases),
-                code_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                output_hashes={
+            {
+                "status": "passed",
+                "source": "audited summary and calendar_years",
+                "rows": len(report),
+                "phase_families": len(phases),
+                "code_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "output_hashes": {
                     n: hashlib.sha256((root / n).read_bytes()).hexdigest()
                     for n in ["review_table.csv", "phase_ranges.csv", "README.md"]
                 },
-            ),
+            },
             indent=2,
         )
         + "\n"

@@ -28,13 +28,13 @@ def main():
     def metrics(d):
         r = d.daily_return.to_numpy()
         nav = np.r_[1.0, np.cumprod(1 + r)]
-        return dict(
-            annualized_return=r.mean() * 252,
-            sharpe=r.mean() / r.std(ddof=1) * np.sqrt(252),
-            cumulative_return=nav[-1] - 1,
-            max_drawdown=(nav / np.maximum.accumulate(nav) - 1).min(),
-            average_one_way_turnover=d.one_way_turnover.mean(),
-        )
+        return {
+            "annualized_return": r.mean() * 252,
+            "sharpe": r.mean() / r.std(ddof=1) * np.sqrt(252),
+            "cumulative_return": nav[-1] - 1,
+            "max_drawdown": (nav / np.maximum.accumulate(nav) - 1).min(),
+            "average_one_way_turnover": d.one_way_turnover.mean(),
+        }
 
     for rule in protocol["rules"]:
         for cost in protocol["costs"]:
@@ -80,13 +80,13 @@ def main():
                 < pd.to_datetime(d.date.iloc[1:-1]).to_numpy()
             ).all()
             checks.append(
-                dict(
-                    strategy=rule["name"],
-                    scenario=cost["scenario"],
-                    accounting=True,
-                    periods=True,
-                    trade_schedule=True,
-                )
+                {
+                    "strategy": rule["name"],
+                    "scenario": cost["scenario"],
+                    "accounting": True,
+                    "periods": True,
+                    "trade_schedule": True,
+                }
             )
     assert len(checks) == len(protocol["rules"]) * len(protocol["costs"]) == 84
     comparison = pd.read_csv(root / "comparison.csv")
@@ -102,18 +102,19 @@ def main():
             np.testing.assert_allclose(getattr(row, key), saved[key], atol=1e-12, rtol=0)
     (root / "audit.json").write_text(
         json.dumps(
-            dict(
-                status="passed",
-                checks=checks,
-                baseline_reproduced=execution["baseline_reproduced"],
-                validator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-            ),
+            {
+                "status": "passed",
+                "checks": checks,
+                "baseline_reproduced": execution["baseline_reproduced"],
+                "validator_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            },
             indent=2,
         )
         + "\n"
     )
     (root / "status.json").write_text(
-        json.dumps(dict(state="complete", completed=84, total=84, validation="passed")) + "\n"
+        json.dumps({"state": "complete", "completed": 84, "total": 84, "validation": "passed"})
+        + "\n"
     )
     print(
         "PASS: 84 configurations, accounts, costs, schedule, full-period and 168 calendar-year summaries."

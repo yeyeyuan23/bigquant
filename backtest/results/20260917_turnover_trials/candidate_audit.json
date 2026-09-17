@@ -9,6 +9,6 @@
   "retained_names_per_leg_max": 85,
   "future_perturbation_cutoff": "2025-11-03",
   "prefix_unchanged_dates": 201,
-  "baseline_source_daily_sha256": "ff52828cd3449c11648a9609ff3efda179e17e38d3f649a44de176b32f617678",
-  "audit_code_sha256": "9ef53d0566c9b02c92dcedb002c75bf15d9b8ba5128c5a309e5f00b7f3eebeb4"
+  "baseline_source_daily_sha256": "15fd2af5b1d15c7ec3a4b625dcce02a9db160240a4cbf206f4deed97c4f04826",
+  "audit_code_sha256": "863f3a4eb58431a71f5b9a98027b26555d39d5be8c23819289f624d8afea6858"
 }
