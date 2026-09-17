@@ -1,0 +1,30 @@
+{
+  "status": "passed",
+  "collected_utc": "2026-09-17T05:04:21.604110+00:00",
+  "remote_directory": "/root/autodl-tmp/turnover-trials-20260917/backtest/results/20260917_turnover_trials",
+  "remote_host": "autodl-container-4e0e468bcd-7deafccc",
+  "simulation_source_commit": "46bfaee",
+  "local_numerical_recomputation": false,
+  "output_and_code_hashes_verified": true,
+  "unit_tests_observed_on_autodl": {
+    "raw_engine": 14,
+    "turnover_policies": 8,
+    "exit_code": 0
+  },
+  "files": {
+    "summary.csv": "ef282f1bfb79d444c537190e1f35298f4a89e3cfdc15975e613ef7a63f7f5c0a",
+    "audit.json": "8f780dd3a0758f8c061ff967bbea895cbc6e6fed832fd2078c842e317e502314",
+    "review_table.csv": "3989fdc89e22c6e3398c92d5dff16d1dc5eb01b1d6911ca51d6ad1078dd95d99",
+    "README.md": "2aa3648a1d41cfa8495deb363f92aa3708af7246c8f0090adfa9ed66befd77ae",
+    "phase_ranges.csv": "7f81e904fa148a23e7b702d99a7c41ab5df85a33c34407d103fc6257f3e19c5f",
+    "report_audit.json": "571b0f214902e5789146040d30a2b865227278ce73d1c2c9a0269c3568c5d5c1",
+    "comparison.csv": "a68b7d720b0993f0141cde4e715703aa4eb340f7e5272ba78f3634615e0c75e4",
+    "protocol.json": "550e7792fdaab8bd58c0facf6b2f32b47ffc747bea42bf65045e71f0c62dc84a",
+    "calendar_years.csv": "47ef53952db5198e8b00a23b408190c540bf1f3e3f03355ac02751055010d334",
+    "net_nav.csv": "fff613f4223f4817c07183a9d20295906d0614e9b660b5c9efd3ce510a3ffb98",
+    "daily.csv.gz": "ff52828cd3449c11648a9609ff3efda179e17e38d3f649a44de176b32f617678",
+    "status.json": "cba02f1e2fd209e2fb1c2edbafb4a1b184b3b96af70dfa1f1f5e8e2e076ff640",
+    "candidate_audit.json": "baa38bbadcb74730cc3a61beea22354f82465cbe5f7c32fdc5e01f1231bcd47f",
+    "execution.json": "5803aef59b6ae735e134079ea8b45f9400cd861ffb0ec52c21517ae9eea414e1"
+  }
+}

@@ -1,0 +1,221 @@
+{
+  "name": "raw_decile_turnover_exploration_20260917",
+  "code_base_commit": "7e8313a",
+  "execution": "AutoDL only; local workstation authors code and renders reports",
+  "signal": "Original factor column from frozen model inference, without clipping, standardization or industry/style neutralization",
+  "raw_scores_sha256": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+  "daily_prices_sha256": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa",
+  "checkpoint_sha256": "252c39baf946f494898fcd0e2c3a0aeca4de2ece378b9de6386a5200378e1dcb",
+  "training_end": "2024-12-26",
+  "start": "2025-01-02",
+  "end": "2026-08-28",
+  "strategies": [
+    "daily_decile",
+    "buffer_10_15",
+    "buffer_10_20",
+    "buffer_10_25",
+    "buffer_10_30",
+    "every_2d_phase0",
+    "every_2d_phase1",
+    "every_3d_phase0",
+    "every_3d_phase1",
+    "every_3d_phase2",
+    "every_5d_phase0",
+    "every_5d_phase1",
+    "every_5d_phase2",
+    "every_5d_phase3",
+    "every_5d_phase4",
+    "partial_25",
+    "partial_50",
+    "partial_75",
+    "buffer_10_20_partial50",
+    "buffer_10_20_every2_phase0",
+    "buffer_10_20_every2_phase1"
+  ],
+  "costs": [
+    {
+      "scenario": "gross",
+      "buy_bps": 0,
+      "sell_bps": 0,
+      "slippage_bps": 0
+    },
+    {
+      "scenario": "fees_slip0",
+      "buy_bps": 3,
+      "sell_bps": 8,
+      "slippage_bps": 0
+    },
+    {
+      "scenario": "fees_slip2",
+      "buy_bps": 3,
+      "sell_bps": 8,
+      "slippage_bps": 2
+    },
+    {
+      "scenario": "fees_slip5",
+      "buy_bps": 3,
+      "sell_bps": 8,
+      "slippage_bps": 5
+    }
+  ],
+  "portfolio": "Daily equal-weight long highest 10% (Q10) and short lowest 10% (Q1); targets +100% and -100% of post-fee NAV. Ten groups are defined in raw score ascending order with instrument order for ties, before prices or future labels.",
+  "buffer": "Keep existing long/short names while inside the configured extreme band; fill each side to 10% using current raw-score rank. These are Q10/Q1-based buffered strategies, not exact daily extreme deciles.",
+  "execution_time": "Signal after close, trade at next open; hold continuously including overnight; last available open reserved for liquidation",
+  "marking": "Daily adjusted close; missing close uses current known opening mark, missing open blocks trading and uses previous known close/mark",
+  "annualization": "252 times arithmetic mean of daily close-to-close portfolio returns across all 402 sessions, including initial cash day",
+  "sharpe": "sqrt(252) times daily mean divided by sample standard deviation (ddof=1); risk-free rate zero; net Sharpe at stated fees",
+  "turnover": "Daily (buy notional + sell notional)/(2 * pre-trade opening NAV), including initial/terminal trading; mean over all 402 sessions",
+  "scope": "Exploratory retrospective comparison after seeing 2025-2026 results. All rules and phases fixed before this batch. No untouched test set; do not call the winner validated or guaranteed.",
+  "rules": [
+    {
+      "name": "daily_decile",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "buffer_10_15",
+      "buffer_fraction": 0.15,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "buffer_10_20",
+      "buffer_fraction": 0.2,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "buffer_10_25",
+      "buffer_fraction": 0.25,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "buffer_10_30",
+      "buffer_fraction": 0.3,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_2d_phase0",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 2,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_2d_phase1",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 2,
+      "phase": 1,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_3d_phase0",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 3,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_3d_phase1",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 3,
+      "phase": 1,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_3d_phase2",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 3,
+      "phase": 2,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_5d_phase0",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 5,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_5d_phase1",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 5,
+      "phase": 1,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_5d_phase2",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 5,
+      "phase": 2,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_5d_phase3",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 5,
+      "phase": 3,
+      "adjustment": 1.0
+    },
+    {
+      "name": "every_5d_phase4",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 5,
+      "phase": 4,
+      "adjustment": 1.0
+    },
+    {
+      "name": "partial_25",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 0.25
+    },
+    {
+      "name": "partial_50",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 0.5
+    },
+    {
+      "name": "partial_75",
+      "buffer_fraction": 0.1,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 0.75
+    },
+    {
+      "name": "buffer_10_20_partial50",
+      "buffer_fraction": 0.2,
+      "rebalance_every": 1,
+      "phase": 0,
+      "adjustment": 0.5
+    },
+    {
+      "name": "buffer_10_20_every2_phase0",
+      "buffer_fraction": 0.2,
+      "rebalance_every": 2,
+      "phase": 0,
+      "adjustment": 1.0
+    },
+    {
+      "name": "buffer_10_20_every2_phase1",
+      "buffer_fraction": 0.2,
+      "rebalance_every": 2,
+      "phase": 1,
+      "adjustment": 1.0
+    }
+  ],
+  "selection": "Show every rule and phase. Compare turnover, net annual return, Sharpe, drawdown, and 2025/2026 separately. Report phase ranges for reduced-frequency rules. Do not suppress failed candidates.",
+  "partial": "Blend normalized existing signed weights with current target at alpha; net overlapping opposite positions, then normalize each signed leg to +1/-1. First trade is full; retained positions without a current score get zero target. This can hold more than 100 names per side.",
+  "frequency": "First available open builds the portfolio in every phase. Thereafter trade when (t-1-phase)%k==0; unchanged share quantities between trade dates, so leverage drifts. All phases reported. Last open liquidates all tradable positions."
+}

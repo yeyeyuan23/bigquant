@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "strategy": "buffer_10_30",
+  "independent_membership_dates": 400,
+  "each_target_leg_names": 100,
+  "target_long": 1,
+  "target_short": -1,
+  "retained_names_per_leg_min": 0,
+  "retained_names_per_leg_max": 85,
+  "future_perturbation_cutoff": "2025-11-03",
+  "prefix_unchanged_dates": 201,
+  "baseline_source_daily_sha256": "ff52828cd3449c11648a9609ff3efda179e17e38d3f649a44de176b32f617678",
+  "audit_code_sha256": "9ef53d0566c9b02c92dcedb002c75bf15d9b8ba5128c5a309e5f00b7f3eebeb4"
+}

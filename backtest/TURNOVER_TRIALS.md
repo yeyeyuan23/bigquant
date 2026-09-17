@@ -1,8 +1,14 @@
-# Q10−Q1 换手优化：待执行方案
+# Q10−Q1 换手优化：方案与结果
 
-本轮由“降低换手，同时尽量保留收益”的要求发起。**状态：代码和固定方案已写好，AutoDL SSH 暂不可连接，尚未运行；没有新增回测结果。** 现有每日 Q10−Q1 扣费前年化 55.35%、Sharpe 3.206；扣费后年化 13.52%、Sharpe 0.784，日均单边换手 1.505。
+本轮由“降低换手，同时尽量保留收益”的要求发起。**状态：AutoDL 已完成 84/84 组，独立账本与指标审计通过。** 22 项测试通过；30% 保留带另经 400 日选股核对与真实数据未来扰动检查。 现有每日 Q10−Q1 扣费前年化 55.35%、Sharpe 3.206；扣费后年化 13.52%、Sharpe 0.784，日均单边换手 1.505。
 
 保持模型权重、原始分数、行情、时点、2025-01-02 至 2026-08-28 区间、单边各 100% 目标敞口与费率不变。原始分数不做行业/风格中性化。不是重新训练，也不是保证收益。
+
+## 本次主要结果
+
+[完整结果、分年表现与审计](results/20260917_turnover_trials/README.md)。10% 持仓 / 30% 保留带：日均单边换手 **0.870**，毛年化 **59.66%**、净年化 **35.46%**、净 Sharpe **1.991**、净累计 **71.63%**、最大回撤 **−12.45%**。2025 年与 2026 年至 8 月净年化分别为 34.99%、36.18%；每侧额外 2bp 后净年化 26.67%、Sharpe 1.498。
+
+这是本批净 Sharpe 最高的配置，不是已证明的最优参数。缓冲后的持仓仍为每侧 100 只，但不再是每日严格 Q10/Q1。低频方案明显依赖调仓起点，全相位范围保留在结果中。
 
 ## 一次固定的比较范围
 
@@ -33,9 +39,19 @@ export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
   --raw-scores /root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/m_raw_frozen_private_oos.parquet \
   --daily-prices /root/autodl-tmp/strategy-application-20260906/results/daily_prices.parquet \
   --inference-audit /root/autodl-tmp/projects/bigquant-default/reports/dependencies/finals_pre/e4_private_fixed_oos/inference_audit.json \
-  --baseline-results backtest/results/20260917_decile_strategy_preview \
-  --out backtest/results/20260917_turnover_trials
-/root/autodl-tmp/conda-envs/quant/bin/python backtest/validate_turnover_trials.py backtest/results/20260917_turnover_trials
+  --baseline-results /root/autodl-tmp/raw-score-backtest-20260916/backtest/results/20260917_decile_strategy_preview \
+  --out backtest/results/NEW_RUN
+/root/autodl-tmp/conda-envs/quant/bin/python backtest/validate_turnover_trials.py backtest/results/NEW_RUN
 ```
 
 `status.json` 必须为 complete、84/84，并通过 audit.json。程序禁止在 macOS 运行回测；本地只写代码、复制已有小型展示数据、渲染 HTML。数值测试和独立账本复核均需远端执行。
+
+实际执行目录为 `/root/autodl-tmp/turnover-trials-20260917`。前次基线位于 `/root/autodl-tmp/raw-score-backtest-20260916/backtest/results/20260917_decile_strategy_preview`。回测计算、测试、分年汇总、报告生成与独立复核均在 AutoDL；本地只取回结果并核对文件哈希。
+
+独立验证通过后，在 AutoDL 上执行报告生成：
+
+```sh
+/root/autodl-tmp/conda-envs/quant/bin/python backtest/report_turnover_trials.py backtest/results/NEW_RUN
+```
+
+本次另用 `audit_turnover_candidate.py --results ... --raw-scores ... --daily-prices ... --strategy buffer_10_30` 核对 30% 保留带的真实持仓与未来信息扰动，输出 `candidate_audit.json`。完整记录见结果目录中的 `collection.json`，包含收回文件哈希和本次运行源码校验。

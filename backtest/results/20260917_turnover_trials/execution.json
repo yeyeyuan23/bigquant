@@ -1,0 +1,29 @@
+{
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "platform": "Linux-5.15.0-94-generic-x86_64-with-glibc2.35",
+  "python": "/root/autodl-tmp/conda-envs/quant/bin/python",
+  "started_utc": "2026-09-17T05:00:14.296814+00:00",
+  "finished_utc": "2026-09-17T05:00:35.588773+00:00",
+  "input_hashes": {
+    "raw_scores": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "daily_prices": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa"
+  },
+  "code_hashes": {
+    "raw_engine.py": "9f96af060539e337625299d857e40097c03b2fc7f61398e8e3f886331846d47f",
+    "turnover_engine.py": "bedad7a5e831ac1cea44f12774bad5722c34a03da706a0fc306bc4da0ffe069a",
+    "run_turnover_trials.py": "e89cb116eb109c1bc5edda1700dcafbf34a8a99a00834a24d28d195f9f48d1bb",
+    "test_turnover_trials.py": "adec538ff4e73c88e055dc7ca7f896a80e5c74f5e33bb6f3dd734b36c7af4f7a",
+    "validate_turnover_trials.py": "5d1b4d5203746e56a29097bad7db55c380a8eebb89e020c2123a56b93f9edd69"
+  },
+  "protocol_sha256": "550e7792fdaab8bd58c0facf6b2f32b47ffc747bea42bf65045e71f0c62dc84a",
+  "baseline_reproduced": true,
+  "output_hashes": {
+    "summary.csv": "ef282f1bfb79d444c537190e1f35298f4a89e3cfdc15975e613ef7a63f7f5c0a",
+    "daily.csv.gz": "ff52828cd3449c11648a9609ff3efda179e17e38d3f649a44de176b32f617678",
+    "calendar_years.csv": "47ef53952db5198e8b00a23b408190c540bf1f3e3f03355ac02751055010d334",
+    "comparison.csv": "a68b7d720b0993f0141cde4e715703aa4eb340f7e5272ba78f3634615e0c75e4",
+    "net_nav.csv": "fff613f4223f4817c07183a9d20295906d0614e9b660b5c9efd3ce510a3ffb98"
+  },
+  "neutralization": false,
+  "backtests_run_locally": false
+}

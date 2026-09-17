@@ -1,0 +1,595 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "strategy": "daily_decile",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "daily_decile",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "daily_decile",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "daily_decile",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_15",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_15",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_15",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_15",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_25",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_25",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_25",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_25",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_30",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_30",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_30",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_30",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase0",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase0",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase0",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase0",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase1",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase1",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase1",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_2d_phase1",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase0",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase0",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase0",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase0",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase1",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase1",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase1",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase1",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase2",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase2",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase2",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_3d_phase2",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase0",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase0",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase0",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase0",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase1",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase1",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase1",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase1",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase2",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase2",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase2",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase2",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase3",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase3",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase3",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase3",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase4",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase4",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase4",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "every_5d_phase4",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_25",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_25",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_25",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_25",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_50",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_75",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_75",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_75",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "partial_75",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_partial50",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_partial50",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_partial50",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_partial50",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase0",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase0",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase0",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase0",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase1",
+      "scenario": "gross",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase1",
+      "scenario": "fees_slip0",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase1",
+      "scenario": "fees_slip2",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    },
+    {
+      "strategy": "buffer_10_20_every2_phase1",
+      "scenario": "fees_slip5",
+      "accounting": true,
+      "periods": true,
+      "trade_schedule": true
+    }
+  ],
+  "baseline_reproduced": true,
+  "validator_sha256": "5d1b4d5203746e56a29097bad7db55c380a8eebb89e020c2123a56b93f9edd69"
+}
