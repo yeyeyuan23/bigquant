@@ -72,6 +72,8 @@ loss = -Pearson(prediction, target)
 
 实验直达：[E6 通道消融的代码与结果](experiments/finals_pre/e6_channel_groups/README.md)、[E8 三种辅助损失对照](experiments/finals_pre/e8_loss_comparison/README.md)、[E9 大规模架构对照（45 次训练）](experiments/finals_pre/e9_tcn_architecture/README.md)。
 
+可交易策略回测单独汇总在 [backtest/README.md](backtest/README.md)：原始模型分数、连续持仓与成交成本，最新为 21 个持仓配置 × 4 种成本情景，84 组已完成并通过审计。该页列明全部策略、成本和结果；与上面的 O2C 因子评价使用不同收益口径。
+
 ## 主要目录
 
 ```text
@@ -87,6 +89,7 @@ scripts/
 
 experiments/finals_pre/               当前 O2C 复盘实验与唯一结果 README
 reports/dependencies/finals_pre/      大型实验产物与审计
+backtest/                             原始分数策略回测、换手优化与审计结果
 submissions/                          冻结提交包
 tests/                                特征、时间因果与模型测试
 ```

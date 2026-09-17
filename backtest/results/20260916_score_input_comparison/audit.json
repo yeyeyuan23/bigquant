@@ -1,0 +1,27 @@
+{
+  "status": "passed",
+  "host": "autodl-container-4e0e468bcd-7deafccc",
+  "changed": "Only score input; historical processed pipeline vs raw outputs",
+  "dates_universe_prices_and_tradability_identical": true,
+  "raw_runs_match_published_results": true,
+  "runs": 12,
+  "input_hashes": {
+    "raw": "d8c16b025601ea720c0fa9f045ef2e1e0a5e8ff9e034318fac261d92ffe1267c",
+    "processed": "fffa18b92c8598eb144ecbaa44bb160008acc2f8ca4141d808e439e5869860e8",
+    "prices": "0639d0e1ae3f7a90ed9a7449d17430635b54a1a1551e2752b3be2731484d8bfa"
+  },
+  "code_hashes": {
+    "diagnostic": "7a2ebfdf70d54cb561e6197e328578b859fc4cda603f29645df2932779962919",
+    "engine": "354c49253a54077297b1cc1dc01ff83228942d0adfcea7dad5667c14e0aebde5"
+  },
+  "overlap_means": {
+    "baseline_daily": {
+      "long_overlap": 0.673175,
+      "short_overlap": 0.7606625
+    },
+    "rank_mean_5d": {
+      "long_overlap": 0.636575,
+      "short_overlap": 0.696825
+    }
+  }
+}
