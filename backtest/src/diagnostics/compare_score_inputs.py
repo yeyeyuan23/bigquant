@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from raw_engine import Costs, load_panel, run, smooth_ranks, summarize, targets  # noqa: E402
+from raw_engine import Costs, load_panel, run, smooth_ranks, summarize, targets
 
 
 def sha(p):
