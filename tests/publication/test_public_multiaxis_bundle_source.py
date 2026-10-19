@@ -1,13 +1,13 @@
 """Exercise relocated source assembly without loading ML or platform runtimes."""
 import ast
 import importlib.util
-from pathlib import Path
 import sys
-from types import ModuleType
 import unittest
+from pathlib import Path
+from types import ModuleType
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class MultiAxisBundleSourceTests(unittest.TestCase):

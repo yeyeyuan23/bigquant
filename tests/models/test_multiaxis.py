@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import torch
 
-from scripts.train_m_multiaxis import stability_loss
 from alpha_models.multiaxis import (
     AXIS_NAMES,
     AXIS_TOKEN_DIM,
@@ -18,6 +17,7 @@ from alpha_models.multiaxis import (
     load_checkpoint,
     pack_multiaxis_day,
 )
+from scripts.train_m_multiaxis import stability_loss
 
 
 def _stats() -> dict[str, object]:

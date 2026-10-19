@@ -21,7 +21,7 @@ src/alpha_models/multiaxis.py        模型与数据变换
 scripts/train_m_multiaxis.py        训练入口
 scripts/predict_m_multiaxis_store.py 本地预测
 scripts/build_m_multiaxis_submission.py 私有上传包导出
-tests/test_multiaxis.py             模型测试
+tests/models/test_multiaxis.py      模型测试
 ```
 
 先按根目录依赖说明安装项目，例如 `python -m pip install -e ".[neural]"`。再使用 `python scripts/train_m_multiaxis.py --help` 查看显式数据路径参数。导出器的 `--source-dir` 指项目根目录，输出必须放到 `artifacts/local/` 或仓库外。所有私有数据、拟合统计量和模型权重由运行者自行准备；本次没有重新训练或验证这些历史实验。

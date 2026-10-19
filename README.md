@@ -113,16 +113,17 @@ Candidate454、T/X 专家、Elastic Net 和旧 O2O/C2C 实验属于历史研究�
 
 ## 验证
 
+测试按发布检查、模型、评估、因子、研究与集成分组，入口和保留原则见 [测试说明](tests/README.md)。
+
 ```bash
 python scripts/check_public_release.py
-python tests/test_public_release_policy.py
-python tests/test_public_embedded_artifacts.py
+python -m unittest discover -s tests/publication -p "test_public*.py" -v
 python -m ruff check .
 coverage run -m pytest -q
 coverage combine
-coverage report --include="src/*"
+coverage report --include="src/*" --fail-under=75
 ```
 
-时间因果检查位于 `tests/test_microstructure_expert.py` 和 `tests/test_microstructure_v2.py`，覆盖前缀不变性、午休分段、mask 和张量形状。平台成绩、冻结权重推理、本地评分和可交易回测是不同证据层；只有完成对应审计后才在 README 中写入结论。
+时间因果检查位于 `tests/models/test_microstructure_expert.py` 和 `tests/models/test_microstructure_v2.py`，覆盖前缀不变性、午休分段、mask 和张量形状。平台成绩、冻结权重推理、本地评分和可交易回测是不同证据层；只有完成对应审计后才在 README 中写入结论。
 
 公开快照检查只证明静态语法、外部文件加载契约和发布规则。需要私有数据/模型的历史复现检查在产物缺失时单独跳过；不应把这些跳过当作模型正确性或成绩复现。

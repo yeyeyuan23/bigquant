@@ -3,12 +3,12 @@ import ast
 import importlib.util
 import json
 import os
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SUBMISSIONS = ROOT / 'submissions'
 RUNTIME_ROOTS = (SUBMISSIONS, ROOT / 'experiments' / 'legacy_submissions')
 
@@ -32,17 +32,15 @@ class PublicEmbeddedArtifactTests(unittest.TestCase):
 
     def test_unset_path_fails_with_external_artifact_contract(self):
         loader = self.loader()
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaisesRegex(RuntimeError, 'PUBLIC_TEST_ARTIFACT'):
-                loader.artifact_path('PUBLIC_TEST_ARTIFACT')
+        with patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(RuntimeError, 'PUBLIC_TEST_ARTIFACT'):
+            loader.artifact_path('PUBLIC_TEST_ARTIFACT')
 
     def test_missing_or_directory_path_fails(self):
         loader = self.loader()
         with tempfile.TemporaryDirectory() as temporary:
             for value in (temporary, str(Path(temporary) / 'absent.json')):
-                with patch.dict(os.environ, {'PUBLIC_TEST_ARTIFACT': value}):
-                    with self.assertRaises(FileNotFoundError):
-                        loader.artifact_path('PUBLIC_TEST_ARTIFACT')
+                with patch.dict(os.environ, {'PUBLIC_TEST_ARTIFACT': value}), self.assertRaises(FileNotFoundError):
+                    loader.artifact_path('PUBLIC_TEST_ARTIFACT')
 
     def test_explicit_environment_json_fixture_and_required_keys(self):
         loader = self.loader()

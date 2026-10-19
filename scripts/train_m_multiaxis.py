@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+
 from alpha_models.multiaxis import (
     RAW_FIELDS,
     MultiAxisConfig,

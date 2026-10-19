@@ -15,7 +15,7 @@ import pytest
 
 from alpha_models import MICROSTRUCTURE_CHANNELS, pack_microstructure_days
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "experiments" / "finals_pre" / "common"))
 
 from fastpack import SIDECAR_CHANNELS, load_microstructure_day_fast

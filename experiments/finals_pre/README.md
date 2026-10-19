@@ -19,7 +19,7 @@
 - 2024 年共有 242 个交易日，最后一天没有下一交易日标签，因此完整评价期包含 241 个可评分因子日。
 - E4 使用比赛时已经提交的正式 O2C checkpoint，训练截止 2024-12-26；2025–2026 年只做冻结权重推理，不重新训练。
 
-数据时间因果由 `tests/test_microstructure_expert.py` 和 `tests/test_microstructure_v2.py` 检查，共 25 项通过。检查包含前缀不变性和午休分段：追加未来日期不会改变已有日期的分钟特征，分钟收益也不会跨午休连接上午与下午。
+数据时间因果由 `tests/models/test_microstructure_expert.py` 和 `tests/models/test_microstructure_v2.py` 检查，共 25 项通过。检查包含前缀不变性和午休分段：追加未来日期不会改变已有日期的分钟特征，分钟收益也不会跨午休连接上午与下午。
 
 ### 四项评价指标
 

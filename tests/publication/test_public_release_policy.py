@@ -1,14 +1,14 @@
 """Public snapshot checks: standard library only; never import research code."""
 from __future__ import annotations
 
-import importlib.util
 import ast
-from pathlib import Path
+import importlib.util
+import subprocess
 import tempfile
 import unittest
-import subprocess
+from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'check_public_release.py'
+SCRIPT = Path(__file__).resolve().parents[2] / 'scripts' / 'check_public_release.py'
 REPOSITORY = SCRIPT.parents[1]
 
 

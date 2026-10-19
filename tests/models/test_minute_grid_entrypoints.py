@@ -37,7 +37,7 @@ def test_compact_export_preserves_all_240_observations_and_rejects_data_loss():
 
 
 def test_raw_export_uses_checkpoint_length_and_current_source(tmp_path, monkeypatch):
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     checkpoint = tmp_path / "current.pt"
     model = MicrostructureModel(model_dim=8, kernels=(3,), tcn_blocks=1, max_minutes=240)
     model.save(checkpoint)

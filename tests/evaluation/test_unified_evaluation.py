@@ -7,14 +7,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "evaluate_unified_temporal.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "evaluate_unified_temporal.py"
 SPEC = importlib.util.spec_from_file_location("evaluate_unified_temporal", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 unified_temporal = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(unified_temporal)
 
 ELASTICNET_SCRIPT = (
-    Path(__file__).resolve().parents[1] / "scripts" / "evaluate_unified_elasticnet.py"
+    Path(__file__).resolve().parents[2] / "scripts" / "evaluate_unified_elasticnet.py"
 )
 ELASTICNET_SPEC = importlib.util.spec_from_file_location(
     "evaluate_unified_elasticnet",
@@ -25,7 +25,7 @@ unified_elasticnet = importlib.util.module_from_spec(ELASTICNET_SPEC)
 ELASTICNET_SPEC.loader.exec_module(unified_elasticnet)
 
 MERGE_SCRIPT = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[2]
     / "scripts"
     / "merge_candidate454_elasticnet_oos.py"
 )

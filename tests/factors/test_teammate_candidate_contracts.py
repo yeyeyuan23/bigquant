@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-CANDIDATE_ROOT = Path(__file__).resolve().parents[1] / "src" / "candidates"
+CANDIDATE_ROOT = Path(__file__).resolve().parents[2] / "src" / "candidates"
 TEAMMATE_RANGES = {
     "composite": {f"int_{index:03d}" for index in range(4, 18)},
     "hf": {f"hf_{index:03d}" for index in range(5, 225)},

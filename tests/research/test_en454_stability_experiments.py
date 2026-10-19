@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-MODULE_PATH = Path(__file__).parents[1] / "scripts" / "run_en454_stability_experiments.py"
+MODULE_PATH = Path(__file__).parents[2] / "scripts" / "run_en454_stability_experiments.py"
 SPEC = importlib.util.spec_from_file_location("en454_stability", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)

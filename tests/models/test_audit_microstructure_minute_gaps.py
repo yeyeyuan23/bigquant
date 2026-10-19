@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 pytest.importorskip("duckdb")
-SCRIPT = Path(__file__).parents[1] / "scripts" / "audit_microstructure_minute_gaps.py"
+SCRIPT = Path(__file__).parents[2] / "scripts" / "audit_microstructure_minute_gaps.py"
 SPEC = importlib.util.spec_from_file_location("audit_microstructure_minute_gaps", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)

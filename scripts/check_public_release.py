@@ -10,9 +10,9 @@ import ast
 import csv
 import io
 import json
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
 BINARY_SUFFIXES = {
     '.parquet', '.pt', '.pth', '.ckpt', '.npz', '.npy', '.pkl', '.pickle',
@@ -27,7 +27,7 @@ PRIVATE_PATTERNS = (
     re.compile(r'\bautodl-container-[a-f0-9]'),
     re.compile(r'https://github\.com/yeyeyuan23/bigquant/(?:releases/(?:download|tag)/|(?:blob|tree|commit)/[0-9a-f]{7,40})'),
 )
-PAYLOAD_NAME = re.compile(r'(?:CHECKPOINT|MODEL|WEIGHT).*?(?:B85|B64|BASE64|BASE85)|(?:B85|B64).*?(?:CHECKPOINT|MODEL|WEIGHT)', re.I)
+PAYLOAD_NAME = re.compile(r'(?:CHECKPOINT|MODEL|WEIGHT).*?(?:B85|B64|BASE64|BASE85)|(?:B85|B64).*?(?:CHECKPOINT|MODEL|WEIGHT)', re.IGNORECASE)
 
 
 def _paths(root: Path) -> list[Path]:
@@ -70,22 +70,29 @@ def _python_payload(source: str) -> bool:
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             names = [target.id for target in node.targets if isinstance(target, ast.Name)]
-            if any(PAYLOAD_NAME.search(name) for name in names):
-                if isinstance(node.value, ast.Constant) and isinstance(node.value.value, (str, bytes)) and len(node.value.value) > 1000:
-                    return True
-        if isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes)):
-            if len(node.value) > 100_000:
-                # Generated Candidate454 modules contain readable algorithm source.
-                # Parse it recursively; never execute it or exempt nested payloads.
-                try:
-                    embedded = ast.parse(node.value)
-                except (SyntaxError, ValueError, UnicodeDecodeError):
-                    return True
-                if not any(isinstance(item, (ast.FunctionDef, ast.ClassDef, ast.Import,
-                                             ast.ImportFrom)) for item in embedded.body):
-                    return True
-                if _python_payload(node.value):
-                    return True
+            if (
+                any(PAYLOAD_NAME.search(name) for name in names)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, (str, bytes))
+                and len(node.value.value) > 1000
+            ):
+                return True
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, (str, bytes))
+            and len(node.value) > 100_000
+        ):
+            # Generated Candidate454 modules contain readable algorithm source.
+            # Parse it recursively; never execute it or exempt nested payloads.
+            try:
+                embedded = ast.parse(node.value)
+            except (SyntaxError, ValueError, UnicodeDecodeError):
+                return True
+            if not any(isinstance(item, (ast.FunctionDef, ast.ClassDef, ast.Import,
+                                         ast.ImportFrom)) for item in embedded.body):
+                return True
+            if _python_payload(node.value):
+                return True
     return False
 
 

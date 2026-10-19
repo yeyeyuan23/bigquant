@@ -19,7 +19,7 @@ from scripts.factor_wiki_remaining.io_utils import (
     read_columns,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 GENERATOR_ROOT = REPO_ROOT / "scripts" / "factor_wiki_remaining"
 GENERATOR_PATH = GENERATOR_ROOT / "build_changjiang_components.py"
 SPEC = importlib.util.spec_from_file_location(
