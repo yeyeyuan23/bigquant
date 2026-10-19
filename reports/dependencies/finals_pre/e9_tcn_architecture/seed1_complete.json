@@ -1,0 +1,22 @@
+{
+  "seed": 20260801,
+  "at": "2026-09-06T17:09:16.907089+00:00",
+  "arms_completed": [
+    "baseline",
+    "depth1",
+    "depth2",
+    "depth4",
+    "single15",
+    "single60",
+    "branches2",
+    "branches4",
+    "branches5",
+    "kernels_2_10_45",
+    "kernels_5_30_120",
+    "kernels_5_60_120",
+    "same_scale60",
+    "rf179_depth2",
+    "rf177_depth4"
+  ],
+  "candidate_elimination": false
+}

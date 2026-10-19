@@ -1,0 +1,16 @@
+{
+  "state": "complete",
+  "arm": "rf177_depth4",
+  "seed": 20260812,
+  "started_at": "2026-09-07T00:37:24.085908+00:00",
+  "pid": 30045,
+  "phase": "inference",
+  "epoch": 3,
+  "step": 200,
+  "total_steps": 3639,
+  "last_loss": -0.03424382954835892,
+  "grad_norm": 0.4040814936161041,
+  "elapsed_seconds": 1950.1240147540811,
+  "updated_at": "2026-09-07T01:09:36.340901+00:00",
+  "finished_at": "2026-09-07T01:09:54.634814+00:00"
+}

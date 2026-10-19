@@ -1,0 +1,111 @@
+{
+  "schema_version": "research-data-v1",
+  "year": 2024,
+  "generated_at": "2026-07-30T18:00:56.699942+08:00",
+  "period": [
+    "2024-01-01",
+    "2024-12-31"
+  ],
+  "trading_days": 242,
+  "daily_pool_rows": 1000,
+  "datasets": {
+    "universe": {
+      "relative_path": "universe/year=2024/part-2024.parquet",
+      "shape": [
+        242000,
+        3
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "name"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "name": 1.0
+      },
+      "sha256": "06d74a45d9df498cdc3a87db7e2d74043e3d14ca2eabc416fc8faccf9a89cfe3",
+      "bytes": 46973
+    },
+    "PV": {
+      "relative_path": "features/PV/year=2024/part-2024.parquet",
+      "shape": [
+        242000,
+        10
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "amount",
+        "volume",
+        "deal_number"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "open": 0.9990495867768595,
+        "high": 0.9990495867768595,
+        "low": 0.9990495867768595,
+        "close": 0.9990495867768595,
+        "pre_close": 0.9982066115702479,
+        "amount": 0.9990495867768595,
+        "volume": 1.0,
+        "deal_number": 1.0
+      },
+      "sha256": "dd7c0fbef1c28952294fccba4fcd6588cbe8e26308e93a01740ddc7e30d9cd3e",
+      "bytes": 7351907
+    },
+    "exposures": {
+      "relative_path": "exposures/year=2024/part-2024.parquet",
+      "shape": [
+        242000,
+        6
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "SIZE",
+        "LIQUIDTY",
+        "industry_level1_code",
+        "float_market_cap"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "SIZE": 0.9999917355371901,
+        "LIQUIDTY": 0.9999917355371901,
+        "industry_level1_code": 0.9999917355371901,
+        "float_market_cap": 0.9999917355371901
+      },
+      "sha256": "38ca1eaeb7348f535be0c9379aa0e30fa596f11e7b682eec74385802e19e77fa",
+      "bytes": 4730265
+    },
+    "labels": {
+      "relative_path": "labels/year=2024/part-2024.parquet",
+      "shape": [
+        242000,
+        5
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "ret_close_to_close",
+        "ret_next_open_to_close",
+        "ret_close_to_next_open"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "ret_close_to_close": 0.9940785123966942,
+        "ret_next_open_to_close": 0.9940785123966942,
+        "ret_close_to_next_open": 0.9940785123966942
+      },
+      "sha256": "c2b59687fdc299e62ffcd73389fcae3d931c8eea1359e83fee82c0ced649b8c6",
+      "bytes": 2271343
+    }
+  },
+  "label_rule": "exact next CN trading day; suspension remains missing",
+  "evaluation_performed": false
+}

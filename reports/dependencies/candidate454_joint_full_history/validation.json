@@ -1,0 +1,37 @@
+{
+  "status": "passed",
+  "protocol": "candidate454_joint_v2_frozen_full_history_in_sample_inclusive_v1",
+  "includes_checkpoint_training_period": true,
+  "strict_oos": false,
+  "official_platform_score": false,
+  "route_count": 10,
+  "score_days": 1394,
+  "joint_common_rows": 1391994,
+  "score_weight_windows": 67,
+  "max_abs_j_formula_error": 1.1102230246251565e-16,
+  "j_formula": "J = 0.3 * A + 0.7 * B",
+  "j_stable_present": false,
+  "required_detail_fields_present": true,
+  "exposure_profile": "reduced_available_style_proxy",
+  "exposure_panel_sha256": "2cd890e0f2dfba0c9242728cb55b10d63b31c61801cb31b469317fd10aac2788",
+  "reproduction_20260805": {
+    "branch": "feature/unified-alpha-fusion",
+    "training_performed": false,
+    "ab_details_byte_identical": true,
+    "summary_byte_identical": true,
+    "route_parquet_count": 10,
+    "route_parquets_byte_identical": true,
+    "detailed_json_semantic_equal_excluding_materialized_path": true,
+    "note": "The only detailed JSON differences are the temporary reproduction output paths."
+  },
+  "artifact_sha256": {
+    "joint_official_proxy_ab_details.csv": "c823e35fc7b2c6ae9c1fa5f75eed66bd36ce9f31a40f52c61c4cbd61ea3f7a23",
+    "joint_official_proxy_summary.csv": "fb4f35c12c126ead9a6c58f25dcf37583886fef6cfaa850b652de3e7dc0ff995",
+    "joint_official_proxy_detailed.json": "d899b07889a32deabd1a60ff2577eb64e444bbc68680c9d6e03577d5ccd8f0c3",
+    "routes_manifest.json": "c3c3e018b1636e8f9d39d6c739e27b8451e03b21e1e92345d8bb30b26b100f30",
+    "scripts/run_candidate454_joint_v2_recalc.py": "d2c5aa350ef82de2c9ff970bc7e3a4412806a5ccbd78872a6e661c36ecd006fe",
+    "scripts/replay_frozen_candidate454_models.py": "82178656b61b5792e47855ebdd19fd2fa9e199528126b3d2581638a03671528d"
+  },
+  "detail_column_count": 28,
+  "score_alias": "score == J"
+}

@@ -1,0 +1,33 @@
+{
+  "scores": [
+    {
+      "arm": "clock240",
+      "seed": 20260801,
+      "epochs": 3,
+      "days": 241,
+      "neutral_rank_ic": 0.026237176514240016,
+      "neutral_rank_ic_ir": 0.5990467385207795,
+      "long_short_sharpe": 6.363302123615729,
+      "stress_ic_ir": 0.3086112595125472
+    },
+    {
+      "arm": "clock242",
+      "seed": 20260801,
+      "epochs": 3,
+      "days": 241,
+      "neutral_rank_ic": 0.02707870522573527,
+      "neutral_rank_ic_ir": 0.6292324688859754,
+      "long_short_sharpe": 6.298222399524195,
+      "stress_ic_ir": 0.34195897589102453
+    }
+  ],
+  "delta_240_minus_242": {
+    "neutral_rank_ic": -0.0008415287114952527,
+    "neutral_rank_ic_ir": -0.030185730365195895,
+    "long_short_sharpe": 0.06507972409153417,
+    "stress_ic_ir": -0.03334771637847733
+  },
+  "scope": "One seed; current fixed-clock 242 control, not frozen tail-padded submission.",
+  "evaluation": "Same industry plus Barra neutralization as E2; O2C; 241 days in 2024.",
+  "factor_rows": 242000
+}

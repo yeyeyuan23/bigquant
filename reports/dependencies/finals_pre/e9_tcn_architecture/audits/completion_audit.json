@@ -1,0 +1,59 @@
+{
+  "state": "passed",
+  "checked_at": "2026-09-07T09:22:22.662026+00:00",
+  "runs": 45,
+  "grid": [
+    15,
+    3,
+    241
+  ],
+  "training_dates": 1213,
+  "scoring_rows": 240567,
+  "minute_partitions_deep_hashed": 1455,
+  "source_files_hashed": 20,
+  "verification_source": "experiments/finals_pre/tcn_architecture_o2c/analysis/completion_check.py",
+  "verification_source_sha256": "14f7dbf770c39042896349d07b81931617710812dc8db006ba8800922aa8f90f",
+  "checks": [
+    "all original summary artifacts",
+    "source and input deep checksums",
+    "all 45 checkpoints and factors",
+    "sample order and initialization",
+    "prediction keys, availability and finite predictions",
+    "scoring key manifests and daily calendars",
+    "RankIC, ICIR and stress ICIR arithmetic",
+    "complete saved cube",
+    "independent synchronous 10-day bootstrap",
+    "independent Holm adjustment",
+    "training endpoint logs and timings"
+  ],
+  "total_wall_hours": 23.7574768208356,
+  "total_training_inference_hours": 23.65090527092152,
+  "baseline_cost": {
+    "arm": "baseline",
+    "mean_startup_through_training_minutes": 29.859198602499802,
+    "mean_total_minutes": 31.450031962526392,
+    "peak_gpu_allocated_gib": 1.8083090782165527,
+    "peak_gpu_reserved_gib": 2.40234375,
+    "parameters": 217953
+  },
+  "five_branch_cost": {
+    "arm": "branches5",
+    "mean_startup_through_training_minutes": 31.811212206267133,
+    "mean_total_minutes": 33.431229656373354,
+    "peak_gpu_allocated_gib": 2.354703903198242,
+    "peak_gpu_reserved_gib": 3.08984375,
+    "parameters": 284481
+  },
+  "five_training_overhead_percent": 6.537394488557746,
+  "five_total_overhead_percent": 6.299509317534602,
+  "timing_definition": "startup through final training step includes validation, initialization and data loading; total includes checkpoint, inference and factor writes, excludes scoring; not isolated GPU compute",
+  "assessment": "Share with caveats",
+  "caveats": [
+    "historical validation period previously used",
+    "three epochs only",
+    "three fixed seeds; date bootstrap is not all initialization uncertainty",
+    "95 percent intervals are unadjusted; decisions use Holm p-values",
+    "parameter counts differ; no isolated mechanism proof",
+    "Sharpe excludes costs"
+  ]
+}

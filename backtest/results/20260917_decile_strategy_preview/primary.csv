@@ -1,0 +1,2 @@
+strategy,name,start,end,days,average_one_way_turnover,gross_annualized_return,net_annualized_return,net_sharpe,gross_sharpe,net_cagr,net_cumulative_return,net_max_drawdown
+daily_decile,每日十分组 Q10−Q1,2025-01-02,2026-08-28,402,1.5050487459972783,0.5534612309795758,0.13517945600438033,0.7837137308739848,3.2061998493090664,0.1278897509529371,0.2116515762624156,-0.14764833542492384

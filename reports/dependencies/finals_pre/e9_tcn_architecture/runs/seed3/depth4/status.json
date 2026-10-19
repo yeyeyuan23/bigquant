@@ -1,0 +1,16 @@
+{
+  "state": "complete",
+  "arm": "depth4",
+  "seed": 20260823,
+  "started_at": "2026-09-07T02:39:17.308405+00:00",
+  "pid": 33522,
+  "phase": "inference",
+  "epoch": 3,
+  "step": 200,
+  "total_steps": 3639,
+  "last_loss": -0.21117199957370758,
+  "grad_norm": 0.38166019320487976,
+  "elapsed_seconds": 1965.990696249064,
+  "updated_at": "2026-09-07T03:11:45.344598+00:00",
+  "finished_at": "2026-09-07T03:12:03.756054+00:00"
+}

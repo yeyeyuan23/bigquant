@@ -1,0 +1,89 @@
+{
+  "status": "built",
+  "upload_files": [
+    "predict.ipynb",
+    "train.py",
+    "weights.json"
+  ],
+  "checkpoint_sha256": "4bfcba4a5d3b0d9e02380b234c0521dacb416000d94ee103260698c2777e48d5",
+  "raw_fields": [
+    "open",
+    "high",
+    "low",
+    "close",
+    "ask_price1",
+    "ask_price2",
+    "ask_price3",
+    "bid_price1",
+    "bid_price2",
+    "bid_price3",
+    "amount",
+    "volume",
+    "deal_number",
+    "ask_volume1",
+    "ask_volume2",
+    "ask_volume3",
+    "bid_volume1",
+    "bid_volume2",
+    "bid_volume3"
+  ],
+  "axes": [
+    "time",
+    "volatility",
+    "turnover"
+  ],
+  "output_columns": [
+    "date",
+    "instrument",
+    "score"
+  ],
+  "training": {
+    "protocol": "full_history_tail60_three_axis_multiday_ic",
+    "start": "2019-01-02",
+    "end": "2024-12-26",
+    "epochs_requested": 3,
+    "epochs_completed": 3,
+    "learning_rate": 0.0003,
+    "max_stocks": 700,
+    "days_per_step": 4,
+    "stability_weight": 0.15,
+    "parameter_count": 542338,
+    "epoch_records": [
+      {
+        "loss": -0.01026535189913242,
+        "mean_ic": 0.02660255171669818,
+        "std_ic": 0.1416096978128174
+      },
+      {
+        "loss": -0.018153696672441873,
+        "mean_ic": 0.032950710401178876,
+        "std_ic": 0.12563116772720911
+      },
+      {
+        "loss": -0.025776510289806064,
+        "mean_ic": 0.039349634800555956,
+        "std_ic": 0.11640960125914748
+      }
+    ],
+    "elapsed_seconds": 8348.005,
+    "store_manifest_sha256": "77b1d80f3a725114970a05cc9a0ef2161a7ec28b0c2e2b788de5fe965cc2af4b"
+  },
+  "files": [
+    {
+      "name": "predict.ipynb",
+      "bytes": 7995,
+      "sha256": "bc163d987e8688c4dba932f636bccfbcc69894574ea56dec2b523ae8605e880d"
+    },
+    {
+      "name": "train.py",
+      "bytes": 37940,
+      "sha256": "55ec68e64c1f8bb52dc9a86f320d5ea188618483c1a5ac4e58fb3753dc3341b7"
+    },
+    {
+      "name": "weights.json",
+      "bytes": 11346281,
+      "sha256": "690561cb3d0fde6f5c01d5f3f840a750d0eba14072b8c309d1fb8b14c191d3d9"
+    }
+  ],
+  "evidence_boundary": "Local package only; AIStudio execution and official score are separate."
+}

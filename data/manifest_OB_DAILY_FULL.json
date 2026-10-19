@@ -1,0 +1,157 @@
+{
+  "schema_version": "ob-daily-full-v2-universe-cropped",
+  "generated_at": "2026-07-26T20:23:32+08:00",
+  "source_table": "bigalpha_2026_stock_bar1m",
+  "aggregation_script": "scripts/aistudio_build_ob_daily.py",
+  "preparation_script": "scripts/prepare_ob_daily_full.py",
+  "key": [
+    "date",
+    "instrument"
+  ],
+  "columns": [
+    "date",
+    "instrument",
+    "ob_snapshot_available",
+    "tail_60_relative_spread_median",
+    "tail_60_depth_completeness_median",
+    "tail_60_bid_depth_imbalance_median",
+    "negative_mid_shock_q10_bid_depth_recovery_5m_median"
+  ],
+  "date_range": [
+    "2019-01-02",
+    "2023-12-29"
+  ],
+  "dates": 1214,
+  "rows": 1214000,
+  "duplicate_keys": 0,
+  "files": [
+    {
+      "year": 2019,
+      "source_path": "data/raw/OB_DAILY_FULL/ob_daily_2019.parquet",
+      "source_rows": 425113,
+      "source_sha256": "fd20efff4f0e9e35722706e70dca64c23436fb68288b2599ca57886694cd4831",
+      "path": "data/features/OB_DAILY_FULL/year=2019/part-2019.parquet",
+      "rows": 244000,
+      "dates": 244,
+      "date_range": [
+        "2019-01-02",
+        "2019-12-31"
+      ],
+      "daily_instruments_min": 1000,
+      "daily_instruments_max": 1000,
+      "missing_universe_keys": 1007,
+      "daily_available_min": 986,
+      "daily_available_max": 998,
+      "null_counts": {
+        "tail_60_relative_spread_median": 1107,
+        "tail_60_depth_completeness_median": 1007,
+        "tail_60_bid_depth_imbalance_median": 1011,
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median": 2001
+      },
+      "sha256": "b3f1be3fd75ab6a35ac630271775a902979d37ec8e1e9342decdd4eea662f4c7"
+    },
+    {
+      "year": 2020,
+      "source_path": "data/raw/OB_DAILY_FULL/ob_daily_2020.parquet",
+      "source_rows": 453360,
+      "source_sha256": "0d980e6676ed0f0a2a8f0d8c91ff7feb721cb4a7309730f57b86bd203985b980",
+      "path": "data/features/OB_DAILY_FULL/year=2020/part-2020.parquet",
+      "rows": 243000,
+      "dates": 243,
+      "date_range": [
+        "2020-01-02",
+        "2020-12-31"
+      ],
+      "daily_instruments_min": 1000,
+      "daily_instruments_max": 1000,
+      "missing_universe_keys": 700,
+      "daily_available_min": 991,
+      "daily_available_max": 999,
+      "null_counts": {
+        "tail_60_relative_spread_median": 900,
+        "tail_60_depth_completeness_median": 700,
+        "tail_60_bid_depth_imbalance_median": 702,
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median": 2266
+      },
+      "sha256": "d0d758025fe0034cb7212cbd36ad7a4e865dade309580db6bcccd37742c9f6ee"
+    },
+    {
+      "year": 2021,
+      "source_path": "data/raw/OB_DAILY_FULL/ob_daily_2021.parquet",
+      "source_rows": 484099,
+      "source_sha256": "6425b8b1115b9df132a0fc3f75bc7c2ab63de562e8a76b625d2f16bc70eabf38",
+      "path": "data/features/OB_DAILY_FULL/year=2021/part-2021.parquet",
+      "rows": 243000,
+      "dates": 243,
+      "date_range": [
+        "2021-01-04",
+        "2021-12-31"
+      ],
+      "daily_instruments_min": 1000,
+      "daily_instruments_max": 1000,
+      "missing_universe_keys": 578,
+      "daily_available_min": 990,
+      "daily_available_max": 999,
+      "null_counts": {
+        "tail_60_relative_spread_median": 612,
+        "tail_60_depth_completeness_median": 578,
+        "tail_60_bid_depth_imbalance_median": 579,
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median": 1024
+      },
+      "sha256": "f201e2d1de81e4d5cb830ebca46b235126eba8b24bea67b3664ee639bb641549"
+    },
+    {
+      "year": 2022,
+      "source_path": "data/raw/OB_DAILY_FULL/ob_daily_2022.parquet",
+      "source_rows": 505530,
+      "source_sha256": "e7ee523751070662a7067db0bc0eced10ff68be81e152dfec81fb962d5792a1b",
+      "path": "data/features/OB_DAILY_FULL/year=2022/part-2022.parquet",
+      "rows": 242000,
+      "dates": 242,
+      "date_range": [
+        "2022-01-04",
+        "2022-12-30"
+      ],
+      "daily_instruments_min": 1000,
+      "daily_instruments_max": 1000,
+      "missing_universe_keys": 490,
+      "daily_available_min": 992,
+      "daily_available_max": 999,
+      "null_counts": {
+        "tail_60_relative_spread_median": 3386,
+        "tail_60_depth_completeness_median": 490,
+        "tail_60_bid_depth_imbalance_median": 490,
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median": 3754
+      },
+      "sha256": "432ec44a98c8d4d58255aad16e4e3a661a3856e4b066f37f5ae87fe334756854"
+    },
+    {
+      "year": 2023,
+      "source_path": "data/raw/OB_DAILY_FULL/ob_daily_2023.parquet",
+      "source_rows": 521538,
+      "source_sha256": "cead4086c690b28b78b0074c355e3139b5184483c24aae2ebed3b5d21bbfb808",
+      "path": "data/features/OB_DAILY_FULL/year=2023/part-2023.parquet",
+      "rows": 242000,
+      "dates": 242,
+      "date_range": [
+        "2023-01-03",
+        "2023-12-29"
+      ],
+      "daily_instruments_min": 1000,
+      "daily_instruments_max": 1000,
+      "missing_universe_keys": 369,
+      "daily_available_min": 994,
+      "daily_available_max": 1000,
+      "null_counts": {
+        "tail_60_relative_spread_median": 377,
+        "tail_60_depth_completeness_median": 369,
+        "tail_60_bid_depth_imbalance_median": 369,
+        "negative_mid_shock_q10_bid_depth_recovery_5m_median": 592
+      },
+      "sha256": "326b065bc60247d970b2a01ec642eb0d2239b1e889c9922d5c28de6c7d460696"
+    }
+  ],
+  "platform_source_hashes_verified_before_preparation": true,
+  "raw_minute_rows_downloaded": false,
+  "evaluation_performed": false
+}

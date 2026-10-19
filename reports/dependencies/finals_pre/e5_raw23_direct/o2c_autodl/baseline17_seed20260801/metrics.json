@@ -1,0 +1,27 @@
+{
+  "arm": "baseline17",
+  "seed": 20260801,
+  "train_period": [
+    "2023-01-03",
+    "2023-12-29"
+  ],
+  "test_period": [
+    "2024-01-02",
+    "2024-12-30"
+  ],
+  "epochs": 3,
+  "epoch_losses": [
+    -0.029261544723716018,
+    -0.04448786405423148,
+    -0.05545726080385637
+  ],
+  "restart_count": 0,
+  "label": "ret_next_open_to_close",
+  "device": "cuda",
+  "store_format": "parquet_fixed_size_lists",
+  "raw_rank_ic": 0.0356997183043984,
+  "prediction_days": 241,
+  "factor_rows": 240771,
+  "parameter_count": 217953,
+  "checkpoint_sha256": "f7807af781cff75d8272cb87230a321e5c67a1c7422e34e4013e590987e41b00"
+}

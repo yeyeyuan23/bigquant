@@ -1,0 +1,26 @@
+{
+  "claim": "Δa 对 Δlog(后复权 close)：日间差消掉逐股复权因子后，a 与独立测得的价格同向变动",
+  "window": [
+    "2024-09-02",
+    "2024-12-31"
+  ],
+  "n_stock_days": 78831,
+  "n_instruments": 1101,
+  "basis_check": {
+    "close_in_low_high": 1.0,
+    "vwap_in_low_high": 0.087005
+  },
+  "pearson_da_dclose": 0.8343252189870581,
+  "spearman_da_dclose": 0.7573256990531003,
+  "slope_da_on_dclose": 0.7500809421339827,
+  "resid_std": 0.02085220848745021,
+  "dclose_std": 0.03756772004676783,
+  "pearson_da_dvwap_sameSource": 0.984537132677266,
+  "per_day_spearman_median": 0.832741727786081,
+  "per_day_spearman_p5": 0.7123818328281034,
+  "per_day_spearman_min": 0.5772871679243992,
+  "adj_factor_cv_median": 0.013414661572850447,
+  "adj_factor_mean_p5": 1.0063218748331757,
+  "adj_factor_mean_median": 3.122119754134429,
+  "adj_factor_mean_p95": 17.960815461609698
+}

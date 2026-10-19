@@ -1,0 +1,40 @@
+{
+  "seed": 20260812,
+  "minutes": 242,
+  "parameter_count": 217953,
+  "initial_weights_sha256": "caa81379ef4d5a87ebd5ebbae3e3b0a094d96841be9e2d119f5bcae73a2e053c",
+  "training_order_sha256": "146dda918d0426c5769a957689766a36e5b0bd2a4b0ef2a1f78167106e1ba0a1",
+  "train_days": 1213,
+  "test_days": 241,
+  "train_start": "2019-01-02",
+  "train_end": "2023-12-28",
+  "sample_inputs": [
+    {
+      "date": "2019-01-02",
+      "stocks": 1000,
+      "hashes": {
+        "values": "dccae5638955f646b742ab3938b6b56d35f944c5b6411b068c3ca71d890e675a",
+        "observed_mask": "8b58852b67ab5ee465082d3d689b5efb768dac5ba8a5ba94d535e0e072879d7e",
+        "minute_mask": "bc98466a8ec672b3dbfdf7d83cddb9884931cea471622ad8cd517e17cfc80a2d"
+      }
+    },
+    {
+      "date": "2023-12-28",
+      "stocks": 997,
+      "hashes": {
+        "values": "bb7717f37f5ccd708ec074b52a7b97db5166917a36efe28b3152cbc95420387b",
+        "observed_mask": "10d22a34f7675f47fc9ea884aa0196c1268e7304a094ce560e04043b7491e33e",
+        "minute_mask": "0eae1102b05fb1db789d6078ccf1654571f666dea744d9b9f1a3a305d7ff85cb"
+      }
+    },
+    {
+      "date": "2024-01-02",
+      "stocks": 997,
+      "hashes": {
+        "values": "5165d1cde492a422580dd52a5445ca1df870d00e3b5540966fecd776a48374fa",
+        "observed_mask": "e112b05138f8cd95b9cc367fc1d888fff0d604a6aa2af9d95c3c68801040f49a",
+        "minute_mask": "0eae1102b05fb1db789d6078ccf1654571f666dea744d9b9f1a3a305d7ff85cb"
+      }
+    }
+  ]
+}

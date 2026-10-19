@@ -1,0 +1,130 @@
+{
+  "validated_at": "2026-09-06T07:41:05.276600+00:00",
+  "status": "passed",
+  "runs": [
+    {
+      "seed": 20260801,
+      "arm": "clock240",
+      "daily_ic_rows": 241,
+      "mean_ic_recomputed": 0.02623717651423999,
+      "ic_ir_recomputed": 0.5990467385207793,
+      "checkpoint_sha256": "4b6c1d5f9008a5fd50e51c15c453fb3dacd1dd67375f353478a17f66a9451173",
+      "checkpoint_binary_check": "prior_collection_audit_only_binary_absent_from_current_checkout",
+      "checkpoint_not_reused": true,
+      "neutral_filled_rows": 1465,
+      "factor_key_check": "prior_pair_scoring_audit"
+    },
+    {
+      "seed": 20260801,
+      "arm": "clock242",
+      "daily_ic_rows": 241,
+      "mean_ic_recomputed": 0.027078705225735248,
+      "ic_ir_recomputed": 0.6292324688859753,
+      "checkpoint_sha256": "58831244cc1e3809f4a1c42ca34da37c9d4dd09b5362ce845e0cfb7a20cc653d",
+      "checkpoint_binary_check": "prior_collection_audit_only_binary_absent_from_current_checkout",
+      "checkpoint_not_reused": true,
+      "neutral_filled_rows": 1465,
+      "factor_key_check": "prior_pair_scoring_audit"
+    },
+    {
+      "seed": 20260812,
+      "arm": "clock240",
+      "daily_ic_rows": 241,
+      "mean_ic_recomputed": 0.029926011231754247,
+      "ic_ir_recomputed": 0.7319008358043656,
+      "checkpoint_sha256": "1268644f04cd5afa428930ea9028bd557792c41dbe256743501d84f4431fd368",
+      "checkpoint_binary_check": "recomputed_now",
+      "checkpoint_not_reused": true,
+      "neutral_filled_rows": 1465,
+      "factor_key_check": "242000_unique_same_keys_across_four_new_arms"
+    },
+    {
+      "seed": 20260812,
+      "arm": "clock242",
+      "daily_ic_rows": 241,
+      "mean_ic_recomputed": 0.029028183973626696,
+      "ic_ir_recomputed": 0.7137624920089453,
+      "checkpoint_sha256": "b300527d0afa2c47383566c6627977a050501089d5d7ef1891a9f5f90482dba0",
+      "checkpoint_binary_check": "recomputed_now",
+      "checkpoint_not_reused": true,
+      "neutral_filled_rows": 1465,
+      "factor_key_check": "242000_unique_same_keys_across_four_new_arms"
+    },
+    {
+      "seed": 20260823,
+      "arm": "clock240",
+      "daily_ic_rows": 241,
+      "mean_ic_recomputed": 0.02952171822173306,
+      "ic_ir_recomputed": 0.7220958730378704,
+      "checkpoint_sha256": "46723d6f9aefa39eef2a5f4b9ebaf85f73cc61810ef1d5f45544c35261192b3b",
+      "checkpoint_binary_check": "recomputed_now",
+      "checkpoint_not_reused": true,
+      "neutral_filled_rows": 1465,
+      "factor_key_check": "242000_unique_same_keys_across_four_new_arms"
+    },
+    {
+      "seed": 20260823,
+      "arm": "clock242",
+      "daily_ic_rows": 241,
+      "mean_ic_recomputed": 0.029112438140549275,
+      "ic_ir_recomputed": 0.7199254595406597,
+      "checkpoint_sha256": "85db59bd883ca64c09d5522332578a6353553a72de15f69b1bc3bacc3485f255",
+      "checkpoint_binary_check": "recomputed_now",
+      "checkpoint_not_reused": true,
+      "neutral_filled_rows": 1465,
+      "factor_key_check": "242000_unique_same_keys_across_four_new_arms"
+    }
+  ],
+  "common_data_and_source_protocol": true,
+  "same_config_except_minutes": true,
+  "within_seed_initial_weights_and_training_order_match": true,
+  "across_seeds_initial_weights_and_training_order_differ": true,
+  "six_distinct_recorded_checkpoint_hashes": true,
+  "four_new_checkpoint_binaries_rehashed": true,
+  "three_seed_summary_and_csvs_recomputed": true,
+  "timings": [
+    {
+      "seed": 20260801,
+      "pair_elapsed_seconds": 3535.125975852832,
+      "arms": [
+        {
+          "arm": "clock240",
+          "seconds": 1770.616883821087
+        },
+        {
+          "arm": "clock242",
+          "seconds": 1757.7262912038714
+        }
+      ]
+    },
+    {
+      "seed": 20260812,
+      "pair_elapsed_seconds": 3885.921775235096,
+      "arms": [
+        {
+          "arm": "clock240",
+          "seconds": 1921.6137500300538
+        },
+        {
+          "arm": "clock242",
+          "seconds": 1955.4707958269864
+        }
+      ]
+    },
+    {
+      "seed": 20260823,
+      "pair_elapsed_seconds": 3936.8017784890253,
+      "arms": [
+        {
+          "arm": "clock240",
+          "seconds": 1963.6787851410918
+        },
+        {
+          "arm": "clock242",
+          "seconds": 1964.129422140075
+        }
+      ]
+    }
+  ],
+  "scope": "Local recomputation of six daily neutral RankIC means/IRs and all three-seed summaries. Sharpe/stress metrics agree with collected per-pair scores; full scoring was performed remotely. Original seed binaries are absent from this checkout; their prior collection/checkpoint audit and recorded hashes were checked, not rehashed now."
+}

@@ -1,0 +1,63 @@
+[
+  {
+    "amp": true,
+    "initial_scale": 65536.0,
+    "steps": [
+      {
+        "date": "2019-01-02",
+        "loss": 0.049239467829465866,
+        "gradient_norm": 12.988221168518066
+      }
+    ],
+    "state": "failed",
+    "date": "2023-12-28",
+    "error": "The total norm of order 2.0 for gradients from `parameters` is non-finite, so it cannot be clipped. To disable this error and scale the gradients by the non-finite norm anyway, set `error_if_nonfinite=False`",
+    "nonfinite_gradients": [
+      "head.3.weight"
+    ]
+  },
+  {
+    "amp": true,
+    "initial_scale": 1024.0,
+    "steps": [
+      {
+        "date": "2019-01-02",
+        "loss": 0.049239467829465866,
+        "gradient_norm": 12.988219261169434
+      },
+      {
+        "date": "2023-12-28",
+        "loss": 0.20073726773262024,
+        "gradient_norm": 12.026845932006836
+      },
+      {
+        "date": "2024-01-02",
+        "loss": -0.21717427670955658,
+        "gradient_norm": 11.804965019226074
+      }
+    ],
+    "state": "passed"
+  },
+  {
+    "amp": false,
+    "initial_scale": 1.0,
+    "steps": [
+      {
+        "date": "2019-01-02",
+        "loss": 0.04975101351737976,
+        "gradient_norm": 12.97873306274414
+      },
+      {
+        "date": "2023-12-28",
+        "loss": 0.2006789743900299,
+        "gradient_norm": 12.019951820373535
+      },
+      {
+        "date": "2024-01-02",
+        "loss": -0.21775907278060913,
+        "gradient_norm": 11.810784339904785
+      }
+    ],
+    "state": "passed"
+  }
+]

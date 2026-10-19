@@ -1,0 +1,111 @@
+{
+  "schema_version": "research-data-v1",
+  "year": 2021,
+  "generated_at": "2026-07-25T14:38:55.527350+00:00",
+  "period": [
+    "2021-01-01",
+    "2021-12-31"
+  ],
+  "trading_days": 243,
+  "daily_pool_rows": 1000,
+  "datasets": {
+    "universe": {
+      "relative_path": "universe/year=2021/part-2021.parquet",
+      "shape": [
+        243000,
+        3
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "name"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "name": 1.0
+      },
+      "sha256": "8c23c1c03296bbf510dc7fe18bf06a6d774da59bff67bd23ae974b7c61ce4f78",
+      "bytes": 38408
+    },
+    "PV": {
+      "relative_path": "features/PV/year=2021/part-2021.parquet",
+      "shape": [
+        243000,
+        10
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "amount",
+        "volume",
+        "deal_number"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "open": 0.9986213991769547,
+        "high": 0.9986213991769547,
+        "low": 0.9986213991769547,
+        "close": 0.9986213991769547,
+        "pre_close": 1.0,
+        "amount": 0.9986213991769547,
+        "volume": 1.0,
+        "deal_number": 1.0
+      },
+      "sha256": "54317fb6ac19b3d582cd2e865f2281f96658d953c7743419401bc53b4991bce8",
+      "bytes": 12261576
+    },
+    "exposures": {
+      "relative_path": "exposures/year=2021/part-2021.parquet",
+      "shape": [
+        243000,
+        6
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "SIZE",
+        "LIQUIDTY",
+        "industry_level1_code",
+        "float_market_cap"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "SIZE": 0.999,
+        "LIQUIDTY": 0.999,
+        "industry_level1_code": 0.999,
+        "float_market_cap": 0.999
+      },
+      "sha256": "48e625378921322edd993ecae59aace0722abd277fce4cc365d677ff1aa32322",
+      "bytes": 6126389
+    },
+    "labels": {
+      "relative_path": "labels/year=2021/part-2021.parquet",
+      "shape": [
+        243000,
+        5
+      ],
+      "columns": [
+        "date",
+        "instrument",
+        "ret_close_to_close",
+        "ret_next_open_to_close",
+        "ret_close_to_next_open"
+      ],
+      "duplicate_keys": 0,
+      "coverage": {
+        "ret_close_to_close": 0.9986172839506173,
+        "ret_next_open_to_close": 0.9986172839506173,
+        "ret_close_to_next_open": 0.9986172839506173
+      },
+      "sha256": "d3d519c0a42bcbf07e28b70cbcd767dce41f6a188fc19eaa31fa0fe1060d81ac",
+      "bytes": 4410403
+    }
+  },
+  "label_rule": "exact next CN trading day; suspension remains missing",
+  "evaluation_performed": false
+}

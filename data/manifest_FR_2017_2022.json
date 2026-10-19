@@ -1,0 +1,100 @@
+{
+  "schema_version": "research-data-v1",
+  "family": "FR",
+  "source_period": [
+    "2017-01-01",
+    "2022-12-31"
+  ],
+  "generated_at": "2026-07-25T14:47:10.834774+00:00",
+  "pool_filter": "union_of_2019_2022_historical_pool",
+  "columns": [
+    "disclosure_date",
+    "effective_date",
+    "instrument",
+    "report_date",
+    "category",
+    "shift",
+    "net_cffoa",
+    "net_profit",
+    "operating_revenue",
+    "total_assets"
+  ],
+  "key": [
+    "disclosure_date",
+    "instrument",
+    "report_date",
+    "category",
+    "shift"
+  ],
+  "partitions": {
+    "2018": {
+      "relative_path": "features/FR/year=2018/part-2018.parquet",
+      "shape": [
+        11540,
+        10
+      ],
+      "sha256": "116fff97bb48adfa395328ec922bc6fdcfa7cbb31628580f7f5eaede798d2843",
+      "bytes": 373674
+    },
+    "2019": {
+      "relative_path": "features/FR/year=2019/part-2019.parquet",
+      "shape": [
+        12032,
+        10
+      ],
+      "sha256": "5ca9372b3a1ac122933e7b61d4c5455dd2400ca332a9ba55438d0df5ba8c3064",
+      "bytes": 390259
+    },
+    "2020": {
+      "relative_path": "features/FR/year=2020/part-2020.parquet",
+      "shape": [
+        12406,
+        10
+      ],
+      "sha256": "8bc1290b842c885682f0aa01ea626323aeaa4854cbfbbc952f8636e106223717",
+      "bytes": 405629
+    },
+    "2021": {
+      "relative_path": "features/FR/year=2021/part-2021.parquet",
+      "shape": [
+        12856,
+        10
+      ],
+      "sha256": "355cf6a72196952c76a07078d9b15c612d28399cce41e62c53aa104b34604622",
+      "bytes": 420246
+    },
+    "2022": {
+      "relative_path": "features/FR/year=2022/part-2022.parquet",
+      "shape": [
+        12666,
+        10
+      ],
+      "sha256": "dd4c88b9d3eae7fdd64c7b29feb6387fd3bb6531dfd9d1d78d90fbf870d27cf2",
+      "bytes": 410599
+    }
+  },
+  "rows": 61500,
+  "instruments": 1764,
+  "duplicate_keys": 0,
+  "strictly_next_trading_day": true,
+  "weekend_disclosures": 10888,
+  "category_rows": {
+    "lf": 30750,
+    "ttm": 30750
+  },
+  "category_coverage": {
+    "lf": {
+      "net_cffoa": 0.9988617886178862,
+      "net_profit": 0.9990894308943089,
+      "operating_revenue": 0.9995447154471545,
+      "total_assets": 0.9993170731707317
+    },
+    "ttm": {
+      "net_cffoa": 0.987739837398374,
+      "net_profit": 0.9819512195121951,
+      "operating_revenue": 0.9837723577235772,
+      "total_assets": 0.0
+    }
+  },
+  "evaluation_performed": false
+}

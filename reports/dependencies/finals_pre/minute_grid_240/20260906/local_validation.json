@@ -1,0 +1,19 @@
+{
+  "clock240": {
+    "daily_rank_ic_rows": 241,
+    "checkpoint_sha256_verified": true,
+    "executed_source_hashes_verified": true,
+    "mean_and_ir_recomputed": true,
+    "neutral_filled_rows": 1465
+  },
+  "clock242": {
+    "daily_rank_ic_rows": 241,
+    "checkpoint_sha256_verified": true,
+    "executed_source_hashes_verified": true,
+    "mean_and_ir_recomputed": true,
+    "neutral_filled_rows": 1465
+  },
+  "same_config_except_minutes": true,
+  "paired_preflight_matches": true,
+  "same_executed_trainer": true
+}

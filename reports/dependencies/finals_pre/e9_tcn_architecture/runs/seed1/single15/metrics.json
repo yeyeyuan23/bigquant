@@ -1,0 +1,20 @@
+{
+  "arm": "single15",
+  "seed": 20260801,
+  "rank_ic": 0.023403661602904628,
+  "rank_ic_ir": 0.5704590342170548,
+  "long_short_sharpe": 4.850120544433594,
+  "stress_ic_ir": 0.2510961515965249,
+  "parameter_count": 144513,
+  "receptive_field": 43,
+  "elapsed_seconds": 1634.6352334069088,
+  "peak_cuda_allocated_bytes": 1352437248,
+  "peak_cuda_reserved_bytes": 1541406720,
+  "scored_days": 241,
+  "scored_rows": 240567,
+  "stress_days": 61,
+  "scoring_keys_hash": "bbe80c2903012407b26f9b78e0dfc626381495d2e94b935a49b0302c444bc404",
+  "factor_sha256": "532f5fcd0698f67be41bc5705406804572f0798093ef0294762b0c9f03599a9a",
+  "prepared_sha256": "7084bf6dbe0625920b51facadb9c25072d82c040fbdccfe763c13488b2dab5d0",
+  "daily_metrics_sha256": "774f6568fe77eb14a7455c7a5f662a153f3bf2d22a8d96855378c57f49e17780"
+}

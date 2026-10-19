@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "strategy": "daily_decile",
+      "scenario": "gross",
+      "days": 402,
+      "accounting": true,
+      "metrics": true,
+      "next_session_signals": true
+    },
+    {
+      "strategy": "daily_decile",
+      "scenario": "fees_slip0",
+      "days": 402,
+      "accounting": true,
+      "metrics": true,
+      "next_session_signals": true
+    }
+  ],
+  "raw_score_input": true,
+  "all_metrics_independently_recomputed": true,
+  "validator_sha256": "db3fa1f0c1c31c30b90a253c546a5f0a96734e6feba5b7d711c0989a8e335ced"
+}

@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "change": "dict keyword calls to literal dictionaries, for CI C408",
+  "checks": {
+    "summary.csv": true,
+    "calendar_years.csv": true,
+    "comparison.csv": true,
+    "net_nav.csv": true,
+    "review_table.csv": true,
+    "phase_ranges.csv": true,
+    "README.md": true,
+    "daily.csv.gz_decompressed": true
+  }
+}

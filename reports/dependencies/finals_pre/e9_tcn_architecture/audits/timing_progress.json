@@ -1,0 +1,27 @@
+{
+  "state": "partial",
+  "completed_runs_with_timing": 38,
+  "paired_seeds": [
+    "seed1",
+    "seed2"
+  ],
+  "timing_definition": "Training endpoint includes setup, validation, initialization and data loading; total endpoint also includes checkpoint and factor write plus inference, excludes scoring. Not isolated GPU compute time.",
+  "comparison": {
+    "baseline": {
+      "startup_through_training_seconds": 1802.1467245245585,
+      "startup_through_factor_write_seconds": 1899.1129421719816,
+      "rank_ic": 0.025298954949948525,
+      "parameter_count": 217953.0,
+      "peak_cuda_allocated_bytes": 1941636608.0
+    },
+    "branches5": {
+      "startup_through_training_seconds": 1907.7042328619864,
+      "startup_through_factor_write_seconds": 2005.7906469530426,
+      "rank_ic": 0.024252878788769215,
+      "parameter_count": 284481.0,
+      "peak_cuda_allocated_bytes": 2528280320.0
+    }
+  },
+  "training_overhead_percent": 5.857320433511104,
+  "total_overhead_percent": 5.617238575556005
+}

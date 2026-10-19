@@ -1,0 +1,32 @@
+{
+  "state": "failed",
+  "arm": "depth1",
+  "date": "2023-12-28",
+  "error": "The total norm of order 2.0 for gradients from `parameters` is non-finite, so it cannot be clipped. To disable this error and scale the gradients by the non-finite norm anyway, set `error_if_nonfinite=False`",
+  "checks": [
+    {
+      "arm": "baseline",
+      "date": "2019-01-02",
+      "loss": -0.0025685299187898636,
+      "grad_norm": 15.509074211120605
+    },
+    {
+      "arm": "baseline",
+      "date": "2023-12-28",
+      "loss": -0.12121304869651794,
+      "grad_norm": 12.4126558303833
+    },
+    {
+      "arm": "baseline",
+      "date": "2024-01-02",
+      "loss": 0.217363178730011,
+      "grad_norm": 12.900801658630371
+    },
+    {
+      "arm": "depth1",
+      "date": "2019-01-02",
+      "loss": 0.049239467829465866,
+      "grad_norm": 12.988221168518066
+    }
+  ]
+}

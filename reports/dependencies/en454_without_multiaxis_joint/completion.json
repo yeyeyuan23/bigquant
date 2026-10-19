@@ -1,0 +1,12 @@
+{
+  "status": "complete",
+  "protocol": "en454_stability_without_m_multiaxis_joint_j_20260805_v1",
+  "route_count": 8,
+  "top_route": "x_tree_frozen",
+  "en_decision": "retain_en454_existing_causal",
+  "formula_max_abs_error": 1.1102230246251565e-16,
+  "joint_manifest_sha256": "b1124d70609c558cf70e85b53246cf5f9f75564625997c691fc3897b956d415d",
+  "details_csv_sha256": "8e560c6b84debebafce610a958a0dbfa6afe96d09eaff7b5ea5c1c55eeffbdc1",
+  "detailed_json_sha256": "4f15754d86ffe4dbe48e4c914e125f95e0cfb4c2d1206ec281fc7fb4dc8662c4",
+  "summary_csv_sha256": "5d305d4f72596ea045a3ed016698109966aceff1cd010865e13a9bd60992d527"
+}

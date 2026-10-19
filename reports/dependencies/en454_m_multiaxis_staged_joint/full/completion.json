@@ -1,0 +1,22 @@
+{
+  "status": "complete",
+  "stage": "full",
+  "route_count": 9,
+  "routes": [
+    "en454_existing_causal",
+    "x_mlp_frozen",
+    "x_tree_frozen",
+    "t_frozen",
+    "t_residual_frozen",
+    "m_raw_frozen",
+    "m_multiaxis_full",
+    "pema_full454",
+    "clean_pema"
+  ],
+  "top_route": "x_tree_frozen",
+  "formula_max_abs_error": 1.1102230246251565e-16,
+  "summary_sha256": "52c5ab6458e11e77c07bf3390c16fbdec40766c01fdfcdd923416222a202744f",
+  "m_route_sha256": "f0469b962feda4455d2673cd636cbd9fa40bbc48f753a723e1a2beb3516f7f30",
+  "m_evidence_boundary": "Pure replay of a checkpoint trained on 2019-2024; this route includes training dates and is not strict OOS or an official score.",
+  "en_evidence_boundary": "Continuous causal OOS after a 60-day warmup; local metrics and J are not official platform scores."
+}

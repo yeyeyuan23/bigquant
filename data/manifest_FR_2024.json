@@ -1,0 +1,49 @@
+{
+  "schema_version": "research-data-v1",
+  "family": "FR",
+  "source_period": [
+    "2024-01-01",
+    "2024-12-31"
+  ],
+  "generated_at": "2026-07-30T18:00:56.796088+08:00",
+  "source": "AIStudio daily financial snapshot; first changed record only",
+  "columns": [
+    "disclosure_date",
+    "effective_date",
+    "instrument",
+    "report_date",
+    "category",
+    "shift",
+    "net_cffoa",
+    "net_profit",
+    "operating_revenue",
+    "total_assets"
+  ],
+  "key": [
+    "disclosure_date",
+    "instrument",
+    "report_date",
+    "category",
+    "shift"
+  ],
+  "partitions": {
+    "2024": {
+      "relative_path": "features/FR/year=2024/part-2024.parquet",
+      "shape": [
+        15842,
+        10
+      ],
+      "sha256": "716260bfdd91bfb065f370b491f164de8e429fff8af744c592fb728619226d21",
+      "bytes": 416518
+    }
+  },
+  "rows": 15842,
+  "instruments": 2246,
+  "duplicate_keys": 0,
+  "strictly_next_trading_day": true,
+  "category_rows": {
+    "ttm": 7921,
+    "lf": 7921
+  },
+  "evaluation_performed": false
+}

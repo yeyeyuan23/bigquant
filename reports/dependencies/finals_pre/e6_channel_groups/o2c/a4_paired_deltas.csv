@@ -1,0 +1,17 @@
+comparison,metric,mean_paired_delta,full_higher_runs,run_count
+Full 17 channels minus Without price-path channels,rank_ic,0.0009498973566394406,3,3
+Full 17 channels minus Without price-path channels,rank_ic_ir,0.021167236410070938,3,3
+Full 17 channels minus Without price-path channels,long_short_sharpe,-0.2106700259864255,1,3
+Full 17 channels minus Without price-path channels,stress_ic_ir,0.02915529347799119,2,3
+Full 17 channels minus Without order-book channels,rank_ic,0.007632630766194667,3,3
+Full 17 channels minus Without order-book channels,rank_ic_ir,0.2282374331466159,3,3
+Full 17 channels minus Without order-book channels,long_short_sharpe,3.310888443545833,3,3
+Full 17 channels minus Without order-book channels,stress_ic_ir,0.110265893542899,3,3
+Full 17 channels minus Without trading-structure channels,rank_ic,0.0031638661336153943,3,3
+Full 17 channels minus Without trading-structure channels,rank_ic_ir,0.0759695241560772,3,3
+Full 17 channels minus Without trading-structure channels,long_short_sharpe,0.967542755864358,3,3
+Full 17 channels minus Without trading-structure channels,stress_ic_ir,-0.028864986371407608,1,3
+Full 17 channels minus Price path and clock only,rank_ic,0.007755722523284996,3,3
+Full 17 channels minus Price path and clock only,rank_ic_ir,0.24805848640890482,3,3
+Full 17 channels minus Price path and clock only,long_short_sharpe,3.592300299777049,3,3
+Full 17 channels minus Price path and clock only,stress_ic_ir,0.03233372670963014,2,3

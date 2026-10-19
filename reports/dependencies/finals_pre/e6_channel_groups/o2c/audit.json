@@ -1,0 +1,79 @@
+{
+  "label": "ret_next_open_to_close",
+  "training_period": "2019-01-02 through 2023-12-29",
+  "evaluation_period": "2024; 241 scorable factor dates",
+  "epochs": 3,
+  "runs_per_arm": 3,
+  "exposure_regressors": [
+    "SIZE",
+    "BETA",
+    "MOMENTUM",
+    "RESVOL",
+    "SIZENL",
+    "BTOP",
+    "LIQUIDTY",
+    "EARNYILD",
+    "GROWTH",
+    "LEVERAGE",
+    "AGRIFOREST",
+    "MINING",
+    "CHEM",
+    "IRONSTEEL",
+    "NONFERMETAL",
+    "ELECTRONICS",
+    "AUTO",
+    "HOUSEAPP",
+    "FOODBEVER",
+    "TEXTILE",
+    "LIGHTINDUS",
+    "HEALTH",
+    "UTILITIES",
+    "TRANSPORTATION",
+    "REALESTATE",
+    "COMMETRADE",
+    "LEISERVICE",
+    "BANK",
+    "NONBANKFINAN",
+    "CONGLOMERATES",
+    "CONMAT",
+    "BUILDDECO",
+    "ELECEQP",
+    "MACHIEQUIP",
+    "AERODEF",
+    "COMPUTER",
+    "MEDIA",
+    "TELECOM",
+    "COAL",
+    "PETRO",
+    "ENVP",
+    "BEAUTY"
+  ],
+  "channel_groups": {
+    "price_path": [
+      "minute_log_return",
+      "bar_range",
+      "close_location"
+    ],
+    "order_book": [
+      "relative_spread",
+      "microprice_gap",
+      "depth_imbalance_l1",
+      "depth_imbalance_l3",
+      "depth_shape"
+    ],
+    "trading_structure": [
+      "log_amount",
+      "log_volume",
+      "log_deal_number",
+      "log_amount_per_deal",
+      "log_volume_per_deal",
+      "signed_log_amount"
+    ],
+    "clock": [
+      "time_sin",
+      "time_cos",
+      "pm_session"
+    ]
+  },
+  "comparison_sign": "positive delta means the full model scored higher"
+}

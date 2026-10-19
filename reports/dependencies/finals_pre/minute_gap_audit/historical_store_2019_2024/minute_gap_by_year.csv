@@ -1,0 +1,7 @@
+year,stock_days,stock_days_with_missing_rows,stock_days_with_internal_gaps,missing_rows,internal_missing_rows,maximum_missing_rows,stock_day_missing_rate,internal_gap_stock_day_rate,missing_row_rate
+2019,242993,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0
+2020,242300,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0
+2021,242422,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0
+2022,241510,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0
+2023,241631,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0
+2024,241770,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0

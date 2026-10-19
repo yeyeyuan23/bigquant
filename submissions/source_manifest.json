@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "distribution": "source_only",
+  "trained_artifacts": "not_included",
+  "market_data": "not_included",
+  "runtime_validation": "not_run",
+  "artifact_contract": "ARTIFACT_CONTRACT.md",
+  "routes": {
+    "m_raw": {
+      "entrypoint": "unified_m_raw.py",
+      "external_artifact_env": "BIGQUANT_M_RAW_CHECKPOINT"
+    }
+  },
+  "selection_basis": "Final uploaded route confirmed by the project owner; other examples are historical research."
+}

@@ -1,0 +1,143 @@
+{
+  "status": "passed",
+  "runs": 18,
+  "daily_rows": 7200,
+  "days_per_run": 400,
+  "checks": [
+    "transfer SHA-256",
+    "self-financing identity",
+    "cost equals actual traded notional times rate",
+    "signal precedes trade",
+    "continuous NAV",
+    "independent annualized return/Sharpe/CAGR/drawdown/turnover recomputation",
+    "delivered engine hash"
+  ],
+  "results": [
+    {
+      "strategy": "baseline_daily",
+      "cost_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.43835809718729e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "baseline_daily",
+      "cost_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 4.2695881552479165e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "baseline_daily",
+      "cost_bps": 10.0,
+      "phase": 0,
+      "max_accounting_error": 3.929148673087468e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "baseline_daily",
+      "cost_bps": 20.0,
+      "phase": 0,
+      "max_accounting_error": 3.2526065174565133e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "cost_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.551115123125783e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "cost_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 6.923715073492431e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "cost_bps": 10.0,
+      "phase": 0,
+      "max_accounting_error": 5.273559366969494e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "buffer_20_30",
+      "cost_bps": 20.0,
+      "phase": 0,
+      "max_accounting_error": 2.7668839441830073e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "rebalance_3d",
+      "cost_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.789639601072594e-16,
+      "terminal_residual_pct_nav": 0.4731504494144358
+    },
+    {
+      "strategy": "rebalance_3d",
+      "cost_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 4.616532850443278e-16,
+      "terminal_residual_pct_nav": 0.5083851425274187
+    },
+    {
+      "strategy": "rebalance_3d",
+      "cost_bps": 10.0,
+      "phase": 0,
+      "max_accounting_error": 3.963843142607004e-16,
+      "terminal_residual_pct_nav": 0.5462436225049375
+    },
+    {
+      "strategy": "rebalance_3d",
+      "cost_bps": 20.0,
+      "phase": 0,
+      "max_accounting_error": 3.1051550219984847e-16,
+      "terminal_residual_pct_nav": 0.6306327798794618
+    },
+    {
+      "strategy": "partial_50",
+      "cost_bps": 0.0,
+      "phase": 0,
+      "max_accounting_error": 5.325601071248798e-16,
+      "terminal_residual_pct_nav": 0.31393136543677574
+    },
+    {
+      "strategy": "partial_50",
+      "cost_bps": 5.0,
+      "phase": 0,
+      "max_accounting_error": 5.998890620362296e-16,
+      "terminal_residual_pct_nav": 0.34956878758682397
+    },
+    {
+      "strategy": "partial_50",
+      "cost_bps": 10.0,
+      "phase": 0,
+      "max_accounting_error": 4.527628272299467e-16,
+      "terminal_residual_pct_nav": 0.3892558319721309
+    },
+    {
+      "strategy": "partial_50",
+      "cost_bps": 20.0,
+      "phase": 0,
+      "max_accounting_error": 3.9898639947466563e-16,
+      "terminal_residual_pct_nav": 0.4826754647513899
+    },
+    {
+      "strategy": "rebalance_3d",
+      "cost_bps": 10.0,
+      "phase": 1,
+      "max_accounting_error": 6.366435156834882e-16,
+      "terminal_residual_pct_nav": 0.0
+    },
+    {
+      "strategy": "rebalance_3d",
+      "cost_bps": 10.0,
+      "phase": 2,
+      "max_accounting_error": 3.699297812520541e-16,
+      "terminal_residual_pct_nav": 0.4890146629205472
+    }
+  ]
+}

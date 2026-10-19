@@ -1,0 +1,30 @@
+{
+  "daily_decile": {
+    "start": "2025-01-02",
+    "end": "2026-08-28",
+    "days": 402,
+    "annualized_return": 0.13517945600438028,
+    "sharpe": 0.783713730873985,
+    "cumulative_return": 0.2116515762624156,
+    "cagr": 0.1278897509529371,
+    "max_drawdown": -0.14764833542492373,
+    "max_drawdown_peak": "2025-12-19",
+    "max_drawdown_trough": "2026-05-20",
+    "max_drawdown_recovery": "2026-07-15",
+    "average_one_way_turnover": 1.5050487459972783,
+    "gross_annualized_return": 0.5534612309795758
+  },
+  "csi1000_reference": {
+    "start": "2025-01-02",
+    "end": "2026-08-28",
+    "days": 402,
+    "annualized_return": 0.2103567149021179,
+    "sharpe": 0.8371922229489831,
+    "cumulative_return": 0.3291203567859662,
+    "cagr": 0.19524854582463758,
+    "max_drawdown": -0.22944572169317723,
+    "max_drawdown_peak": "2026-05-13",
+    "max_drawdown_trough": "2026-07-30",
+    "max_drawdown_recovery": null
+  }
+}

@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Source-only publication checks
+        run: |
+          python scripts/check_public_release.py
+          python -m unittest discover -s tests -p "test_public_release_policy.py" -v
+          python -m unittest discover -s tests -p "test_public_embedded_artifacts.py" -v
+      - run: python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check .
+      - name: E9 sealed experiment checks
+        run: |
+          python -m pytest -q -o addopts="" experiments/finals_pre/e9_tcn_architecture/test_protocol.py
+          if [ -f reports/dependencies/finals_pre/tcn_architecture_o2c/results/daily_rankic_cube.npz ]; then
+            python experiments/finals_pre/e9_tcn_architecture/analysis/verify_results.py
+          else
+            echo "::notice::SKIP E9 historical result recomputation: private daily_rankic_cube.npz is absent from the source-only release; protocol tests still run."
+          fi
+      - name: E8 sealed experiment checks
+        run: |
+          python -m pytest -q -o addopts="" experiments/finals_pre/e8_loss_comparison/test_e8.py
+          if [ -f reports/dependencies/finals_pre/e8_loss_comparison/20260915/results/daily_rankic_cube.npz ]; then
+            python experiments/finals_pre/e8_loss_comparison/validate_results.py reports/dependencies/finals_pre/e8_loss_comparison/20260915
+          else
+            echo "::notice::SKIP E8 historical result recomputation: private daily_rankic_cube.npz is absent from the source-only release; protocol tests still run."
+          fi
+      - run: coverage run -m pytest -q -rs
+      - run: coverage combine
+      - run: coverage report --include="src/*" --fail-under=75

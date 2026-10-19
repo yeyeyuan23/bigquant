@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bigalpha-2026-factors"
+version = "0.1.0"
+description = "BigAlpha 2026 factor selection and evaluation toolkit"
+requires-python = ">=3.11"
+dependencies = [
+  "duckdb>=1.4,<2",
+  "lightgbm>=4.3,<5",
+  "nbformat>=5.10,<6",
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "polars>=1.30,<2",
+  "pyarrow==25.0.0",
+  "scikit-learn>=1.3",
+  "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+neural = [
+  "torch==2.6.0",
+]
+dev = [
+  "coverage[toml]>=7.15,<8",
+  "pytest==9.1.1",
+  "ruff==0.16.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = [
+  "candidate_transforms",
+  "competition_score_proxy",
+  "evaluation",
+  "factor_pool",
+  "factorlib",
+  "feature_contracts",
+  "research_policy",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+# Frozen platform submission bundles and concluded experiment staging are
+# generated artifacts; they are archived as-is and excluded from linting.
+extend-exclude = [
+  "third_party", "submissions", "experiments/legacy_submissions", "remote_submission_notebooks", "work",
+  "reports/dependencies/finals_pre/e7_strategy_application/20260906/code",
+]
+# The local schedule helper also runs with macOS's Python 3.9; training uses 3.11+.
+per-file-target-version = { "experiments/finals_pre/minute_grid_240/monitor.py" = "py39" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+# Immutable source snapshots accompany historical results; collect the maintained
+# experiment tests instead of importing a second copy with the same module name.
+# E8 and E9 use sealed alpha_models snapshots; CI runs each suite separately.
+addopts = [
+  "--ignore=reports/dependencies/finals_pre/e7_strategy_application/20260906/code",
+  "--ignore=experiments/finals_pre/e9_tcn_architecture",
+  "--ignore=experiments/finals_pre/tcn_architecture_o2c",
+  "--ignore=experiments/finals_pre/e8_loss_comparison",
+]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+concurrency = ["multiprocessing"]
+source = ["src", "scripts"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+# These historical report/audit sources are kept byte-for-byte for E9 hashes.
+[tool.ruff.lint.per-file-ignores]
+"experiments/finals_pre/e9_tcn_architecture/analysis/completion_check.py" = ["I001", "F401"]
+"experiments/finals_pre/e9_tcn_architecture/analysis/build_readme.py" = ["I001", "C401"]

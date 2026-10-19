@@ -1,0 +1,14 @@
+{
+  "completed_at": "2026-09-15T08:56:00.251474+00:00",
+  "runs": 9,
+  "prepared_sha256": "6de00fb068502d54551086f3da09f77627ac85130bce606e9f82df7c09bde8e1",
+  "files": {
+    "per_run.csv": "ad4dfa47ce2af406e72818d0a69ee434c85084cf83cdd16493b20c26450ec66c",
+    "paired_deltas.csv": "5c7b6490e0476a6a550c1836669fc24ee161004e3b4ce2a1c481f9b9e015fea7",
+    "summary.csv": "d142a0f67ace3760c9daa3f6ab3a2a54da6a8c0e83cee64ef25914957e195504",
+    "summary.json": "a2baa4ba5e824b4dc91ebf36f9be76af51aff58cc0919756dfe2f92cd792eb4a",
+    "daily_rankic_cube.npz": "ccb4c68294d6e76abca7524b9123c6236364222d498179913285954844126978",
+    "loss.csv": "d142a0f67ace3760c9daa3f6ab3a2a54da6a8c0e83cee64ef25914957e195504",
+    "README.md": "49b055dabdded7b5f0d130f260a5665897212bdf143954f4d0e41194979c1e6c"
+  }
+}

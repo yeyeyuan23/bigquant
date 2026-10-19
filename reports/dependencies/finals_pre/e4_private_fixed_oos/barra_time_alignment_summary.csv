@@ -1,0 +1,4 @@
+period,requested_start,requested_end,actual_start,actual_end,days,factor_rows,same_day_matched_rows,same_day_key_coverage,complete_regressor_rows,complete_regressor_coverage,min_daily_key_coverage,min_daily_complete_regressor_coverage
+all,2025-01-01,2026-08-31,2025-01-02,2026-08-28,402,402000,402000,1.0,402000,1.0,1.0,1.0
+public_private1,2025-03-01,2025-12-31,2025-03-03,2025-12-31,207,207000,207000,1.0,207000,1.0,1.0,1.0
+private2,2025-03-01,2026-08-31,2025-03-03,2026-08-28,366,366000,366000,1.0,366000,1.0,1.0,1.0
