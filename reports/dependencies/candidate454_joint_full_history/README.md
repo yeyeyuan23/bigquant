@@ -64,12 +64,14 @@ and this six-year neutralization is not described as proprietary BARRA.
 
 ## Frozen checkpoint dependencies
 
-Only the checkpoints and checkpoint manifests referenced by the six frozen
-base routes are retained.  Each replay manifest records the repository-relative
-checkpoint path and SHA256; `tests/test_frozen_six_year_artifacts.py` verifies
-that all six files exist, match their declared hashes, and are inference-only.
-The shared Candidate454/exposure and microstructure stores remain external data
-dependencies and must not be deleted as part of branch cleanup.
+This historical replay used six frozen base-route checkpoints.  The retained
+replay manifests record their original repository-relative paths and SHA256
+hashes; the public source release does not include the private checkpoints or
+the shared Candidate454/exposure and microstructure stores.  These manifests
+document past runs and do not verify that the artifacts are available today.
+The former private-artifact presence/hash tests have been removed; see the
+[current test guide](../../../tests/README.md) and
+[external artifact contract](../../../submissions/ARTIFACT_CONTRACT.md).
 
 ## Artifacts
 
